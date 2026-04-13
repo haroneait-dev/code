@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { curriculum, totalLessons, type Lesson, type Module } from "@/lib/curriculum";
 import { exercisesByLesson } from "@/lib/exercises";
+import { createClient } from "@/lib/supabase/client";
 
 // ────────────────────────────────────────────────
 // HELPERS
@@ -654,6 +655,8 @@ function TopBar({
   onNext,
   hasPrev,
   hasNext,
+  userEmail,
+  onLogout,
 }: {
   lesson: Lesson | null;
   mod: Module | null;
@@ -662,6 +665,8 @@ function TopBar({
   onNext: () => void;
   hasPrev: boolean;
   hasNext: boolean;
+  userEmail?: string;
+  onLogout: () => void;
 }) {
   return (
     <header
@@ -688,7 +693,7 @@ function TopBar({
         </>
       )}
 
-      <div className="flex items-center gap-2 ml-auto">
+      <div className="flex items-center gap-3 ml-auto">
         <button
           onClick={onPrev}
           disabled={!hasPrev}
@@ -705,6 +710,19 @@ function TopBar({
         >
           Suiv. →
         </button>
+        {userEmail && (
+          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", paddingLeft: "0.5rem", borderLeft: "1px solid var(--border)" }}>
+            <span style={{ fontSize: "0.75rem", color: "var(--text-muted)", maxWidth: "120px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              {userEmail}
+            </span>
+            <button
+              onClick={onLogout}
+              style={{ fontSize: "0.75rem", padding: "0.25rem 0.6rem", background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.25)", borderRadius: "6px", color: "#f87171", cursor: "pointer" }}
+            >
+              Déco.
+            </button>
+          </div>
+        )}
       </div>
     </header>
   );
@@ -719,15 +737,25 @@ export default function App() {
   const [currentModuleId, setCurrentModuleId] = useState(curriculum[0].id);
   const [currentLessonId, setCurrentLessonId] = useState(curriculum[0].lessons[0].id);
   const [completed, setCompleted] = useState<Set<string>>(new Set());
+  const [userEmail, setUserEmail] = useState<string>("");
   const contentRef = useRef<HTMLDivElement>(null);
+  const supabase = createClient();
 
-  // Load progress from localStorage
+  // Load user + progress
   useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      if (data.user?.email) setUserEmail(data.user.email);
+    });
     try {
       const saved = localStorage.getItem("cc_progress");
       if (saved) setCompleted(new Set(JSON.parse(saved)));
     } catch {}
   }, []);
+
+  const handleLogout = useCallback(async () => {
+    await supabase.auth.signOut();
+    window.location.href = "/auth/login";
+  }, [supabase]);
 
   const saveProgress = useCallback((newSet: Set<string>) => {
     try {
@@ -819,6 +847,8 @@ export default function App() {
             onNext={goNext}
             hasPrev={hasPrev}
             hasNext={hasNext}
+            userEmail={userEmail}
+            onLogout={handleLogout}
           />
         )}
 
