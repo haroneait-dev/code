@@ -1,37 +1,81 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { curriculum, totalLessons, type Lesson, type Module } from "@/lib/curriculum";
 import { exercisesByLesson } from "@/lib/exercises";
 
-// ────────────────────────────────────────────────
+// ─────────────────────────────────────────────
+// SEARCH INDEX
+// ─────────────────────────────────────────────
+type SearchResult = {
+  modId: string;
+  modTitle: string;
+  lessonId: string;
+  lessonTitle: string;
+  sectionIdx: number | null;
+  sectionHeading: string | null;
+  excerpt: string;
+};
+
+function buildIndex(): SearchResult[] {
+  const index: SearchResult[] = [];
+  for (const mod of curriculum) {
+    for (const lesson of mod.lessons) {
+      // lesson title
+      index.push({ modId: mod.id, modTitle: mod.title, lessonId: lesson.id, lessonTitle: lesson.title, sectionIdx: null, sectionHeading: null, excerpt: lesson.intro });
+      // sections
+      lesson.sections.forEach((s, i) => {
+        const text = [s.heading, s.body, ...(s.bullets ?? []), ...(s.keypoints ?? [])].filter(Boolean).join(" ");
+        if (text.trim()) {
+          index.push({ modId: mod.id, modTitle: mod.title, lessonId: lesson.id, lessonTitle: lesson.title, sectionIdx: i, sectionHeading: s.heading ?? null, excerpt: text.slice(0, 120) });
+        }
+      });
+    }
+  }
+  return index;
+}
+
+function search(query: string, index: SearchResult[]): SearchResult[] {
+  if (!query.trim()) return [];
+  const q = query.toLowerCase();
+  const seen = new Set<string>();
+  return index.filter(r => {
+    const text = `${r.lessonTitle} ${r.sectionHeading ?? ""} ${r.excerpt}`.toLowerCase();
+    if (!text.includes(q)) return false;
+    const key = `${r.lessonId}-${r.sectionIdx ?? ""}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  }).slice(0, 8);
+}
+
+// ─────────────────────────────────────────────
 // HELPERS
-// ────────────────────────────────────────────────
+// ─────────────────────────────────────────────
 function copyToClipboard(text: string, cb: () => void) {
   navigator.clipboard.writeText(text).then(cb);
 }
 
 function highlightCode(code: string, lang: string): string {
+  if (lang === "bash" || lang === "sh") {
+    return code
+      .replace(/^(#.*)$/gm, '<span class="tok-comment">$1</span>')
+      .replace(/\b(npm|pnpm|git|npx|claude|curl|echo|export|cd|ls|cat|mkdir)\b/g, '<span class="tok-cmd">$1</span>')
+      .replace(/(--[\w-]+|-[a-zA-Z])\b/g, '<span class="tok-flag">$1</span>')
+      .replace(/("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')/g, '<span class="tok-str">$1</span>');
+  }
+  if (lang === "typescript" || lang === "ts" || lang === "js") {
+    return code
+      .replace(/\/\/.*/g, '<span class="tok-comment">$&</span>')
+      .replace(/\b(import|export|const|let|var|function|async|await|return|interface|type|from|new|class)\b/g, '<span class="tok-kw">$1</span>')
+      .replace(/("(?:[^"\\]|\\.)*"|`(?:[^`\\]|\\.)*`)/g, '<span class="tok-str">$1</span>')
+      .replace(/\b(\d+)\b/g, '<span class="tok-num">$1</span>');
+  }
   if (lang === "json") {
     return code
       .replace(/("(?:[^"\\]|\\.)*")\s*:/g, '<span class="tok-kw">$1</span>:')
       .replace(/:\s*("(?:[^"\\]|\\.)*")/g, ': <span class="tok-str">$1</span>')
-      .replace(/:\s*(\d+\.?\d*)/g, ': <span class="tok-num">$1</span>')
-      .replace(/\/\/.*/g, '<span class="tok-comment">$&</span>');
-  }
-  if (lang === "bash" || lang === "sh") {
-    return code
-      .replace(/^(#.*)$/gm, '<span class="tok-comment">$1</span>')
-      .replace(/\b(npm|pnpm|yarn|git|npx|claude|curl|kill|echo|export|cd|ls)\b/g, '<span class="tok-cmd">$1</span>')
-      .replace(/(--[\w-]+|-[a-zA-Z])\b/g, '<span class="tok-flag">$1</span>')
-      .replace(/("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')/g, '<span class="tok-str">$1</span>');
-  }
-  if (lang === "typescript" || lang === "ts") {
-    return code
-      .replace(/\/\/.*/g, '<span class="tok-comment">$&</span>')
-      .replace(/\b(import|export|const|let|var|function|async|await|return|interface|type|from|new)\b/g, '<span class="tok-kw">$1</span>')
-      .replace(/("(?:[^"\\]|\\.)*"|`(?:[^`\\]|\\.)*`)/g, '<span class="tok-str">$1</span>')
-      .replace(/\b(\d+)\b/g, '<span class="tok-num">$1</span>');
+      .replace(/:\s*(\d+\.?\d*)/g, ': <span class="tok-num">$1</span>');
   }
   if (lang === "markdown") {
     return code
@@ -41,24 +85,20 @@ function highlightCode(code: string, lang: string): string {
   return code;
 }
 
-// ────────────────────────────────────────────────
+// ─────────────────────────────────────────────
 // CODE BLOCK
-// ────────────────────────────────────────────────
+// ─────────────────────────────────────────────
 function CodeBlock({ lang, code, label }: { lang: string; code: string; label?: string }) {
   const [copied, setCopied] = useState(false);
-  const highlighted = highlightCode(code, lang);
   return (
     <div className="code-block my-4">
       <div className="code-block-header">
         <span className="code-block-lang">{label || lang}</span>
-        <button
-          className="code-block-copy"
-          onClick={() => copyToClipboard(code, () => { setCopied(true); setTimeout(() => setCopied(false), 2000); })}
-        >
+        <button className="code-block-copy" onClick={() => copyToClipboard(code, () => { setCopied(true); setTimeout(() => setCopied(false), 2000); })}>
           {copied ? "✓ Copié" : "Copier"}
         </button>
       </div>
-      <pre dangerouslySetInnerHTML={{ __html: highlighted }} />
+      <pre dangerouslySetInnerHTML={{ __html: highlightCode(code, lang) }} />
     </div>
   );
 }
@@ -74,25 +114,17 @@ function Callout({ type, icon, text }: { type: string; icon: string; text: strin
 
 function Table({ headers, rows }: { headers: string[]; rows: string[][] }) {
   return (
-    <div className="overflow-x-auto my-4">
-      <table className="w-full text-sm border-collapse">
+    <div style={{ overflowX: "auto", margin: "1rem 0" }}>
+      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.85rem" }}>
         <thead>
-          <tr>
-            {headers.map((h, i) => (
-              <th key={i} className="text-left py-2 px-3 border-b border-[var(--border)] text-[var(--text-muted)] font-semibold text-xs uppercase tracking-wider">{h}</th>
-            ))}
-          </tr>
+          <tr>{headers.map((h, i) => <th key={i} style={{ textAlign: "left", padding: "0.5rem 0.75rem", borderBottom: "1px solid var(--border)", color: "var(--text-muted)", fontWeight: 600, fontSize: "0.72rem", textTransform: "uppercase", letterSpacing: "0.05em" }}>{h}</th>)}</tr>
         </thead>
         <tbody>
           {rows.map((row, ri) => (
-            <tr key={ri} className="hover:bg-[var(--bg-hover)] transition-colors">
+            <tr key={ri}>
               {row.map((cell, ci) => (
-                <td key={ci} className="py-2 px-3 border-b border-[var(--border)] text-[var(--text-dim)]"
-                  dangerouslySetInnerHTML={{
-                    __html: ci === 0
-                      ? `<code style="font-family:'JetBrains Mono',monospace;font-size:0.8em;color:#9f67ff">${cell}</code>`
-                      : cell,
-                  }}
+                <td key={ci} style={{ padding: "0.5rem 0.75rem", borderBottom: "1px solid rgba(255,255,255,0.04)", color: "var(--text-dim)" }}
+                  dangerouslySetInnerHTML={{ __html: ci === 0 ? `<code style="font-family:'JetBrains Mono',monospace;font-size:0.78em;color:var(--accent-light)">${cell}</code>` : cell }}
                 />
               ))}
             </tr>
@@ -105,10 +137,10 @@ function Table({ headers, rows }: { headers: string[]; rows: string[][] }) {
 
 function BulletList({ items }: { items: string[] }) {
   return (
-    <ul className="my-3 space-y-1.5">
+    <ul style={{ margin: "0.75rem 0", padding: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: "0.5rem" }}>
       {items.map((item, i) => (
-        <li key={i} className="flex items-start gap-2.5 text-[var(--text-dim)] text-sm leading-relaxed">
-          <span className="text-[var(--accent)] mt-0.5 flex-shrink-0 text-xs">▸</span>
+        <li key={i} style={{ display: "flex", gap: "0.6rem", fontSize: "0.875rem", color: "var(--text-dim)", lineHeight: 1.65, alignItems: "flex-start" }}>
+          <span style={{ color: "var(--accent)", flexShrink: 0, fontSize: "0.6rem", marginTop: "0.45rem" }}>▸</span>
           <span dangerouslySetInnerHTML={{ __html: item }} />
         </li>
       ))}
@@ -116,136 +148,80 @@ function BulletList({ items }: { items: string[] }) {
   );
 }
 
-// ────────────────────────────────────────────────
-// EXERCISE CARD — professional task style
-// ────────────────────────────────────────────────
-const LEVEL_META: Record<string, { label: string; color: string }> = {
-  "débutant":      { label: "Débutant",      color: "#4ade80" },
-  "intermédiaire": { label: "Intermédiaire", color: "#fb923c" },
-  "avancé":        { label: "Avancé",        color: "#a78bfa" },
-};
-
-function ExerciseCard({ ex, index }: {
+// ─────────────────────────────────────────────
+// EXERCISE — minimal style
+// ─────────────────────────────────────────────
+function ExerciseItem({ ex, index }: {
   ex: { level: string; icon: string; title: string; description: string; hint: string };
   index: number;
 }) {
   const [hintOpen, setHintOpen] = useState(false);
-  const [done, setDone] = useState(false);
-  const meta = LEVEL_META[ex.level] ?? LEVEL_META["débutant"];
+  const levelColor: Record<string, string> = { "débutant": "#4ade80", "intermédiaire": "#fb923c", "avancé": "#a78bfa" };
+  const color = levelColor[ex.level] ?? "#4ade80";
 
   return (
-    <div style={{
-      display: "flex",
-      gap: "1rem",
-      padding: "1rem 1.25rem",
-      background: done ? "rgba(34,197,94,0.04)" : "var(--bg-card)",
-      border: `1px solid ${done ? "rgba(34,197,94,0.2)" : "var(--border)"}`,
-      borderRadius: "8px",
-      transition: "all 0.15s",
-    }}>
-      {/* Checkbox */}
-      <button
-        onClick={() => setDone(v => !v)}
-        style={{
-          flexShrink: 0,
-          width: "20px", height: "20px",
-          borderRadius: "4px",
-          border: `1.5px solid ${done ? "#22c55e" : "var(--border)"}`,
-          background: done ? "#22c55e" : "transparent",
-          color: "#fff",
-          fontSize: "0.7rem",
-          cursor: "pointer",
-          display: "flex", alignItems: "center", justifyContent: "center",
-          marginTop: "1px",
-          transition: "all 0.15s",
-        }}
-      >{done ? "✓" : ""}</button>
-
-      <div style={{ flex: 1 }}>
-        {/* Title row */}
-        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.3rem", flexWrap: "wrap" }}>
-          <span style={{ fontSize: "0.75rem", fontWeight: 600, color: meta.color }}>
+    <div style={{ padding: "0.875rem 0", borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
+      <div style={{ display: "flex", alignItems: "flex-start", gap: "0.75rem" }}>
+        <span style={{ fontSize: "0.65rem", fontWeight: 700, color, background: `${color}12`, border: `1px solid ${color}25`, borderRadius: "3px", padding: "0.15rem 0.4rem", flexShrink: 0, marginTop: "0.1rem" }}>
+          {ex.level}
+        </span>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: "0.875rem", fontWeight: 600, color: "var(--text)", marginBottom: "0.25rem" }}>
             {index + 1}. {ex.title}
-          </span>
-          <span style={{
-            fontSize: "0.65rem",
-            color: meta.color,
-            background: `${meta.color}15`,
-            border: `1px solid ${meta.color}30`,
-            borderRadius: "4px",
-            padding: "0.1rem 0.4rem",
-            fontWeight: 600,
-          }}>{meta.label}</span>
-        </div>
-
-        <p style={{ fontSize: "0.8rem", color: "var(--text-muted)", lineHeight: 1.6, margin: 0 }}>
-          {ex.description}
-        </p>
-
-        <button
-          onClick={() => setHintOpen(v => !v)}
-          style={{ marginTop: "0.5rem", background: "none", border: "none", color: "var(--accent)", fontSize: "0.72rem", cursor: "pointer", padding: 0 }}
-        >
-          {hintOpen ? "▾ Masquer l'indice" : "▸ Voir l'indice"}
-        </button>
-
-        {hintOpen && (
-          <div style={{
-            marginTop: "0.4rem",
-            padding: "0.5rem 0.75rem",
-            background: "rgba(124,58,237,0.06)",
-            border: "1px solid rgba(124,58,237,0.15)",
-            borderRadius: "6px",
-            fontSize: "0.78rem",
-            color: "#a78bfa",
-            lineHeight: 1.6,
-          }}>
-            {ex.hint}
           </div>
-        )}
+          <p style={{ fontSize: "0.8rem", color: "var(--text-muted)", margin: 0, lineHeight: 1.6 }}>{ex.description}</p>
+          <button onClick={() => setHintOpen(v => !v)} style={{ marginTop: "0.4rem", background: "none", border: "none", color: "var(--accent)", fontSize: "0.72rem", cursor: "pointer", padding: 0 }}>
+            {hintOpen ? "▾ masquer l'indice" : "▸ voir l'indice"}
+          </button>
+          {hintOpen && (
+            <div style={{ marginTop: "0.35rem", padding: "0.5rem 0.75rem", background: "rgba(91,106,249,0.06)", borderLeft: "2px solid var(--accent)", fontSize: "0.78rem", color: "var(--text-dim)", lineHeight: 1.6 }}>
+              {ex.hint}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
 }
 
-// ────────────────────────────────────────────────
+// ─────────────────────────────────────────────
 // LESSON CONTENT
-// ────────────────────────────────────────────────
-function LessonContent({ lesson, mod, onComplete, isCompleted }: {
+// ─────────────────────────────────────────────
+function LessonContent({ lesson, mod, scrollToSection }: {
   lesson: Lesson;
   mod: Module;
-  onComplete: () => void;
-  isCompleted: boolean;
+  scrollToSection: number | null;
 }) {
+  const sectionRefs = useRef<(HTMLDivElement | null)[]>([]);
   const exercises = exercisesByLesson[lesson.id] ?? lesson.exercises ?? [];
 
+  useEffect(() => {
+    if (scrollToSection !== null && sectionRefs.current[scrollToSection]) {
+      setTimeout(() => sectionRefs.current[scrollToSection]?.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
+    }
+  }, [scrollToSection, lesson.id]);
+
   return (
-    <div className="fade-in" style={{ maxWidth: "760px" }}>
-      {/* Breadcrumb */}
-      <div style={{ display: "flex", alignItems: "center", gap: "0.375rem", marginBottom: "1.5rem" }}>
-        <span style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>{mod.emoji} {mod.title}</span>
-        <span style={{ color: "var(--border)", fontSize: "0.75rem" }}>/</span>
-        {lesson.tag && (
-          <>
-            <span style={{ fontSize: "0.7rem", fontWeight: 600, color: "var(--accent)", background: "var(--accent-dim)", padding: "0.1rem 0.5rem", borderRadius: "4px" }}>{lesson.tag}</span>
-            <span style={{ color: "var(--border)", fontSize: "0.75rem" }}>/</span>
-          </>
-        )}
-        <span style={{ fontSize: "0.75rem", color: "var(--text-dim)" }}>{lesson.duration}</span>
+    <div className="fade-in" style={{ maxWidth: "740px" }}>
+      {/* Header */}
+      <div style={{ marginBottom: "2rem" }}>
+        <div style={{ fontSize: "0.7rem", color: "var(--text-muted)", marginBottom: "0.75rem" }}>
+          {mod.title} {lesson.tag ? `· ${lesson.tag}` : ""} · {lesson.duration}
+        </div>
+        <h1 style={{ fontSize: "1.75rem", fontWeight: 700, color: "var(--text)", lineHeight: 1.2, letterSpacing: "-0.02em", marginBottom: "0.75rem" }}>
+          {lesson.title}
+        </h1>
+        <p style={{ fontSize: "0.9375rem", color: "var(--text-dim)", lineHeight: 1.75 }}>
+          {lesson.intro}
+        </p>
       </div>
 
-      {/* Title */}
-      <h1 style={{ fontSize: "1.875rem", fontWeight: 800, color: "#fff", lineHeight: 1.15, letterSpacing: "-0.02em", marginBottom: "0.75rem" }}>
-        {lesson.title}
-      </h1>
-      <p style={{ color: "var(--text-dim)", fontSize: "1rem", lineHeight: 1.75, marginBottom: "2.5rem", borderBottom: "1px solid var(--border)", paddingBottom: "2rem" }}>
-        {lesson.intro}
-      </p>
+      <div style={{ height: "1px", background: "var(--border)", margin: "0 0 2rem" }} />
 
-      {/* Content sections */}
+      {/* Sections */}
       <div className="prose">
         {lesson.sections.map((section, i) => (
-          <div key={i}>
+          <div key={i} ref={el => { sectionRefs.current[i] = el; }} id={`section-${i}`} style={{ scrollMarginTop: "1.5rem" }}>
             {section.heading && <h2>{section.heading}</h2>}
             {section.body && <p>{section.body}</p>}
             {section.bullets && <BulletList items={section.bullets} />}
@@ -253,15 +229,13 @@ function LessonContent({ lesson, mod, onComplete, isCompleted }: {
             {section.callout && <Callout type={section.callout.type} icon={section.callout.icon} text={section.callout.text} />}
             {section.table && <Table headers={section.table.headers} rows={section.table.rows} />}
             {section.keypoints && (
-              <div style={{ background: "var(--accent-dim)", border: "1px solid var(--accent-border)", borderRadius: "8px", padding: "1rem 1.25rem", margin: "1rem 0" }}>
-                <div style={{ fontSize: "0.7rem", fontWeight: 700, color: "var(--accent)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "0.6rem" }}>Points clés</div>
-                <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: "0.4rem" }}>
-                  {section.keypoints.map((kp, ki) => (
-                    <li key={ki} style={{ display: "flex", gap: "0.5rem", fontSize: "0.85rem", color: "var(--text-dim)" }}>
-                      <span style={{ color: "var(--accent)", flexShrink: 0 }}>✦</span> {kp}
-                    </li>
-                  ))}
-                </ul>
+              <div style={{ background: "rgba(91,106,249,0.05)", border: "1px solid rgba(91,106,249,0.15)", borderRadius: "6px", padding: "0.875rem 1rem", margin: "1rem 0" }}>
+                <div style={{ fontSize: "0.65rem", fontWeight: 700, color: "var(--accent)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "0.6rem" }}>Points clés</div>
+                {section.keypoints.map((kp, ki) => (
+                  <div key={ki} style={{ display: "flex", gap: "0.5rem", fontSize: "0.83rem", color: "var(--text-dim)", marginBottom: "0.3rem" }}>
+                    <span style={{ color: "var(--accent)", flexShrink: 0 }}>–</span> {kp}
+                  </div>
+                ))}
               </div>
             )}
           </div>
@@ -270,168 +244,72 @@ function LessonContent({ lesson, mod, onComplete, isCompleted }: {
 
       {/* Exercises */}
       {exercises.length > 0 && (
-        <div style={{ marginTop: "3rem", paddingTop: "2rem", borderTop: "1px solid var(--border)" }}>
-          <div style={{ marginBottom: "1rem" }}>
-            <h3 style={{ fontSize: "0.8rem", fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.08em", margin: 0 }}>
-              Exercices pratiques · {exercises.length} exercices
-            </h3>
+        <div style={{ marginTop: "3rem" }}>
+          <div style={{ height: "1px", background: "var(--border)", marginBottom: "1.5rem" }} />
+          <div style={{ fontSize: "0.7rem", fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "0.5rem" }}>
+            Exercices pratiques — {exercises.length}
           </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
-            {exercises.map((ex, i) => <ExerciseCard key={i} ex={ex} index={i} />)}
-          </div>
+          {exercises.map((ex, i) => <ExerciseItem key={i} ex={ex} index={i} />)}
         </div>
       )}
-
-      {/* Complete button */}
-      <div style={{ marginTop: "3rem", paddingTop: "1.5rem", borderTop: "1px solid var(--border)", display: "flex", alignItems: "center", gap: "1rem" }}>
-        <button
-          onClick={onComplete}
-          style={{
-            display: "flex", alignItems: "center", gap: "0.5rem",
-            padding: "0.6rem 1.25rem",
-            borderRadius: "6px",
-            border: isCompleted ? "1px solid rgba(34,197,94,0.3)" : "1px solid var(--accent)",
-            background: isCompleted ? "rgba(34,197,94,0.08)" : "var(--accent)",
-            color: isCompleted ? "#4ade80" : "#fff",
-            fontSize: "0.85rem",
-            fontWeight: 600,
-            cursor: isCompleted ? "default" : "pointer",
-            transition: "all 0.15s",
-          }}
-        >
-          {isCompleted ? "✓ Leçon complétée" : "Marquer comme terminée"}
-        </button>
-        {isCompleted && (
-          <span style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>
-            Passez à la leçon suivante →
-          </span>
-        )}
-      </div>
     </div>
   );
 }
 
-// ────────────────────────────────────────────────
-// HOMEPAGE — professional course overview
-// ────────────────────────────────────────────────
-function HomePage({ onStart, onSelect, completed }: {
-  onStart: () => void;
-  onSelect: (modId: string, lessonId: string) => void;
-  completed: number;
-}) {
-  const pct = Math.round((completed / totalLessons) * 100);
-
+// ─────────────────────────────────────────────
+// HOMEPAGE
+// ─────────────────────────────────────────────
+function HomePage({ onSelect }: { onSelect: (modId: string, lessonId: string) => void }) {
   return (
-    <div className="fade-in" style={{ maxWidth: "900px", margin: "0 auto", padding: "3rem 2.5rem 5rem" }}>
+    <div className="fade-in" style={{ maxWidth: "820px", margin: "0 auto", padding: "3.5rem 2.5rem 6rem" }}>
 
-      {/* ── HEADER ──────────────────────────────── */}
-      <div style={{ marginBottom: "3rem" }}>
-        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "2rem", flexWrap: "wrap" }}>
-          <div style={{ flex: 1, minWidth: "300px" }}>
-            <div style={{ fontSize: "0.7rem", fontWeight: 700, color: "var(--accent)", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "0.6rem" }}>
-              Formation complète · 4 heures
-            </div>
-            <h1 style={{ fontSize: "2.25rem", fontWeight: 800, color: "#fff", lineHeight: 1.1, letterSpacing: "-0.025em", marginBottom: "1rem" }}>
-              Maîtriser Claude Code
-            </h1>
-            <p style={{ color: "var(--text-dim)", fontSize: "1rem", lineHeight: 1.75, maxWidth: "520px", marginBottom: "1.5rem" }}>
-              De la première commande aux workflows multi-agents avancés. Une formation structurée qui couvre l&apos;intégralité de Claude Code — des fondamentaux à la maîtrise réelle.
-            </p>
-
-            {/* Stats row */}
-            <div style={{ display: "flex", gap: "1.5rem", flexWrap: "wrap" }}>
-              {[
-                { value: `${totalLessons}`, label: "leçons" },
-                { value: `${curriculum.length}`, label: "modules" },
-                { value: "50+", label: "exercices" },
-                { value: "4h", label: "de contenu" },
-              ].map(s => (
-                <div key={s.label} style={{ textAlign: "center" }}>
-                  <div style={{ fontSize: "1.375rem", fontWeight: 800, color: "#fff", lineHeight: 1 }}>{s.value}</div>
-                  <div style={{ fontSize: "0.7rem", color: "var(--text-muted)", marginTop: "0.2rem" }}>{s.label}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* CTA card */}
-          <div style={{
-            width: "220px",
-            flexShrink: 0,
-            background: "var(--bg-card)",
-            border: "1px solid var(--border)",
-            borderRadius: "10px",
-            padding: "1.25rem",
-          }}>
-            {completed > 0 ? (
-              <>
-                <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginBottom: "0.5rem" }}>Votre progression</div>
-                <div style={{ fontSize: "1.75rem", fontWeight: 800, color: "#fff", lineHeight: 1 }}>{pct}%</div>
-                <div style={{ fontSize: "0.72rem", color: "var(--text-muted)", marginBottom: "0.75rem" }}>{completed}/{totalLessons} leçons terminées</div>
-                <div style={{ height: "4px", background: "var(--bg-hover)", borderRadius: "4px", overflow: "hidden", marginBottom: "1rem" }}>
-                  <div className="progress-bar-fill" style={{ height: "100%", width: `${pct}%`, borderRadius: "4px" }} />
-                </div>
-              </>
-            ) : (
-              <div style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginBottom: "1rem", lineHeight: 1.5 }}>
-                Progression sauvegardée automatiquement dans votre navigateur.
-              </div>
-            )}
-            <button
-              onClick={onStart}
-              style={{
-                width: "100%",
-                padding: "0.65rem",
-                background: "var(--accent)",
-                border: "none",
-                borderRadius: "6px",
-                color: "#fff",
-                fontSize: "0.875rem",
-                fontWeight: 700,
-                cursor: "pointer",
-              }}
-            >
-              {completed > 0 ? "Continuer →" : "Commencer →"}
-            </button>
-          </div>
+      {/* Header */}
+      <div style={{ marginBottom: "3.5rem" }}>
+        <div style={{ fontSize: "0.7rem", fontWeight: 600, color: "var(--accent)", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "0.75rem" }}>
+          Formation · {totalLessons} leçons · 4h
         </div>
+        <h1 style={{ fontSize: "2rem", fontWeight: 700, color: "var(--text)", letterSpacing: "-0.025em", lineHeight: 1.15, marginBottom: "0.875rem" }}>
+          Maîtriser Claude Code
+        </h1>
+        <p style={{ fontSize: "0.9375rem", color: "var(--text-dim)", lineHeight: 1.75, maxWidth: "560px" }}>
+          Une formation structurée qui couvre Claude Code de A à Z — des premiers pas aux architectures multi-agents avancées.
+        </p>
       </div>
 
-      {/* ── WHAT YOU WILL MASTER ─────────────────── */}
-      <div style={{ marginBottom: "3rem", padding: "1.75rem", background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: "10px" }}>
-        <h2 style={{ fontSize: "0.8rem", fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "1.25rem" }}>
-          Ce que vous allez maîtriser
-        </h2>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: "0.6rem" }}>
+      {/* Compétences */}
+      <div style={{ marginBottom: "3.5rem" }}>
+        <div style={{ fontSize: "0.7rem", fontWeight: 600, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "1rem" }}>
+          Au programme
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: "0.4rem" }}>
           {[
-            "Rédiger un CLAUDE.md qui transforme Claude en expert de votre codebase",
-            "Configurer des serveurs MCP (GitHub, filesystem, bases de données)",
-            "Créer des hooks pour automatiser vos workflows de développement",
-            "Passer du mode 'chat' au mode 'délégation' — la vraie différence d'échelle",
-            "Gérer la fenêtre de contexte et éviter les dérives coûteuses",
-            "Orchestrer des agents en parallèle pour des tâches complexes",
-            "Utiliser la mémoire persistante entre les sessions de travail",
+            "Écrire un CLAUDE.md qui rend Claude expert de votre codebase",
+            "Configurer des serveurs MCP (GitHub, filesystem, BDD)",
+            "Automatiser vos workflows avec le système de hooks",
+            "Passer du mode chat au mode délégation complète",
+            "Gérer la fenêtre de contexte sans gaspiller de tokens",
+            "Orchestrer des agents en parallèle sur des tâches complexes",
+            "Utiliser la mémoire persistante entre les sessions",
             "Intégrer Claude Code dans vos pipelines CI/CD",
-            "Optimiser les coûts et itérer sans gaspiller des tokens",
-            "Déboguer efficacement avec les outils de diagnostic intégrés",
+            "Optimiser les coûts et éviter les dérives de contexte",
+            "Déboguer avec les outils de diagnostic intégrés",
           ].map((item, i) => (
-            <div key={i} style={{ display: "flex", gap: "0.6rem", fontSize: "0.82rem", color: "var(--text-dim)", lineHeight: 1.5, alignItems: "flex-start" }}>
-              <span style={{ color: "var(--accent)", flexShrink: 0, fontSize: "0.75rem", marginTop: "0.15rem" }}>✓</span>
+            <div key={i} style={{ display: "flex", gap: "0.6rem", fontSize: "0.825rem", color: "var(--text-dim)", lineHeight: 1.5, alignItems: "flex-start", padding: "0.35rem 0" }}>
+              <span style={{ color: "var(--accent)", flexShrink: 0, fontSize: "0.6rem", marginTop: "0.45rem" }}>▸</span>
               {item}
             </div>
           ))}
         </div>
       </div>
 
-      {/* ── CURRICULUM ───────────────────────────── */}
+      {/* Curriculum */}
       <div>
-        <h2 style={{ fontSize: "0.8rem", fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "1.25rem" }}>
-          Programme — {curriculum.length} modules
-        </h2>
-
-        <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+        <div style={{ fontSize: "0.7rem", fontWeight: 600, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "1rem" }}>
+          {curriculum.length} modules
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: "1px" }}>
           {curriculum.map((mod, idx) => (
-            <ModuleRow key={mod.id} mod={mod} idx={idx} completed={completed} onSelect={onSelect} />
+            <ModuleAccordion key={mod.id} mod={mod} idx={idx} onSelect={onSelect} defaultOpen={idx === 0} />
           ))}
         </div>
       </div>
@@ -439,70 +317,33 @@ function HomePage({ onStart, onSelect, completed }: {
   );
 }
 
-function ModuleRow({ mod, idx, completed, onSelect }: {
-  mod: Module;
-  idx: number;
-  completed: number;
-  onSelect: (modId: string, lessonId: string) => void;
-}) {
-  const [open, setOpen] = useState(idx === 0);
-  const totalEx = mod.lessons.reduce((a, l) => a + (exercisesByLesson[l.id]?.length ?? 0), 0);
+function ModuleAccordion({ mod, idx, onSelect, defaultOpen }: { mod: Module; idx: number; onSelect: (m: string, l: string) => void; defaultOpen?: boolean }) {
+  const [open, setOpen] = useState(defaultOpen ?? false);
 
   return (
-    <div style={{ border: "1px solid var(--border)", borderRadius: "8px", overflow: "hidden" }}>
-      {/* Module header */}
+    <div style={{ borderBottom: "1px solid var(--border)" }}>
       <button
         onClick={() => setOpen(v => !v)}
-        style={{
-          width: "100%",
-          display: "flex",
-          alignItems: "center",
-          gap: "0.75rem",
-          padding: "0.875rem 1rem",
-          background: open ? "var(--bg-card)" : "transparent",
-          border: "none",
-          cursor: "pointer",
-          textAlign: "left",
-          transition: "background 0.15s",
-        }}
+        style={{ width: "100%", display: "flex", alignItems: "center", gap: "1rem", padding: "0.875rem 0", background: "none", border: "none", cursor: "pointer", textAlign: "left" }}
       >
-        <span style={{ fontSize: "0.65rem", fontWeight: 700, color: "var(--text-muted)", width: "24px", flexShrink: 0, textAlign: "center" }}>
-          {String(idx + 1).padStart(2, "0")}
-        </span>
-        <span style={{ fontSize: "1rem", flexShrink: 0 }}>{mod.emoji}</span>
-        <span style={{ flex: 1, fontSize: "0.9rem", fontWeight: 600, color: "#fff" }}>{mod.title}</span>
-        <span style={{ fontSize: "0.72rem", color: "var(--text-muted)", flexShrink: 0 }}>
-          {mod.lessons.length} leçons · {totalEx} exercices
-        </span>
-        <span style={{ color: "var(--text-muted)", fontSize: "0.75rem", transition: "transform 0.15s", transform: open ? "rotate(90deg)" : "none", flexShrink: 0 }}>›</span>
+        <span style={{ fontSize: "0.65rem", color: "var(--text-muted)", width: "20px", textAlign: "right", flexShrink: 0 }}>{String(idx + 1).padStart(2, "0")}</span>
+        <span style={{ flex: 1, fontSize: "0.875rem", fontWeight: 600, color: "var(--text)" }}>{mod.title}</span>
+        <span style={{ fontSize: "0.72rem", color: "var(--text-muted)" }}>{mod.lessons.length} leçons</span>
+        <span style={{ color: "var(--text-muted)", fontSize: "0.7rem", transition: "transform 0.15s", transform: open ? "rotate(90deg)" : "none" }}>›</span>
       </button>
-
-      {/* Lesson list */}
       {open && (
-        <div style={{ borderTop: "1px solid var(--border)" }}>
+        <div style={{ paddingBottom: "0.5rem" }}>
           {mod.lessons.map((lesson, li) => (
             <button
               key={lesson.id}
               onClick={() => onSelect(mod.id, lesson.id)}
-              style={{
-                width: "100%",
-                display: "flex",
-                alignItems: "center",
-                gap: "0.75rem",
-                padding: "0.6rem 1rem 0.6rem 2.75rem",
-                background: "transparent",
-                border: "none",
-                borderBottom: li < mod.lessons.length - 1 ? "1px solid rgba(255,255,255,0.04)" : "none",
-                cursor: "pointer",
-                textAlign: "left",
-                transition: "background 0.1s",
-              }}
+              style={{ width: "100%", display: "flex", alignItems: "center", gap: "1rem", padding: "0.45rem 0 0.45rem 2rem", background: "none", border: "none", cursor: "pointer", textAlign: "left", transition: "background 0.1s", borderRadius: "4px" }}
               onMouseEnter={e => (e.currentTarget.style.background = "var(--bg-hover)")}
-              onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
+              onMouseLeave={e => (e.currentTarget.style.background = "none")}
             >
-              <span style={{ fontSize: "0.72rem", color: "var(--text-muted)", width: "20px", flexShrink: 0 }}>{String(li + 1).padStart(2, "0")}</span>
+              <span style={{ fontSize: "0.65rem", color: "var(--text-muted)", width: "20px", textAlign: "right", flexShrink: 0 }}>{li + 1}</span>
               <span style={{ flex: 1, fontSize: "0.825rem", color: "var(--text-dim)" }}>{lesson.title}</span>
-              <span style={{ fontSize: "0.7rem", color: "var(--text-muted)", flexShrink: 0 }}>{lesson.duration}</span>
+              <span style={{ fontSize: "0.7rem", color: "var(--text-muted)" }}>{lesson.duration}</span>
             </button>
           ))}
         </div>
@@ -511,29 +352,100 @@ function ModuleRow({ mod, idx, completed, onSelect }: {
   );
 }
 
-// ────────────────────────────────────────────────
+// ─────────────────────────────────────────────
+// SEARCH BAR
+// ─────────────────────────────────────────────
+function SearchBar({ onNavigate }: { onNavigate: (modId: string, lessonId: string, sectionIdx: number | null) => void }) {
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState<SearchResult[]>([]);
+  const [focused, setFocused] = useState(false);
+  const index = useMemo(() => buildIndex(), []);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setResults(search(query, index));
+  }, [query, index]);
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setFocused(false);
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
+
+  const showDropdown = focused && query.length > 0;
+
+  return (
+    <div ref={ref} style={{ position: "relative" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", padding: "0.4rem 0.6rem", background: "var(--bg-dark)", border: "1px solid var(--border)", borderRadius: "5px" }}>
+        <span style={{ fontSize: "0.7rem", color: "var(--text-muted)", flexShrink: 0 }}>⌕</span>
+        <input
+          type="text"
+          value={query}
+          onChange={e => setQuery(e.target.value)}
+          onFocus={() => setFocused(true)}
+          placeholder="Rechercher…"
+          style={{ flex: 1, background: "none", border: "none", outline: "none", fontSize: "0.775rem", color: "var(--text)", caretColor: "var(--accent)" }}
+        />
+        {query && (
+          <button onClick={() => setQuery("")} style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", fontSize: "0.7rem", padding: 0, lineHeight: 1 }}>✕</button>
+        )}
+      </div>
+
+      {showDropdown && (
+        <div style={{
+          position: "absolute",
+          top: "calc(100% + 4px)",
+          left: 0, right: 0,
+          background: "var(--bg-card)",
+          border: "1px solid var(--border)",
+          borderRadius: "6px",
+          zIndex: 100,
+          overflow: "hidden",
+          boxShadow: "0 8px 24px rgba(0,0,0,0.4)",
+        }}>
+          {results.length === 0 ? (
+            <div style={{ padding: "0.75rem 0.875rem", fontSize: "0.775rem", color: "var(--text-muted)" }}>Aucun résultat</div>
+          ) : results.map((r, i) => (
+            <button
+              key={i}
+              onClick={() => {
+                onNavigate(r.modId, r.lessonId, r.sectionIdx);
+                setQuery("");
+                setFocused(false);
+              }}
+              style={{ width: "100%", display: "block", padding: "0.6rem 0.875rem", background: "none", border: "none", borderBottom: "1px solid rgba(255,255,255,0.04)", cursor: "pointer", textAlign: "left", transition: "background 0.1s" }}
+              onMouseEnter={e => (e.currentTarget.style.background = "var(--bg-hover)")}
+              onMouseLeave={e => (e.currentTarget.style.background = "none")}
+            >
+              <div style={{ fontSize: "0.775rem", fontWeight: 500, color: "var(--text)", marginBottom: "0.15rem" }}>
+                {r.sectionHeading ?? r.lessonTitle}
+              </div>
+              <div style={{ fontSize: "0.7rem", color: "var(--text-muted)" }}>
+                {r.modTitle} · {r.lessonTitle}
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
 // SIDEBAR
-// ────────────────────────────────────────────────
-function Sidebar({
-  currentModuleId,
-  currentLessonId,
-  completedSet,
-  onSelect,
-  onHome,
-  collapsed,
-  onToggle,
-}: {
+// ─────────────────────────────────────────────
+function Sidebar({ currentModuleId, currentLessonId, onSelect, onHome, collapsed, onToggle, onNavigate }: {
   currentModuleId: string;
   currentLessonId: string;
-  completedSet: Set<string>;
   onSelect: (modId: string, lessonId: string) => void;
   onHome: () => void;
   collapsed: boolean;
   onToggle: () => void;
+  onNavigate: (modId: string, lessonId: string, sectionIdx: number | null) => void;
 }) {
-  const [expandedModules, setExpandedModules] = useState<Set<string>>(
-    () => new Set([currentModuleId])
-  );
+  const [expandedModules, setExpandedModules] = useState<Set<string>>(() => new Set([currentModuleId]));
 
   useEffect(() => {
     setExpandedModules(prev => new Set([...prev, currentModuleId]));
@@ -547,139 +459,59 @@ function Sidebar({
     });
   };
 
-  const completedCount = completedSet.size;
-  const pct = Math.round((completedCount / totalLessons) * 100);
-
   return (
-    <aside style={{
-      width: collapsed ? "48px" : "256px",
-      minWidth: collapsed ? "48px" : "256px",
-      display: "flex",
-      flexDirection: "column",
-      borderRight: "1px solid var(--border)",
-      background: "var(--bg-surface)",
-      transition: "width 0.2s, min-width 0.2s",
-      flexShrink: 0,
-    }}>
-      {/* Brand */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 0.75rem", height: "52px", borderBottom: "1px solid var(--border)", flexShrink: 0 }}>
+    <aside style={{ width: collapsed ? "44px" : "248px", minWidth: collapsed ? "44px" : "248px", display: "flex", flexDirection: "column", borderRight: "1px solid var(--border)", background: "var(--bg-surface)", transition: "width 0.18s, min-width 0.18s", flexShrink: 0 }}>
+      {/* Top */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 0.625rem", height: "48px", borderBottom: "1px solid var(--border)", flexShrink: 0 }}>
         {!collapsed && (
-          <button onClick={onHome} style={{ display: "flex", alignItems: "center", gap: "0.5rem", background: "none", border: "none", cursor: "pointer", padding: 0 }}>
-            <span style={{ width: "22px", height: "22px", borderRadius: "5px", background: "var(--accent)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.7rem", color: "#fff", fontWeight: 800, flexShrink: 0 }}>C</span>
-            <span style={{ fontSize: "0.8rem", fontWeight: 700, color: "#fff", whiteSpace: "nowrap" }}>Claude Code</span>
+          <button onClick={onHome} style={{ display: "flex", alignItems: "center", gap: "0.45rem", background: "none", border: "none", cursor: "pointer", padding: 0 }}>
+            <span style={{ width: "20px", height: "20px", borderRadius: "4px", background: "var(--accent)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.65rem", color: "#fff", fontWeight: 800, flexShrink: 0 }}>C</span>
+            <span style={{ fontSize: "0.775rem", fontWeight: 600, color: "var(--text)", whiteSpace: "nowrap" }}>Claude Code</span>
           </button>
         )}
-        <button
-          onClick={onToggle}
-          style={{ width: "26px", height: "26px", display: "flex", alignItems: "center", justifyContent: "center", borderRadius: "5px", border: "none", background: "none", color: "var(--text-muted)", cursor: "pointer", fontSize: "0.85rem", marginLeft: collapsed ? "auto" : "0", flexShrink: 0 }}
-        >
+        <button onClick={onToggle} style={{ width: "24px", height: "24px", display: "flex", alignItems: "center", justifyContent: "center", borderRadius: "4px", border: "none", background: "none", color: "var(--text-muted)", cursor: "pointer", fontSize: "0.8rem", marginLeft: collapsed ? "auto" : "0", flexShrink: 0 }}>
           {collapsed ? "›" : "‹"}
         </button>
       </div>
 
       {!collapsed && (
         <>
-          {/* Progress */}
-          <div style={{ padding: "0.75rem", borderBottom: "1px solid var(--border)", flexShrink: 0 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.7rem", color: "var(--text-muted)", marginBottom: "0.5rem" }}>
-              <span>Progression</span>
-              <span>{completedCount} / {totalLessons}</span>
-            </div>
-            <div style={{ height: "3px", background: "var(--bg-hover)", borderRadius: "3px", overflow: "hidden" }}>
-              <div className="progress-bar-fill" style={{ height: "100%", width: `${pct}%`, borderRadius: "3px" }} />
-            </div>
+          {/* Search */}
+          <div style={{ padding: "0.5rem 0.625rem", borderBottom: "1px solid var(--border)", flexShrink: 0 }}>
+            <SearchBar onNavigate={onNavigate} />
           </div>
 
-          {/* Modules */}
-          <nav style={{ flex: 1, overflowY: "auto", padding: "0.375rem 0" }}>
+          {/* Nav */}
+          <nav style={{ flex: 1, overflowY: "auto", padding: "0.25rem 0" }}>
             {curriculum.map(mod => {
               const isExpanded = expandedModules.has(mod.id);
-              const modCompleted = mod.lessons.filter(l => completedSet.has(`${mod.id}:${l.id}`)).length;
-
               return (
                 <div key={mod.id}>
                   <button
                     onClick={() => toggleModule(mod.id)}
-                    style={{
-                      width: "100%",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "0.5rem",
-                      padding: "0.5rem 0.75rem",
-                      background: "none",
-                      border: "none",
-                      cursor: "pointer",
-                      textAlign: "left",
-                      transition: "background 0.1s",
-                    }}
+                    style={{ width: "100%", display: "flex", alignItems: "center", gap: "0.45rem", padding: "0.425rem 0.625rem", background: "none", border: "none", cursor: "pointer", textAlign: "left" }}
                     onMouseEnter={e => (e.currentTarget.style.background = "var(--bg-hover)")}
                     onMouseLeave={e => (e.currentTarget.style.background = "none")}
                   >
-                    <span style={{ fontSize: "0.85rem", flexShrink: 0 }}>{mod.emoji}</span>
-                    <span style={{ flex: 1, fontSize: "0.72rem", fontWeight: 600, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.05em", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                      {mod.title}
-                    </span>
-                    <span style={{ fontSize: "0.65rem", color: "var(--text-muted)", flexShrink: 0 }}>{modCompleted}/{mod.lessons.length}</span>
-                    <span style={{ color: "var(--text-muted)", fontSize: "0.7rem", transition: "transform 0.15s", transform: isExpanded ? "rotate(90deg)" : "none", flexShrink: 0 }}>›</span>
+                    <span style={{ flex: 1, fontSize: "0.7rem", fontWeight: 600, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.06em", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{mod.title}</span>
+                    <span style={{ color: "var(--text-muted)", fontSize: "0.65rem", transition: "transform 0.15s", transform: isExpanded ? "rotate(90deg)" : "none", flexShrink: 0 }}>›</span>
                   </button>
-
-                  {isExpanded && (
-                    <div>
-                      {mod.lessons.map(lesson => {
-                        const key = `${mod.id}:${lesson.id}`;
-                        const isActive = currentModuleId === mod.id && currentLessonId === lesson.id;
-                        const isDone = completedSet.has(key);
-
-                        return (
-                          <button
-                            key={lesson.id}
-                            onClick={() => onSelect(mod.id, lesson.id)}
-                            style={{
-                              width: "100%",
-                              display: "flex",
-                              alignItems: "center",
-                              gap: "0.5rem",
-                              padding: "0.4rem 0.75rem 0.4rem 1.875rem",
-                              background: isActive ? "var(--accent-dim)" : "none",
-                              borderTop: "none",
-                              borderRight: "none",
-                              borderBottom: "none",
-                              borderLeft: isActive ? "2px solid var(--accent)" : "2px solid transparent",
-                              cursor: "pointer",
-                              textAlign: "left",
-                              transition: "background 0.1s",
-                            }}
-                            onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = "var(--bg-hover)"; }}
-                            onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = "none"; }}
-                          >
-                            <span style={{
-                              width: "14px", height: "14px",
-                              borderRadius: "3px",
-                              border: `1.5px solid ${isDone ? "#22c55e" : isActive ? "var(--accent)" : "var(--border)"}`,
-                              background: isDone ? "#22c55e" : "transparent",
-                              display: "flex", alignItems: "center", justifyContent: "center",
-                              flexShrink: 0,
-                              fontSize: "0.55rem",
-                              color: "#fff",
-                            }}>
-                              {isDone ? "✓" : ""}
-                            </span>
-                            <span style={{
-                              fontSize: "0.75rem",
-                              color: isActive ? "#fff" : "var(--text-muted)",
-                              fontWeight: isActive ? 500 : 400,
-                              flex: 1,
-                              overflow: "hidden",
-                              textOverflow: "ellipsis",
-                              whiteSpace: "nowrap",
-                            }}>
-                              {lesson.title}
-                            </span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
+                  {isExpanded && mod.lessons.map(lesson => {
+                    const isActive = currentModuleId === mod.id && currentLessonId === lesson.id;
+                    return (
+                      <button
+                        key={lesson.id}
+                        onClick={() => onSelect(mod.id, lesson.id)}
+                        style={{ width: "100%", display: "flex", alignItems: "center", gap: "0.45rem", padding: "0.35rem 0.625rem 0.35rem 1.5rem", background: isActive ? "rgba(91,106,249,0.08)" : "none", borderLeft: isActive ? "2px solid var(--accent)" : "2px solid transparent", borderTop: "none", borderRight: "none", borderBottom: "none", cursor: "pointer", textAlign: "left", transition: "background 0.1s" }}
+                        onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = "var(--bg-hover)"; }}
+                        onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = "none"; }}
+                      >
+                        <span style={{ flex: 1, fontSize: "0.765rem", color: isActive ? "var(--text)" : "var(--text-dim)", fontWeight: isActive ? 500 : 400, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {lesson.title}
+                        </span>
+                      </button>
+                    );
+                  })}
                 </div>
               );
             })}
@@ -688,22 +520,10 @@ function Sidebar({
       )}
 
       {collapsed && (
-        <nav style={{ flex: 1, overflowY: "auto", padding: "0.5rem 0", display: "flex", flexDirection: "column", alignItems: "center", gap: "0.25rem" }}>
+        <nav style={{ flex: 1, overflowY: "auto", padding: "0.375rem 0", display: "flex", flexDirection: "column", alignItems: "center", gap: "0.2rem" }}>
           {curriculum.map(mod => (
-            <button
-              key={mod.id}
-              onClick={() => { onToggle(); setTimeout(() => setExpandedModules(new Set([mod.id])), 50); }}
-              title={mod.title}
-              style={{
-                width: "30px", height: "30px",
-                borderRadius: "6px",
-                border: "none",
-                background: currentModuleId === mod.id ? "var(--accent-dim)" : "none",
-                cursor: "pointer",
-                fontSize: "0.875rem",
-                display: "flex", alignItems: "center", justifyContent: "center",
-              }}
-            >
+            <button key={mod.id} onClick={() => { onToggle(); setTimeout(() => setExpandedModules(new Set([mod.id])), 50); }} title={mod.title}
+              style={{ width: "28px", height: "28px", borderRadius: "5px", border: "none", background: currentModuleId === mod.id ? "rgba(91,106,249,0.1)" : "none", cursor: "pointer", fontSize: "0.8rem", display: "flex", alignItems: "center", justifyContent: "center" }}>
               {mod.emoji}
             </button>
           ))}
@@ -713,92 +533,46 @@ function Sidebar({
   );
 }
 
-// ────────────────────────────────────────────────
+// ─────────────────────────────────────────────
 // TOP BAR
-// ────────────────────────────────────────────────
+// ─────────────────────────────────────────────
 function TopBar({ lesson, mod, onHome, onPrev, onNext, hasPrev, hasNext }: {
-  lesson: Lesson | null;
-  mod: Module | null;
-  onHome: () => void;
-  onPrev: () => void;
-  onNext: () => void;
-  hasPrev: boolean;
-  hasNext: boolean;
+  lesson: Lesson | null; mod: Module | null;
+  onHome: () => void; onPrev: () => void; onNext: () => void;
+  hasPrev: boolean; hasNext: boolean;
 }) {
   return (
-    <header style={{
-      height: "52px",
-      display: "flex",
-      alignItems: "center",
-      gap: "0.5rem",
-      padding: "0 1.25rem",
-      borderBottom: "1px solid var(--border)",
-      background: "var(--bg-surface)",
-      flexShrink: 0,
-    }}>
-      <button
-        onClick={onHome}
-        style={{ display: "flex", alignItems: "center", gap: "0.375rem", background: "none", border: "none", color: "var(--text-muted)", fontSize: "0.8rem", cursor: "pointer", padding: "0.25rem 0.5rem", borderRadius: "4px", transition: "color 0.1s" }}
-        onMouseEnter={e => (e.currentTarget.style.color = "#fff")}
-        onMouseLeave={e => (e.currentTarget.style.color = "var(--text-muted)")}
-      >
+    <header style={{ height: "48px", display: "flex", alignItems: "center", gap: "0.5rem", padding: "0 1.25rem", borderBottom: "1px solid var(--border)", background: "var(--bg-surface)", flexShrink: 0 }}>
+      <button onClick={onHome} style={{ background: "none", border: "none", color: "var(--text-muted)", fontSize: "0.775rem", cursor: "pointer", padding: "0.2rem 0.4rem", borderRadius: "3px", transition: "color 0.1s", flexShrink: 0 }}
+        onMouseEnter={e => (e.currentTarget.style.color = "var(--text)")} onMouseLeave={e => (e.currentTarget.style.color = "var(--text-muted)")}>
         ← Accueil
       </button>
-
       {lesson && mod && (
         <>
-          <span style={{ color: "var(--border)", fontSize: "0.75rem" }}>/</span>
-          <span style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>{mod.emoji} {mod.title}</span>
-          <span style={{ color: "var(--border)", fontSize: "0.75rem" }}>/</span>
-          <span style={{ fontSize: "0.8rem", color: "var(--text-dim)", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-            {lesson.title}
-          </span>
+          <span style={{ color: "var(--border)", fontSize: "0.7rem" }}>/</span>
+          <span style={{ fontSize: "0.775rem", color: "var(--text-muted)", flexShrink: 0 }}>{mod.title}</span>
+          <span style={{ color: "var(--border)", fontSize: "0.7rem" }}>/</span>
+          <span style={{ fontSize: "0.775rem", color: "var(--text-dim)", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{lesson.title}</span>
         </>
       )}
-
-      <div style={{ display: "flex", gap: "0.375rem", marginLeft: "auto", flexShrink: 0 }}>
-        <button
-          onClick={onPrev}
-          disabled={!hasPrev}
-          className="lesson-nav-btn"
-          style={{ padding: "0.3rem 0.7rem", fontSize: "0.775rem", opacity: hasPrev ? 1 : 0.3 }}
-        >
-          ← Préc.
-        </button>
-        <button
-          onClick={onNext}
-          disabled={!hasNext}
-          className="lesson-nav-btn primary"
-          style={{ padding: "0.3rem 0.7rem", fontSize: "0.775rem", opacity: hasNext ? 1 : 0.3 }}
-        >
-          Suiv. →
-        </button>
+      <div style={{ display: "flex", gap: "0.25rem", marginLeft: "auto", flexShrink: 0 }}>
+        <button onClick={onPrev} disabled={!hasPrev} className="lesson-nav-btn" style={{ padding: "0.25rem 0.6rem", fontSize: "0.75rem", opacity: hasPrev ? 1 : 0.3 }}>← Préc.</button>
+        <button onClick={onNext} disabled={!hasNext} className="lesson-nav-btn primary" style={{ padding: "0.25rem 0.6rem", fontSize: "0.75rem", opacity: hasNext ? 1 : 0.3 }}>Suiv. →</button>
       </div>
     </header>
   );
 }
 
-// ────────────────────────────────────────────────
+// ─────────────────────────────────────────────
 // MAIN APP
-// ────────────────────────────────────────────────
+// ─────────────────────────────────────────────
 export default function App() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [view, setView] = useState<"home" | "lesson">("home");
   const [currentModuleId, setCurrentModuleId] = useState(curriculum[0].id);
   const [currentLessonId, setCurrentLessonId] = useState(curriculum[0].lessons[0].id);
-  const [completed, setCompleted] = useState<Set<string>>(new Set());
+  const [scrollToSection, setScrollToSection] = useState<number | null>(null);
   const contentRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem("cc_progress");
-      if (saved) setCompleted(new Set(JSON.parse(saved)));
-    } catch {}
-  }, []);
-
-  const saveProgress = useCallback((newSet: Set<string>) => {
-    try { localStorage.setItem("cc_progress", JSON.stringify([...newSet])); } catch {}
-  }, []);
 
   const currentMod = curriculum.find(m => m.id === currentModuleId) ?? curriculum[0];
   const currentLesson = currentMod.lessons.find(l => l.id === currentLessonId) ?? currentMod.lessons[0];
@@ -811,6 +585,15 @@ export default function App() {
   const goToLesson = useCallback((modId: string, lessonId: string) => {
     setCurrentModuleId(modId);
     setCurrentLessonId(lessonId);
+    setScrollToSection(null);
+    setView("lesson");
+    contentRef.current?.scrollTo(0, 0);
+  }, []);
+
+  const navigate = useCallback((modId: string, lessonId: string, sectionIdx: number | null) => {
+    setCurrentModuleId(modId);
+    setCurrentLessonId(lessonId);
+    setScrollToSection(sectionIdx);
     setView("lesson");
     contentRef.current?.scrollTo(0, 0);
   }, []);
@@ -818,61 +601,32 @@ export default function App() {
   const goPrev = useCallback(() => { if (hasPrev) { const p = allLessons[currentIndex - 1]; goToLesson(p.modId, p.lessonId); } }, [hasPrev, currentIndex, allLessons, goToLesson]);
   const goNext = useCallback(() => { if (hasNext) { const n = allLessons[currentIndex + 1]; goToLesson(n.modId, n.lessonId); } }, [hasNext, currentIndex, allLessons, goToLesson]);
 
-  const markComplete = useCallback(() => {
-    const key = `${currentModuleId}:${currentLessonId}`;
-    setCompleted(prev => { const next = new Set(prev); next.add(key); saveProgress(next); return next; });
-  }, [currentModuleId, currentLessonId, saveProgress]);
-
-  const handleStart = useCallback(() => {
-    for (const { modId, lessonId } of allLessons) {
-      if (!completed.has(`${modId}:${lessonId}`)) { goToLesson(modId, lessonId); return; }
-    }
-    goToLesson(allLessons[0].modId, allLessons[0].lessonId);
-  }, [allLessons, completed, goToLesson]);
-
   return (
     <main style={{ height: "100vh", overflow: "hidden", display: "flex", background: "var(--bg-dark)" }}>
       <Sidebar
         currentModuleId={currentModuleId}
         currentLessonId={currentLessonId}
-        completedSet={completed}
         onSelect={goToLesson}
         onHome={() => setView("home")}
         collapsed={sidebarCollapsed}
         onToggle={() => setSidebarCollapsed(v => !v)}
+        onNavigate={navigate}
       />
 
       <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
         {view === "lesson" && (
-          <TopBar
-            lesson={currentLesson}
-            mod={currentMod}
-            onHome={() => setView("home")}
-            onPrev={goPrev}
-            onNext={goNext}
-            hasPrev={hasPrev}
-            hasNext={hasNext}
-          />
+          <TopBar lesson={currentLesson} mod={currentMod} onHome={() => setView("home")} onPrev={goPrev} onNext={goNext} hasPrev={hasPrev} hasNext={hasNext} />
         )}
 
         <div ref={contentRef} style={{ flex: 1, overflowY: "auto", background: "var(--bg-dark)" }}>
           {view === "home" ? (
-            <HomePage onStart={handleStart} onSelect={goToLesson} completed={completed.size} />
+            <HomePage onSelect={goToLesson} />
           ) : (
             <div style={{ padding: "2.5rem 3rem" }}>
-              <LessonContent
-                lesson={currentLesson}
-                mod={currentMod}
-                onComplete={markComplete}
-                isCompleted={completed.has(`${currentModuleId}:${currentLessonId}`)}
-              />
-              <div style={{ display: "flex", justifyContent: "space-between", marginTop: "3rem", paddingTop: "1.5rem", borderTop: "1px solid var(--border)", maxWidth: "760px" }}>
-                <button onClick={goPrev} disabled={!hasPrev} className="lesson-nav-btn" style={{ opacity: hasPrev ? 1 : 0.3 }}>
-                  ← Leçon précédente
-                </button>
-                <button onClick={goNext} disabled={!hasNext} className="lesson-nav-btn primary" style={{ opacity: hasNext ? 1 : 0.3 }}>
-                  Leçon suivante →
-                </button>
+              <LessonContent lesson={currentLesson} mod={currentMod} scrollToSection={scrollToSection} />
+              <div style={{ display: "flex", justifyContent: "space-between", marginTop: "3.5rem", paddingTop: "1.5rem", borderTop: "1px solid var(--border)", maxWidth: "740px" }}>
+                <button onClick={goPrev} disabled={!hasPrev} className="lesson-nav-btn" style={{ opacity: hasPrev ? 1 : 0.3 }}>← Précédente</button>
+                <button onClick={goNext} disabled={!hasNext} className="lesson-nav-btn primary" style={{ opacity: hasNext ? 1 : 0.3 }}>Suivante →</button>
               </div>
             </div>
           )}
