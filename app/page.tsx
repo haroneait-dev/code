@@ -19,6 +19,29 @@ function useIsMobile() {
 }
 
 // ─────────────────────────────────────────────
+// WIKI TYPES
+// ─────────────────────────────────────────────
+type WikiTip = {
+  id: string;
+  title: string;
+  content: string;
+  author: string | null;
+  category: string;
+  upvotes: number;
+  created_at: string;
+};
+
+const WIKI_CATEGORIES = ["Tous", "Tips & Tricks", "Workflow", "CLAUDE.md", "MCP", "Hooks", "Divers"] as const;
+const WIKI_CATEGORY_COLORS: Record<string, string> = {
+  "Tips & Tricks": "#9080c8",
+  "Workflow": "#6080b0",
+  "CLAUDE.md": "#c89060",
+  "MCP": "#7fa87f",
+  "Hooks": "#c87070",
+  "Divers": "#9a9080",
+};
+
+// ─────────────────────────────────────────────
 // SEARCH
 // ─────────────────────────────────────────────
 type SR = {
@@ -247,11 +270,12 @@ function SearchResults({ results, query, onSelect }: { results: SR[]; query: str
 // ─────────────────────────────────────────────
 // MOBILE DRAWER
 // ─────────────────────────────────────────────
-function MobileDrawer({ open, onClose, currentModuleId, currentLessonId, onNavigate, onSelect }: {
+function MobileDrawer({ open, onClose, currentModuleId, currentLessonId, currentView, onNavigate, onSelect, onWiki }: {
   open: boolean; onClose: () => void;
-  currentModuleId: string; currentLessonId: string;
+  currentModuleId: string; currentLessonId: string; currentView: "home" | "lesson" | "wiki";
   onNavigate: (modId: string, lessonId: string, sectionIdx: number | null) => void;
   onSelect: (modId: string, lessonId: string) => void;
+  onWiki: () => void;
 }) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SR[]>([]);
@@ -300,6 +324,11 @@ function MobileDrawer({ open, onClose, currentModuleId, currentLessonId, onNavig
             <SearchResults results={results} query={query} onSelect={r => { onNavigate(r.modId, r.lessonId, r.sectionIdx); setQuery(""); onClose(); }} />
           ) : (
             <nav style={{ padding: "0.5rem 0" }}>
+              {/* Communauté link */}
+              <button onClick={() => { onWiki(); onClose(); }}
+                style={{ width: "100%", display: "flex", alignItems: "center", gap: "0.5rem", padding: "0.65rem 1rem", background: currentView === "wiki" ? "rgba(144,128,184,0.1)" : "none", borderLeft: currentView === "wiki" ? "2px solid var(--purple-light)" : "2px solid transparent", borderTop: "none", borderRight: "none", borderBottom: "1px solid var(--border)", cursor: "pointer", textAlign: "left" }}>
+                <span style={{ fontSize: "0.8rem", fontWeight: currentView === "wiki" ? 600 : 400, color: currentView === "wiki" ? "var(--purple-light)" : "var(--beige-dim)" }}>Communauté</span>
+              </button>
               {curriculum.map(mod => {
                 const isExpanded = expandedMod === mod.id;
                 return (
@@ -335,7 +364,7 @@ function MobileDrawer({ open, onClose, currentModuleId, currentLessonId, onNavig
 // ─────────────────────────────────────────────
 function MobileHeader({ onMenuOpen, onHome, view, lessonTitle, onSearchOpen }: {
   onMenuOpen: () => void; onHome: () => void;
-  view: "home" | "lesson"; lessonTitle?: string;
+  view: "home" | "lesson" | "wiki"; lessonTitle?: string;
   onSearchOpen: () => void;
 }) {
   return (
@@ -421,10 +450,11 @@ function MobileBottomNav({ onPrev, onNext, hasPrev, hasNext }: { onPrev: () => v
 // ─────────────────────────────────────────────
 // DESKTOP COMPONENTS
 // ─────────────────────────────────────────────
-function DesktopTopNav({ currentModuleId, currentView, onHome, onModuleSelect, onNavigate }: {
-  currentModuleId: string; currentView: "home" | "lesson";
+function DesktopTopNav({ currentModuleId, currentView, onHome, onModuleSelect, onNavigate, onWiki }: {
+  currentModuleId: string; currentView: "home" | "lesson" | "wiki";
   onHome: () => void; onModuleSelect: (modId: string) => void;
   onNavigate: (modId: string, lessonId: string, sectionIdx: number | null) => void;
+  onWiki: () => void;
 }) {
   const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -498,6 +528,11 @@ function DesktopTopNav({ currentModuleId, currentView, onHome, onModuleSelect, o
             </button>
           );
         })}
+        <div style={{ flex: 1 }} />
+        <button onClick={onWiki}
+          style={{ padding: "0.5rem 0.875rem", background: "none", border: "none", borderBottom: currentView === "wiki" ? "2px solid var(--purple-light)" : "2px solid transparent", cursor: "pointer", fontSize: "0.775rem", fontWeight: currentView === "wiki" ? 600 : 400, color: currentView === "wiki" ? "var(--purple-light)" : "var(--beige-muted)", whiteSpace: "nowrap", transition: "color 0.1s", marginBottom: "-1px" }}>
+          Communauté
+        </button>
       </div>
     </div>
   );
@@ -638,11 +673,244 @@ function HomepageSearch({ onNavigate }: { onNavigate: (modId: string, lessonId: 
 }
 
 // ─────────────────────────────────────────────
+// WIKI VIEW
+// ─────────────────────────────────────────────
+function WikiView({ isMobile }: { isMobile: boolean }) {
+  const [tips, setTips] = useState<WikiTip[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [activeCategory, setActiveCategory] = useState<string>("Tous");
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [voted, setVoted] = useState<Set<string>>(new Set());
+  const [showForm, setShowForm] = useState(false);
+  const [formTitle, setFormTitle] = useState("");
+  const [formContent, setFormContent] = useState("");
+  const [formAuthor, setFormAuthor] = useState("");
+  const [formCategory, setFormCategory] = useState("Tips & Tricks");
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState("");
+  const [submitSuccess, setSubmitSuccess] = useState(false);
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem("wiki_voted");
+      if (stored) setVoted(new Set(JSON.parse(stored)));
+    } catch {}
+    fetch("/api/wiki")
+      .then(r => r.json())
+      .then(data => { setTips(Array.isArray(data) ? data : []); setLoading(false); })
+      .catch(() => setLoading(false));
+  }, []);
+
+  const filteredTips = activeCategory === "Tous" ? tips : tips.filter(t => t.category === activeCategory);
+
+  const handleVote = async (id: string) => {
+    if (voted.has(id)) return;
+    const next = new Set(voted); next.add(id);
+    setVoted(next);
+    try { localStorage.setItem("wiki_voted", JSON.stringify([...next])); } catch {}
+    setTips(prev => prev.map(t => t.id === id ? { ...t, upvotes: t.upvotes + 1 } : t));
+    fetch(`/api/wiki/${id}/vote`, { method: "POST" }).catch(() => {});
+  };
+
+  const handleSubmit = async () => {
+    if (!formTitle.trim() || !formContent.trim()) { setSubmitError("Titre et contenu requis."); return; }
+    setSubmitting(true); setSubmitError("");
+    const res = await fetch("/api/wiki", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: formTitle, content: formContent, author: formAuthor || null, category: formCategory }),
+    });
+    const data = await res.json();
+    if (!res.ok) { setSubmitError(data.error ?? "Erreur serveur."); setSubmitting(false); return; }
+    setTips(prev => [data, ...prev]);
+    setSubmitSuccess(true);
+    setFormTitle(""); setFormContent(""); setFormAuthor(""); setFormCategory("Tips & Tricks");
+    setSubmitting(false);
+    setTimeout(() => { setShowForm(false); setSubmitSuccess(false); }, 1200);
+  };
+
+  return (
+    <div className="fade-in" style={{ maxWidth: "760px", margin: "0 auto", padding: isMobile ? "1.5rem 1.25rem 5rem" : "3rem 2rem 5rem" }}>
+      {/* Header */}
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: "2rem", gap: "1rem" }}>
+        <div>
+          <div style={{ fontSize: "0.65rem", fontWeight: 600, color: "var(--beige-muted)", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "0.5rem" }}>
+            Base de connaissances · {tips.length} contribution{tips.length !== 1 ? "s" : ""}
+          </div>
+          <h1 style={{ fontSize: isMobile ? "1.5rem" : "1.875rem", fontWeight: 700, color: "var(--beige)", letterSpacing: "-0.02em", lineHeight: 1.15, marginBottom: "0.5rem" }}>
+            Communauté
+          </h1>
+          <p style={{ fontSize: "0.875rem", color: "var(--beige-muted)", lineHeight: 1.7, maxWidth: "480px" }}>
+            Tips, workflows et configs partagés par la communauté. Partage ce qui marche pour toi.
+          </p>
+        </div>
+        <button onClick={() => setShowForm(true)}
+          style={{ flexShrink: 0, padding: "0.5rem 1rem", background: "var(--beige)", border: "none", borderRadius: "6px", color: "var(--bg-dark)", fontSize: "0.8rem", fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap", transition: "background 0.1s" }}
+          onMouseEnter={e => (e.currentTarget.style.background = "var(--beige-light)")}
+          onMouseLeave={e => (e.currentTarget.style.background = "var(--beige)")}>
+          + Partager
+        </button>
+      </div>
+
+      {/* Category filter */}
+      <div style={{ display: "flex", gap: "0.375rem", flexWrap: "wrap", marginBottom: "1.75rem" }}>
+        {WIKI_CATEGORIES.map(cat => {
+          const isActive = activeCategory === cat;
+          return (
+            <button key={cat} onClick={() => setActiveCategory(cat)}
+              style={{ padding: "0.3rem 0.75rem", background: isActive ? "rgba(200,190,168,0.1)" : "none", border: `1px solid ${isActive ? "rgba(200,190,168,0.3)" : "var(--border)"}`, borderRadius: "999px", color: isActive ? "var(--beige)" : "var(--beige-muted)", fontSize: "0.75rem", cursor: "pointer", fontWeight: isActive ? 500 : 400, transition: "all 0.1s" }}>
+              {cat}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Tips list */}
+      {loading ? (
+        <div style={{ padding: "3rem 0", textAlign: "center", color: "var(--beige-muted)", fontSize: "0.875rem" }}>Chargement…</div>
+      ) : filteredTips.length === 0 ? (
+        <div style={{ padding: "3rem 0", textAlign: "center" }}>
+          <div style={{ fontSize: "0.875rem", color: "var(--beige-muted)", marginBottom: "1rem" }}>
+            {activeCategory === "Tous" ? "Aucune contribution pour l'instant." : `Aucune contribution dans "${activeCategory}".`}
+          </div>
+          <button onClick={() => setShowForm(true)}
+            style={{ padding: "0.5rem 1.25rem", background: "none", border: "1px solid var(--border)", borderRadius: "6px", color: "var(--beige-dim)", fontSize: "0.825rem", cursor: "pointer" }}>
+            Être le premier à contribuer →
+          </button>
+        </div>
+      ) : (
+        <div>
+          {filteredTips.map(tip => {
+            const isExpanded = expandedId === tip.id;
+            const hasVoted = voted.has(tip.id);
+            const color = WIKI_CATEGORY_COLORS[tip.category] ?? "#9a9080";
+            return (
+              <div key={tip.id} style={{ borderTop: "1px solid var(--border)", padding: "1.1rem 0" }}>
+                <div style={{ display: "flex", gap: "0.875rem", alignItems: "flex-start" }}>
+                  {/* Upvote */}
+                  <button onClick={() => handleVote(tip.id)}
+                    title={hasVoted ? "Déjà voté" : "Utile"}
+                    style={{ flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center", gap: "0.2rem", background: "none", border: `1px solid ${hasVoted ? "rgba(200,190,168,0.25)" : "var(--border)"}`, borderRadius: "6px", padding: "0.4rem 0.5rem", cursor: hasVoted ? "default" : "pointer", transition: "all 0.1s", minWidth: "40px" }}>
+                    <svg width="9" height="9" viewBox="0 0 9 9" fill="none">
+                      <path d="M4.5 1L8.5 7.5H0.5L4.5 1Z" fill={hasVoted ? "var(--beige)" : "var(--beige-muted)"} />
+                    </svg>
+                    <span style={{ fontSize: "0.68rem", fontWeight: 600, color: hasVoted ? "var(--beige)" : "var(--beige-muted)", fontFamily: "'JetBrains Mono', monospace" }}>{tip.upvotes}</span>
+                  </button>
+
+                  {/* Body */}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.35rem" }}>
+                      <span style={{ fontSize: "0.6rem", fontWeight: 600, color, border: `1px solid ${color}40`, borderRadius: "3px", padding: "0.1rem 0.4rem", fontFamily: "'JetBrains Mono', monospace", whiteSpace: "nowrap" }}>
+                        {tip.category}
+                      </span>
+                    </div>
+                    <button onClick={() => setExpandedId(isExpanded ? null : tip.id)}
+                      style={{ background: "none", border: "none", padding: 0, cursor: "pointer", textAlign: "left", width: "100%", display: "block" }}>
+                      <h3 style={{ fontSize: "0.9rem", fontWeight: 600, color: "var(--beige)", marginBottom: "0.3rem", lineHeight: 1.4 }}>{tip.title}</h3>
+                    </button>
+
+                    {isExpanded ? (
+                      <pre style={{ fontSize: "0.825rem", color: "var(--beige-dim)", lineHeight: 1.75, whiteSpace: "pre-wrap", fontFamily: "inherit", margin: "0 0 0.5rem" }}>
+                        {tip.content}
+                      </pre>
+                    ) : (
+                      <p style={{ fontSize: "0.825rem", color: "var(--beige-muted)", margin: "0 0 0.5rem", lineHeight: 1.65, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const }}>
+                        {tip.content}
+                      </p>
+                    )}
+
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+                      {tip.author && <span style={{ fontSize: "0.7rem", color: "var(--beige-muted)" }}>par {tip.author}</span>}
+                      <span style={{ fontSize: "0.68rem", color: "var(--text-muted)" }}>
+                        {new Date(tip.created_at).toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" })}
+                      </span>
+                      <button onClick={() => setExpandedId(isExpanded ? null : tip.id)}
+                        style={{ marginLeft: "auto", background: "none", border: "none", color: "var(--beige-muted)", fontSize: "0.7rem", cursor: "pointer", padding: 0 }}>
+                        {isExpanded ? "↑ Réduire" : "↓ Lire"}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+          <div style={{ borderTop: "1px solid var(--border)" }} />
+        </div>
+      )}
+
+      {/* Form modal */}
+      {showForm && (
+        <>
+          <div onClick={() => setShowForm(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)", zIndex: 400 }} />
+          <div style={{ position: "fixed", top: "50%", left: "50%", transform: "translate(-50%,-50%)", width: isMobile ? "calc(100vw - 2rem)" : "560px", maxHeight: "90vh", overflowY: "auto", background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: "10px", zIndex: 401, padding: "1.5rem" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.25rem" }}>
+              <h2 style={{ fontSize: "1rem", fontWeight: 600, color: "var(--beige)" }}>Partager un tip</h2>
+              <button onClick={() => setShowForm(false)} style={{ background: "none", border: "none", color: "var(--beige-muted)", cursor: "pointer", fontSize: "1rem", padding: "0.25rem" }}>✕</button>
+            </div>
+
+            {submitSuccess ? (
+              <div className="check-pop" style={{ padding: "2rem 0", textAlign: "center", color: "var(--beige)", fontSize: "0.9rem" }}>
+                ✓ Contribution publiée, merci !
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+                <div>
+                  <label style={{ display: "block", fontSize: "0.7rem", fontWeight: 600, color: "var(--beige-muted)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "0.4rem" }}>Titre *</label>
+                  <input value={formTitle} onChange={e => setFormTitle(e.target.value)}
+                    placeholder="Ex: Utiliser #file pour donner du contexte ciblé"
+                    style={{ width: "100%", padding: "0.6rem 0.75rem", background: "var(--bg-dark)", border: "1px solid var(--border)", borderRadius: "6px", color: "var(--beige)", fontSize: "0.875rem", outline: "none", boxSizing: "border-box" }} />
+                </div>
+
+                <div>
+                  <label style={{ display: "block", fontSize: "0.7rem", fontWeight: 600, color: "var(--beige-muted)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "0.4rem" }}>Catégorie</label>
+                  <select value={formCategory} onChange={e => setFormCategory(e.target.value)}
+                    style={{ width: "100%", padding: "0.6rem 0.75rem", background: "var(--bg-dark)", border: "1px solid var(--border)", borderRadius: "6px", color: "var(--beige)", fontSize: "0.875rem", outline: "none" }}>
+                    {WIKI_CATEGORIES.slice(1).map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{ display: "block", fontSize: "0.7rem", fontWeight: 600, color: "var(--beige-muted)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "0.4rem" }}>Contenu *</label>
+                  <textarea value={formContent} onChange={e => setFormContent(e.target.value)}
+                    rows={7}
+                    placeholder={"Décris ton tip, workflow ou config en détail.\nTu peux inclure du code ou des exemples."}
+                    style={{ width: "100%", padding: "0.6rem 0.75rem", background: "var(--bg-dark)", border: "1px solid var(--border)", borderRadius: "6px", color: "var(--beige)", fontSize: "0.84rem", outline: "none", resize: "vertical", lineHeight: 1.7, fontFamily: "inherit", boxSizing: "border-box" }} />
+                </div>
+
+                <div>
+                  <label style={{ display: "block", fontSize: "0.7rem", fontWeight: 600, color: "var(--beige-muted)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "0.4rem" }}>Nom (optionnel)</label>
+                  <input value={formAuthor} onChange={e => setFormAuthor(e.target.value)}
+                    placeholder="Anonyme si laissé vide"
+                    style={{ width: "100%", padding: "0.6rem 0.75rem", background: "var(--bg-dark)", border: "1px solid var(--border)", borderRadius: "6px", color: "var(--beige)", fontSize: "0.875rem", outline: "none", boxSizing: "border-box" }} />
+                </div>
+
+                {submitError && <div style={{ fontSize: "0.8rem", color: "#c87070" }}>{submitError}</div>}
+
+                <div style={{ display: "flex", gap: "0.75rem", justifyContent: "flex-end" }}>
+                  <button onClick={() => setShowForm(false)}
+                    style={{ padding: "0.5rem 1rem", background: "none", border: "1px solid var(--border)", borderRadius: "6px", color: "var(--beige-dim)", fontSize: "0.825rem", cursor: "pointer" }}>
+                    Annuler
+                  </button>
+                  <button onClick={handleSubmit} disabled={submitting}
+                    style={{ padding: "0.5rem 1.25rem", background: "var(--beige)", border: "none", borderRadius: "6px", color: "var(--bg-dark)", fontSize: "0.825rem", fontWeight: 600, cursor: submitting ? "default" : "pointer", opacity: submitting ? 0.7 : 1 }}>
+                    {submitting ? "Envoi…" : "Publier"}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
 // MAIN APP
 // ─────────────────────────────────────────────
 export default function App() {
   const isMobile = useIsMobile();
-  const [view, setView] = useState<"home" | "lesson">("home");
+  const [view, setView] = useState<"home" | "lesson" | "wiki">("home");
   const [currentModuleId, setCurrentModuleId] = useState(curriculum[0].id);
   const [currentLessonId, setCurrentLessonId] = useState(curriculum[0].lessons[0].id);
   const [scrollToSection, setScrollToSection] = useState<number | null>(null);
@@ -690,8 +958,10 @@ export default function App() {
           onClose={() => setDrawerOpen(false)}
           currentModuleId={currentModuleId}
           currentLessonId={currentLessonId}
+          currentView={view}
           onNavigate={(modId, lessonId, sectionIdx) => { navigate(modId, lessonId, sectionIdx); setDrawerOpen(false); }}
           onSelect={(modId, lessonId) => { goToLesson(modId, lessonId); setDrawerOpen(false); }}
+          onWiki={() => { setView("wiki"); setDrawerOpen(false); }}
         />
 
         <MobileSearchOverlay open={mobileSearchOpen} onClose={() => setMobileSearchOpen(false)} onNavigate={navigate} />
@@ -699,6 +969,8 @@ export default function App() {
         <div ref={contentRef} style={{ flex: 1, overflowY: "auto", WebkitOverflowScrolling: "touch" }}>
           {view === "home" ? (
             <HomePage onNavigate={navigate} onSelect={goToLesson} isMobile={true} />
+          ) : view === "wiki" ? (
+            <WikiView isMobile={true} />
           ) : (
             <div style={{ padding: "0 1.25rem" }}>
               <LessonView lesson={currentLesson} mod={currentMod} scrollToSection={scrollToSection} isMobile={true} />
@@ -722,6 +994,7 @@ export default function App() {
         onHome={() => setView("home")}
         onModuleSelect={handleModuleSelect}
         onNavigate={navigate}
+        onWiki={() => setView("wiki")}
       />
 
       <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
@@ -732,6 +1005,8 @@ export default function App() {
         <div ref={contentRef} style={{ flex: 1, overflowY: "auto" }}>
           {view === "home" ? (
             <HomePage onNavigate={navigate} onSelect={goToLesson} isMobile={false} />
+          ) : view === "wiki" ? (
+            <WikiView isMobile={false} />
           ) : (
             <div style={{ padding: "0 3rem" }}>
               <LessonView lesson={currentLesson} mod={currentMod} scrollToSection={scrollToSection} isMobile={false} />
