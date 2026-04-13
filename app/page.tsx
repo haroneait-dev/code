@@ -786,10 +786,11 @@ function AuthModal({ onClose, onAuth }: { onClose: () => void; onAuth: (user: Us
   };
 
   const handleGoogle = async () => {
-    await supabase.auth.signInWithOAuth({
+    const { error: err } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: { redirectTo: window.location.origin },
     });
+    if (err) setError("Google non configuré. Utilise email/mot de passe.");
   };
 
   return (
