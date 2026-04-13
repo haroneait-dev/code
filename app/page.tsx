@@ -3,6 +3,8 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { curriculum, totalLessons, type Lesson, type Module } from "@/lib/curriculum";
 import { exercisesByLesson } from "@/lib/exercises";
+import { supabase } from "@/lib/supabase";
+import type { User } from "@supabase/supabase-js";
 
 // ─────────────────────────────────────────────
 // RESPONSIVE HOOK
@@ -29,6 +31,23 @@ type WikiTip = {
   category: string;
   upvotes: number;
   created_at: string;
+};
+
+type CommunitySkill = {
+  id: string;
+  name: string;
+  level: "Débutant" | "Intermédiaire" | "Avancé";
+  description: string | null;
+  author: string | null;
+  upvotes: number;
+  created_at: string;
+};
+
+const SKILL_LEVELS = ["Débutant", "Intermédiaire", "Avancé"] as const;
+const SKILL_LEVEL_COLORS: Record<string, string> = {
+  "Débutant": "#7fa87f",
+  "Intermédiaire": "#c89060",
+  "Avancé": "#c87070",
 };
 
 const WIKI_CATEGORIES = ["Tous", "Tips & Tricks", "Workflow", "CLAUDE.md", "MCP", "Hooks", "Divers"] as const;
@@ -362,10 +381,11 @@ function MobileDrawer({ open, onClose, currentModuleId, currentLessonId, current
 // ─────────────────────────────────────────────
 // MOBILE HEADER
 // ─────────────────────────────────────────────
-function MobileHeader({ onMenuOpen, onHome, view, lessonTitle, onSearchOpen }: {
+function MobileHeader({ onMenuOpen, onHome, view, lessonTitle, onSearchOpen, user, onAuthClick }: {
   onMenuOpen: () => void; onHome: () => void;
   view: "home" | "lesson" | "wiki"; lessonTitle?: string;
   onSearchOpen: () => void;
+  user: User | null; onAuthClick: () => void;
 }) {
   return (
     <header style={{ height: "52px", display: "flex", alignItems: "center", padding: "0 1rem", gap: "0.75rem", borderBottom: "1px solid var(--border)", background: "var(--bg-surface)", flexShrink: 0 }}>
@@ -386,6 +406,12 @@ function MobileHeader({ onMenuOpen, onHome, view, lessonTitle, onSearchOpen }: {
 
       <button onClick={onSearchOpen} style={{ marginLeft: "auto", width: "36px", height: "36px", display: "flex", alignItems: "center", justifyContent: "center", background: "none", border: "none", cursor: "pointer", flexShrink: 0 }}>
         <svg width="16" height="16" viewBox="0 0 15 15" fill="none"><path d="M10 6.5a3.5 3.5 0 1 1-7 0 3.5 3.5 0 0 1 7 0Zm-.889 3.182a4.5 4.5 0 1 1 .707-.707l2.604 2.603a.5.5 0 0 1-.707.707L9.111 9.682Z" fill="var(--beige-muted)" fillRule="evenodd" clipRule="evenodd"/></svg>
+      </button>
+      <button onClick={onAuthClick}
+        style={{ width: "30px", height: "30px", borderRadius: "50%", background: user ? "var(--beige-muted)" : "none", border: user ? "none" : "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0, fontSize: user ? "0.65rem" : "0.6rem", fontWeight: 700, color: user ? "var(--bg-dark)" : "var(--beige-muted)", fontFamily: "'JetBrains Mono', monospace" }}>
+        {user ? (user.email?.[0]?.toUpperCase() ?? "?") : (
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="5" r="2.5" stroke="var(--beige-muted)" strokeWidth="1.2"/><path d="M2 12c0-2.76 2.24-5 5-5s5 2.24 5 5" stroke="var(--beige-muted)" strokeWidth="1.2" strokeLinecap="round"/></svg>
+        )}
       </button>
     </header>
   );
@@ -448,13 +474,58 @@ function MobileBottomNav({ onPrev, onNext, hasPrev, hasNext }: { onPrev: () => v
 }
 
 // ─────────────────────────────────────────────
+// USER MENU
+// ─────────────────────────────────────────────
+function UserMenu({ user, onSignOut }: { user: User; onSignOut: () => void }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const initials = user.email?.[0]?.toUpperCase() ?? "?";
+  const shortEmail = user.email ? (user.email.length > 20 ? user.email.slice(0, 18) + "…" : user.email) : "";
+
+  useEffect(() => {
+    const click = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+    document.addEventListener("mousedown", click);
+    return () => document.removeEventListener("mousedown", click);
+  }, []);
+
+  return (
+    <div ref={ref} style={{ position: "relative", flexShrink: 0 }}>
+      <button onClick={() => setOpen(v => !v)}
+        style={{ display: "flex", alignItems: "center", gap: "0.5rem", padding: "0.25rem 0.5rem 0.25rem 0.25rem", background: open ? "rgba(200,190,168,0.08)" : "none", border: "1px solid var(--border)", borderRadius: "20px", cursor: "pointer", transition: "all 0.1s" }}>
+        <span style={{ width: "24px", height: "24px", borderRadius: "50%", background: "var(--beige-muted)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.65rem", fontWeight: 700, color: "var(--bg-dark)", fontFamily: "'JetBrains Mono', monospace", flexShrink: 0 }}>{initials}</span>
+        <span style={{ fontSize: "0.75rem", color: "var(--beige-dim)", maxWidth: "140px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{shortEmail}</span>
+        <svg width="10" height="10" viewBox="0 0 10 10" fill="none" style={{ transform: open ? "rotate(180deg)" : "none", transition: "transform 0.15s", flexShrink: 0 }}>
+          <path d="M2 3.5L5 6.5L8 3.5" stroke="var(--beige-muted)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+      </button>
+      {open && (
+        <div style={{ position: "absolute", top: "calc(100% + 6px)", right: 0, background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: "8px", minWidth: "180px", overflow: "hidden", boxShadow: "0 12px 32px rgba(0,0,0,0.5)", zIndex: 300 }}>
+          <div style={{ padding: "0.75rem 1rem", borderBottom: "1px solid var(--border)" }}>
+            <div style={{ fontSize: "0.7rem", color: "var(--beige-muted)", marginBottom: "0.15rem" }}>Connecté en tant que</div>
+            <div style={{ fontSize: "0.8rem", color: "var(--beige)", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{user.email}</div>
+          </div>
+          <button onClick={() => { onSignOut(); setOpen(false); }}
+            style={{ width: "100%", padding: "0.65rem 1rem", background: "none", border: "none", cursor: "pointer", textAlign: "left", fontSize: "0.825rem", color: "var(--beige-dim)", display: "flex", alignItems: "center", gap: "0.5rem", transition: "background 0.1s" }}
+            onMouseEnter={e => (e.currentTarget.style.background = "rgba(200,190,168,0.05)")}
+            onMouseLeave={e => (e.currentTarget.style.background = "none")}>
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M5 2H2a1 1 0 0 0-1 1v7a1 1 0 0 0 1 1h3M9 9l3-3-3-3M12 6.5H5" stroke="var(--beige-muted)" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            Se déconnecter
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
 // DESKTOP COMPONENTS
 // ─────────────────────────────────────────────
-function DesktopTopNav({ currentModuleId, currentView, onHome, onModuleSelect, onNavigate, onWiki }: {
+function DesktopTopNav({ currentModuleId, currentView, onHome, onModuleSelect, onNavigate, onWiki, user, onAuthClick, onSignOut }: {
   currentModuleId: string; currentView: "home" | "lesson" | "wiki";
   onHome: () => void; onModuleSelect: (modId: string) => void;
   onNavigate: (modId: string, lessonId: string, sectionIdx: number | null) => void;
   onWiki: () => void;
+  user: User | null; onAuthClick: () => void; onSignOut: () => void;
 }) {
   const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -511,6 +582,18 @@ function DesktopTopNav({ currentModuleId, currentView, onHome, onModuleSelect, o
             </div>
           )}
         </div>
+
+        {/* Auth */}
+        {user ? (
+          <UserMenu user={user} onSignOut={onSignOut} />
+        ) : (
+          <button onClick={onAuthClick}
+            style={{ padding: "0.375rem 0.875rem", background: "var(--beige)", border: "none", borderRadius: "5px", color: "var(--bg-dark)", fontSize: "0.775rem", fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap", transition: "background 0.1s", flexShrink: 0 }}
+            onMouseEnter={e => (e.currentTarget.style.background = "var(--beige-light)")}
+            onMouseLeave={e => (e.currentTarget.style.background = "var(--beige)")}>
+            Se connecter
+          </button>
+        )}
       </div>
 
       {/* Module tabs */}
@@ -673,9 +756,128 @@ function HomepageSearch({ onNavigate }: { onNavigate: (modId: string, lessonId: 
 }
 
 // ─────────────────────────────────────────────
+// AUTH MODAL
+// ─────────────────────────────────────────────
+function AuthModal({ onClose, onAuth }: { onClose: () => void; onAuth: (user: User) => void }) {
+  const [mode, setMode] = useState<"signin" | "signup">("signin");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+
+  const handleSubmit = async () => {
+    if (!email.trim() || !password.trim()) { setError("Email et mot de passe requis."); return; }
+    setLoading(true); setError("");
+    if (mode === "signin") {
+      const { data, error: err } = await supabase.auth.signInWithPassword({ email, password });
+      if (err) { setError(err.message); setLoading(false); return; }
+      if (data.user) { onAuth(data.user); onClose(); }
+    } else {
+      const { data, error: err } = await supabase.auth.signUp({ email, password });
+      if (err) { setError(err.message); setLoading(false); return; }
+      if (data.user && !data.session) {
+        setSuccess("Vérifie ton email pour confirmer ton compte.");
+      } else if (data.user) {
+        onAuth(data.user); onClose();
+      }
+    }
+    setLoading(false);
+  };
+
+  const handleGoogle = async () => {
+    await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: { redirectTo: window.location.origin },
+    });
+  };
+
+  return (
+    <>
+      <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.8)", zIndex: 500 }} />
+      <div className="fade-in" style={{ position: "fixed", top: "50%", left: "50%", transform: "translate(-50%,-50%)", width: "420px", maxWidth: "calc(100vw - 2rem)", background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: "12px", zIndex: 501, padding: "2rem" }}>
+        {/* Close */}
+        <button onClick={onClose} style={{ position: "absolute", top: "1rem", right: "1rem", background: "none", border: "none", color: "var(--beige-muted)", cursor: "pointer", fontSize: "1rem", padding: "0.25rem", lineHeight: 1 }}>✕</button>
+
+        {/* Logo */}
+        <div style={{ textAlign: "center", marginBottom: "1.75rem" }}>
+          <div style={{ width: "38px", height: "38px", borderRadius: "8px", background: "var(--beige)", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: "1.05rem", color: "var(--bg-dark)", fontWeight: 800, fontFamily: "'JetBrains Mono', monospace", marginBottom: "0.75rem" }}>C</div>
+          <div style={{ fontSize: "0.9rem", fontWeight: 600, color: "var(--beige)" }}>Claude Code Formation</div>
+        </div>
+
+        {/* Tabs */}
+        <div style={{ display: "flex", borderBottom: "1px solid var(--border)", marginBottom: "1.5rem" }}>
+          {(["signin", "signup"] as const).map(m => (
+            <button key={m} onClick={() => { setMode(m); setError(""); setSuccess(""); }}
+              style={{ flex: 1, padding: "0.5rem", background: "none", border: "none", borderBottom: mode === m ? "2px solid var(--beige)" : "2px solid transparent", color: mode === m ? "var(--beige)" : "var(--beige-muted)", fontSize: "0.85rem", fontWeight: mode === m ? 600 : 400, cursor: "pointer", marginBottom: "-1px", transition: "color 0.1s" }}>
+              {m === "signin" ? "Connexion" : "Créer un compte"}
+            </button>
+          ))}
+        </div>
+
+        {success ? (
+          <div style={{ padding: "1.5rem 0", textAlign: "center", lineHeight: 1.7 }}>
+            <div style={{ fontSize: "2rem", marginBottom: "0.75rem" }}>✉️</div>
+            <p style={{ fontSize: "0.875rem", color: "var(--beige-dim)" }}>{success}</p>
+          </div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: "0.875rem" }}>
+            {/* Google OAuth */}
+            <button onClick={handleGoogle}
+              style={{ width: "100%", padding: "0.65rem", background: "none", border: "1px solid var(--border)", borderRadius: "7px", color: "var(--beige-dim)", fontSize: "0.875rem", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "0.6rem", transition: "background 0.1s" }}
+              onMouseEnter={e => (e.currentTarget.style.background = "rgba(200,190,168,0.05)")}
+              onMouseLeave={e => (e.currentTarget.style.background = "none")}>
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <path d="M15.68 8.18c0-.57-.05-1.12-.14-1.64H8v3.1h4.31a3.67 3.67 0 0 1-1.6 2.41v2h2.58C16.8 12.7 15.68 10.6 15.68 8.18Z" fill="#4285F4"/>
+                <path d="M8 16c2.16 0 3.97-.72 5.3-1.94l-2.58-2a4.87 4.87 0 0 1-7.27-2.56H.76v2.07A8 8 0 0 0 8 16Z" fill="#34A853"/>
+                <path d="M3.45 9.5A4.8 4.8 0 0 1 3.2 8c0-.52.09-1.02.25-1.5V4.43H.76A8 8 0 0 0 0 8c0 1.29.31 2.51.76 3.57L3.45 9.5Z" fill="#FBBC04"/>
+                <path d="M8 3.18c1.22 0 2.3.42 3.16 1.24l2.37-2.37A7.93 7.93 0 0 0 8 0 8 8 0 0 0 .76 4.43L3.45 6.5A4.77 4.77 0 0 1 8 3.18Z" fill="#EA4335"/>
+              </svg>
+              Continuer avec Google
+            </button>
+
+            <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+              <div style={{ flex: 1, height: "1px", background: "var(--border)" }} />
+              <span style={{ fontSize: "0.68rem", color: "var(--text-muted)" }}>ou par email</span>
+              <div style={{ flex: 1, height: "1px", background: "var(--border)" }} />
+            </div>
+
+            <div>
+              <label style={{ display: "block", fontSize: "0.7rem", fontWeight: 600, color: "var(--beige-muted)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "0.4rem" }}>Email</label>
+              <input autoFocus type="email" value={email} onChange={e => setEmail(e.target.value)}
+                onKeyDown={e => e.key === "Enter" && handleSubmit()}
+                placeholder="toi@exemple.com"
+                style={{ width: "100%", padding: "0.65rem 0.75rem", background: "var(--bg-dark)", border: "1px solid var(--border)", borderRadius: "6px", color: "var(--beige)", fontSize: "0.875rem", outline: "none", boxSizing: "border-box" }} />
+            </div>
+
+            <div>
+              <label style={{ display: "block", fontSize: "0.7rem", fontWeight: 600, color: "var(--beige-muted)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "0.4rem" }}>Mot de passe</label>
+              <input type="password" value={password} onChange={e => setPassword(e.target.value)}
+                onKeyDown={e => e.key === "Enter" && handleSubmit()}
+                placeholder={mode === "signup" ? "8 caractères minimum" : "••••••••"}
+                style={{ width: "100%", padding: "0.65rem 0.75rem", background: "var(--bg-dark)", border: "1px solid var(--border)", borderRadius: "6px", color: "var(--beige)", fontSize: "0.875rem", outline: "none", boxSizing: "border-box" }} />
+            </div>
+
+            {error && <div style={{ fontSize: "0.8rem", color: "#c87070", lineHeight: 1.5 }}>{error}</div>}
+
+            <button onClick={handleSubmit} disabled={loading}
+              style={{ width: "100%", padding: "0.7rem", background: "var(--beige)", border: "none", borderRadius: "7px", color: "var(--bg-dark)", fontSize: "0.875rem", fontWeight: 600, cursor: loading ? "default" : "pointer", opacity: loading ? 0.7 : 1, marginTop: "0.125rem", transition: "background 0.1s" }}
+              onMouseEnter={e => { if (!loading) e.currentTarget.style.background = "var(--beige-light)"; }}
+              onMouseLeave={e => (e.currentTarget.style.background = "var(--beige)")}>
+              {loading ? "…" : mode === "signin" ? "Se connecter" : "Créer mon compte"}
+            </button>
+          </div>
+        )}
+      </div>
+    </>
+  );
+}
+
+// ─────────────────────────────────────────────
 // WIKI VIEW
 // ─────────────────────────────────────────────
 function WikiView({ isMobile }: { isMobile: boolean }) {
+  const [communityTab, setCommunityTab] = useState<"tips" | "skills">("tips");
   const [tips, setTips] = useState<WikiTip[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeCategory, setActiveCategory] = useState<string>("Tous");
@@ -732,25 +934,37 @@ function WikiView({ isMobile }: { isMobile: boolean }) {
   return (
     <div className="fade-in" style={{ maxWidth: "760px", margin: "0 auto", padding: isMobile ? "1.5rem 1.25rem 5rem" : "3rem 2rem 5rem" }}>
       {/* Header */}
-      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: "2rem", gap: "1rem" }}>
-        <div>
-          <div style={{ fontSize: "0.65rem", fontWeight: 600, color: "var(--beige-muted)", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "0.5rem" }}>
-            Base de connaissances · {tips.length} contribution{tips.length !== 1 ? "s" : ""}
-          </div>
-          <h1 style={{ fontSize: isMobile ? "1.5rem" : "1.875rem", fontWeight: 700, color: "var(--beige)", letterSpacing: "-0.02em", lineHeight: 1.15, marginBottom: "0.5rem" }}>
-            Communauté
-          </h1>
-          <p style={{ fontSize: "0.875rem", color: "var(--beige-muted)", lineHeight: 1.7, maxWidth: "480px" }}>
-            Tips, workflows et configs partagés par la communauté. Partage ce qui marche pour toi.
-          </p>
+      <div style={{ marginBottom: "1.75rem" }}>
+        <div style={{ fontSize: "0.65rem", fontWeight: 600, color: "var(--beige-muted)", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "0.5rem" }}>
+          Base de connaissances
         </div>
-        <button onClick={() => setShowForm(true)}
-          style={{ flexShrink: 0, padding: "0.5rem 1rem", background: "var(--beige)", border: "none", borderRadius: "6px", color: "var(--bg-dark)", fontSize: "0.8rem", fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap", transition: "background 0.1s" }}
-          onMouseEnter={e => (e.currentTarget.style.background = "var(--beige-light)")}
-          onMouseLeave={e => (e.currentTarget.style.background = "var(--beige)")}>
-          + Partager
-        </button>
+        <h1 style={{ fontSize: isMobile ? "1.5rem" : "1.875rem", fontWeight: 700, color: "var(--beige)", letterSpacing: "-0.02em", lineHeight: 1.15, marginBottom: "0.5rem" }}>
+          Communauté
+        </h1>
+        <p style={{ fontSize: "0.875rem", color: "var(--beige-muted)", lineHeight: 1.7, maxWidth: "480px" }}>
+          Tips, workflows, configs et compétences partagés par la communauté.
+        </p>
       </div>
+
+      {/* Tabs */}
+      <div style={{ display: "flex", gap: "0", borderBottom: "1px solid var(--border)", marginBottom: "1.75rem" }}>
+        {(["tips", "skills"] as const).map(tab => {
+          const label = tab === "tips" ? "Tips & Wiki" : "Compétences";
+          const isActive = communityTab === tab;
+          return (
+            <button key={tab} onClick={() => setCommunityTab(tab)}
+              style={{ padding: "0.5rem 1.1rem", background: "none", border: "none", borderBottom: isActive ? "2px solid var(--beige)" : "2px solid transparent", marginBottom: "-1px", cursor: "pointer", fontSize: "0.825rem", fontWeight: isActive ? 600 : 400, color: isActive ? "var(--beige)" : "var(--beige-muted)", transition: "color 0.1s" }}>
+              {label}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Skills tab */}
+      {communityTab === "skills" && <SkillsView isMobile={isMobile} />}
+
+      {/* Tips tab content below */}
+      {communityTab === "tips" && <>
 
       {/* Category filter */}
       <div style={{ display: "flex", gap: "0.375rem", flexWrap: "wrap", marginBottom: "1.75rem" }}>
@@ -901,6 +1115,213 @@ function WikiView({ isMobile }: { isMobile: boolean }) {
           </div>
         </>
       )}
+      </>}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
+// SKILLS VIEW
+// ─────────────────────────────────────────────
+function SkillsView({ isMobile }: { isMobile: boolean }) {
+  const [skills, setSkills] = useState<CommunitySkill[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [activeLevel, setActiveLevel] = useState<string>("Tous");
+  const [voted, setVoted] = useState<Set<string>>(new Set());
+  const [showForm, setShowForm] = useState(false);
+  const [formName, setFormName] = useState("");
+  const [formLevel, setFormLevel] = useState<string>("Débutant");
+  const [formDescription, setFormDescription] = useState("");
+  const [formAuthor, setFormAuthor] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState("");
+  const [submitSuccess, setSubmitSuccess] = useState(false);
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem("skills_voted");
+      if (stored) setVoted(new Set(JSON.parse(stored)));
+    } catch {}
+    fetch("/api/skills")
+      .then(r => r.json())
+      .then(data => { setSkills(Array.isArray(data) ? data : []); setLoading(false); })
+      .catch(() => setLoading(false));
+  }, []);
+
+  const filtered = activeLevel === "Tous" ? skills : skills.filter(s => s.level === activeLevel);
+
+  const handleVote = async (id: string) => {
+    if (voted.has(id)) return;
+    const next = new Set(voted); next.add(id);
+    setVoted(next);
+    try { localStorage.setItem("skills_voted", JSON.stringify([...next])); } catch {}
+    setSkills(prev => prev.map(s => s.id === id ? { ...s, upvotes: s.upvotes + 1 } : s));
+    fetch(`/api/skills/${id}/vote`, { method: "POST" }).catch(() => {});
+  };
+
+  const handleSubmit = async () => {
+    if (!formName.trim()) { setSubmitError("Nom de compétence requis."); return; }
+    setSubmitting(true); setSubmitError("");
+    const res = await fetch("/api/skills", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: formName, level: formLevel, description: formDescription || null, author: formAuthor || null }),
+    });
+    const data = await res.json();
+    if (!res.ok) { setSubmitError(data.error ?? "Erreur serveur."); setSubmitting(false); return; }
+    setSkills(prev => [data, ...prev]);
+    setSubmitSuccess(true);
+    setFormName(""); setFormLevel("Débutant"); setFormDescription(""); setFormAuthor("");
+    setSubmitting(false);
+    setTimeout(() => { setShowForm(false); setSubmitSuccess(false); }, 1200);
+  };
+
+  const levelFilters = ["Tous", ...SKILL_LEVELS];
+
+  return (
+    <div>
+      {/* Level filter + add button */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "1.5rem", gap: "1rem", flexWrap: "wrap" }}>
+        <div style={{ display: "flex", gap: "0.375rem", flexWrap: "wrap" }}>
+          {levelFilters.map(lv => {
+            const isActive = activeLevel === lv;
+            const color = lv === "Tous" ? undefined : SKILL_LEVEL_COLORS[lv];
+            return (
+              <button key={lv} onClick={() => setActiveLevel(lv)}
+                style={{ padding: "0.3rem 0.75rem", background: isActive ? "rgba(200,190,168,0.1)" : "none", border: `1px solid ${isActive ? (color ?? "rgba(200,190,168,0.3)") : "var(--border)"}`, borderRadius: "999px", color: isActive ? (color ?? "var(--beige)") : "var(--beige-muted)", fontSize: "0.75rem", cursor: "pointer", fontWeight: isActive ? 500 : 400, transition: "all 0.1s" }}>
+                {lv}
+              </button>
+            );
+          })}
+        </div>
+        <button onClick={() => setShowForm(true)}
+          style={{ flexShrink: 0, padding: "0.45rem 0.9rem", background: "var(--beige)", border: "none", borderRadius: "6px", color: "var(--bg-dark)", fontSize: "0.78rem", fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}
+          onMouseEnter={e => (e.currentTarget.style.background = "var(--beige-light)")}
+          onMouseLeave={e => (e.currentTarget.style.background = "var(--beige)")}>
+          + Ajouter
+        </button>
+      </div>
+
+      {/* Skills list */}
+      {loading ? (
+        <div style={{ padding: "3rem 0", textAlign: "center", color: "var(--beige-muted)", fontSize: "0.875rem" }}>Chargement…</div>
+      ) : filtered.length === 0 ? (
+        <div style={{ padding: "3rem 0", textAlign: "center" }}>
+          <div style={{ fontSize: "0.875rem", color: "var(--beige-muted)", marginBottom: "1rem" }}>
+            {activeLevel === "Tous" ? "Aucune compétence pour l'instant." : `Aucune compétence de niveau "${activeLevel}".`}
+          </div>
+          <button onClick={() => setShowForm(true)}
+            style={{ padding: "0.5rem 1.25rem", background: "none", border: "1px solid var(--border)", borderRadius: "6px", color: "var(--beige-dim)", fontSize: "0.825rem", cursor: "pointer" }}>
+            Être le premier à contribuer →
+          </button>
+        </div>
+      ) : (
+        <div>
+          {filtered.map(skill => {
+            const hasVoted = voted.has(skill.id);
+            const color = SKILL_LEVEL_COLORS[skill.level] ?? "#9a9080";
+            return (
+              <div key={skill.id} style={{ borderTop: "1px solid var(--border)", padding: "1.1rem 0" }}>
+                <div style={{ display: "flex", gap: "0.875rem", alignItems: "flex-start" }}>
+                  {/* Upvote */}
+                  <button onClick={() => handleVote(skill.id)}
+                    title={hasVoted ? "Déjà voté" : "Utile"}
+                    style={{ flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center", gap: "0.2rem", background: "none", border: `1px solid ${hasVoted ? "rgba(200,190,168,0.25)" : "var(--border)"}`, borderRadius: "6px", padding: "0.4rem 0.5rem", cursor: hasVoted ? "default" : "pointer", transition: "all 0.1s", minWidth: "40px" }}>
+                    <svg width="9" height="9" viewBox="0 0 9 9" fill="none">
+                      <path d="M4.5 1L8.5 7.5H0.5L4.5 1Z" fill={hasVoted ? "var(--beige)" : "var(--beige-muted)"} />
+                    </svg>
+                    <span style={{ fontSize: "0.68rem", fontWeight: 600, color: hasVoted ? "var(--beige)" : "var(--beige-muted)", fontFamily: "'JetBrains Mono', monospace" }}>{skill.upvotes}</span>
+                  </button>
+
+                  {/* Body */}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.35rem" }}>
+                      <span style={{ fontSize: "0.6rem", fontWeight: 600, color, border: `1px solid ${color}40`, borderRadius: "3px", padding: "0.1rem 0.4rem", fontFamily: "'JetBrains Mono', monospace", whiteSpace: "nowrap" }}>
+                        {skill.level}
+                      </span>
+                    </div>
+                    <h3 style={{ fontSize: "0.9rem", fontWeight: 600, color: "var(--beige)", marginBottom: "0.3rem", lineHeight: 1.4 }}>{skill.name}</h3>
+                    {skill.description && (
+                      <p style={{ fontSize: "0.825rem", color: "var(--beige-muted)", margin: "0 0 0.5rem", lineHeight: 1.65 }}>{skill.description}</p>
+                    )}
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+                      {skill.author && <span style={{ fontSize: "0.7rem", color: "var(--beige-muted)" }}>par {skill.author}</span>}
+                      <span style={{ fontSize: "0.68rem", color: "var(--text-muted)" }}>
+                        {new Date(skill.created_at).toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" })}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+          <div style={{ borderTop: "1px solid var(--border)" }} />
+        </div>
+      )}
+
+      {/* Form modal */}
+      {showForm && (
+        <>
+          <div onClick={() => setShowForm(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)", zIndex: 400 }} />
+          <div style={{ position: "fixed", top: "50%", left: "50%", transform: "translate(-50%,-50%)", width: isMobile ? "calc(100vw - 2rem)" : "480px", maxHeight: "90vh", overflowY: "auto", background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: "10px", zIndex: 401, padding: "1.5rem" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.25rem" }}>
+              <h2 style={{ fontSize: "1rem", fontWeight: 600, color: "var(--beige)" }}>Ajouter une compétence</h2>
+              <button onClick={() => setShowForm(false)} style={{ background: "none", border: "none", color: "var(--beige-muted)", cursor: "pointer", fontSize: "1rem", padding: "0.25rem" }}>✕</button>
+            </div>
+
+            {submitSuccess ? (
+              <div className="check-pop" style={{ padding: "2rem 0", textAlign: "center", color: "var(--beige)", fontSize: "0.9rem" }}>
+                ✓ Compétence ajoutée, merci !
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+                <div>
+                  <label style={{ display: "block", fontSize: "0.7rem", fontWeight: 600, color: "var(--beige-muted)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "0.4rem" }}>Compétence *</label>
+                  <input value={formName} onChange={e => setFormName(e.target.value)}
+                    placeholder="Ex: Prompt engineering, MCP servers, CLAUDE.md…"
+                    style={{ width: "100%", padding: "0.6rem 0.75rem", background: "var(--bg-dark)", border: "1px solid var(--border)", borderRadius: "6px", color: "var(--beige)", fontSize: "0.875rem", outline: "none", boxSizing: "border-box" }} />
+                </div>
+
+                <div>
+                  <label style={{ display: "block", fontSize: "0.7rem", fontWeight: 600, color: "var(--beige-muted)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "0.4rem" }}>Niveau</label>
+                  <select value={formLevel} onChange={e => setFormLevel(e.target.value)}
+                    style={{ width: "100%", padding: "0.6rem 0.75rem", background: "var(--bg-dark)", border: "1px solid var(--border)", borderRadius: "6px", color: "var(--beige)", fontSize: "0.875rem", outline: "none" }}>
+                    {SKILL_LEVELS.map(l => <option key={l} value={l}>{l}</option>)}
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{ display: "block", fontSize: "0.7rem", fontWeight: 600, color: "var(--beige-muted)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "0.4rem" }}>Description (optionnelle)</label>
+                  <textarea value={formDescription} onChange={e => setFormDescription(e.target.value)}
+                    rows={4}
+                    placeholder="Décris comment tu utilises cette compétence, ou donne un exemple…"
+                    style={{ width: "100%", padding: "0.6rem 0.75rem", background: "var(--bg-dark)", border: "1px solid var(--border)", borderRadius: "6px", color: "var(--beige)", fontSize: "0.84rem", outline: "none", resize: "vertical", lineHeight: 1.7, fontFamily: "inherit", boxSizing: "border-box" }} />
+                </div>
+
+                <div>
+                  <label style={{ display: "block", fontSize: "0.7rem", fontWeight: 600, color: "var(--beige-muted)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "0.4rem" }}>Nom (optionnel)</label>
+                  <input value={formAuthor} onChange={e => setFormAuthor(e.target.value)}
+                    placeholder="Anonyme si laissé vide"
+                    style={{ width: "100%", padding: "0.6rem 0.75rem", background: "var(--bg-dark)", border: "1px solid var(--border)", borderRadius: "6px", color: "var(--beige)", fontSize: "0.875rem", outline: "none", boxSizing: "border-box" }} />
+                </div>
+
+                {submitError && <div style={{ fontSize: "0.8rem", color: "#c87070" }}>{submitError}</div>}
+
+                <div style={{ display: "flex", gap: "0.75rem", justifyContent: "flex-end" }}>
+                  <button onClick={() => setShowForm(false)}
+                    style={{ padding: "0.5rem 1rem", background: "none", border: "1px solid var(--border)", borderRadius: "6px", color: "var(--beige-dim)", fontSize: "0.825rem", cursor: "pointer" }}>
+                    Annuler
+                  </button>
+                  <button onClick={handleSubmit} disabled={submitting}
+                    style={{ padding: "0.5rem 1.25rem", background: "var(--beige)", border: "none", borderRadius: "6px", color: "var(--bg-dark)", fontSize: "0.825rem", fontWeight: 600, cursor: submitting ? "default" : "pointer", opacity: submitting ? 0.7 : 1 }}>
+                    {submitting ? "Envoi…" : "Publier"}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -916,7 +1337,23 @@ export default function App() {
   const [scrollToSection, setScrollToSection] = useState<number | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
+  const [user, setUser] = useState<User | null>(null);
+  const [showAuth, setShowAuth] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
+
+  // Auth listener
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => setUser(data.session?.user ?? null));
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const handleSignOut = useCallback(async () => {
+    await supabase.auth.signOut();
+    setUser(null);
+  }, []);
 
   const currentMod = curriculum.find(m => m.id === currentModuleId) ?? curriculum[0];
   const currentLesson = currentMod.lessons.find(l => l.id === currentLessonId) ?? currentMod.lessons[0];
@@ -951,6 +1388,8 @@ export default function App() {
           view={view}
           lessonTitle={view === "lesson" ? currentLesson.title : undefined}
           onSearchOpen={() => setMobileSearchOpen(true)}
+          user={user}
+          onAuthClick={() => setShowAuth(true)}
         />
 
         <MobileDrawer
@@ -981,6 +1420,8 @@ export default function App() {
         {view === "lesson" && (
           <MobileBottomNav onPrev={goPrev} onNext={goNext} hasPrev={currentIndex > 0} hasNext={currentIndex < allLessons.length - 1} />
         )}
+
+        {showAuth && <AuthModal onClose={() => setShowAuth(false)} onAuth={u => setUser(u)} />}
       </main>
     );
   }
@@ -995,6 +1436,9 @@ export default function App() {
         onModuleSelect={handleModuleSelect}
         onNavigate={navigate}
         onWiki={() => setView("wiki")}
+        user={user}
+        onAuthClick={() => setShowAuth(true)}
+        onSignOut={handleSignOut}
       />
 
       <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
@@ -1018,6 +1462,8 @@ export default function App() {
           )}
         </div>
       </div>
+
+      {showAuth && <AuthModal onClose={() => setShowAuth(false)} onAuth={u => setUser(u)} />}
     </main>
   );
 }
