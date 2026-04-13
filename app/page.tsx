@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { curriculum, totalLessons, type Lesson, type Module } from "@/lib/curriculum";
 
 // ────────────────────────────────────────────────
@@ -320,6 +321,8 @@ function Sidebar({
   onSelect,
   collapsed,
   onToggle,
+  userEmail,
+  onLogout,
 }: {
   currentModuleId: string;
   currentLessonId: string;
@@ -327,6 +330,8 @@ function Sidebar({
   onSelect: (modId: string, lessonId: string) => void;
   collapsed: boolean;
   onToggle: () => void;
+  userEmail: string;
+  onLogout: () => void;
 }) {
   const [expandedModules, setExpandedModules] = useState<Set<string>>(
     () => new Set([currentModuleId])
@@ -383,6 +388,25 @@ function Sidebar({
 
       {!collapsed && (
         <>
+          {/* User info + logout */}
+          {userEmail && (
+            <div className="px-3 py-2.5 border-b border-[var(--border)] flex items-center gap-2">
+              <div
+                className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
+                style={{ background: "linear-gradient(135deg,#7c3aed,#a855f7)", color: "#fff" }}
+              >
+                {userEmail[0].toUpperCase()}
+              </div>
+              <span className="text-xs text-[var(--text-muted)] truncate flex-1">{userEmail}</span>
+              <button
+                onClick={onLogout}
+                title="Déconnexion"
+                className="text-[var(--text-muted)] hover:text-red-400 transition-colors text-xs px-1.5 py-0.5 rounded hover:bg-[rgba(239,68,68,0.1)]"
+              >
+                ⎋
+              </button>
+            </div>
+          )}
           {/* Progress */}
           <div className="px-3 py-3 border-b border-[var(--border)]">
             <div className="flex justify-between text-xs text-[var(--text-muted)] mb-1.5">
@@ -568,6 +592,8 @@ function TopBar({
 // MAIN APP
 // ────────────────────────────────────────────────
 export default function App() {
+  const router = useRouter();
+  const [userEmail, setUserEmail] = useState("");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [view, setView] = useState<"home" | "lesson">("home");
   const [currentModuleId, setCurrentModuleId] = useState(curriculum[0].id);
@@ -575,13 +601,22 @@ export default function App() {
   const [completed, setCompleted] = useState<Set<string>>(new Set());
   const contentRef = useRef<HTMLDivElement>(null);
 
-  // Load progress from localStorage
+  // Load progress from localStorage + fetch user info
   useEffect(() => {
     try {
       const saved = localStorage.getItem("cc_progress");
       if (saved) setCompleted(new Set(JSON.parse(saved)));
     } catch {}
+    fetch("/api/auth/me")
+      .then((r) => r.json())
+      .then((d) => { if (d.email) setUserEmail(d.email); })
+      .catch(() => {});
   }, []);
+
+  async function handleLogout() {
+    await fetch("/api/auth/logout", { method: "POST" });
+    router.push("/auth");
+  }
 
   const saveProgress = useCallback((newSet: Set<string>) => {
     try {
@@ -659,6 +694,8 @@ export default function App() {
         onSelect={goToLesson}
         collapsed={sidebarCollapsed}
         onToggle={() => setSidebarCollapsed((v) => !v)}
+        userEmail={userEmail}
+        onLogout={handleLogout}
       />
 
       {/* Main area */}
