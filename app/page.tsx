@@ -738,19 +738,42 @@ export default function App() {
   const [currentLessonId, setCurrentLessonId] = useState(curriculum[0].lessons[0].id);
   const [completed, setCompleted] = useState<Set<string>>(new Set());
   const [userEmail, setUserEmail] = useState<string>("");
+  const [authChecked, setAuthChecked] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
 
-  // Load user + progress (client-side only)
+  // Check auth + load progress (client-side only)
   useEffect(() => {
     const supabase = createClient();
     supabase.auth.getUser().then(({ data }) => {
-      if (data.user?.email) setUserEmail(data.user.email);
+      if (data.user) {
+        setIsLoggedIn(true);
+        setUserEmail(data.user.email ?? "");
+      } else {
+        setIsLoggedIn(false);
+      }
+      setAuthChecked(true);
     });
     try {
       const saved = localStorage.getItem("cc_progress");
       if (saved) setCompleted(new Set(JSON.parse(saved)));
     } catch {}
   }, []);
+
+  // Show nothing while checking auth (avoids flash)
+  if (!authChecked) {
+    return (
+      <div style={{ minHeight: "100vh", background: "var(--bg-dark)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <div style={{ color: "var(--text-muted)", fontSize: "0.9rem" }}>Chargement…</div>
+      </div>
+    );
+  }
+
+  // Not logged in → redirect to login
+  if (!isLoggedIn) {
+    window.location.replace("/auth/login");
+    return null;
+  }
 
   const handleLogout = useCallback(async () => {
     const supabase = createClient();
