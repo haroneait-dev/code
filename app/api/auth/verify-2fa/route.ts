@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { authenticator } from "otplib";
+import * as OTPAuth from "otpauth";
 import { getSession, signToken, cookieOptions } from "@/lib/session";
 import { getUserById } from "@/lib/users";
 
@@ -15,8 +15,17 @@ export async function POST(req: NextRequest) {
   if (!user || !user.totpSecret || !user.totpEnabled)
     return NextResponse.json({ error: "2FA non configuré" }, { status: 400 });
 
-  const isValid = authenticator.verify({ token: code.replace(/\s/g, ""), secret: user.totpSecret });
-  if (!isValid)
+  const totp = new OTPAuth.TOTP({
+    issuer: "Claude Code Formation",
+    label: user.email,
+    algorithm: "SHA1",
+    digits: 6,
+    period: 30,
+    secret: OTPAuth.Secret.fromBase32(user.totpSecret),
+  });
+
+  const delta = totp.validate({ token: code.replace(/\s/g, ""), window: 1 });
+  if (delta === null)
     return NextResponse.json({ error: "Code incorrect, réessayez" }, { status: 400 });
 
   const newToken = await signToken({ userId: user.id, email: user.email, step: "authenticated" });

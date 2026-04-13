@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { authenticator } from "otplib";
+import * as OTPAuth from "otpauth";
 import QRCode from "qrcode";
 import { getSession, signToken, cookieOptions } from "@/lib/session";
 import { getUserById, updateUser } from "@/lib/users";
@@ -14,13 +14,21 @@ export async function GET() {
   if (!user) return NextResponse.json({ error: "Utilisateur introuvable" }, { status: 404 });
 
   // Générer un nouveau secret si l'utilisateur n'en a pas encore
-  const secret = user.totpSecret ?? authenticator.generateSecret();
-  if (!user.totpSecret) updateUser(user.id, { totpSecret: secret });
+  const secretBase32 = user.totpSecret ?? new OTPAuth.Secret().base32;
+  if (!user.totpSecret) updateUser(user.id, { totpSecret: secretBase32 });
 
-  const otpauth = authenticator.keyuri(user.email, "Claude Code Formation", secret);
-  const qrDataURL = await QRCode.toDataURL(otpauth, { width: 200, margin: 2 });
+  const totp = new OTPAuth.TOTP({
+    issuer: "Claude Code Formation",
+    label: user.email,
+    algorithm: "SHA1",
+    digits: 6,
+    period: 30,
+    secret: OTPAuth.Secret.fromBase32(secretBase32),
+  });
 
-  return NextResponse.json({ secret, qrDataURL });
+  const qrDataURL = await QRCode.toDataURL(totp.toString(), { width: 200, margin: 2 });
+
+  return NextResponse.json({ secret: secretBase32, qrDataURL });
 }
 
 // POST — vérifie le code et active le 2FA
@@ -36,8 +44,17 @@ export async function POST(req: NextRequest) {
   if (!user || !user.totpSecret)
     return NextResponse.json({ error: "Secret 2FA introuvable" }, { status: 400 });
 
-  const isValid = authenticator.verify({ token: code.replace(/\s/g, ""), secret: user.totpSecret });
-  if (!isValid)
+  const totp = new OTPAuth.TOTP({
+    issuer: "Claude Code Formation",
+    label: user.email,
+    algorithm: "SHA1",
+    digits: 6,
+    period: 30,
+    secret: OTPAuth.Secret.fromBase32(user.totpSecret),
+  });
+
+  const delta = totp.validate({ token: code.replace(/\s/g, ""), window: 1 });
+  if (delta === null)
     return NextResponse.json({ error: "Code incorrect, réessayez" }, { status: 400 });
 
   updateUser(user.id, { totpEnabled: true });
