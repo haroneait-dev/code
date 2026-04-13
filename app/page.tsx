@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { curriculum, totalLessons, type Lesson, type Module } from "@/lib/curriculum";
+import { exercisesByLesson } from "@/lib/exercises";
 
 // ────────────────────────────────────────────────
 // HELPERS
@@ -132,12 +133,71 @@ function BulletList({ items }: { items: string[] }) {
 // ────────────────────────────────────────────────
 // LESSON CONTENT RENDERER
 // ────────────────────────────────────────────────
+// ────────────────────────────────────────────────
+// EXERCISE CARD
+// ────────────────────────────────────────────────
+function ExerciseCard({ ex, index }: { ex: { level: string; icon: string; title: string; description: string; hint: string }; index: number }) {
+  const [hintOpen, setHintOpen] = useState(false);
+  const [done, setDone] = useState(false);
+
+  const levelStyle: Record<string, { bg: string; border: string; color: string }> = {
+    "débutant":       { bg: "rgba(34,197,94,0.08)",   border: "rgba(34,197,94,0.25)",   color: "#4ade80" },
+    "intermédiaire":  { bg: "rgba(249,115,22,0.08)",  border: "rgba(249,115,22,0.25)",  color: "#fb923c" },
+    "avancé":         { bg: "rgba(239,68,68,0.08)",   border: "rgba(239,68,68,0.25)",   color: "#f87171" },
+  };
+  const ls = levelStyle[ex.level] ?? levelStyle["débutant"];
+
+  return (
+    <div style={{ background: done ? "rgba(34,197,94,0.05)" : "var(--bg-card)", border: `1px solid ${done ? "rgba(34,197,94,0.3)" : "var(--border)"}`, borderRadius: "12px", padding: "1.1rem 1.25rem", transition: "all 0.2s" }}>
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "0.75rem" }}>
+        <div style={{ flex: 1 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.5rem" }}>
+            <span style={{ fontSize: "1.1rem" }}>{ex.icon}</span>
+            <span style={{ fontSize: "0.65rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.07em", padding: "0.15rem 0.5rem", borderRadius: "999px", background: ls.bg, border: `1px solid ${ls.border}`, color: ls.color }}>
+              {ex.level}
+            </span>
+            <span style={{ fontSize: "0.65rem", color: "var(--text-muted)" }}>Exercice {index + 1}</span>
+          </div>
+          <div style={{ fontSize: "0.9rem", fontWeight: 700, color: done ? "#4ade80" : "#fff", marginBottom: "0.4rem" }}>
+            {done && "✓ "}{ex.title}
+          </div>
+          <div style={{ fontSize: "0.82rem", color: "var(--text-dim)", lineHeight: 1.65 }}>{ex.description}</div>
+
+          <button
+            onClick={() => setHintOpen(v => !v)}
+            style={{ marginTop: "0.6rem", background: "none", border: "none", color: "var(--text-muted)", fontSize: "0.75rem", cursor: "pointer", padding: 0, display: "flex", alignItems: "center", gap: "0.3rem" }}
+          >
+            {hintOpen ? "▾" : "▸"} {hintOpen ? "Masquer l'indice" : "Voir l'indice"}
+          </button>
+          {hintOpen && (
+            <div style={{ marginTop: "0.5rem", padding: "0.6rem 0.8rem", background: "rgba(124,58,237,0.1)", border: "1px solid rgba(124,58,237,0.2)", borderRadius: "8px", fontSize: "0.8rem", color: "#c4b5fd", fontStyle: "italic", lineHeight: 1.6 }}>
+              💡 {ex.hint}
+            </div>
+          )}
+        </div>
+        <button
+          onClick={() => setDone(v => !v)}
+          style={{ flexShrink: 0, width: "28px", height: "28px", borderRadius: "8px", border: `2px solid ${done ? "#22c55e" : "var(--border)"}`, background: done ? "#22c55e" : "transparent", color: "#fff", fontSize: "0.8rem", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.15s" }}
+          title={done ? "Marquer comme non-fait" : "Marquer comme fait"}
+        >
+          {done ? "✓" : ""}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ────────────────────────────────────────────────
+// LESSON CONTENT
+// ────────────────────────────────────────────────
 function LessonContent({ lesson, mod, onComplete, isCompleted }: {
   lesson: Lesson;
   mod: Module;
   onComplete: () => void;
   isCompleted: boolean;
 }) {
+  const exercises = exercisesByLesson[lesson.id] ?? lesson.exercises ?? [];
+
   return (
     <div className="fade-in max-w-3xl">
       {/* Header */}
@@ -146,6 +206,9 @@ function LessonContent({ lesson, mod, onComplete, isCompleted }: {
           <span className="badge badge-purple">{mod.emoji} {mod.title}</span>
           {lesson.tag && <span className="badge badge-orange">{lesson.tag}</span>}
           <span className="text-xs text-[var(--text-muted)]">⏱ {lesson.duration}</span>
+          {exercises.length > 0 && (
+            <span className="badge badge-green">🎯 {exercises.length} exercices</span>
+          )}
         </div>
         <h1 className="text-3xl font-extrabold text-white mb-3">{lesson.title}</h1>
         <p className="text-[var(--text-dim)] text-base leading-relaxed">{lesson.intro}</p>
@@ -159,27 +222,17 @@ function LessonContent({ lesson, mod, onComplete, isCompleted }: {
             {section.body && <p>{section.body}</p>}
             {section.bullets && <BulletList items={section.bullets} />}
             {section.code && (
-              <CodeBlock
-                lang={section.code.lang}
-                code={section.code.code}
-                label={section.code.label}
-              />
+              <CodeBlock lang={section.code.lang} code={section.code.code} label={section.code.label} />
             )}
             {section.callout && (
-              <Callout
-                type={section.callout.type}
-                icon={section.callout.icon}
-                text={section.callout.text}
-              />
+              <Callout type={section.callout.type} icon={section.callout.icon} text={section.callout.text} />
             )}
             {section.table && (
               <Table headers={section.table.headers} rows={section.table.rows} />
             )}
             {section.keypoints && (
               <div className="bg-[var(--purple-dim)] border border-[rgba(124,58,237,0.3)] rounded-lg p-4 my-4">
-                <div className="text-xs font-semibold text-[var(--purple-light)] uppercase tracking-wider mb-2">
-                  Points clés
-                </div>
+                <div className="text-xs font-semibold text-[var(--purple-light)] uppercase tracking-wider mb-2">Points clés</div>
                 <ul className="space-y-1">
                   {section.keypoints.map((kp, ki) => (
                     <li key={ki} className="text-sm text-[var(--text-dim)] flex items-start gap-2">
@@ -193,6 +246,20 @@ function LessonContent({ lesson, mod, onComplete, isCompleted }: {
         ))}
       </div>
 
+      {/* Exercises */}
+      {exercises.length > 0 && (
+        <div style={{ marginTop: "2.5rem", paddingTop: "2rem", borderTop: "1px solid var(--border)" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", marginBottom: "1.25rem" }}>
+            <span style={{ fontSize: "1.2rem" }}>🎯</span>
+            <h2 style={{ fontSize: "1.1rem", fontWeight: 800, color: "#fff", margin: 0 }}>Exercices pratiques</h2>
+            <span style={{ fontSize: "0.72rem", color: "var(--text-muted)", fontWeight: 500 }}>— ancre les concepts dans la réalité</span>
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+            {exercises.map((ex, i) => <ExerciseCard key={i} ex={ex} index={i} />)}
+          </div>
+        </div>
+      )}
+
       {/* Complete button */}
       <div className="mt-10 pt-6 border-t border-[var(--border)] flex items-center gap-3">
         <button
@@ -203,19 +270,9 @@ function LessonContent({ lesson, mod, onComplete, isCompleted }: {
               : "bg-[var(--purple)] hover:bg-[#6d28d9] text-white border border-[var(--purple)]"
           }`}
         >
-          {isCompleted ? (
-            <>
-              <span className="check-pop">✓</span> Leçon complétée
-            </>
-          ) : (
-            <>✓ Marquer comme complété</>
-          )}
+          {isCompleted ? <><span className="check-pop">✓</span> Leçon complétée</> : <>✓ Marquer comme complété</>}
         </button>
-        {isCompleted && (
-          <span className="text-sm text-[var(--text-muted)]">
-            Passez à la leçon suivante →
-          </span>
-        )}
+        {isCompleted && <span className="text-sm text-[var(--text-muted)]">Passez à la leçon suivante →</span>}
       </div>
     </div>
   );
@@ -226,89 +283,178 @@ function LessonContent({ lesson, mod, onComplete, isCompleted }: {
 // ────────────────────────────────────────────────
 function HomePage({ onStart, completed }: { onStart: () => void; completed: number }) {
   const pct = Math.round((completed / totalLessons) * 100);
+  const totalExercises = 50;
+
   return (
-    <div className="fade-in flex flex-col items-center justify-center min-h-full py-16 px-8 text-center">
-      {/* Glow */}
-      <div
-        style={{
-          position: "absolute",
-          top: "20%",
-          left: "50%",
-          transform: "translate(-50%, -50%)",
-          width: "600px",
-          height: "600px",
-          background: "radial-gradient(circle, rgba(124,58,237,0.12) 0%, transparent 70%)",
-          pointerEvents: "none",
-        }}
-      />
-
-      {/* Logo */}
-      <div className="relative mb-6">
-        <div
-          className="w-24 h-24 rounded-3xl flex items-center justify-center text-5xl mb-2 mx-auto"
-          style={{ background: "linear-gradient(135deg, #7c3aed, #a855f7)" }}
-        >
-          ◈
+    <div className="fade-in" style={{ overflowX: "hidden" }}>
+      {/* ── HERO ─────────────────────────────────────────── */}
+      <div style={{ position: "relative", padding: "5rem 2rem 4rem", textAlign: "center" }}>
+        {/* Glows */}
+        <div style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "hidden" }}>
+          <div style={{ position: "absolute", top: "-80px", left: "50%", transform: "translateX(-50%)", width: "700px", height: "500px", background: "radial-gradient(ellipse at top, rgba(124,58,237,0.25) 0%, transparent 65%)" }} />
+          <div style={{ position: "absolute", top: "30%", left: "10%", width: "300px", height: "300px", background: "radial-gradient(circle, rgba(168,85,247,0.08) 0%, transparent 70%)" }} />
+          <div style={{ position: "absolute", top: "20%", right: "10%", width: "250px", height: "250px", background: "radial-gradient(circle, rgba(249,115,22,0.06) 0%, transparent 70%)" }} />
         </div>
-      </div>
 
-      <h1 className="text-5xl font-extrabold text-white mb-2" style={{ letterSpacing: "-0.02em" }}>
-        Claude Code
-      </h1>
-      <p className="text-xl text-[var(--purple-light)] font-semibold mb-4">
-        Formation Complète
-      </p>
-      <p className="text-[var(--text-dim)] max-w-xl text-base leading-relaxed mb-10">
-        Maîtrisez Claude Code de A à Z — le CLI officiel d'Anthropic pour coder avec l'IA.
-        {" "}
-        <span className="text-[var(--text)]">{totalLessons} leçons</span> couvrant l'installation, les outils fichiers, Git, MCP, Hooks, la mémoire et les techniques avancées.
-      </p>
-
-      {/* Progress */}
-      {completed > 0 && (
-        <div className="w-full max-w-sm mb-8">
-          <div className="flex justify-between text-xs text-[var(--text-muted)] mb-2">
-            <span>Progression</span>
-            <span>{completed}/{totalLessons} leçons</span>
-          </div>
-          <div className="h-2 bg-[var(--bg-card)] rounded-full overflow-hidden border border-[var(--border)]">
-            <div className="progress-bar-fill h-full rounded-full" style={{ width: `${pct}%` }} />
-          </div>
-          <p className="text-xs text-[var(--text-muted)] mt-1.5">{pct}% complété</p>
+        {/* Badge */}
+        <div style={{ display: "inline-flex", alignItems: "center", gap: "0.4rem", background: "rgba(124,58,237,0.12)", border: "1px solid rgba(124,58,237,0.3)", borderRadius: "999px", padding: "0.3rem 0.9rem", marginBottom: "1.75rem", fontSize: "0.78rem", fontWeight: 600, color: "#a78bfa" }}>
+          <span>🔥</span> Formation basée sur la vidéo de 4h — de Zéro à Expert
         </div>
-      )}
 
-      {/* Module cards */}
-      <div className="grid grid-cols-2 gap-3 max-w-xl w-full mb-10">
-        {curriculum.map((mod) => (
-          <div
-            key={mod.id}
-            className="flex items-center gap-3 p-3 rounded-xl border border-[var(--border)] bg-[var(--bg-card)] text-left"
-          >
-            <span className="text-2xl">{mod.emoji}</span>
-            <div>
-              <div className="text-sm font-semibold text-white">{mod.title}</div>
-              <div className="text-xs text-[var(--text-muted)]">
-                {mod.lessons.length} leçon{mod.lessons.length > 1 ? "s" : ""}
-              </div>
+        {/* H1 */}
+        <h1 style={{ fontSize: "clamp(2.5rem, 6vw, 4.5rem)", fontWeight: 900, lineHeight: 1.05, letterSpacing: "-0.03em", marginBottom: "1.25rem" }}>
+          <span style={{ color: "#fff", display: "block" }}>Passe de débutant</span>
+          <span style={{ display: "block", background: "linear-gradient(135deg, #7c3aed 0%, #a855f7 40%, #f97316 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
+            à expert Claude
+          </span>
+        </h1>
+
+        <p style={{ color: "var(--text-dim)", fontSize: "1.1rem", maxWidth: "560px", margin: "0 auto 2.5rem", lineHeight: 1.7 }}>
+          La formation complète pour maîtriser l&apos;IA la plus puissante de 2026.
+          {" "}<strong style={{ color: "var(--text)" }}>{totalLessons} leçons</strong>, {totalExercises}+ exercices pratiques,
+          {" "}zéro prérequis.
+        </p>
+
+        {/* Progress (returning user) */}
+        {completed > 0 && (
+          <div style={{ maxWidth: "380px", margin: "0 auto 2rem", background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: "12px", padding: "1rem 1.25rem" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.78rem", color: "var(--text-muted)", marginBottom: "0.6rem" }}>
+              <span>🔄 Reprends là où tu t&apos;es arrêté</span>
+              <span style={{ color: "#a78bfa", fontWeight: 600 }}>{pct}% — {completed}/{totalLessons}</span>
+            </div>
+            <div style={{ height: "6px", background: "var(--bg-surface)", borderRadius: "999px", overflow: "hidden" }}>
+              <div className="progress-bar-fill" style={{ height: "100%", width: `${pct}%`, borderRadius: "999px" }} />
             </div>
           </div>
-        ))}
+        )}
+
+        {/* CTA */}
+        <button
+          onClick={onStart}
+          style={{ display: "inline-flex", alignItems: "center", gap: "0.5rem", padding: "0.9rem 2.2rem", background: "linear-gradient(135deg, #7c3aed, #a855f7)", border: "none", borderRadius: "12px", color: "#fff", fontSize: "1rem", fontWeight: 800, cursor: "pointer", boxShadow: "0 8px 32px rgba(124,58,237,0.45)", transition: "transform 0.15s, box-shadow 0.15s", letterSpacing: "-0.01em" }}
+          onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.transform = "translateY(-2px)"; (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 12px 40px rgba(124,58,237,0.55)"; }}
+          onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.transform = "none"; (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 8px 32px rgba(124,58,237,0.45)"; }}
+        >
+          {completed > 0 ? "Continuer la formation" : "Commencer gratuitement"} →
+        </button>
+
+        <p style={{ marginTop: "0.9rem", color: "var(--text-muted)", fontSize: "0.78rem" }}>
+          Gratuit · Aucune inscription · Progression sauvegardée localement
+        </p>
       </div>
 
-      <button
-        onClick={onStart}
-        className="px-8 py-3.5 rounded-xl font-bold text-base text-white transition-all hover:scale-105"
-        style={{
-          background: "linear-gradient(135deg, #7c3aed, #a855f7)",
-          boxShadow: "0 4px 24px rgba(124,58,237,0.4)",
-        }}
-      >
-        {completed > 0 ? "Continuer la formation →" : "Commencer la formation →"}
-      </button>
+      {/* ── CHATTER vs DÉLÉGUER ──────────────────────────── */}
+      <div style={{ padding: "0 2rem 4rem", maxWidth: "860px", margin: "0 auto" }}>
+        <div style={{ textAlign: "center", marginBottom: "1.5rem" }}>
+          <span style={{ fontSize: "0.72rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--text-muted)" }}>Le secret des experts</span>
+          <h2 style={{ fontSize: "1.6rem", fontWeight: 800, color: "#fff", marginTop: "0.4rem", letterSpacing: "-0.02em" }}>
+            La plupart chatent. Les experts <span style={{ color: "#a855f7" }}>délèguent.</span>
+          </h2>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
+          {/* Chat card */}
+          <div style={{ background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: "14px", padding: "1.5rem", position: "relative", overflow: "hidden" }}>
+            <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "3px", background: "rgba(239,68,68,0.5)" }} />
+            <div style={{ fontSize: "1.5rem", marginBottom: "0.75rem" }}>💬</div>
+            <div style={{ fontSize: "0.72rem", fontWeight: 700, color: "#f87171", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "0.5rem" }}>Mode Débutant — Chatter</div>
+            {["\"Écris-moi une fonction de tri\"", "Guide Claude étape par étape", "1 prompt = 1 action", "Résultat : un bout de code", "Gain : quelques minutes"].map((t, i) => (
+              <div key={i} style={{ display: "flex", alignItems: "baseline", gap: "0.4rem", fontSize: "0.82rem", color: "var(--text-muted)", marginBottom: "0.35rem" }}>
+                <span style={{ color: "#f87171", flexShrink: 0 }}>✗</span> {t}
+              </div>
+            ))}
+          </div>
+          {/* Déléguer card */}
+          <div style={{ background: "linear-gradient(135deg, rgba(124,58,237,0.12), rgba(168,85,247,0.08))", border: "1px solid rgba(124,58,237,0.35)", borderRadius: "14px", padding: "1.5rem", position: "relative", overflow: "hidden" }}>
+            <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "3px", background: "linear-gradient(90deg, #7c3aed, #a855f7)" }} />
+            <div style={{ fontSize: "1.5rem", marginBottom: "0.75rem" }}>🚀</div>
+            <div style={{ fontSize: "0.72rem", fontWeight: 700, color: "#a78bfa", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "0.5rem" }}>Mode Expert — Déléguer</div>
+            {["\"Implémente la feature auth complète\"", "Claude planifie et exécute seul", "1 prompt = 10-50 actions", "Résultat : feature complète + tests", "Gain : 2 à 4 heures"].map((t, i) => (
+              <div key={i} style={{ display: "flex", alignItems: "baseline", gap: "0.4rem", fontSize: "0.82rem", color: "var(--text-dim)", marginBottom: "0.35rem" }}>
+                <span style={{ color: "#4ade80", flexShrink: 0 }}>✓</span> {t}
+              </div>
+            ))}
+          </div>
+        </div>
+        <p style={{ textAlign: "center", marginTop: "1rem", fontSize: "0.85rem", color: "var(--text-muted)" }}>
+          Cette formation t&apos;apprend à passer en mode <strong style={{ color: "var(--text)" }}>délégation</strong> dès la première leçon.
+        </p>
+      </div>
+
+      {/* ── STATS ────────────────────────────────────────── */}
+      <div style={{ padding: "2rem", borderTop: "1px solid var(--border)", borderBottom: "1px solid var(--border)", background: "var(--bg-surface)" }}>
+        <div style={{ maxWidth: "700px", margin: "0 auto", display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "1rem", textAlign: "center" }}>
+          {[
+            { icon: "📚", value: `${totalLessons}`, label: "Leçons" },
+            { icon: "⏱", value: "4h", label: "De contenu" },
+            { icon: "🎯", value: `${totalExercises}+`, label: "Exercices" },
+            { icon: "🚀", value: "0", label: "Prérequis" },
+          ].map((s) => (
+            <div key={s.label}>
+              <div style={{ fontSize: "1.4rem", marginBottom: "0.3rem" }}>{s.icon}</div>
+              <div style={{ fontSize: "1.75rem", fontWeight: 900, color: "#fff", letterSpacing: "-0.03em", lineHeight: 1 }}>{s.value}</div>
+              <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: "0.25rem" }}>{s.label}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* ── MODULES ──────────────────────────────────────── */}
+      <div style={{ padding: "3.5rem 2rem", maxWidth: "900px", margin: "0 auto" }}>
+        <div style={{ textAlign: "center", marginBottom: "2rem" }}>
+          <span style={{ fontSize: "0.72rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--text-muted)" }}>Programme complet</span>
+          <h2 style={{ fontSize: "1.5rem", fontWeight: 800, color: "#fff", marginTop: "0.4rem", letterSpacing: "-0.02em" }}>
+            {curriculum.length} modules · Du zéro à l&apos;expert
+          </h2>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: "0.875rem" }}>
+          {curriculum.map((mod, idx) => {
+            const modCompleted = mod.lessons.filter((l) => completed > 0).length;
+            return (
+              <div
+                key={mod.id}
+                style={{ background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: "14px", padding: "1.25rem", cursor: "pointer", transition: "border-color 0.15s, transform 0.15s", position: "relative", overflow: "hidden" }}
+                onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.borderColor = mod.color + "66"; (e.currentTarget as HTMLDivElement).style.transform = "translateY(-2px)"; }}
+                onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.borderColor = "var(--border)"; (e.currentTarget as HTMLDivElement).style.transform = "none"; }}
+              >
+                <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "2px", background: mod.color, opacity: 0.7 }} />
+                <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", marginBottom: "0.6rem" }}>
+                  <span style={{ fontSize: "1.4rem" }}>{mod.emoji}</span>
+                  <span style={{ fontSize: "0.65rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: mod.color, opacity: 0.9 }}>Module {idx + 1}</span>
+                </div>
+                <div style={{ fontSize: "0.95rem", fontWeight: 700, color: "#fff", marginBottom: "0.35rem" }}>{mod.title}</div>
+                <div style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>
+                  {mod.lessons.length} leçon{mod.lessons.length > 1 ? "s" : ""} · {mod.lessons.reduce((a, l) => a + (exercisesByLesson[l.id]?.length ?? 0), 0)} exercices
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* ── EXERCICES CTA ─────────────────────────────────── */}
+      <div style={{ padding: "0 2rem 3rem", maxWidth: "700px", margin: "0 auto", textAlign: "center" }}>
+        <div style={{ background: "linear-gradient(135deg, rgba(124,58,237,0.15), rgba(249,115,22,0.08))", border: "1px solid rgba(124,58,237,0.25)", borderRadius: "16px", padding: "2rem" }}>
+          <div style={{ fontSize: "2rem", marginBottom: "0.75rem" }}>🎯</div>
+          <h3 style={{ fontSize: "1.2rem", fontWeight: 800, color: "#fff", marginBottom: "0.5rem" }}>
+            {totalExercices}+ exercices pratiques inclus
+          </h3>
+          <p style={{ color: "var(--text-dim)", fontSize: "0.875rem", lineHeight: 1.7, marginBottom: "1.5rem" }}>
+            Chaque leçon se termine par 3 exercices graduels — débutant, intermédiaire, avancé.
+            La théorie sans pratique, ça ne sert à rien.
+          </p>
+          <button
+            onClick={onStart}
+            style={{ padding: "0.75rem 2rem", background: "linear-gradient(135deg, #7c3aed, #a855f7)", border: "none", borderRadius: "10px", color: "#fff", fontSize: "0.95rem", fontWeight: 700, cursor: "pointer", boxShadow: "0 4px 20px rgba(124,58,237,0.4)" }}
+          >
+            {completed > 0 ? `Reprendre — ${pct}% complété →` : "Commencer maintenant →"}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
+
+const totalExercices = 50;
 
 // ────────────────────────────────────────────────
 // SIDEBAR

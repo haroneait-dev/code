@@ -10,6 +10,14 @@ export interface Callout {
   text: string;
 }
 
+export interface Exercise {
+  level: "débutant" | "intermédiaire" | "avancé";
+  icon: string;
+  title: string;
+  description: string;
+  hint: string;
+}
+
 export interface Lesson {
   id: string;
   title: string;
@@ -17,6 +25,7 @@ export interface Lesson {
   tag?: string;
   intro: string;
   sections: LessonSection[];
+  exercises?: Exercise[];
 }
 
 export interface LessonSection {
@@ -48,12 +57,125 @@ export const curriculum: Module[] = [
     color: "#7c3aed",
     lessons: [
       {
+        id: "chatting-vs-delegating",
+        title: "Chatter vs Déléguer — le mindset qui change tout",
+        duration: "6 min",
+        tag: "Mindset",
+        intro:
+          "La majorité des gens utilisent Claude pour chatter — poser des questions, obtenir des réponses, comme un moteur de recherche amélioré. Les experts, eux, délèguent — ils confient des missions entières à Claude et récupèrent des résultats concrets. Cette leçon est la plus importante de toute la formation.",
+        sections: [
+          {
+            heading: "La différence fondamentale",
+            body: "Chatter, c'est demander à Claude d'écrire une fonction. Déléguer, c'est lui confier d'implémenter toute la feature d'authentification, de la tester, de la committer et d'ouvrir la PR — pendant que vous faites autre chose.",
+          },
+          {
+            table: {
+              headers: ["💬 Chatter (débutant)", "🚀 Déléguer (expert)"],
+              rows: [
+                ["\"Écris-moi une fonction de tri\"", "\"Implémenter le tri et la pagination sur /api/products\""],
+                ["Une réponse, une action", "Un objectif, N actions autonomes"],
+                ["Vous guidez chaque étape", "Claude planifie et exécute seul"],
+                ["Résultat : un bout de code", "Résultat : une feature complète et testée"],
+                ["Gain de temps : 10 min", "Gain de temps : 2-4 heures"],
+              ],
+            },
+          },
+          {
+            heading: "Pourquoi la plupart restent bloqués en mode \"chat\"",
+            bullets: [
+              "Ils ont appris Claude comme un chatbot — ancrer sa réponse immédiate",
+              "Ils ne font pas confiance à l'IA pour prendre des décisions",
+              "Ils ne savent pas comment structurer une mission complète",
+              "Ils n'ont pas de CLAUDE.md pour donner le contexte projet",
+            ],
+          },
+          {
+            heading: "Le shift mental à opérer",
+            body: "Arrêtez de voir Claude comme un assistant qui répond à vos questions. Commencez à le voir comme un senior dev à qui vous confiez des missions. Vous définissez l'objectif et les contraintes — Claude gère l'exécution.",
+          },
+          {
+            callout: {
+              type: "success",
+              icon: "🎯",
+              text: "<strong>La règle des 5 minutes :</strong> Si expliquer ce que vous voulez prend plus de 5 min, c'est que vous pensez encore en \"chat\". Une vraie délégation tient en 2-3 phrases claires sur l'objectif final.",
+            },
+          },
+          {
+            heading: "Exemples de vraie délégation",
+            code: {
+              lang: "text",
+              label: "Prompts de délégation (pas de chat)",
+              code: `# ❌ Chat : micro-instructions
+> écris une fonction qui prend un email en paramètre
+> maintenant ajoute la validation
+> maintenant ajoute les tests
+
+# ✅ Délégation : mission complète
+> dans src/auth/, crée un système de validation d'email
+  robuste avec tests unitaires, gestion des edge cases
+  (emails internationaux, sous-domaines) et intégration
+  au formulaire existant dans components/RegisterForm.tsx
+
+# ✅ Délégation encore plus forte
+> les users se plaignent que le login est lent.
+  Trouve pourquoi, corrige, teste et commit.`,
+            },
+          },
+        ],
+        exercises: [
+          {
+            level: "débutant",
+            icon: "✍️",
+            title: "Convertis un prompt \"chat\" en délégation",
+            description: "Prends ce prompt : \"Comment créer un composant Button en React ?\" et réécris-le en mode délégation — donne une vraie mission à Claude avec contexte et objectif final.",
+            hint: "Pense à : quel est le vrai résultat que tu veux ? Dans quel projet ? Avec quelles contraintes ?",
+          },
+          {
+            level: "intermédiaire",
+            icon: "🚀",
+            title: "Ta première vraie délégation",
+            description: "Ouvre Claude Code sur un projet réel (ou crée un dossier test). Délègue-lui la création d'un fichier README.md complet basé sur la structure du projet — sans lui donner d'instructions step-by-step.",
+            hint: "Dis juste : \"analyse ce projet et génère un README.md complet et professionnel\"",
+          },
+          {
+            level: "avancé",
+            icon: "🏆",
+            title: "Mission autonome de bout en bout",
+            description: "Donne à Claude une mission qui touche au moins 5 fichiers différents. Observe comment il planifie, exécute et itère sans que tu intervienne. Note ce qui t'a surpris.",
+            hint: "Ex: \"Ajoute un système de logging structuré (Winston/Pino) à toutes les routes API de ce projet\"",
+          },
+        ],
+      },
+      {
         id: "what-is-cc",
         title: "Qu'est-ce que Claude Code ?",
         duration: "5 min",
         tag: "Fondamentaux",
         intro:
           "Claude Code est le CLI officiel d'Anthropic qui amène Claude directement dans votre terminal. C'est un agent de codage autonome capable de lire, écrire, éditer des fichiers, exécuter des commandes shell, interagir avec Git et bien plus encore.",
+        exercises: [
+          {
+            level: "débutant",
+            icon: "🔍",
+            title: "Explore la doc officielle",
+            description: "Va sur claude.ai et demande à Claude de t'expliquer la différence entre l'interface web et Claude Code CLI. Note 3 choses que Claude Code peut faire que le chat ne peut pas.",
+            hint: "Focus sur : filesystem, terminal, autonomie",
+          },
+          {
+            level: "intermédiaire",
+            icon: "⚡",
+            title: "Compare avec GitHub Copilot",
+            description: "Si tu as déjà utilisé Copilot ou Cursor, écris un court paragraphe sur la différence fondamentale d'approche entre un outil d'autocomplétion et un agent autonome comme Claude Code.",
+            hint: "La clé : autocomplete réagit à votre code, Claude Code agit sur votre projet",
+          },
+          {
+            level: "avancé",
+            icon: "🏗️",
+            title: "Identifie 5 cas d'usage dans ton projet actuel",
+            description: "Prends ton projet principal et liste 5 tâches répétitives ou complexes que tu pourrais déléguer à Claude Code dès aujourd'hui. Estime le temps gagné par tâche.",
+            hint: "Types de tâches : refactoring, génération de tests, documentation, migrations, review",
+          },
+        ],
         sections: [
           {
             heading: "Un agent, pas un simple chatbot",
