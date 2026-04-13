@@ -1,0 +1,329 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  --bg-dark: #0a0a0f;
+  --bg-surface: #111118;
+  --bg-card: #16161f;
+  --bg-hover: #1e1e2a;
+  --border: #2a2a3a;
+  --purple: #7c3aed;
+  --purple-light: #9f67ff;
+  --purple-dim: rgba(124, 58, 237, 0.15);
+  --orange: #f97316;
+  --orange-dim: rgba(249, 115, 22, 0.15);
+  --green: #22c55e;
+  --green-dim: rgba(34, 197, 94, 0.1);
+  --blue: #3b82f6;
+  --blue-dim: rgba(59, 130, 246, 0.1);
+  --text: #e5e7eb;
+  --text-dim: #9ca3af;
+  --text-muted: #6b7280;
+}
+
+html,
+body {
+  height: 100%;
+  background-color: var(--bg-dark);
+  color: var(--text);
+  font-family: 'Inter', system-ui, sans-serif;
+  overflow: hidden;
+}
+
+#__next,
+main {
+  height: 100%;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #3a3a4a;
+}
+
+/* Prose styles for lesson content */
+.prose h1 {
+  font-size: 1.75rem;
+  font-weight: 800;
+  color: #fff;
+  margin-bottom: 0.75rem;
+  line-height: 1.2;
+}
+.prose h2 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #fff;
+  margin-top: 2rem;
+  margin-bottom: 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.prose h3 {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--text);
+  margin-top: 1.5rem;
+  margin-bottom: 0.5rem;
+}
+.prose p {
+  color: var(--text-dim);
+  line-height: 1.8;
+  margin-bottom: 1rem;
+}
+.prose ul,
+.prose ol {
+  margin-bottom: 1rem;
+  padding-left: 1.25rem;
+}
+.prose li {
+  color: var(--text-dim);
+  line-height: 1.8;
+  margin-bottom: 0.25rem;
+}
+.prose ul li {
+  list-style-type: disc;
+}
+.prose ol li {
+  list-style-type: decimal;
+}
+.prose strong {
+  color: var(--text);
+  font-weight: 600;
+}
+.prose code {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.85em;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0.15em 0.4em;
+  color: var(--purple-light);
+}
+.prose a {
+  color: var(--purple-light);
+  text-decoration: underline;
+}
+
+/* Code block */
+.code-block {
+  background: #0d0d14;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  margin: 1rem 0;
+  overflow: hidden;
+}
+.code-block-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem 1rem;
+  background: #13131e;
+  border-bottom: 1px solid var(--border);
+}
+.code-block-lang {
+  font-size: 0.7rem;
+  font-family: 'JetBrains Mono', monospace;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.code-block-copy {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 0.2rem 0.6rem;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: transparent;
+  transition: all 0.15s;
+}
+.code-block-copy:hover {
+  color: var(--text);
+  border-color: #3a3a4a;
+  background: var(--bg-hover);
+}
+.code-block pre {
+  padding: 1rem 1.25rem;
+  overflow-x: auto;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.82rem;
+  line-height: 1.7;
+  color: #c9d1d9;
+}
+
+/* Syntax-like coloring */
+.tok-kw { color: #ff79c6; }
+.tok-str { color: #f1fa8c; }
+.tok-cmd { color: #50fa7b; }
+.tok-flag { color: #8be9fd; }
+.tok-comment { color: #6272a4; font-style: italic; }
+.tok-num { color: #bd93f9; }
+.tok-path { color: #ffb86c; }
+
+/* Tip / callout boxes */
+.callout {
+  border-radius: 8px;
+  padding: 0.9rem 1.1rem;
+  margin: 1rem 0;
+  border-left: 3px solid;
+  display: flex;
+  gap: 0.75rem;
+}
+.callout-tip {
+  background: var(--purple-dim);
+  border-color: var(--purple);
+}
+.callout-warn {
+  background: var(--orange-dim);
+  border-color: var(--orange);
+}
+.callout-info {
+  background: var(--blue-dim);
+  border-color: var(--blue);
+}
+.callout-success {
+  background: var(--green-dim);
+  border-color: var(--green);
+}
+.callout-icon {
+  font-size: 1.1rem;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+.callout-body {
+  font-size: 0.875rem;
+  color: var(--text-dim);
+  line-height: 1.7;
+}
+.callout-body strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+/* Badge */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.badge-purple {
+  background: var(--purple-dim);
+  color: var(--purple-light);
+  border: 1px solid rgba(124, 58, 237, 0.3);
+}
+.badge-orange {
+  background: var(--orange-dim);
+  color: #fb923c;
+  border: 1px solid rgba(249, 115, 22, 0.3);
+}
+.badge-green {
+  background: var(--green-dim);
+  color: #4ade80;
+  border: 1px solid rgba(34, 197, 94, 0.25);
+}
+
+/* Keyboard key */
+kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.75rem;
+  padding: 0.15rem 0.45rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-bottom: 2px solid var(--border);
+  border-radius: 4px;
+  color: var(--text);
+  white-space: nowrap;
+}
+
+/* Sidebar transition */
+.sidebar-item {
+  transition: background 0.15s, color 0.15s;
+}
+
+/* Lesson nav buttons */
+.lesson-nav-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 1.1rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text-dim);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.lesson-nav-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+  border-color: #3a3a4a;
+}
+.lesson-nav-btn.primary {
+  background: var(--purple);
+  border-color: var(--purple);
+  color: #fff;
+}
+.lesson-nav-btn.primary:hover {
+  background: #6d28d9;
+}
+
+/* Progress bar */
+@keyframes shimmer {
+  from { background-position: -200% center; }
+  to { background-position: 200% center; }
+}
+.progress-bar-fill {
+  background: linear-gradient(90deg, var(--purple) 0%, #a855f7 50%, var(--purple) 100%);
+  background-size: 200% auto;
+  animation: shimmer 3s linear infinite;
+  transition: width 0.5s ease;
+}
+
+/* Check animation */
+@keyframes pop {
+  0% { transform: scale(0); }
+  60% { transform: scale(1.2); }
+  100% { transform: scale(1); }
+}
+.check-pop {
+  animation: pop 0.3s ease-out forwards;
+}
+
+/* Fade in */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.fade-in {
+  animation: fadeIn 0.25s ease-out forwards;
+}
