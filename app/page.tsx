@@ -739,10 +739,10 @@ export default function App() {
   const [completed, setCompleted] = useState<Set<string>>(new Set());
   const [userEmail, setUserEmail] = useState<string>("");
   const contentRef = useRef<HTMLDivElement>(null);
-  const supabase = createClient();
 
-  // Load user + progress
+  // Load user + progress (client-side only)
   useEffect(() => {
+    const supabase = createClient();
     supabase.auth.getUser().then(({ data }) => {
       if (data.user?.email) setUserEmail(data.user.email);
     });
@@ -753,9 +753,10 @@ export default function App() {
   }, []);
 
   const handleLogout = useCallback(async () => {
+    const supabase = createClient();
     await supabase.auth.signOut();
     window.location.href = "/auth/login";
-  }, [supabase]);
+  }, []);
 
   const saveProgress = useCallback((newSet: Set<string>) => {
     try {
