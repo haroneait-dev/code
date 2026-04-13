@@ -1580,6 +1580,633 @@ console.log(parsed.result);`,
       },
     ],
   },
+  // ─────────────────────────────────────────────────────────
+  // MODULE 8 — TOKENS & MODÈLES IA
+  // ─────────────────────────────────────────────────────────
+  {
+    id: "tokens",
+    title: "Tokens & Modèles IA",
+    emoji: "🧬",
+    color: "#a855f7",
+    lessons: [
+      {
+        id: "how-models-work",
+        title: "Comment fonctionnent les modèles IA",
+        duration: "8 min",
+        tag: "Théorie",
+        intro:
+          "Comprendre comment Claude fonctionne sous le capot vous permet de l'utiliser bien plus efficacement. Tokens, fenêtre de contexte, attention — ces concepts ont un impact direct sur votre workflow.",
+        sections: [
+          {
+            heading: "Qu'est-ce qu'un token ?",
+            body: "Un token est la plus petite unité de texte traitée par le modèle. Ce n'est ni un mot, ni un caractère — c'est un fragment de texte d'environ 3-4 caractères en moyenne en anglais (un peu plus en français). Le modèle lit et génère des tokens, pas des mots.",
+          },
+          {
+            callout: {
+              type: "info",
+              icon: "📏",
+              text: "<strong>Exemples de tokenisation :</strong> \"Claude\" = 1 token. \"Claude Code\" = 2 tokens. \"anticonstitutionnellement\" = 5-6 tokens. Un fichier de 1000 lignes de code ≈ 3000-5000 tokens.",
+            },
+          },
+          {
+            heading: "La fenêtre de contexte",
+            body: "Le modèle a une limite de tokens qu'il peut traiter en une fois — c'est la fenêtre de contexte. Claude claude-sonnet-4-6 et Opus 4.6 ont une fenêtre de 200 000 tokens (~150 000 mots). Tout ce que Claude peut \"voir\" à un instant T (historique, fichiers lus, instructions) doit tenir dans cette fenêtre.",
+          },
+          {
+            heading: "Le mécanisme d'attention",
+            body: "Le modèle utilise un mécanisme d'attention pour pondérer l'importance de chaque token par rapport aux autres. Les tokens récents et les tokens du début du contexte ont tendance à recevoir plus d'attention. C'est pourquoi les instructions dans CLAUDE.md (chargées au début) ont plus d'impact que les instructions enterrées au milieu d'une longue conversation.",
+          },
+          {
+            callout: {
+              type: "tip",
+              icon: "💡",
+              text: "<strong>Implication pratique :</strong> Plus le contexte est long, plus le modèle peut \"diluer\" son attention sur des parties importantes. Gardez le contexte propre avec <code>/compact</code> et des CLAUDE.md bien structurés.",
+            },
+          },
+          {
+            heading: "Tokens input vs output",
+            bullets: [
+              "Tokens input = tout ce que Claude reçoit (historique + fichiers lus + votre prompt)",
+              "Tokens output = ce que Claude génère (réponse + code écrit)",
+              "Les tokens input sont moins chers que les tokens output",
+              "La majorité du coût vient des tokens input sur les longues sessions",
+            ],
+          },
+          {
+            heading: "Prompt caching",
+            body: "Claude Code utilise le prompt caching d'Anthropic : si le début d'un contexte reste identique entre deux requêtes, les tokens en cache sont jusqu'à 10x moins chers. C'est pourquoi les CLAUDE.md et instructions stables au début du contexte réduisent significativement les coûts.",
+          },
+        ],
+      },
+      {
+        id: "pricing",
+        title: "Tarification & gestion des coûts",
+        duration: "7 min",
+        tag: "Pratique",
+        intro:
+          "Claude Code se paie à l'usage via l'API Anthropic. Comprendre la tarification vous permet d'optimiser vos coûts sans sacrifier la qualité.",
+        sections: [
+          {
+            heading: "Modèles disponibles et prix",
+            table: {
+              headers: ["Modèle", "Input (MTok)", "Output (MTok)", "Usage idéal"],
+              rows: [
+                ["claude-opus-4-6", "~$15", "~$75", "Tâches complexes, architecture"],
+                ["claude-sonnet-4-6", "~$3", "~$15", "Usage quotidien équilibré"],
+                ["claude-haiku-4-5", "~$0.25", "~$1.25", "Tâches simples, CI/CD"],
+              ],
+            },
+          },
+          {
+            callout: {
+              type: "info",
+              icon: "💰",
+              text: "<strong>Prix avec cache :</strong> Les tokens en cache coûtent ~90% moins cher. Sur une longue session Claude Code, le cache peut réduire la facture de 50-70%. Les prix varient, vérifiez <code>anthropic.com/pricing</code> pour les tarifs actuels.",
+            },
+          },
+          {
+            heading: "Voir le coût de votre session",
+            code: {
+              lang: "text",
+              label: "Dans Claude Code",
+              code: `# Afficher le coût de la session en cours
+/cost
+
+# Résultat exemple :
+Session cost: $0.23
+  Input tokens:  45,230 (cache read: 38,100)
+  Output tokens: 2,847
+  Cache savings: ~$0.34`,
+            },
+          },
+          {
+            heading: "Stratégies pour réduire les coûts",
+            bullets: [
+              "Utiliser /compact régulièrement pour réduire les tokens input",
+              "Écrire des CLAUDE.md précis pour éviter les re-explications",
+              "Utiliser claude-haiku pour les tâches répétitives (linting, formatage)",
+              "Éviter de coller de gros logs ou fichiers inutiles dans le contexte",
+              "Utiliser le mode --print pour les scripts (pas de contexte interactif)",
+              "Limiter le nombre de fichiers lus au strict nécessaire",
+            ],
+          },
+          {
+            heading: "Budgets par cas d'usage typiques",
+            table: {
+              headers: ["Tâche", "Coût estimé", "Modèle recommandé"],
+              rows: [
+                ["Bug fix simple", "$0.02-0.10", "Sonnet"],
+                ["Feature complète (200 lignes)", "$0.20-0.80", "Sonnet/Opus"],
+                ["Refactoring d'un module", "$0.50-2.00", "Opus"],
+                ["Session de 2h sur un projet", "$2-8", "Sonnet"],
+                ["Revue de PR automatisée (CI)", "$0.05-0.20", "Haiku/Sonnet"],
+              ],
+            },
+          },
+          {
+            callout: {
+              type: "tip",
+              icon: "🎯",
+              text: "<strong>Rapport qualité/prix :</strong> Sonnet est le sweet spot pour 95% des usages. Réservez Opus pour les tâches d'architecture complexe où vous avez vraiment besoin du maximum de raisonnement.",
+            },
+          },
+        ],
+      },
+    ],
+  },
+
+  // ─────────────────────────────────────────────────────────
+  // MODULE 9 — PLAN MODE & AGENTS
+  // ─────────────────────────────────────────────────────────
+  {
+    id: "plan-agents",
+    title: "Plan Mode & Agents",
+    emoji: "🤖",
+    color: "#06b6d4",
+    lessons: [
+      {
+        id: "plan-mode",
+        title: "Plan Mode — planifier avant d'agir",
+        duration: "8 min",
+        tag: "Fonctionnalité clé",
+        intro:
+          "Le Plan Mode est une fonctionnalité majeure de Claude Code qui lui permet de réfléchir et planifier une implémentation complexe AVANT d'écrire le moindre code. C'est essentiel pour les tâches importantes.",
+        sections: [
+          {
+            heading: "Pourquoi utiliser le Plan Mode ?",
+            body: "Sans plan, Claude peut foncer dans l'implémentation et prendre de mauvaises décisions architecturales qui nécessitent un refactoring complet. Le Plan Mode force une réflexion structurée avant l'action.",
+          },
+          {
+            heading: "Activer le Plan Mode",
+            code: {
+              lang: "text",
+              label: "Activer explicitement",
+              code: `# Option 1 : demander un plan explicitement
+> avant de coder, fais d'abord un plan détaillé de comment
+  tu vas implémenter le système d'authentification
+
+# Option 2 : utiliser le slash command
+/plan implémente un système de paiement Stripe
+
+# Option 3 : EnterPlanMode (dans l'interface)
+# Claude liste les étapes, vous validez, puis il exécute`,
+            },
+          },
+          {
+            heading: "Ce que Claude produit en Plan Mode",
+            bullets: [
+              "Liste des fichiers à créer/modifier avec leur rôle",
+              "Dépendances entre les composants",
+              "Ordre d'implémentation optimal",
+              "Points de risque identifiés à l'avance",
+              "Questions à clarifier avant de commencer",
+              "Estimation du scope (pour valider que c'est réaliste)",
+            ],
+          },
+          {
+            code: {
+              lang: "text",
+              label: "Exemple de workflow avec Plan Mode",
+              code: `> /plan ajouter un système de notifications en temps réel
+  avec WebSockets dans ce projet Express + React
+
+# Claude répond avec un plan :
+## Plan d'implémentation
+
+### Backend (Express)
+1. src/websocket/wsServer.ts — serveur WebSocket avec ws
+2. src/websocket/notificationService.ts — logique métier
+3. src/models/notification.ts — modèle Prisma
+4. Migration BDD pour la table notifications
+
+### Frontend (React)
+5. src/hooks/useNotifications.ts — hook WebSocket
+6. src/components/NotificationBell.tsx — UI
+7. src/components/NotificationList.tsx — liste
+
+### Risques identifiés
+- Gestion des reconnexions WebSocket côté client
+- Scalabilité si > 1000 connexions simultanées
+
+Validez ce plan ? Je commence par le backend.
+
+> oui, vas-y`,
+            },
+          },
+          {
+            callout: {
+              type: "tip",
+              icon: "🏗️",
+              text: "<strong>Bonne pratique :</strong> Pour toute feature qui touche > 3 fichiers, utilisez systématiquement le Plan Mode. Vous économiserez du temps et de l'argent en évitant les dead ends.",
+            },
+          },
+          {
+            heading: "Modifier le plan avant l'exécution",
+            body: "Le Plan Mode est un aller-retour. Vous pouvez demander à Claude de modifier son plan (\"n'utilise pas WebSockets, utilise SSE plutôt\") avant qu'il commence à coder. C'est le moment idéal pour aligner sur l'architecture.",
+          },
+        ],
+      },
+      {
+        id: "subagents",
+        title: "Subagents — déléguer des sous-tâches",
+        duration: "9 min",
+        tag: "Avancé",
+        intro:
+          "Les subagents permettent à Claude Code de spawner des agents secondaires pour exécuter des tâches en parallèle ou des recherches indépendantes. C'est la fonctionnalité la plus puissante pour les tâches complexes.",
+        sections: [
+          {
+            heading: "Concept des subagents",
+            body: "Un subagent est une instance séparée de Claude qui travaille sur une sous-tâche spécifique. L'agent principal garde le contexte global et orchestre les subagents. Les subagents ont leur propre fenêtre de contexte, ce qui protège le contexte principal.",
+          },
+          {
+            callout: {
+              type: "info",
+              icon: "🔱",
+              text: "<strong>Architecture :</strong> Agent principal → délègue à subagents → récupère les résultats → synthétise. Chaque subagent reçoit des instructions précises et retourne un résultat structuré.",
+            },
+          },
+          {
+            heading: "Quand utiliser les subagents",
+            bullets: [
+              "Recherche dans de larges codebases (protège le contexte principal)",
+              "Tâches parallèles indépendantes (ex: analyser 5 modules simultanément)",
+              "Exploration exploratoire (le subagent peut \"se perdre\" sans polluer le contexte)",
+              "Vérifications de sécurité ou qualité sur du code généré",
+              "Revue de code indépendante (second regard sans biais du contexte)",
+            ],
+          },
+          {
+            code: {
+              lang: "text",
+              label: "Demander un subagent",
+              code: `> utilise un subagent pour explorer et comprendre
+  l'architecture du module src/payments/ sans polluer
+  notre contexte actuel, puis rapporte-moi les points clés
+
+> lance des subagents en parallèle pour :
+  - analyser les performances de /api/orders
+  - checker la couverture de tests de src/auth/
+  - trouver tous les TODO dans le codebase
+  Synthétise les résultats quand c'est fait`,
+            },
+          },
+          {
+            heading: "Types de subagents disponibles",
+            table: {
+              headers: ["Type", "Spécialité", "Outils disponibles"],
+              rows: [
+                ["general-purpose", "Tâches générales", "Tous les outils"],
+                ["Explore", "Exploration de codebase", "Glob, Grep, Read, Bash (lecture)"],
+                ["Plan", "Architecture & planification", "Analyse seulement, pas d'édition"],
+              ],
+            },
+          },
+          {
+            callout: {
+              type: "warn",
+              icon: "💸",
+              text: "<strong>Coût :</strong> Chaque subagent démarre avec un contexte frais — il ne bénéficie pas du cache. Sur des tâches simples, un subagent peut coûter plus cher qu'une réponse directe. Utilisez-les pour des tâches qui le justifient.",
+            },
+          },
+        ],
+      },
+      {
+        id: "multi-agent",
+        title: "Workflows multi-agents",
+        duration: "10 min",
+        tag: "Expert",
+        intro:
+          "La collaboration entre plusieurs agents est le niveau ultime de Claude Code. Un orchestrateur coordonne des agents spécialisés pour accomplir des tâches qui dépassent les capacités d'un seul agent.",
+        sections: [
+          {
+            heading: "Pattern Orchestrateur → Agents spécialisés",
+            body: "L'orchestrateur reçoit l'objectif global, décompose en sous-tâches, délègue à des agents spécialisés (un pour la recherche, un pour l'implémentation, un pour les tests), puis consolide les résultats.",
+          },
+          {
+            code: {
+              lang: "text",
+              label: "Exemple de workflow multi-agents",
+              code: `> Je veux migrer toute la codebase de JavaScript vers TypeScript.
+  Utilise plusieurs agents :
+  1. Un agent Explore pour inventorier tous les fichiers JS
+     et identifier les plus complexes
+  2. Un agent Plan pour définir la stratégie de migration
+     par ordre de priorité
+  3. Ensuite tu implementeras toi-même en commençant
+     par les fichiers les moins dépendants`,
+            },
+          },
+          {
+            heading: "Agents de recherche (Research agents)",
+            body: "Un pattern très puissant : spawner un agent dont le seul rôle est de chercher de l'information (dans le code, sur le web, dans la doc) et de la synthétiser pour l'agent principal.",
+            code: {
+              lang: "text",
+              label: "Agent de recherche",
+              code: `> utilise un subagent pour rechercher dans la doc officielle
+  de Prisma comment implémenter des transactions nested,
+  et rapporte-moi les patterns recommandés avec des exemples
+
+> lance un agent de recherche pour trouver comment
+  les autres endpoints de l'app gèrent la pagination,
+  puis applique le même pattern à /api/products`,
+            },
+          },
+          {
+            heading: "Isolation de contexte — pourquoi c'est crucial",
+            body: "Quand un agent explore un large module ou fait des recherches, il peut lire des dizaines de fichiers. Si c'est dans le contexte principal, toute cette info \"pollue\" la fenêtre et dilue l'attention sur l'essentiel. Les subagents isolent cette exploration.",
+          },
+          {
+            callout: {
+              type: "success",
+              icon: "🏆",
+              text: "<strong>Pattern expert :</strong> Agent principal = chef de projet (contexte propre, décisions finales). Subagents = consultants spécialisés (contexte dédié, livrables précis). Ce pattern permet de traiter des codebases entiers de façon cohérente.",
+            },
+          },
+          {
+            heading: "Tâches en parallèle avec subagents",
+            code: {
+              lang: "text",
+              label: "Parallélisation",
+              code: `> Lance ces 3 tâches en parallèle avec des subagents :
+  - Subagent 1 : génère les tests unitaires pour src/auth/
+  - Subagent 2 : génère les tests unitaires pour src/payments/
+  - Subagent 3 : génère les tests unitaires pour src/users/
+  Quand les 3 sont finis, consolide et lance npm test`,
+            },
+          },
+        ],
+      },
+    ],
+  },
+
+  // ─────────────────────────────────────────────────────────
+  // MODULE 10 — PROJET SAAS COMPLET
+  // ─────────────────────────────────────────────────────────
+  {
+    id: "saas-project",
+    title: "Projet SaaS Complet",
+    emoji: "🏗️",
+    color: "#f97316",
+    lessons: [
+      {
+        id: "project-setup",
+        title: "Démarrer un projet from scratch",
+        duration: "10 min",
+        tag: "Projet réel",
+        intro:
+          "Voyons comment créer un projet SaaS complet avec Claude Code, de l'initialisation jusqu'au déploiement. C'est le workflow que les devs pros utilisent au quotidien.",
+        sections: [
+          {
+            heading: "Étape 1 : Définir le projet et le stack",
+            code: {
+              lang: "text",
+              label: "Prompt d'initialisation",
+              code: `> je veux créer un SaaS de gestion de tâches pour les équipes.
+  Stack souhaité :
+  - Next.js 15 (App Router) + TypeScript
+  - Prisma + PostgreSQL
+  - Authentification avec NextAuth.js
+  - Paiements avec Stripe
+  - Déploiement sur Vercel
+
+  Commence par créer la structure du projet et le CLAUDE.md
+  avec toutes les conventions qu'on va suivre`,
+            },
+          },
+          {
+            heading: "Étape 2 : Laisser Claude créer la structure",
+            body: "Claude va créer la structure de dossiers, installer les dépendances, configurer TypeScript, ESLint, Prettier, configurer la base de données et écrire le CLAUDE.md de référence pour toute la suite du projet.",
+          },
+          {
+            callout: {
+              type: "tip",
+              icon: "🎯",
+              text: "<strong>Pro tip :</strong> Demandez à Claude de créer le CLAUDE.md <em>en premier</em>. Toutes les décisions d'architecture prises au démarrage seront documentées et Claude s'y référera pour toute la suite du projet.",
+            },
+          },
+          {
+            heading: "Étape 3 : Implémenter feature par feature",
+            code: {
+              lang: "text",
+              label: "Workflow feature",
+              code: `# Pour chaque feature, suivre ce workflow :
+
+# 1. Plan
+> /plan implémenter l'authentification avec NextAuth.js
+
+# 2. Validation du plan
+> ok, commence par le backend (providers + API routes)
+
+# 3. Tests en continu
+> maintenant génère les tests et vérifie que tout passe
+
+# 4. Commit
+> /commit
+
+# 5. PR si en équipe
+> /review-pr`,
+            },
+          },
+          {
+            heading: "Étape 4 : Intégration Stripe",
+            code: {
+              lang: "text",
+              label: "Exemple intégration Stripe",
+              code: `> implémente les paiements Stripe avec :
+  - Plans Free/Pro/Enterprise
+  - Checkout session pour l'upgrade
+  - Webhook pour les événements (payment_succeeded,
+    subscription_cancelled, etc.)
+  - Gestion des trials 14 jours
+  - Portal client pour gérer l'abonnement
+
+  Utilise les patterns Stripe recommandés pour Next.js
+  et les types TypeScript de @stripe/stripe-js`,
+            },
+          },
+        ],
+      },
+      {
+        id: "existing-project",
+        title: "Intégration dans un projet existant",
+        duration: "8 min",
+        tag: "Projet réel",
+        intro:
+          "Intégrer Claude Code sur un projet existant (legacy ou en cours) demande une approche différente d'un projet from scratch. Il faut d'abord que Claude comprenne l'existant.",
+        sections: [
+          {
+            heading: "Étape 1 : Onboarding Claude sur le projet",
+            code: {
+              lang: "text",
+              label: "Première session sur un projet existant",
+              code: `> explore ce projet et crée un CLAUDE.md complet qui documente :
+  - l'architecture globale
+  - les patterns et conventions utilisés
+  - les dépendances clés et leur rôle
+  - les commandes importantes (dev, test, build)
+  - les zones sensibles à ne pas toucher sans review
+
+  Prends ton temps pour bien explorer avant d'écrire`,
+            },
+          },
+          {
+            callout: {
+              type: "info",
+              icon: "🔍",
+              text: "<strong>Cette étape est cruciale :</strong> Un CLAUDE.md bien fait au départ évite les incohérences. Claude va lire la codebase, comprendre les patterns, et les respecter automatiquement dans toutes les sessions suivantes.",
+            },
+          },
+          {
+            heading: "Étape 2 : Identifier les quick wins",
+            code: {
+              lang: "text",
+              label: "Audit rapide",
+              code: `> fais un audit rapide du projet et identifie :
+  - les 5 plus gros problèmes de qualité/dette technique
+  - les tests manquants les plus critiques
+  - les dépendances obsolètes ou avec vulnérabilités
+  - le code mort ou inutilisé
+
+  Priorise par impact/effort`,
+            },
+          },
+          {
+            heading: "Gestion du code legacy",
+            body: "Pour du code legacy sans tests, la règle d'or est : tests d'abord, refactoring ensuite. Demandez toujours à Claude de \"photographier\" le comportement actuel avec des tests avant de toucher au code.",
+            code: {
+              lang: "text",
+              label: "Approche code legacy",
+              code: `# MAUVAIS : refactorer directement
+> refactore src/legacy/userManager.js
+
+# BON : tests → refactoring ✅
+> 1. analyse le comportement actuel de src/legacy/userManager.js
+  2. génère des tests qui documentent ce comportement
+  3. vérifie que les tests passent sur le code actuel
+  4. ensuite seulement, propose un refactoring`,
+            },
+          },
+          {
+            heading: "Étape 3 : Middleware et règles personnalisées",
+            body: "Sur un projet existant, les règles métier sont souvent implicites dans le code. Aidez Claude à les identifier et les documenter dans CLAUDE.md pour qu'elles soient respectées.",
+            code: {
+              lang: "text",
+              label: "Extraire les règles implicites",
+              code: `> en analysant le middleware d'authentification et les guards
+  dans ce projet, identifie et documente toutes les règles
+  de permissions implicites. Ajoute-les au CLAUDE.md
+  sous une section "Règles métier"`,
+            },
+          },
+        ],
+      },
+      {
+        id: "professional-tips",
+        title: "Usage professionnel & retours terrain",
+        duration: "10 min",
+        tag: "Expert",
+        intro:
+          "Les conseils de devs qui utilisent Claude Code en production au quotidien. Ce qui marche vraiment, les pièges à éviter, et les patterns qui font gagner le plus de temps.",
+        sections: [
+          {
+            heading: "Ce qui change vraiment dans le workflow",
+            bullets: [
+              "On écrit plus de specs/prompts et moins de code boilerplate",
+              "La revue de code devient la compétence principale (pas l'écriture)",
+              "Les tests sont générés en même temps que le code, pas après",
+              "La documentation suit naturellement (Claude commente en écrivant)",
+              "On peut tacler des refactorings qu'on repoussait depuis des mois",
+            ],
+          },
+          {
+            heading: "Gérer plusieurs terminaux",
+            body: "Une technique pro : ouvrir plusieurs instances de Claude Code en parallèle, chacune sur une branche différente pour des features distinctes. Vous orchestrez les travaux et mergez les résultats.",
+            code: {
+              lang: "bash",
+              label: "Multiple instances Claude Code",
+              code: `# Terminal 1 : feature/auth
+cd projet && git checkout feature/auth && claude
+
+# Terminal 2 : feature/payments (en parallèle)
+cd projet && git checkout feature/payments && claude
+
+# Terminal 3 : fix/bugs
+cd projet && git checkout fix/bugs && claude
+
+# Chaque Claude travaille sur sa branche indépendamment`,
+            },
+          },
+          {
+            callout: {
+              type: "tip",
+              icon: "⚡",
+              text: "<strong>Multiplicateur de productivité :</strong> 3 instances Claude en parallèle = 3x plus de features développées simultanément. Vous devenez le chef d'orchestre pendant que les agents codent.",
+            },
+          },
+          {
+            heading: "Stratégies avancées de code review",
+            code: {
+              lang: "text",
+              label: "Review de code approfondie",
+              code: `# Review de sécurité
+> fais une revue de sécurité de ce diff en cherchant :
+  injections SQL, XSS, IDOR, secrets exposés,
+  mauvaise gestion des erreurs révélant des infos sensibles
+
+# Review de performance
+> analyse ce composant React pour les re-renders inutiles,
+  les dépendances manquantes dans useEffect, et les
+  opportunités de mémoïsation
+
+# Review d'architecture
+> cette implémentation respecte-t-elle les patterns
+  du reste du projet ? Qu'est-ce qui serait fait différemment
+  par un senior dev ?`,
+            },
+          },
+          {
+            heading: "Prompts de processus créatif",
+            body: "Claude Code n'est pas qu'un exécutant. Il peut proposer des approches, challenger vos décisions et suggérer des alternatives que vous n'aviez pas envisagées.",
+            code: {
+              lang: "text",
+              label: "Challenger ses propres décisions",
+              code: `> j'ai prévu d'implémenter le cache avec Redis.
+  Quelles sont les alternatives que je n'ai peut-être
+  pas considérées pour ce cas d'usage ? Quels sont
+  les trade-offs de chaque approche ?
+
+> voici mon implémentation actuelle. Qu'est-ce qu'un
+  dev senior ferait différemment et pourquoi ?`,
+            },
+          },
+          {
+            heading: "Automatisation de la création de prompts",
+            body: "Une technique avancée : demander à Claude de générer les prompts pour les tâches futures. Claude connaît votre projet et peut créer des instructions précises pour les prochaines sessions.",
+            code: {
+              lang: "text",
+              label: "Générer ses propres prompts",
+              code: `> génère un prompt complet et précis que je pourrai
+  utiliser dans une prochaine session pour implémenter
+  les notifications push. Le prompt doit inclure tout
+  le contexte nécessaire pour qu'un Claude fresh
+  puisse l'exécuter sans autres explications`,
+            },
+          },
+          {
+            heading: "Conclusion : le bon état d'esprit",
+            bullets: [
+              "Claude Code est un senior dev junior — très compétent, mais à guider",
+              "Plus vous lui donnez de contexte, meilleur est le résultat",
+              "Vérifiez toujours le code généré avec git diff avant de committer",
+              "Les CLAUDE.md sont votre investissement le plus rentable",
+              "Commencez par les tâches répétitives et monotones pour gagner du temps",
+              "Progressivement, déléguez des tâches de plus en plus complexes",
+            ],
+          },
+        ],
+      },
+    ],
+  },
 ];
 
 export const totalLessons = curriculum.reduce(
