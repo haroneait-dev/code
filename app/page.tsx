@@ -879,13 +879,15 @@ function AuthModal({ onClose, onAuth }: { onClose: () => void; onAuth: (user: Us
 // ─────────────────────────────────────────────
 // WIKI VIEW
 // ─────────────────────────────────────────────
-function WikiView({ isMobile }: { isMobile: boolean }) {
+function WikiView({ isMobile, isAdmin }: { isMobile: boolean; isAdmin: boolean }) {
   const [communityTab, setCommunityTab] = useState<"tips" | "skills">("tips");
   const [tips, setTips] = useState<WikiTip[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeCategory, setActiveCategory] = useState<string>("Tous");
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [voted, setVoted] = useState<Set<string>>(new Set());
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [formTitle, setFormTitle] = useState("");
   const [formContent, setFormContent] = useState("");
@@ -915,6 +917,22 @@ function WikiView({ isMobile }: { isMobile: boolean }) {
     try { localStorage.setItem("wiki_voted", JSON.stringify([...next])); } catch {}
     setTips(prev => prev.map(t => t.id === id ? { ...t, upvotes: t.upvotes + 1 } : t));
     fetch(`/api/wiki/${id}/vote`, { method: "POST" }).catch(() => {});
+  };
+
+  const handleDelete = async (id: string) => {
+    setDeleting(true);
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token;
+    if (!token) { setDeleting(false); return; }
+    const res = await fetch(`/api/wiki/${id}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (res.ok) {
+      setTips(prev => prev.filter(t => t.id !== id));
+      setConfirmDeleteId(null);
+    }
+    setDeleting(false);
   };
 
   const handleSubmit = async () => {
@@ -1045,6 +1063,31 @@ function WikiView({ isMobile }: { isMobile: boolean }) {
                         style={{ marginLeft: "auto", background: "none", border: "none", color: "var(--beige-muted)", fontSize: "0.7rem", cursor: "pointer", padding: 0 }}>
                         {isExpanded ? "↑ Réduire" : "↓ Lire"}
                       </button>
+                      {isAdmin && (
+                        confirmDeleteId === tip.id ? (
+                          <span style={{ display: "flex", alignItems: "center", gap: "0.35rem", marginLeft: "0.5rem" }}>
+                            <span style={{ fontSize: "0.68rem", color: "var(--beige-muted)" }}>Supprimer ?</span>
+                            <button onClick={() => handleDelete(tip.id)} disabled={deleting}
+                              style={{ fontSize: "0.68rem", color: "#c87070", background: "none", border: "none", cursor: "pointer", padding: 0, fontWeight: 600 }}>
+                              {deleting ? "…" : "Oui"}
+                            </button>
+                            <button onClick={() => setConfirmDeleteId(null)}
+                              style={{ fontSize: "0.68rem", color: "var(--beige-muted)", background: "none", border: "none", cursor: "pointer", padding: 0 }}>
+                              Non
+                            </button>
+                          </span>
+                        ) : (
+                          <button onClick={() => setConfirmDeleteId(tip.id)}
+                            title="Supprimer"
+                            style={{ marginLeft: "0.25rem", background: "none", border: "none", cursor: "pointer", padding: "0.1rem", color: "var(--beige-muted)", opacity: 0.5, transition: "opacity 0.1s", lineHeight: 1 }}
+                            onMouseEnter={e => (e.currentTarget.style.opacity = "1")}
+                            onMouseLeave={e => (e.currentTarget.style.opacity = "0.5")}>
+                            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                              <path d="M2 3h8M5 3V2h2v1M4.5 3v6M7.5 3v6M3 3l.5 7h5L9 3" stroke="#c87070" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                            </svg>
+                          </button>
+                        )
+                      )}
                     </div>
                   </div>
                 </div>
@@ -1358,6 +1401,8 @@ export default function App() {
     setUser(null);
   }, []);
 
+  const isAdmin = !!(user?.email && user.email === process.env.NEXT_PUBLIC_ADMIN_EMAIL);
+
   const currentMod = curriculum.find(m => m.id === currentModuleId) ?? curriculum[0];
   const currentLesson = currentMod.lessons.find(l => l.id === currentLessonId) ?? currentMod.lessons[0];
   const allLessons = curriculum.flatMap(mod => mod.lessons.map(l => ({ modId: mod.id, lessonId: l.id })));
@@ -1412,7 +1457,7 @@ export default function App() {
           {view === "home" ? (
             <HomePage onNavigate={navigate} onSelect={goToLesson} isMobile={true} />
           ) : view === "wiki" ? (
-            <WikiView isMobile={true} />
+            <WikiView isMobile={true} isAdmin={isAdmin} />
           ) : (
             <div style={{ padding: "0 1.25rem" }}>
               <LessonView lesson={currentLesson} mod={currentMod} scrollToSection={scrollToSection} isMobile={true} />
@@ -1453,7 +1498,7 @@ export default function App() {
           {view === "home" ? (
             <HomePage onNavigate={navigate} onSelect={goToLesson} isMobile={false} />
           ) : view === "wiki" ? (
-            <WikiView isMobile={false} />
+            <WikiView isMobile={false} isAdmin={isAdmin} />
           ) : (
             <div style={{ padding: "0 3rem" }}>
               <LessonView lesson={currentLesson} mod={currentMod} scrollToSection={scrollToSection} isMobile={false} />
