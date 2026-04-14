@@ -546,7 +546,7 @@ function DesktopTopNav({ currentModuleId, currentView, onHome, onModuleSelect, o
   }, []);
 
   return (
-    <div style={{ borderBottom: "1px solid var(--border)", flexShrink: 0 }}>
+    <div className="glass-nav" style={{ borderBottom: "1px solid rgba(200,190,168,0.07)", flexShrink: 0, position: "relative", zIndex: 10 }}>
       <div style={{ display: "flex", alignItems: "center", padding: "0 1.5rem", height: "52px", gap: "1rem" }}>
         <button onClick={onHome} style={{ display: "flex", alignItems: "center", gap: "0.5rem", background: "none", border: "none", cursor: "pointer", flexShrink: 0, padding: 0 }}>
           <span style={{ width: "22px", height: "22px", borderRadius: "4px", background: "var(--beige)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.65rem", color: "var(--bg-dark)", fontWeight: 800, fontFamily: "'JetBrains Mono', monospace" }}>C</span>
@@ -658,14 +658,17 @@ function HomePage({ onNavigate, onSelect, isMobile, user, onAuthClick }: {
   const introLessonCount = curriculum.find(m => m.id === "intro")?.lessons.length ?? 0;
   const lockedLessonsCount = totalLessons - introLessonCount;
 
+  useReveal([user]);
+
   return (
-    <div className="fade-in" style={{ maxWidth: "680px", margin: "0 auto", padding: isMobile ? "2.5rem 1.25rem 5rem" : "4.5rem 2.5rem 6rem" }}>
+    <div className="view-enter" style={{ maxWidth: "680px", margin: "0 auto", padding: isMobile ? "2.5rem 1.25rem 5rem" : "4.5rem 2.5rem 6rem", position: "relative", zIndex: 1 }}>
       {/* Hero */}
-      <div style={{ marginBottom: isMobile ? "2.5rem" : "4rem" }}>
-        <div style={{ fontSize: "0.65rem", fontWeight: 600, color: "var(--beige-muted)", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "0.75rem" }}>
+      <div className="reveal reveal-delay-1" style={{ marginBottom: isMobile ? "2.5rem" : "4rem" }}>
+        <div className="badge-live" style={{ display: "inline-flex", alignItems: "center", gap: "0.4rem", fontSize: "0.62rem", fontWeight: 600, color: "rgba(160,140,220,0.9)", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "1rem", padding: "0.25rem 0.7rem", background: "rgba(120,90,200,0.12)", border: "1px solid rgba(120,90,200,0.25)", borderRadius: "999px" }}>
+          <span style={{ width: "5px", height: "5px", borderRadius: "50%", background: "rgba(160,140,220,0.9)", display: "inline-block" }} />
           Formation · {totalLessons} leçons · 4h
         </div>
-        <h1 style={{ fontSize: isMobile ? "2rem" : "2.5rem", fontWeight: 700, color: "var(--beige)", letterSpacing: "-0.03em", lineHeight: 1.1, marginBottom: "0.875rem" }}>
+        <h1 className="gradient-text" style={{ fontSize: isMobile ? "2.2rem" : "3rem", fontWeight: 800, letterSpacing: "-0.04em", lineHeight: 1.05, marginBottom: "1rem" }}>
           Maîtriser Claude Code
         </h1>
         <p style={{ fontSize: "0.9375rem", color: "var(--beige-muted)", lineHeight: 1.75, marginBottom: "2rem", maxWidth: "480px" }}>
@@ -680,9 +683,10 @@ function HomePage({ onNavigate, onSelect, isMobile, user, onAuthClick }: {
 
       {/* Auth teaser banner */}
       {!user && (
-        <div style={{ display: "flex", alignItems: "center", gap: "1rem", padding: "0.875rem 1.1rem", background: "rgba(200,190,168,0.05)", border: "1px solid rgba(200,190,168,0.12)", borderRadius: "8px", marginBottom: isMobile ? "2rem" : "2.5rem", flexWrap: "wrap" }}>
-          <div style={{ flex: 1, minWidth: "200px" }}>
-            <div style={{ fontSize: "0.8rem", color: "var(--beige)", fontWeight: 500, marginBottom: "0.2rem" }}>
+        <div className="reveal reveal-delay-2" style={{ display: "flex", alignItems: "center", gap: "1rem", padding: "1rem 1.25rem", background: "linear-gradient(135deg,rgba(100,70,200,0.08),rgba(50,80,180,0.06))", border: "1px solid rgba(120,90,200,0.2)", borderRadius: "10px", marginBottom: isMobile ? "2rem" : "2.5rem", flexWrap: "wrap", position: "relative", overflow: "hidden" }}>
+          <div style={{ position: "absolute", inset: 0, background: "linear-gradient(90deg,transparent,rgba(120,90,200,0.04),transparent)", backgroundSize: "200% 100%", animation: "shimmer-lock 4s linear infinite" }} />
+          <div style={{ flex: 1, minWidth: "200px", position: "relative" }}>
+            <div style={{ fontSize: "0.8rem", color: "var(--beige)", fontWeight: 600, marginBottom: "0.2rem" }}>
               🔒 {lockedLessonsCount} leçons accessibles après connexion
             </div>
             <div style={{ fontSize: "0.72rem", color: "var(--beige-muted)" }}>
@@ -690,19 +694,22 @@ function HomePage({ onNavigate, onSelect, isMobile, user, onAuthClick }: {
             </div>
           </div>
           <button onClick={onAuthClick}
-            style={{ padding: "0.5rem 1.1rem", background: "var(--beige)", border: "none", borderRadius: "6px", color: "var(--bg-dark)", fontSize: "0.8rem", fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0 }}>
+            style={{ padding: "0.55rem 1.2rem", background: "linear-gradient(135deg,rgba(120,90,200,0.9),rgba(80,100,200,0.9))", border: "1px solid rgba(160,130,240,0.4)", borderRadius: "8px", color: "#fff", fontSize: "0.8rem", fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0, position: "relative", transition: "transform 0.15s" }}
+            onMouseEnter={e => (e.currentTarget.style.transform = "scale(1.04)")}
+            onMouseLeave={e => (e.currentTarget.style.transform = "scale(1)")}
+          >
             Se connecter →
           </button>
         </div>
       )}
 
       {/* Skills */}
-      <div style={{ marginBottom: isMobile ? "2.5rem" : "3.5rem" }}>
+      <div className="reveal reveal-delay-2" style={{ marginBottom: isMobile ? "2.5rem" : "3.5rem" }}>
         <div style={{ fontSize: "0.62rem", fontWeight: 600, color: "var(--beige-muted)", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "1rem" }}>Au programme</div>
         <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: "0 2rem" }}>
           {["Écrire un CLAUDE.md efficace", "Configurer des serveurs MCP", "Automatiser avec les hooks", "Passer du chat à la délégation", "Gérer la fenêtre de contexte", "Orchestrer des agents en parallèle", "Utiliser la mémoire persistante", "Optimiser les coûts de tokens", "Intégrer dans vos pipelines CI/CD", "Déboguer avec les outils intégrés"].map((item, i) => (
             <div key={i} style={{ display: "flex", gap: "0.625rem", fontSize: "0.84rem", color: "var(--beige-dim)", lineHeight: 1.5, alignItems: "flex-start", padding: "0.3rem 0", borderBottom: "1px solid rgba(200,190,168,0.04)" }}>
-              <span style={{ color: "var(--beige-muted)", flexShrink: 0, fontSize: "0.65rem", marginTop: "0.35rem" }}>—</span>
+              <span style={{ color: "rgba(120,90,200,0.7)", flexShrink: 0, fontSize: "0.7rem", marginTop: "0.3rem" }}>◆</span>
               {item}
             </div>
           ))}
@@ -711,32 +718,33 @@ function HomePage({ onNavigate, onSelect, isMobile, user, onAuthClick }: {
 
       {/* Curriculum */}
       <div>
-        <div style={{ fontSize: "0.62rem", fontWeight: 600, color: "var(--beige-muted)", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "1rem" }}>
+        <div className="reveal reveal-delay-3" style={{ fontSize: "0.62rem", fontWeight: 600, color: "var(--beige-muted)", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "1rem" }}>
           {curriculum.length} modules
         </div>
         {curriculum.map((mod, idx) => {
           const isLocked = !user && mod.id !== "intro";
           return (
-          <div key={mod.id} style={{ borderTop: "1px solid var(--border)", opacity: isLocked ? 0.55 : 1, transition: "opacity 0.15s" }}>
+          <div key={mod.id} className={`reveal reveal-delay-${Math.min(idx + 3, 5)} mod-row`}
+            style={{ borderTop: "1px solid rgba(200,190,168,0.07)", opacity: isLocked ? 0.6 : 1, transition: "opacity 0.15s" }}>
             <button onClick={() => isLocked ? onAuthClick() : setExpandedMod(expandedMod === mod.id ? null : mod.id)}
-              style={{ width: "100%", display: "flex", alignItems: "center", gap: "0.875rem", padding: "0.875rem 0", background: "none", border: "none", cursor: "pointer", textAlign: "left" }}>
-              <span style={{ fontSize: "0.62rem", color: "var(--beige-muted)", fontFamily: "'JetBrains Mono', monospace", flexShrink: 0, width: "18px", textAlign: "right" }}>{String(idx + 1).padStart(2, "0")}</span>
+              style={{ width: "100%", display: "flex", alignItems: "center", gap: "0.875rem", padding: "0.875rem 0.4rem", background: "none", border: "none", cursor: "pointer", textAlign: "left" }}>
+              <span style={{ fontSize: "0.62rem", color: "rgba(120,90,200,0.6)", fontFamily: "'JetBrains Mono', monospace", flexShrink: 0, width: "18px", textAlign: "right" }}>{String(idx + 1).padStart(2, "0")}</span>
               <span style={{ flex: 1, fontSize: "0.9rem", fontWeight: 600, color: isLocked ? "var(--beige-muted)" : "var(--beige)" }}>{mod.title}</span>
               <span style={{ fontSize: "0.7rem", color: "var(--beige-muted)" }}>{mod.lessons.length} leçons</span>
               {isLocked
-                ? <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><rect x="2" y="5" width="8" height="6" rx="1.5" stroke="var(--beige-muted)" strokeWidth="1.2"/><path d="M4 5V3.5a2 2 0 0 1 4 0V5" stroke="var(--beige-muted)" strokeWidth="1.2" strokeLinecap="round"/></svg>
-                : <span style={{ color: "var(--beige-muted)", fontSize: "0.7rem", transition: "transform 0.15s", transform: expandedMod === mod.id ? "rotate(90deg)" : "none" }}>›</span>
+                ? <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><rect x="2" y="5" width="8" height="6" rx="1.5" stroke="rgba(120,90,200,0.5)" strokeWidth="1.2"/><path d="M4 5V3.5a2 2 0 0 1 4 0V5" stroke="rgba(120,90,200,0.5)" strokeWidth="1.2" strokeLinecap="round"/></svg>
+                : <span style={{ color: "var(--beige-muted)", fontSize: "0.7rem", transition: "transform 0.15s", display: "inline-block", transform: expandedMod === mod.id ? "rotate(90deg)" : "none" }}>›</span>
               }
             </button>
             {!isLocked && expandedMod === mod.id && (
-              <div style={{ paddingBottom: "0.5rem" }}>
+              <div className="view-enter" style={{ paddingBottom: "0.5rem" }}>
                 {mod.lessons.map((lesson, li) => (
                   <button key={lesson.id} onClick={() => onSelect(mod.id, lesson.id)}
-                    style={{ width: "100%", display: "flex", gap: "0.875rem", alignItems: "center", padding: "0.45rem 0 0.45rem 1.875rem", background: "none", border: "none", cursor: "pointer", textAlign: "left", borderRadius: "4px", transition: "background 0.1s", minHeight: "44px" }}
-                    onMouseEnter={e => (e.currentTarget.style.background = "rgba(200,190,168,0.05)")}
-                    onMouseLeave={e => (e.currentTarget.style.background = "none")}
+                    style={{ width: "100%", display: "flex", gap: "0.875rem", alignItems: "center", padding: "0.45rem 0 0.45rem 1.875rem", background: "none", border: "none", cursor: "pointer", textAlign: "left", borderRadius: "4px", transition: "background 0.15s", minHeight: "44px" }}
+                    onMouseEnter={e => { e.currentTarget.style.background = "rgba(100,70,200,0.06)"; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = "none"; }}
                   >
-                    <span style={{ fontSize: "0.62rem", color: "var(--beige-muted)", fontFamily: "'JetBrains Mono', monospace", flexShrink: 0, width: "18px", textAlign: "right" }}>{li + 1}</span>
+                    <span style={{ fontSize: "0.62rem", color: "rgba(120,90,200,0.55)", fontFamily: "'JetBrains Mono', monospace", flexShrink: 0, width: "18px", textAlign: "right" }}>{li + 1}</span>
                     <span style={{ flex: 1, fontSize: "0.84rem", color: "var(--beige-dim)", lineHeight: 1.4 }}>{lesson.title}</span>
                     <span style={{ fontSize: "0.68rem", color: "var(--beige-muted)", flexShrink: 0 }}>{lesson.duration}</span>
                   </button>
@@ -1419,6 +1427,90 @@ function SkillsView({ isMobile }: { isMobile: boolean }) {
 }
 
 // ─────────────────────────────────────────────
+// BACKGROUND ORBS
+// ─────────────────────────────────────────────
+function BackgroundOrbs() {
+  return (
+    <div style={{ position: "fixed", inset: 0, overflow: "hidden", pointerEvents: "none", zIndex: 0 }}>
+      {/* Purple orb — top left */}
+      <div style={{
+        position: "absolute", width: "700px", height: "700px", borderRadius: "50%",
+        background: "radial-gradient(circle, rgba(100,70,200,0.13) 0%, transparent 68%)",
+        top: "-250px", left: "-180px",
+        animation: "orb1 22s ease-in-out infinite",
+        willChange: "transform",
+      }} />
+      {/* Blue orb — bottom right */}
+      <div style={{
+        position: "absolute", width: "600px", height: "600px", borderRadius: "50%",
+        background: "radial-gradient(circle, rgba(50,90,200,0.10) 0%, transparent 68%)",
+        bottom: "-150px", right: "-150px",
+        animation: "orb2 28s ease-in-out infinite",
+        willChange: "transform",
+      }} />
+      {/* Indigo orb — center */}
+      <div style={{
+        position: "absolute", width: "450px", height: "450px", borderRadius: "50%",
+        background: "radial-gradient(circle, rgba(130,50,180,0.07) 0%, transparent 68%)",
+        top: "35%", right: "25%",
+        animation: "orb3 20s ease-in-out infinite",
+        willChange: "transform",
+      }} />
+      {/* Dot grid overlay */}
+      <div style={{
+        position: "absolute", inset: 0,
+        backgroundImage: "radial-gradient(circle, rgba(200,190,168,0.06) 1px, transparent 1px)",
+        backgroundSize: "28px 28px",
+        maskImage: "radial-gradient(ellipse 80% 80% at 50% 50%, black 40%, transparent 100%)",
+        WebkitMaskImage: "radial-gradient(ellipse 80% 80% at 50% 50%, black 40%, transparent 100%)",
+      }} />
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
+// REVEAL HOOK (scroll animations)
+// ─────────────────────────────────────────────
+function useReveal(deps: unknown[] = []) {
+  useEffect(() => {
+    const els = document.querySelectorAll(".reveal");
+    const io = new IntersectionObserver(
+      (entries) => entries.forEach(e => { if (e.isIntersecting) e.target.classList.add("visible"); }),
+      { threshold: 0.08 }
+    );
+    els.forEach(el => io.observe(el));
+    return () => io.disconnect();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, deps);
+}
+
+// ─────────────────────────────────────────────
+// 3D TILT CARD
+// ─────────────────────────────────────────────
+function Tilt3D({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
+  const ref = useRef<HTMLDivElement>(null);
+  function onMove(e: React.MouseEvent) {
+    const el = ref.current; if (!el) return;
+    const r = el.getBoundingClientRect();
+    const x = ((e.clientX - r.left) / r.width - 0.5) * 14;
+    const y = ((e.clientY - r.top) / r.height - 0.5) * -10;
+    el.style.transform = `perspective(700px) rotateX(${y}deg) rotateY(${x}deg) scale3d(1.025,1.025,1.025)`;
+    el.style.boxShadow = `${-x * 1.5}px ${y * 1.5}px 32px rgba(100,70,200,0.18), 0 0 0 1px rgba(130,100,220,0.18)`;
+  }
+  function onLeave() {
+    const el = ref.current; if (!el) return;
+    el.style.transform = "perspective(700px) rotateX(0deg) rotateY(0deg) scale3d(1,1,1)";
+    el.style.boxShadow = "none";
+  }
+  return (
+    <div ref={ref} onMouseMove={onMove} onMouseLeave={onLeave}
+      style={{ transition: "transform 0.25s ease, box-shadow 0.25s ease", ...style }}>
+      {children}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
 // CHAT WIDGET
 // ─────────────────────────────────────────────
 type ChatMessage = { role: "user" | "assistant"; content: string };
@@ -1510,19 +1602,21 @@ function ChatWidget({ user }: { user: User | null }) {
       <button
         onClick={() => setOpen(v => !v)}
         title="Assistant IA"
+        className={!open ? "chat-btn-glow" : ""}
         style={{
           position: "fixed", bottom: "1.5rem", right: "1.5rem", zIndex: 1000,
-          width: "52px", height: "52px", borderRadius: "50%",
-          background: open ? "rgba(144,128,200,0.95)" : "rgba(144,128,200,0.85)",
-          border: "1px solid rgba(144,128,200,0.4)",
-          boxShadow: "0 4px 24px rgba(0,0,0,0.4)",
+          width: "54px", height: "54px", borderRadius: "50%",
+          background: open
+            ? "linear-gradient(135deg,rgba(120,96,200,0.98),rgba(80,100,200,0.98))"
+            : "linear-gradient(135deg,rgba(120,96,200,0.88),rgba(80,100,200,0.88))",
+          border: "1px solid rgba(160,130,240,0.5)",
           cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
-          transition: "all 0.2s", fontSize: "1.35rem",
+          transition: "transform 0.2s, background 0.2s", fontSize: "1.3rem",
         }}
-        onMouseEnter={e => (e.currentTarget.style.transform = "scale(1.08)")}
+        onMouseEnter={e => (e.currentTarget.style.transform = "scale(1.1)")}
         onMouseLeave={e => (e.currentTarget.style.transform = "scale(1)")}
       >
-        {open ? "✕" : "✦"}
+        <span className={!open ? "float-icon" : ""}>{open ? "✕" : "✦"}</span>
       </button>
 
       {/* Chat panel */}
@@ -1745,13 +1839,14 @@ export default function App() {
 
         {showAuth && <AuthModal onClose={() => setShowAuth(false)} onAuth={u => setUser(u)} />}
         <ChatWidget user={user} />
+        <BackgroundOrbs />
       </main>
     );
   }
 
   // ── DESKTOP LAYOUT ──
   return (
-    <main style={{ height: "100vh", overflow: "hidden", display: "flex", flexDirection: "column", background: "var(--bg-dark)" }}>
+    <main style={{ height: "100vh", overflow: "hidden", display: "flex", flexDirection: "column", background: "var(--bg-dark)", position: "relative" }}>
       <DesktopTopNav
         currentModuleId={currentModuleId}
         currentView={view}
@@ -1764,7 +1859,7 @@ export default function App() {
         onSignOut={handleSignOut}
       />
 
-      <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
+      <div style={{ flex: 1, display: "flex", overflow: "hidden", position: "relative", zIndex: 1 }}>
         {view === "lesson" && (
           <DesktopLessonSidebar mod={currentMod} currentLessonId={currentLessonId} onSelect={goToLesson} />
         )}
@@ -1788,6 +1883,7 @@ export default function App() {
 
       {showAuth && <AuthModal onClose={() => setShowAuth(false)} onAuth={u => setUser(u)} />}
       <ChatWidget user={user} />
+      <BackgroundOrbs />
     </main>
   );
 }
