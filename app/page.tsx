@@ -692,6 +692,137 @@ function CountUp({ to, duration = 1200, delay = 0 }: { to: number; duration?: nu
 }
 
 // ─────────────────────────────────────────────
+// TERMINAL MOCKUP — hero visual
+// ─────────────────────────────────────────────
+function TerminalMockup({ isMobile }: { isMobile: boolean }) {
+  const LINES = [
+    { text: '$ claude "Ajoute des tests unitaires"', color: "#8be9fd" },
+    { text: "◆ Lecture du projet (47 fichiers)…", color: "#b0a0e8" },
+    { text: "◆ Analyse de Button.tsx", color: "#b0a0e8" },
+    { text: "◆ Écriture de Button.test.tsx", color: "#b0a0e8" },
+    { text: "◆ Mise à jour de vitest.config.ts", color: "#b0a0e8" },
+    { text: "✓ 12 tests créés — 100% coverage", color: "#70d090" },
+    { text: "$ _", color: "#8be9fd" },
+  ];
+  const [visible, setVisible] = useState(0);
+  const [cycle, setCycle] = useState(0);
+  const termRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setVisible(0);
+    let count = 0;
+    let tid: ReturnType<typeof setTimeout>;
+    function next() {
+      count++;
+      setVisible(count);
+      if (count < LINES.length) {
+        tid = setTimeout(next, 420);
+      } else {
+        tid = setTimeout(() => setCycle(c => c + 1), 4500);
+      }
+    }
+    tid = setTimeout(next, 900);
+    return () => clearTimeout(tid);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cycle]);
+
+  useEffect(() => {
+    if (isMobile) return;
+    const move = (e: MouseEvent) => {
+      if (!termRef.current) return;
+      const x = (e.clientX / window.innerWidth - 0.5) * 14;
+      const y = (e.clientY / window.innerHeight - 0.5) * -9;
+      termRef.current.style.transform = `perspective(1100px) rotateY(${x}deg) rotateX(${y}deg)`;
+    };
+    const leave = () => {
+      if (termRef.current) termRef.current.style.transform = "perspective(1100px) rotateY(0deg) rotateX(0deg)";
+    };
+    window.addEventListener("mousemove", move);
+    window.addEventListener("mouseleave", leave);
+    return () => { window.removeEventListener("mousemove", move); window.removeEventListener("mouseleave", leave); };
+  }, [isMobile]);
+
+  const tags = [
+    { label: "CLAUDE.md", top: "8%", left: "-14%", delay: "0s" },
+    { label: "MCP Server", top: "18%", right: "-13%", delay: "1.8s" },
+    { label: "$ hooks", bottom: "22%", left: "-11%", delay: "0.9s" },
+    { label: "// agents", bottom: "10%", right: "-11%", delay: "2.5s" },
+  ];
+
+  return (
+    <div style={{ position: "relative" }}>
+      {/* Glow derrière le terminal */}
+      <div style={{
+        position: "absolute", top: "50%", left: "50%",
+        transform: "translate(-50%,-50%)",
+        width: "120%", height: "120%",
+        background: "radial-gradient(ellipse at center, rgba(96,80,200,0.13) 0%, transparent 68%)",
+        pointerEvents: "none", zIndex: 0,
+        animation: "chat-glow 4s ease-in-out infinite",
+      }} />
+
+      {/* Tags flottants */}
+      {!isMobile && tags.map((tag, i) => (
+        <div key={i} style={{
+          position: "absolute", zIndex: 20,
+          top: tag.top, bottom: (tag as {bottom?: string}).bottom,
+          left: (tag as {left?: string}).left, right: (tag as {right?: string}).right,
+          padding: "0.28rem 0.7rem",
+          background: "rgba(18,15,12,0.92)",
+          border: "1px solid rgba(200,190,168,0.18)",
+          borderRadius: "999px",
+          fontSize: "0.65rem",
+          fontFamily: "'JetBrains Mono', monospace",
+          color: "rgba(200,190,168,0.85)",
+          backdropFilter: "blur(8px)",
+          boxShadow: "0 4px 20px rgba(0,0,0,0.25)",
+          animation: "float-tag 4s ease-in-out infinite",
+          animationDelay: tag.delay,
+          whiteSpace: "nowrap",
+        }}>{tag.label}</div>
+      ))}
+
+      {/* Terminal window */}
+      <div ref={termRef} style={{
+        position: "relative", zIndex: 10,
+        background: "linear-gradient(160deg, #171412 0%, #100e0c 100%)",
+        border: "1px solid rgba(200,190,168,0.1)",
+        borderRadius: "14px",
+        overflow: "hidden",
+        boxShadow: "0 40px 80px rgba(0,0,0,0.22), 0 0 0 1px rgba(255,255,255,0.04), inset 0 1px 0 rgba(255,255,255,0.05)",
+        transition: "transform 0.28s cubic-bezier(0.175,0.885,0.32,1.275)",
+        transformStyle: "preserve-3d",
+      }}>
+        {/* Barre de titre */}
+        <div style={{
+          padding: "0.65rem 1rem", display: "flex", alignItems: "center", gap: "0.45rem",
+          borderBottom: "1px solid rgba(255,255,255,0.05)",
+          background: "rgba(255,255,255,0.02)",
+        }}>
+          {["#ff5f57","#febc2e","#28c840"].map((c, i) => (
+            <span key={i} style={{ width: 11, height: 11, borderRadius: "50%", background: c, opacity: 0.8, display: "inline-block" }} />
+          ))}
+          <span style={{ flex: 1, textAlign: "center", fontSize: "0.66rem", color: "rgba(200,190,168,0.3)", fontFamily: "'JetBrains Mono', monospace" }}>
+            claude-code — zsh
+          </span>
+        </div>
+        {/* Contenu */}
+        <div style={{ padding: "1.25rem 1.5rem", fontFamily: "'JetBrains Mono', monospace", fontSize: "0.77rem", lineHeight: 2.1, minHeight: "210px" }}>
+          {LINES.slice(0, visible).map((line, i) => (
+            <div key={`${cycle}-${i}`} className="fade-in" style={{ color: line.color }}>
+              {line.text}
+              {i === visible - 1 && line.text === "$ _" && (
+                <span style={{ borderRight: "2px solid #8be9fd", marginLeft: "1px", animation: "blink 0.7s step-end infinite", display: "inline-block", height: "0.8em", verticalAlign: "middle" }} />
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
 // HOMEPAGE
 // ─────────────────────────────────────────────
 function HomePage({ onNavigate, onSelect, isMobile, user, onAuthClick }: {
@@ -707,117 +838,146 @@ function HomePage({ onNavigate, onSelect, isMobile, user, onAuthClick }: {
 
   useReveal([user]);
 
+  const FEATURES = [
+    { code: ".md", label: "CLAUDE.md", desc: "Configure l'IA pour ton projet" },
+    { code: "mcp", label: "Serveurs MCP", desc: "Connecte des outils externes" },
+    { code: "fn()", label: "Hooks", desc: "Automatise avec des scripts" },
+    { code: "x4", label: "Multi-agents", desc: "Orchestre des agents en parallèle" },
+    { code: "ctx", label: "Contexte", desc: "Gère la fenêtre de contexte" },
+    { code: "git", label: "CI/CD", desc: "Intègre dans tes pipelines" },
+  ];
+
   return (
-    <div className="view-enter" style={{ maxWidth: "680px", margin: "0 auto", padding: isMobile ? "2.5rem 1.25rem 5rem" : "4.5rem 2.5rem 6rem", position: "relative", zIndex: 1 }}>
-      {/* Hero */}
-      <div className="reveal reveal-delay-1" style={{ marginBottom: isMobile ? "2.5rem" : "4rem" }}>
-        <div className="badge-live" style={{ display: "inline-flex", alignItems: "center", gap: "0.4rem", fontSize: "0.62rem", fontWeight: 600, color: "rgba(96,80,160,0.9)", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "1rem", padding: "0.25rem 0.7rem", background: "rgba(96,80,160,0.08)", border: "1px solid rgba(96,80,160,0.2)", borderRadius: "999px" }}>
-          <span style={{ width: "5px", height: "5px", borderRadius: "50%", background: "rgba(96,80,160,0.9)", display: "inline-block" }} />
-          Formation Claude Code
-        </div>
+    <div className="view-enter" style={{ maxWidth: isMobile ? "100%" : "1080px", margin: "0 auto", padding: isMobile ? "2.5rem 1.25rem 5rem" : "4rem 3rem 6rem", position: "relative", zIndex: 1 }}>
 
-        <h1 className="gradient-text" style={{ fontSize: isMobile ? "2.2rem" : "3.2rem", fontWeight: 800, letterSpacing: "-0.04em", lineHeight: 1.05, marginBottom: "1rem" }}>
-          <TypewriterText text="Maîtriser Claude Code" speed={55} />
-        </h1>
+      {/* ── HERO 2 COLONNES ── */}
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: isMobile ? "2.5rem" : "5rem", alignItems: "center", marginBottom: isMobile ? "3.5rem" : "6rem" }}>
 
-        <p style={{ fontSize: "0.9375rem", color: "var(--beige-muted)", lineHeight: 1.75, marginBottom: "2rem", maxWidth: "480px" }}>
-          De la première commande aux architectures multi-agents. Une formation structurée, complète, pensée pour les développeurs.
-        </p>
+        {/* Colonne gauche — texte */}
+        <div className="reveal reveal-delay-1">
+          <div className="badge-live" style={{ display: "inline-flex", alignItems: "center", gap: "0.4rem", fontSize: "0.62rem", fontWeight: 600, color: "rgba(96,80,160,0.9)", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "1.25rem", padding: "0.25rem 0.75rem", background: "rgba(96,80,160,0.08)", border: "1px solid rgba(96,80,160,0.2)", borderRadius: "999px" }}>
+            <span style={{ width: "5px", height: "5px", borderRadius: "50%", background: "rgba(96,80,160,0.9)", display: "inline-block" }} />
+            Formation Claude Code
+          </div>
 
-        {/* Stats animées */}
-        <div style={{ display: "flex", gap: isMobile ? "1rem" : "2rem", marginBottom: "2rem", flexWrap: "wrap" }}>
-          {[
-            { value: totalLessons, label: "leçons", delay: 200 },
-            { value: curriculum.length, label: "modules", delay: 400 },
-            { value: 4, label: "heures", delay: 600 },
-          ].map(({ value, label, delay }, i) => (
-            <div key={i} className="stat-pop" style={{ animationDelay: `${delay}ms`, animationFillMode: "both", textAlign: "center", padding: "0.75rem 1.25rem", background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: "10px", minWidth: "80px", boxShadow: "0 2px 12px rgba(0,0,0,0.05)" }}>
-              <div style={{ fontSize: isMobile ? "1.6rem" : "2rem", fontWeight: 800, color: "var(--purple)", lineHeight: 1, fontFamily: "'JetBrains Mono', monospace" }}>
-                <CountUp to={value} duration={1000} delay={delay} />
+          <h1 className="gradient-text" style={{ fontSize: isMobile ? "2.4rem" : "3.5rem", fontWeight: 800, letterSpacing: "-0.04em", lineHeight: 1.05, marginBottom: "1.25rem" }}>
+            <TypewriterText text="Maîtriser Claude Code" speed={52} />
+          </h1>
+
+          <p style={{ fontSize: "1rem", color: "var(--beige-muted)", lineHeight: 1.75, marginBottom: "2rem", maxWidth: "420px" }}>
+            De la première commande aux architectures multi-agents. Formation structurée, pensée pour les développeurs.
+          </p>
+
+          {/* Stats */}
+          <div style={{ display: "flex", gap: "1rem", marginBottom: "2rem", flexWrap: "wrap" }}>
+            {[
+              { value: totalLessons, label: "leçons", delay: 300 },
+              { value: curriculum.length, label: "modules", delay: 550 },
+              { value: 4, label: "heures", delay: 800 },
+            ].map(({ value, label, delay }, i) => (
+              <div key={i} className="stat-pop" style={{ animationDelay: `${delay}ms`, animationFillMode: "both", textAlign: "center", padding: "0.75rem 1.25rem", background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: "12px", minWidth: "76px", boxShadow: "0 2px 16px rgba(0,0,0,0.05)" }}>
+                <div style={{ fontSize: "1.9rem", fontWeight: 800, color: "var(--purple)", lineHeight: 1, fontFamily: "'JetBrains Mono', monospace" }}>
+                  <CountUp to={value} duration={900} delay={delay} />
+                </div>
+                <div style={{ fontSize: "0.65rem", color: "var(--beige-muted)", textTransform: "uppercase", letterSpacing: "0.08em", marginTop: "0.3rem" }}>{label}</div>
               </div>
-              <div style={{ fontSize: "0.68rem", color: "var(--beige-muted)", textTransform: "uppercase", letterSpacing: "0.08em", marginTop: "0.25rem" }}>{label}</div>
-            </div>
-          ))}
+            ))}
+          </div>
+
+          {/* CTA */}
+          <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
+            <button onClick={user ? undefined : onAuthClick} className="btn-magnetic"
+              style={{ padding: "0.7rem 1.5rem", background: "linear-gradient(135deg, rgba(96,80,200,0.92), rgba(60,80,200,0.92))", border: "none", borderRadius: "10px", color: "#fff", fontSize: "0.875rem", fontWeight: 600, cursor: "pointer" }}>
+              {user ? "Continuer la formation →" : "Commencer gratuitement →"}
+            </button>
+            {!isMobile && (
+              <div style={{ flex: 1, minWidth: "200px" }}>
+                <HomepageSearch onNavigate={onNavigate} />
+              </div>
+            )}
+          </div>
         </div>
 
+        {/* Colonne droite — terminal */}
         {!isMobile && (
-          <div style={{ maxWidth: "500px" }}>
-            <HomepageSearch onNavigate={onNavigate} />
+          <div className="reveal reveal-delay-2" style={{ padding: "2rem 1rem" }}>
+            <TerminalMockup isMobile={false} />
           </div>
         )}
       </div>
 
-      {/* Auth teaser banner */}
+      {/* ── AUTH BANNER ── */}
       {!user && (
-        <Tilt3D className="reveal reveal-delay-2" style={{ marginBottom: isMobile ? "2rem" : "2.5rem", borderRadius: "10px" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "1rem", padding: "1rem 1.25rem", background: "linear-gradient(135deg,rgba(100,70,200,0.08),rgba(50,80,180,0.06))", border: "1px solid rgba(120,90,200,0.2)", borderRadius: "10px", flexWrap: "wrap", position: "relative", overflow: "hidden" }}>
-          <div style={{ position: "absolute", inset: 0, background: "linear-gradient(90deg,transparent,rgba(120,90,200,0.04),transparent)", backgroundSize: "200% 100%", animation: "shimmer-lock 4s linear infinite" }} />
-          <div style={{ flex: 1, minWidth: "200px", position: "relative" }}>
-            <div style={{ fontSize: "0.8rem", color: "var(--beige)", fontWeight: 600, marginBottom: "0.2rem" }}>
-              🔒 {lockedLessonsCount} leçons accessibles après connexion
+        <Tilt3D className="reveal reveal-delay-2" style={{ marginBottom: "4rem", borderRadius: "14px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "1rem", padding: "1.25rem 1.5rem", background: "linear-gradient(135deg,rgba(96,80,200,0.07),rgba(50,80,180,0.05))", border: "1px solid rgba(96,80,200,0.18)", borderRadius: "14px", flexWrap: "wrap", position: "relative", overflow: "hidden" }}>
+            <div style={{ position: "absolute", inset: 0, background: "linear-gradient(90deg,transparent,rgba(96,80,200,0.04),transparent)", backgroundSize: "200% 100%", animation: "shimmer-lock 4s linear infinite" }} />
+            <div style={{ flex: 1, minWidth: "200px", position: "relative" }}>
+              <div style={{ fontSize: "0.85rem", color: "var(--beige)", fontWeight: 600, marginBottom: "0.25rem" }}>
+                {lockedLessonsCount} leçons accessibles après connexion
+              </div>
+              <div style={{ fontSize: "0.75rem", color: "var(--beige-muted)" }}>
+                {introLessonCount} leçons gratuites disponibles maintenant
+              </div>
             </div>
-            <div style={{ fontSize: "0.72rem", color: "var(--beige-muted)" }}>
-              {introLessonCount} leçons gratuites disponibles maintenant
-            </div>
+            <button onClick={onAuthClick} className="btn-magnetic"
+              style={{ padding: "0.6rem 1.3rem", background: "linear-gradient(135deg,rgba(96,80,200,0.9),rgba(60,80,200,0.9))", border: "1px solid rgba(140,120,240,0.35)", borderRadius: "9px", color: "#fff", fontSize: "0.82rem", fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0, position: "relative" }}>
+              Se connecter →
+            </button>
           </div>
-          <button onClick={onAuthClick} className="btn-magnetic"
-            style={{ padding: "0.55rem 1.2rem", background: "linear-gradient(135deg,rgba(120,90,200,0.9),rgba(80,100,200,0.9))", border: "1px solid rgba(160,130,240,0.4)", borderRadius: "8px", color: "#fff", fontSize: "0.8rem", fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0, position: "relative" }}
-          >
-            Se connecter →
-          </button>
-        </div>
         </Tilt3D>
       )}
 
-      {/* Skills */}
-      <div className="reveal reveal-delay-2" style={{ marginBottom: isMobile ? "2.5rem" : "3.5rem" }}>
-        <div style={{ fontSize: "0.62rem", fontWeight: 600, color: "var(--beige-muted)", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "1rem" }}>Au programme</div>
-        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: "0 2rem" }}>
-          {["Écrire un CLAUDE.md efficace", "Configurer des serveurs MCP", "Automatiser avec les hooks", "Passer du chat à la délégation", "Gérer la fenêtre de contexte", "Orchestrer des agents en parallèle", "Utiliser la mémoire persistante", "Optimiser les coûts de tokens", "Intégrer dans vos pipelines CI/CD", "Déboguer avec les outils intégrés"].map((item, i) => (
-            <div key={i} style={{ display: "flex", gap: "0.625rem", fontSize: "0.84rem", color: "var(--beige-dim)", lineHeight: 1.5, alignItems: "flex-start", padding: "0.3rem 0", borderBottom: "1px solid rgba(200,190,168,0.04)" }}>
-              <span style={{ color: "rgba(120,90,200,0.7)", flexShrink: 0, fontSize: "0.7rem", marginTop: "0.3rem" }}>◆</span>
-              {item}
-            </div>
+      {/* ── AU PROGRAMME — feature cards ── */}
+      <div className="reveal reveal-delay-2" style={{ marginBottom: isMobile ? "3rem" : "4.5rem" }}>
+        <div style={{ fontSize: "0.62rem", fontWeight: 600, color: "var(--beige-muted)", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "1.5rem" }}>Au programme</div>
+        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(3, 1fr)", gap: "0.875rem" }}>
+          {FEATURES.map((f, i) => (
+            <Tilt3D key={i} style={{ borderRadius: "12px" }}>
+              <div style={{ padding: "1.25rem", background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: "12px", boxShadow: "0 2px 12px rgba(0,0,0,0.04)", height: "100%" }}>
+                <div style={{ fontSize: "0.68rem", fontFamily: "'JetBrains Mono', monospace", color: "var(--purple)", fontWeight: 700, marginBottom: "0.6rem", padding: "0.2rem 0.5rem", background: "rgba(96,80,160,0.07)", borderRadius: "4px", display: "inline-block", letterSpacing: "0.03em" }}>{f.code}</div>
+                <div style={{ fontSize: "0.875rem", fontWeight: 600, color: "var(--beige)", marginBottom: "0.3rem" }}>{f.label}</div>
+                <div style={{ fontSize: "0.78rem", color: "var(--beige-muted)", lineHeight: 1.5 }}>{f.desc}</div>
+              </div>
+            </Tilt3D>
           ))}
         </div>
       </div>
 
-      {/* Curriculum */}
-      <div>
+      {/* ── CURRICULUM ── */}
+      <div style={{ maxWidth: "680px" }}>
         <div className="reveal reveal-delay-3" style={{ fontSize: "0.62rem", fontWeight: 600, color: "var(--beige-muted)", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "1rem" }}>
           {curriculum.length} modules
         </div>
         {curriculum.map((mod, idx) => {
           const isLocked = !user && mod.id !== "intro";
           return (
-          <div key={mod.id} className={`reveal reveal-delay-${Math.min(idx + 3, 5)} mod-row module-card-hover`}
-            style={{ borderTop: "1px solid rgba(200,190,168,0.07)", opacity: isLocked ? 0.6 : 1, transition: "opacity 0.15s" }}>
-            <button onClick={() => isLocked ? onAuthClick() : setExpandedMod(expandedMod === mod.id ? null : mod.id)}
-              style={{ width: "100%", display: "flex", alignItems: "center", gap: "0.875rem", padding: "0.875rem 0.4rem", background: "none", border: "none", cursor: "pointer", textAlign: "left" }}>
-              <span style={{ fontSize: "0.62rem", color: "rgba(120,90,200,0.6)", fontFamily: "'JetBrains Mono', monospace", flexShrink: 0, width: "18px", textAlign: "right" }}>{String(idx + 1).padStart(2, "0")}</span>
-              <span style={{ flex: 1, fontSize: "0.9rem", fontWeight: 600, color: isLocked ? "var(--beige-muted)" : "var(--beige)" }}>{mod.title}</span>
-              <span style={{ fontSize: "0.7rem", color: "var(--beige-muted)" }}>{mod.lessons.length} leçons</span>
-              {isLocked
-                ? <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><rect x="2" y="5" width="8" height="6" rx="1.5" stroke="rgba(120,90,200,0.5)" strokeWidth="1.2"/><path d="M4 5V3.5a2 2 0 0 1 4 0V5" stroke="rgba(120,90,200,0.5)" strokeWidth="1.2" strokeLinecap="round"/></svg>
-                : <span style={{ color: "var(--beige-muted)", fontSize: "0.7rem", transition: "transform 0.15s", display: "inline-block", transform: expandedMod === mod.id ? "rotate(90deg)" : "none" }}>›</span>
-              }
-            </button>
-            {!isLocked && expandedMod === mod.id && (
-              <div className="view-enter" style={{ paddingBottom: "0.5rem" }}>
-                {mod.lessons.map((lesson, li) => (
-                  <button key={lesson.id} onClick={() => onSelect(mod.id, lesson.id)}
-                    style={{ width: "100%", display: "flex", gap: "0.875rem", alignItems: "center", padding: "0.45rem 0 0.45rem 1.875rem", background: "none", border: "none", cursor: "pointer", textAlign: "left", borderRadius: "4px", transition: "background 0.15s", minHeight: "44px" }}
-                    onMouseEnter={e => { e.currentTarget.style.background = "rgba(100,70,200,0.06)"; }}
-                    onMouseLeave={e => { e.currentTarget.style.background = "none"; }}
-                  >
-                    <span style={{ fontSize: "0.62rem", color: "rgba(120,90,200,0.55)", fontFamily: "'JetBrains Mono', monospace", flexShrink: 0, width: "18px", textAlign: "right" }}>{li + 1}</span>
-                    <span style={{ flex: 1, fontSize: "0.84rem", color: "var(--beige-dim)", lineHeight: 1.4 }}>{lesson.title}</span>
-                    <span style={{ fontSize: "0.68rem", color: "var(--beige-muted)", flexShrink: 0 }}>{lesson.duration}</span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
+            <div key={mod.id} className={`reveal reveal-delay-${Math.min(idx + 3, 5)} mod-row module-card-hover`}
+              style={{ borderTop: "1px solid rgba(42,32,24,0.07)", opacity: isLocked ? 0.55 : 1, transition: "opacity 0.15s" }}>
+              <button onClick={() => isLocked ? onAuthClick() : setExpandedMod(expandedMod === mod.id ? null : mod.id)}
+                style={{ width: "100%", display: "flex", alignItems: "center", gap: "0.875rem", padding: "0.875rem 0.4rem", background: "none", border: "none", cursor: "pointer", textAlign: "left" }}>
+                <span style={{ fontSize: "0.62rem", color: "rgba(96,80,160,0.6)", fontFamily: "'JetBrains Mono', monospace", flexShrink: 0, width: "18px", textAlign: "right" }}>{String(idx + 1).padStart(2, "0")}</span>
+                <span style={{ flex: 1, fontSize: "0.9rem", fontWeight: 600, color: isLocked ? "var(--beige-muted)" : "var(--beige)" }}>{mod.title}</span>
+                <span style={{ fontSize: "0.7rem", color: "var(--beige-muted)" }}>{mod.lessons.length} leçons</span>
+                {isLocked
+                  ? <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><rect x="2" y="5" width="8" height="6" rx="1.5" stroke="rgba(96,80,160,0.5)" strokeWidth="1.2"/><path d="M4 5V3.5a2 2 0 0 1 4 0V5" stroke="rgba(96,80,160,0.5)" strokeWidth="1.2" strokeLinecap="round"/></svg>
+                  : <span style={{ color: "var(--beige-muted)", fontSize: "0.7rem", transition: "transform 0.15s", display: "inline-block", transform: expandedMod === mod.id ? "rotate(90deg)" : "none" }}>›</span>
+                }
+              </button>
+              {!isLocked && expandedMod === mod.id && (
+                <div className="view-enter" style={{ paddingBottom: "0.5rem" }}>
+                  {mod.lessons.map((lesson, li) => (
+                    <button key={lesson.id} onClick={() => onSelect(mod.id, lesson.id)}
+                      style={{ width: "100%", display: "flex", gap: "0.875rem", alignItems: "center", padding: "0.45rem 0 0.45rem 1.875rem", background: "none", border: "none", cursor: "pointer", textAlign: "left", borderRadius: "4px", transition: "background 0.15s", minHeight: "44px" }}
+                      onMouseEnter={e => { e.currentTarget.style.background = "rgba(96,80,160,0.05)"; }}
+                      onMouseLeave={e => { e.currentTarget.style.background = "none"; }}>
+                      <span style={{ fontSize: "0.62rem", color: "rgba(96,80,160,0.5)", fontFamily: "'JetBrains Mono', monospace", flexShrink: 0, width: "18px", textAlign: "right" }}>{li + 1}</span>
+                      <span style={{ flex: 1, fontSize: "0.84rem", color: "var(--beige-dim)", lineHeight: 1.4 }}>{lesson.title}</span>
+                      <span style={{ fontSize: "0.68rem", color: "var(--beige-muted)", flexShrink: 0 }}>{lesson.duration}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           );
         })}
         <div style={{ borderTop: "1px solid var(--border)" }} />
