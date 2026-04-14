@@ -647,12 +647,16 @@ function DesktopLessonSidebar({ mod, currentLessonId, onSelect }: { mod: Module;
 // ─────────────────────────────────────────────
 // HOMEPAGE
 // ─────────────────────────────────────────────
-function HomePage({ onNavigate, onSelect, isMobile }: {
+function HomePage({ onNavigate, onSelect, isMobile, user, onAuthClick }: {
   onNavigate: (modId: string, lessonId: string, sectionIdx: number | null) => void;
   onSelect: (modId: string, lessonId: string) => void;
   isMobile: boolean;
+  user: User | null;
+  onAuthClick: () => void;
 }) {
   const [expandedMod, setExpandedMod] = useState<string | null>(curriculum[0].id);
+  const introLessonCount = curriculum.find(m => m.id === "intro")?.lessons.length ?? 0;
+  const lockedLessonsCount = totalLessons - introLessonCount;
 
   return (
     <div className="fade-in" style={{ maxWidth: "680px", margin: "0 auto", padding: isMobile ? "2.5rem 1.25rem 5rem" : "4.5rem 2.5rem 6rem" }}>
@@ -674,6 +678,24 @@ function HomePage({ onNavigate, onSelect, isMobile }: {
         )}
       </div>
 
+      {/* Auth teaser banner */}
+      {!user && (
+        <div style={{ display: "flex", alignItems: "center", gap: "1rem", padding: "0.875rem 1.1rem", background: "rgba(200,190,168,0.05)", border: "1px solid rgba(200,190,168,0.12)", borderRadius: "8px", marginBottom: isMobile ? "2rem" : "2.5rem", flexWrap: "wrap" }}>
+          <div style={{ flex: 1, minWidth: "200px" }}>
+            <div style={{ fontSize: "0.8rem", color: "var(--beige)", fontWeight: 500, marginBottom: "0.2rem" }}>
+              🔒 {lockedLessonsCount} leçons accessibles après connexion
+            </div>
+            <div style={{ fontSize: "0.72rem", color: "var(--beige-muted)" }}>
+              {introLessonCount} leçons gratuites disponibles maintenant
+            </div>
+          </div>
+          <button onClick={onAuthClick}
+            style={{ padding: "0.5rem 1.1rem", background: "var(--beige)", border: "none", borderRadius: "6px", color: "var(--bg-dark)", fontSize: "0.8rem", fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0 }}>
+            Se connecter →
+          </button>
+        </div>
+      )}
+
       {/* Skills */}
       <div style={{ marginBottom: isMobile ? "2.5rem" : "3.5rem" }}>
         <div style={{ fontSize: "0.62rem", fontWeight: 600, color: "var(--beige-muted)", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "1rem" }}>Au programme</div>
@@ -692,16 +714,21 @@ function HomePage({ onNavigate, onSelect, isMobile }: {
         <div style={{ fontSize: "0.62rem", fontWeight: 600, color: "var(--beige-muted)", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "1rem" }}>
           {curriculum.length} modules
         </div>
-        {curriculum.map((mod, idx) => (
-          <div key={mod.id} style={{ borderTop: "1px solid var(--border)" }}>
-            <button onClick={() => setExpandedMod(expandedMod === mod.id ? null : mod.id)}
+        {curriculum.map((mod, idx) => {
+          const isLocked = !user && mod.id !== "intro";
+          return (
+          <div key={mod.id} style={{ borderTop: "1px solid var(--border)", opacity: isLocked ? 0.55 : 1, transition: "opacity 0.15s" }}>
+            <button onClick={() => isLocked ? onAuthClick() : setExpandedMod(expandedMod === mod.id ? null : mod.id)}
               style={{ width: "100%", display: "flex", alignItems: "center", gap: "0.875rem", padding: "0.875rem 0", background: "none", border: "none", cursor: "pointer", textAlign: "left" }}>
               <span style={{ fontSize: "0.62rem", color: "var(--beige-muted)", fontFamily: "'JetBrains Mono', monospace", flexShrink: 0, width: "18px", textAlign: "right" }}>{String(idx + 1).padStart(2, "0")}</span>
-              <span style={{ flex: 1, fontSize: "0.9rem", fontWeight: 600, color: "var(--beige)" }}>{mod.title}</span>
+              <span style={{ flex: 1, fontSize: "0.9rem", fontWeight: 600, color: isLocked ? "var(--beige-muted)" : "var(--beige)" }}>{mod.title}</span>
               <span style={{ fontSize: "0.7rem", color: "var(--beige-muted)" }}>{mod.lessons.length} leçons</span>
-              <span style={{ color: "var(--beige-muted)", fontSize: "0.7rem", transition: "transform 0.15s", transform: expandedMod === mod.id ? "rotate(90deg)" : "none" }}>›</span>
+              {isLocked
+                ? <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><rect x="2" y="5" width="8" height="6" rx="1.5" stroke="var(--beige-muted)" strokeWidth="1.2"/><path d="M4 5V3.5a2 2 0 0 1 4 0V5" stroke="var(--beige-muted)" strokeWidth="1.2" strokeLinecap="round"/></svg>
+                : <span style={{ color: "var(--beige-muted)", fontSize: "0.7rem", transition: "transform 0.15s", transform: expandedMod === mod.id ? "rotate(90deg)" : "none" }}>›</span>
+              }
             </button>
-            {expandedMod === mod.id && (
+            {!isLocked && expandedMod === mod.id && (
               <div style={{ paddingBottom: "0.5rem" }}>
                 {mod.lessons.map((lesson, li) => (
                   <button key={lesson.id} onClick={() => onSelect(mod.id, lesson.id)}
@@ -717,7 +744,8 @@ function HomePage({ onNavigate, onSelect, isMobile }: {
               </div>
             )}
           </div>
-        ))}
+          );
+        })}
         <div style={{ borderTop: "1px solid var(--border)" }} />
       </div>
     </div>
@@ -1427,14 +1455,16 @@ export default function App() {
   const currentIndex = allLessons.findIndex(x => x.modId === currentModuleId && x.lessonId === currentLessonId);
 
   const goToLesson = useCallback((modId: string, lessonId: string) => {
+    if (!user && modId !== "intro") { setShowAuth(true); return; }
     setCurrentModuleId(modId); setCurrentLessonId(lessonId); setScrollToSection(null); setView("lesson");
     contentRef.current?.scrollTo(0, 0);
-  }, []);
+  }, [user]);
 
   const navigate = useCallback((modId: string, lessonId: string, sectionIdx: number | null) => {
+    if (!user && modId !== "intro") { setShowAuth(true); return; }
     setCurrentModuleId(modId); setCurrentLessonId(lessonId); setScrollToSection(sectionIdx); setView("lesson");
     contentRef.current?.scrollTo(0, 0);
-  }, []);
+  }, [user]);
 
   const handleModuleSelect = useCallback((modId: string) => {
     const mod = curriculum.find(m => m.id === modId);
@@ -1466,14 +1496,14 @@ export default function App() {
           currentView={view}
           onNavigate={(modId, lessonId, sectionIdx) => { navigate(modId, lessonId, sectionIdx); setDrawerOpen(false); }}
           onSelect={(modId, lessonId) => { goToLesson(modId, lessonId); setDrawerOpen(false); }}
-          onWiki={() => { setView("wiki"); setDrawerOpen(false); }}
+          onWiki={() => { if (!user) { setShowAuth(true); return; } setView("wiki"); setDrawerOpen(false); }}
         />
 
         <MobileSearchOverlay open={mobileSearchOpen} onClose={() => setMobileSearchOpen(false)} onNavigate={navigate} />
 
         <div ref={contentRef} style={{ flex: 1, overflowY: "auto", WebkitOverflowScrolling: "touch" }}>
           {view === "home" ? (
-            <HomePage onNavigate={navigate} onSelect={goToLesson} isMobile={true} />
+            <HomePage onNavigate={navigate} onSelect={goToLesson} isMobile={true} user={user} onAuthClick={() => setShowAuth(true)} />
           ) : view === "wiki" ? (
             <WikiView isMobile={true} isAdmin={isAdmin} />
           ) : (
@@ -1501,7 +1531,7 @@ export default function App() {
         onHome={() => setView("home")}
         onModuleSelect={handleModuleSelect}
         onNavigate={navigate}
-        onWiki={() => setView("wiki")}
+        onWiki={() => { if (!user) { setShowAuth(true); return; } setView("wiki"); }}
         user={user}
         onAuthClick={() => setShowAuth(true)}
         onSignOut={handleSignOut}
@@ -1514,7 +1544,7 @@ export default function App() {
 
         <div ref={contentRef} style={{ flex: 1, overflowY: "auto" }}>
           {view === "home" ? (
-            <HomePage onNavigate={navigate} onSelect={goToLesson} isMobile={false} />
+            <HomePage onNavigate={navigate} onSelect={goToLesson} isMobile={false} user={user} onAuthClick={() => setShowAuth(true)} />
           ) : view === "wiki" ? (
             <WikiView isMobile={false} isAdmin={isAdmin} />
           ) : (
