@@ -1419,6 +1419,232 @@ function SkillsView({ isMobile }: { isMobile: boolean }) {
 }
 
 // ─────────────────────────────────────────────
+// CHAT WIDGET
+// ─────────────────────────────────────────────
+type ChatMessage = { role: "user" | "assistant"; content: string };
+
+function renderMarkdown(text: string): string {
+  return text
+    .replace(/```(\w*)\n([\s\S]*?)```/g, (_, lang, code) =>
+      `<pre style="background:rgba(0,0,0,0.4);border:1px solid rgba(200,190,168,0.12);border-radius:6px;padding:0.75rem;overflow-x:auto;margin:0.5rem 0;font-family:'JetBrains Mono',monospace;font-size:0.78rem;line-height:1.5;color:var(--beige-dim)"><code>${code.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</code></pre>`)
+    .replace(/`([^`]+)`/g, '<code style="font-family:\'JetBrains Mono\',monospace;font-size:0.82em;background:rgba(200,190,168,0.1);padding:0.1em 0.3em;border-radius:3px;color:var(--beige)">$1</code>')
+    .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+    .replace(/\*([^*]+)\*/g, "<em>$1</em>")
+    .replace(/^#{1,3}\s+(.+)$/gm, '<div style="font-weight:600;color:var(--beige);margin:0.75rem 0 0.25rem">$1</div>')
+    .replace(/^[-•]\s+(.+)$/gm, '<div style="display:flex;gap:0.4rem;padding:0.1rem 0"><span style="color:var(--beige-muted);flex-shrink:0">•</span><span>$1</span></div>')
+    .replace(/\n\n/g, '<div style="height:0.6rem"></div>')
+    .replace(/\n/g, "<br/>");
+}
+
+function ChatWidget({ user }: { user: User | null }) {
+  const [open, setOpen] = useState(false);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [input, setInput] = useState("");
+  const [loading, setLoading] = useState(false);
+  const bottomRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    if (open) {
+      bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+      setTimeout(() => inputRef.current?.focus(), 100);
+    }
+  }, [open, messages]);
+
+  if (!user) return null;
+
+  async function sendMessage() {
+    const text = input.trim();
+    if (!text || loading) return;
+    setInput("");
+    const newMessages: ChatMessage[] = [...messages, { role: "user", content: text }];
+    setMessages([...newMessages, { role: "assistant", content: "" }]);
+    setLoading(true);
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ messages: newMessages }),
+      });
+
+      if (!res.ok || !res.body) {
+        setMessages(prev => [...prev.slice(0, -1), { role: "assistant", content: "_Erreur lors de la connexion à l'assistant._" }]);
+        return;
+      }
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let accumulated = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        accumulated += decoder.decode(value, { stream: true });
+        setMessages(prev => [...prev.slice(0, -1), { role: "assistant", content: accumulated }]);
+        bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+      }
+    } catch {
+      setMessages(prev => [...prev.slice(0, -1), { role: "assistant", content: "_Erreur réseau._" }]);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function handleKey(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  }
+
+  return (
+    <>
+      {/* Floating button */}
+      <button
+        onClick={() => setOpen(v => !v)}
+        title="Assistant IA"
+        style={{
+          position: "fixed", bottom: "1.5rem", right: "1.5rem", zIndex: 1000,
+          width: "52px", height: "52px", borderRadius: "50%",
+          background: open ? "rgba(144,128,200,0.95)" : "rgba(144,128,200,0.85)",
+          border: "1px solid rgba(144,128,200,0.4)",
+          boxShadow: "0 4px 24px rgba(0,0,0,0.4)",
+          cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+          transition: "all 0.2s", fontSize: "1.35rem",
+        }}
+        onMouseEnter={e => (e.currentTarget.style.transform = "scale(1.08)")}
+        onMouseLeave={e => (e.currentTarget.style.transform = "scale(1)")}
+      >
+        {open ? "✕" : "✦"}
+      </button>
+
+      {/* Chat panel */}
+      {open && (
+        <div style={{
+          position: "fixed", bottom: "5rem", right: "1.5rem", zIndex: 999,
+          width: "min(380px, calc(100vw - 2rem))",
+          height: "min(520px, calc(100vh - 8rem))",
+          background: "var(--bg-panel)",
+          border: "1px solid var(--border)",
+          borderRadius: "12px",
+          boxShadow: "0 8px 40px rgba(0,0,0,0.5)",
+          display: "flex", flexDirection: "column",
+          overflow: "hidden",
+        }}>
+          {/* Header */}
+          <div style={{ padding: "0.875rem 1rem", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", gap: "0.625rem", flexShrink: 0 }}>
+            <span style={{ fontSize: "1rem" }}>✦</span>
+            <div>
+              <div style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--beige)" }}>Assistant Claude Code</div>
+              <div style={{ fontSize: "0.68rem", color: "var(--beige-muted)" }}>Formation + recherche web</div>
+            </div>
+            {messages.length > 0 && (
+              <button
+                onClick={() => setMessages([])}
+                style={{ marginLeft: "auto", background: "none", border: "none", color: "var(--beige-muted)", fontSize: "0.68rem", cursor: "pointer", padding: "0.25rem 0.5rem", borderRadius: "4px" }}
+              >
+                Effacer
+              </button>
+            )}
+          </div>
+
+          {/* Messages */}
+          <div style={{ flex: 1, overflowY: "auto", padding: "0.875rem 1rem", display: "flex", flexDirection: "column", gap: "0.875rem" }}>
+            {messages.length === 0 && (
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", marginTop: "0.5rem" }}>
+                <div style={{ fontSize: "0.82rem", color: "var(--beige-muted)", lineHeight: 1.6 }}>
+                  Pose-moi n'importe quelle question sur Claude Code, la formation, ou l'IA pour les devs.
+                </div>
+                {["C'est quoi un CLAUDE.md ?", "Comment configurer un serveur MCP ?", "Quelle est la différence entre chat et délégation ?"].map((q) => (
+                  <button
+                    key={q}
+                    onClick={() => { setInput(q); inputRef.current?.focus(); }}
+                    style={{ textAlign: "left", background: "rgba(200,190,168,0.05)", border: "1px solid rgba(200,190,168,0.1)", borderRadius: "6px", padding: "0.45rem 0.7rem", fontSize: "0.75rem", color: "var(--beige-dim)", cursor: "pointer" }}
+                    onMouseEnter={e => (e.currentTarget.style.borderColor = "rgba(200,190,168,0.25)")}
+                    onMouseLeave={e => (e.currentTarget.style.borderColor = "rgba(200,190,168,0.1)")}
+                  >
+                    {q}
+                  </button>
+                ))}
+              </div>
+            )}
+            {messages.map((msg, i) => (
+              <div key={i} style={{ display: "flex", flexDirection: "column", gap: "0.2rem", alignItems: msg.role === "user" ? "flex-end" : "flex-start" }}>
+                <div style={{
+                  maxWidth: "90%",
+                  padding: "0.55rem 0.875rem",
+                  borderRadius: msg.role === "user" ? "12px 12px 4px 12px" : "12px 12px 12px 4px",
+                  background: msg.role === "user" ? "rgba(144,128,200,0.25)" : "rgba(200,190,168,0.07)",
+                  border: `1px solid ${msg.role === "user" ? "rgba(144,128,200,0.3)" : "rgba(200,190,168,0.1)"}`,
+                  fontSize: "0.82rem",
+                  color: "var(--beige-dim)",
+                  lineHeight: 1.65,
+                  wordBreak: "break-word",
+                }}>
+                  {msg.role === "user"
+                    ? <span>{msg.content}</span>
+                    : msg.content
+                      ? <span dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.content) }} />
+                      : <span style={{ color: "var(--beige-muted)", fontSize: "0.75rem" }}>
+                          <span style={{ animation: "pulse 1.2s infinite" }}>Recherche et réflexion</span>
+                          {" "}<span style={{ opacity: 0.5 }}>•••</span>
+                        </span>
+                  }
+                </div>
+              </div>
+            ))}
+            <div ref={bottomRef} />
+          </div>
+
+          {/* Input */}
+          <div style={{ padding: "0.75rem", borderTop: "1px solid var(--border)", flexShrink: 0, display: "flex", gap: "0.5rem", alignItems: "flex-end" }}>
+            <textarea
+              ref={inputRef}
+              value={input}
+              onChange={e => setInput(e.target.value)}
+              onKeyDown={handleKey}
+              disabled={loading}
+              placeholder="Pose ta question… (Entrée pour envoyer)"
+              rows={1}
+              style={{
+                flex: 1, background: "rgba(200,190,168,0.05)", border: "1px solid rgba(200,190,168,0.15)",
+                borderRadius: "8px", padding: "0.55rem 0.75rem", color: "var(--beige)", fontSize: "0.82rem",
+                resize: "none", outline: "none", fontFamily: "inherit", lineHeight: 1.5,
+                maxHeight: "120px", overflowY: "auto",
+              }}
+              onInput={e => {
+                const t = e.currentTarget;
+                t.style.height = "auto";
+                t.style.height = Math.min(t.scrollHeight, 120) + "px";
+              }}
+            />
+            <button
+              onClick={sendMessage}
+              disabled={loading || !input.trim()}
+              style={{
+                background: "rgba(144,128,200,0.85)", border: "none", borderRadius: "8px",
+                padding: "0.55rem 0.875rem", color: "#fff", fontSize: "0.8rem", fontWeight: 600,
+                cursor: loading || !input.trim() ? "not-allowed" : "pointer",
+                opacity: loading || !input.trim() ? 0.5 : 1, flexShrink: 0,
+              }}
+            >
+              ↑
+            </button>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+// ─────────────────────────────────────────────
 // MAIN APP
 // ─────────────────────────────────────────────
 export default function App() {
@@ -1518,6 +1744,7 @@ export default function App() {
         )}
 
         {showAuth && <AuthModal onClose={() => setShowAuth(false)} onAuth={u => setUser(u)} />}
+        <ChatWidget user={user} />
       </main>
     );
   }
@@ -1560,6 +1787,7 @@ export default function App() {
       </div>
 
       {showAuth && <AuthModal onClose={() => setShowAuth(false)} onAuth={u => setUser(u)} />}
+      <ChatWidget user={user} />
     </main>
   );
 }
