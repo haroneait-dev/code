@@ -587,10 +587,8 @@ function DesktopTopNav({ currentModuleId, currentView, onHome, onModuleSelect, o
         {user ? (
           <UserMenu user={user} onSignOut={onSignOut} />
         ) : (
-          <button onClick={onAuthClick}
-            style={{ padding: "0.375rem 0.875rem", background: "var(--beige)", border: "none", borderRadius: "5px", color: "var(--bg-dark)", fontSize: "0.775rem", fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap", transition: "background 0.1s", flexShrink: 0 }}
-            onMouseEnter={e => (e.currentTarget.style.background = "var(--beige-light)")}
-            onMouseLeave={e => (e.currentTarget.style.background = "var(--beige)")}>
+          <button onClick={onAuthClick} className="btn-magnetic"
+            style={{ padding: "0.375rem 0.875rem", background: "var(--beige)", border: "none", borderRadius: "5px", color: "var(--bg-dark)", fontSize: "0.775rem", fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0 }}>
             Se connecter
           </button>
         )}
@@ -645,6 +643,55 @@ function DesktopLessonSidebar({ mod, currentLessonId, onSelect }: { mod: Module;
 }
 
 // ─────────────────────────────────────────────
+// TYPEWRITER
+// ─────────────────────────────────────────────
+function TypewriterText({ text, speed = 48, className, style }: {
+  text: string; speed?: number; className?: string; style?: React.CSSProperties;
+}) {
+  const [displayed, setDisplayed] = useState("");
+  const [done, setDone] = useState(false);
+  useEffect(() => {
+    setDisplayed(""); setDone(false);
+    let i = 0;
+    const id = setInterval(() => {
+      i++;
+      setDisplayed(text.slice(0, i));
+      if (i >= text.length) { setDone(true); clearInterval(id); }
+    }, speed);
+    return () => clearInterval(id);
+  }, [text, speed]);
+  return (
+    <span className={className} style={style}>
+      {displayed}
+      {!done && (
+        <span style={{ borderRight: "3px solid currentColor", marginLeft: "1px", animation: "blink 0.7s step-end infinite", display: "inline-block", height: "0.85em", verticalAlign: "middle" }} />
+      )}
+    </span>
+  );
+}
+
+// ─────────────────────────────────────────────
+// COUNT UP
+// ─────────────────────────────────────────────
+function CountUp({ to, duration = 1200, delay = 0 }: { to: number; duration?: number; delay?: number }) {
+  const [val, setVal] = useState(0);
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      const start = performance.now();
+      const frame = (now: number) => {
+        const p = Math.min((now - start) / duration, 1);
+        const eased = 1 - Math.pow(1 - p, 3);
+        setVal(Math.round(eased * to));
+        if (p < 1) requestAnimationFrame(frame);
+      };
+      requestAnimationFrame(frame);
+    }, delay);
+    return () => clearTimeout(timeout);
+  }, [to, duration, delay]);
+  return <>{val}</>;
+}
+
+// ─────────────────────────────────────────────
 // HOMEPAGE
 // ─────────────────────────────────────────────
 function HomePage({ onNavigate, onSelect, isMobile, user, onAuthClick }: {
@@ -664,16 +711,35 @@ function HomePage({ onNavigate, onSelect, isMobile, user, onAuthClick }: {
     <div className="view-enter" style={{ maxWidth: "680px", margin: "0 auto", padding: isMobile ? "2.5rem 1.25rem 5rem" : "4.5rem 2.5rem 6rem", position: "relative", zIndex: 1 }}>
       {/* Hero */}
       <div className="reveal reveal-delay-1" style={{ marginBottom: isMobile ? "2.5rem" : "4rem" }}>
-        <div className="badge-live" style={{ display: "inline-flex", alignItems: "center", gap: "0.4rem", fontSize: "0.62rem", fontWeight: 600, color: "rgba(160,140,220,0.9)", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "1rem", padding: "0.25rem 0.7rem", background: "rgba(120,90,200,0.12)", border: "1px solid rgba(120,90,200,0.25)", borderRadius: "999px" }}>
-          <span style={{ width: "5px", height: "5px", borderRadius: "50%", background: "rgba(160,140,220,0.9)", display: "inline-block" }} />
-          Formation · {totalLessons} leçons · 4h
+        <div className="badge-live" style={{ display: "inline-flex", alignItems: "center", gap: "0.4rem", fontSize: "0.62rem", fontWeight: 600, color: "rgba(96,80,160,0.9)", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "1rem", padding: "0.25rem 0.7rem", background: "rgba(96,80,160,0.08)", border: "1px solid rgba(96,80,160,0.2)", borderRadius: "999px" }}>
+          <span style={{ width: "5px", height: "5px", borderRadius: "50%", background: "rgba(96,80,160,0.9)", display: "inline-block" }} />
+          Formation Claude Code
         </div>
-        <h1 className="gradient-text" style={{ fontSize: isMobile ? "2.2rem" : "3rem", fontWeight: 800, letterSpacing: "-0.04em", lineHeight: 1.05, marginBottom: "1rem" }}>
-          Maîtriser Claude Code
+
+        <h1 className="gradient-text" style={{ fontSize: isMobile ? "2.2rem" : "3.2rem", fontWeight: 800, letterSpacing: "-0.04em", lineHeight: 1.05, marginBottom: "1rem" }}>
+          <TypewriterText text="Maîtriser Claude Code" speed={55} />
         </h1>
+
         <p style={{ fontSize: "0.9375rem", color: "var(--beige-muted)", lineHeight: 1.75, marginBottom: "2rem", maxWidth: "480px" }}>
           De la première commande aux architectures multi-agents. Une formation structurée, complète, pensée pour les développeurs.
         </p>
+
+        {/* Stats animées */}
+        <div style={{ display: "flex", gap: isMobile ? "1rem" : "2rem", marginBottom: "2rem", flexWrap: "wrap" }}>
+          {[
+            { value: totalLessons, label: "leçons", delay: 200 },
+            { value: curriculum.length, label: "modules", delay: 400 },
+            { value: 4, label: "heures", delay: 600 },
+          ].map(({ value, label, delay }, i) => (
+            <div key={i} className="stat-pop" style={{ animationDelay: `${delay}ms`, animationFillMode: "both", textAlign: "center", padding: "0.75rem 1.25rem", background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: "10px", minWidth: "80px", boxShadow: "0 2px 12px rgba(0,0,0,0.05)" }}>
+              <div style={{ fontSize: isMobile ? "1.6rem" : "2rem", fontWeight: 800, color: "var(--purple)", lineHeight: 1, fontFamily: "'JetBrains Mono', monospace" }}>
+                <CountUp to={value} duration={1000} delay={delay} />
+              </div>
+              <div style={{ fontSize: "0.68rem", color: "var(--beige-muted)", textTransform: "uppercase", letterSpacing: "0.08em", marginTop: "0.25rem" }}>{label}</div>
+            </div>
+          ))}
+        </div>
+
         {!isMobile && (
           <div style={{ maxWidth: "500px" }}>
             <HomepageSearch onNavigate={onNavigate} />
@@ -683,7 +749,8 @@ function HomePage({ onNavigate, onSelect, isMobile, user, onAuthClick }: {
 
       {/* Auth teaser banner */}
       {!user && (
-        <div className="reveal reveal-delay-2" style={{ display: "flex", alignItems: "center", gap: "1rem", padding: "1rem 1.25rem", background: "linear-gradient(135deg,rgba(100,70,200,0.08),rgba(50,80,180,0.06))", border: "1px solid rgba(120,90,200,0.2)", borderRadius: "10px", marginBottom: isMobile ? "2rem" : "2.5rem", flexWrap: "wrap", position: "relative", overflow: "hidden" }}>
+        <Tilt3D className="reveal reveal-delay-2" style={{ marginBottom: isMobile ? "2rem" : "2.5rem", borderRadius: "10px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "1rem", padding: "1rem 1.25rem", background: "linear-gradient(135deg,rgba(100,70,200,0.08),rgba(50,80,180,0.06))", border: "1px solid rgba(120,90,200,0.2)", borderRadius: "10px", flexWrap: "wrap", position: "relative", overflow: "hidden" }}>
           <div style={{ position: "absolute", inset: 0, background: "linear-gradient(90deg,transparent,rgba(120,90,200,0.04),transparent)", backgroundSize: "200% 100%", animation: "shimmer-lock 4s linear infinite" }} />
           <div style={{ flex: 1, minWidth: "200px", position: "relative" }}>
             <div style={{ fontSize: "0.8rem", color: "var(--beige)", fontWeight: 600, marginBottom: "0.2rem" }}>
@@ -693,14 +760,13 @@ function HomePage({ onNavigate, onSelect, isMobile, user, onAuthClick }: {
               {introLessonCount} leçons gratuites disponibles maintenant
             </div>
           </div>
-          <button onClick={onAuthClick}
-            style={{ padding: "0.55rem 1.2rem", background: "linear-gradient(135deg,rgba(120,90,200,0.9),rgba(80,100,200,0.9))", border: "1px solid rgba(160,130,240,0.4)", borderRadius: "8px", color: "#fff", fontSize: "0.8rem", fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0, position: "relative", transition: "transform 0.15s" }}
-            onMouseEnter={e => (e.currentTarget.style.transform = "scale(1.04)")}
-            onMouseLeave={e => (e.currentTarget.style.transform = "scale(1)")}
+          <button onClick={onAuthClick} className="btn-magnetic"
+            style={{ padding: "0.55rem 1.2rem", background: "linear-gradient(135deg,rgba(120,90,200,0.9),rgba(80,100,200,0.9))", border: "1px solid rgba(160,130,240,0.4)", borderRadius: "8px", color: "#fff", fontSize: "0.8rem", fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0, position: "relative" }}
           >
             Se connecter →
           </button>
         </div>
+        </Tilt3D>
       )}
 
       {/* Skills */}
@@ -724,7 +790,7 @@ function HomePage({ onNavigate, onSelect, isMobile, user, onAuthClick }: {
         {curriculum.map((mod, idx) => {
           const isLocked = !user && mod.id !== "intro";
           return (
-          <div key={mod.id} className={`reveal reveal-delay-${Math.min(idx + 3, 5)} mod-row`}
+          <div key={mod.id} className={`reveal reveal-delay-${Math.min(idx + 3, 5)} mod-row module-card-hover`}
             style={{ borderTop: "1px solid rgba(200,190,168,0.07)", opacity: isLocked ? 0.6 : 1, transition: "opacity 0.15s" }}>
             <button onClick={() => isLocked ? onAuthClick() : setExpandedMod(expandedMod === mod.id ? null : mod.id)}
               style={{ width: "100%", display: "flex", alignItems: "center", gap: "0.875rem", padding: "0.875rem 0.4rem", background: "none", border: "none", cursor: "pointer", textAlign: "left" }}>
@@ -1487,25 +1553,36 @@ function useReveal(deps: unknown[] = []) {
 // ─────────────────────────────────────────────
 // 3D TILT CARD
 // ─────────────────────────────────────────────
-function Tilt3D({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
+function Tilt3D({ children, style, className }: { children: React.ReactNode; style?: React.CSSProperties; className?: string }) {
   const ref = useRef<HTMLDivElement>(null);
+  const glareRef = useRef<HTMLDivElement>(null);
   function onMove(e: React.MouseEvent) {
-    const el = ref.current; if (!el) return;
+    const el = ref.current;
+    const glare = glareRef.current;
+    if (!el || !glare) return;
     const r = el.getBoundingClientRect();
-    const x = ((e.clientX - r.left) / r.width - 0.5) * 14;
-    const y = ((e.clientY - r.top) / r.height - 0.5) * -10;
-    el.style.transform = `perspective(700px) rotateX(${y}deg) rotateY(${x}deg) scale3d(1.025,1.025,1.025)`;
-    el.style.boxShadow = `${-x * 1.5}px ${y * 1.5}px 32px rgba(100,70,200,0.18), 0 0 0 1px rgba(130,100,220,0.18)`;
+    const x = ((e.clientX - r.left) / r.width - 0.5) * 20;
+    const y = ((e.clientY - r.top) / r.height - 0.5) * -20;
+    el.style.transform = `perspective(1000px) rotateX(${y}deg) rotateY(${x}deg) scale3d(1.02,1.02,1.02)`;
+    
+    const glareX = (e.clientX - r.left) / r.width * 100;
+    const glareY = (e.clientY - r.top) / r.height * 100;
+    glare.style.background = `radial-gradient(circle at ${glareX}% ${glareY}%, rgba(255,255,255,0.08), transparent 50%)`;
   }
   function onLeave() {
-    const el = ref.current; if (!el) return;
-    el.style.transform = "perspective(700px) rotateX(0deg) rotateY(0deg) scale3d(1,1,1)";
-    el.style.boxShadow = "none";
+    const el = ref.current;
+    const glare = glareRef.current;
+    if (!el || !glare) return;
+    el.style.transform = "perspective(1000px) rotateX(0deg) rotateY(0deg) scale3d(1,1,1)";
+    glare.style.background = "transparent";
   }
   return (
-    <div ref={ref} onMouseMove={onMove} onMouseLeave={onLeave}
-      style={{ transition: "transform 0.25s ease, box-shadow 0.25s ease", ...style }}>
-      {children}
+    <div ref={ref} onMouseMove={onMove} onMouseLeave={onLeave} className={className}
+      style={{ transition: "transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275)", transformStyle: "preserve-3d", position: "relative", ...style }}>
+      <div ref={glareRef} style={{ position: "absolute", inset: 0, pointerEvents: "none", transition: "background 0.2s ease", borderRadius: "inherit", zIndex: 10 }} />
+      <div style={{ transform: "translateZ(25px)", display: "block", height: "100%" }}>
+        {children}
+      </div>
     </div>
   );
 }
@@ -1739,6 +1816,117 @@ function ChatWidget({ user }: { user: User | null }) {
 }
 
 // ─────────────────────────────────────────────
+// GLOWING MOUSE ORB
+// ─────────────────────────────────────────────
+function GlowingMouseOrb() {
+  const orbRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const move = (e: MouseEvent) => {
+      if (!orbRef.current) return;
+      orbRef.current.style.transform = `translate(${e.clientX - 200}px, ${e.clientY - 200}px)`;
+    };
+    window.addEventListener("mousemove", move);
+    return () => window.removeEventListener("mousemove", move);
+  }, []);
+  return (
+    <div ref={orbRef} style={{
+      position: "fixed", top: 0, left: 0, width: "400px", height: "400px",
+      borderRadius: "50%", pointerEvents: "none", zIndex: 0,
+      background: "radial-gradient(circle, rgba(96,80,160,0.05) 0%, transparent 70%)",
+      transition: "transform 0.12s ease-out",
+      willChange: "transform",
+    }} />
+  );
+}
+
+// ─────────────────────────────────────────────
+// COSMIC BACKGROUND
+// ─────────────────────────────────────────────
+function CosmicBackground() {
+  return (
+    <div style={{ position: "fixed", inset: 0, overflow: "hidden", pointerEvents: "none", zIndex: 0 }}>
+      {/* Purple orb — top left */}
+      <div style={{
+        position: "absolute", width: "800px", height: "800px", borderRadius: "50%",
+        background: "radial-gradient(circle, rgba(96,80,200,0.07) 0%, transparent 65%)",
+        top: "-300px", left: "-200px",
+        animation: "orb1 22s ease-in-out infinite",
+        willChange: "transform",
+      }} />
+      {/* Blue orb — bottom right */}
+      <div style={{
+        position: "absolute", width: "700px", height: "700px", borderRadius: "50%",
+        background: "radial-gradient(circle, rgba(60,100,200,0.05) 0%, transparent 65%)",
+        bottom: "-200px", right: "-180px",
+        animation: "orb2 28s ease-in-out infinite",
+        willChange: "transform",
+      }} />
+      {/* Warm orb — center */}
+      <div style={{
+        position: "absolute", width: "500px", height: "500px", borderRadius: "50%",
+        background: "radial-gradient(circle, rgba(200,160,80,0.04) 0%, transparent 65%)",
+        top: "30%", right: "20%",
+        animation: "orb3 20s ease-in-out infinite",
+        willChange: "transform",
+      }} />
+      {/* Dot grid overlay */}
+      <div style={{
+        position: "absolute", inset: 0,
+        backgroundImage: "radial-gradient(circle, rgba(100,85,65,0.08) 1px, transparent 1px)",
+        backgroundSize: "28px 28px",
+        maskImage: "radial-gradient(ellipse 80% 80% at 50% 50%, black 40%, transparent 100%)",
+        WebkitMaskImage: "radial-gradient(ellipse 80% 80% at 50% 50%, black 40%, transparent 100%)",
+      }} />
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
+// GLOBAL QUANTUM STYLES (keyframes injected at runtime)
+// ─────────────────────────────────────────────
+function GlobalQuantumStyles() {
+  useEffect(() => {
+    const id = "quantum-styles";
+    if (document.getElementById(id)) return;
+    const style = document.createElement("style");
+    style.id = id;
+    style.textContent = `
+      @keyframes quantum-float {
+        0%,100% { transform: translateY(0px) rotate(0deg); }
+        33%      { transform: translateY(-8px) rotate(1deg); }
+        66%      { transform: translateY(4px) rotate(-1deg); }
+      }
+      @keyframes aurora-shift {
+        0%   { background-position: 0% 50%; opacity: 0.6; }
+        50%  { background-position: 100% 50%; opacity: 1; }
+        100% { background-position: 0% 50%; opacity: 0.6; }
+      }
+      @keyframes particle-rise {
+        0%   { transform: translateY(0) scale(1); opacity: 0.7; }
+        100% { transform: translateY(-120px) scale(0); opacity: 0; }
+      }
+      .module-card-hover {
+        transition: transform 0.25s cubic-bezier(0.175,0.885,0.32,1.275), box-shadow 0.25s ease;
+      }
+      .module-card-hover:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 32px rgba(96,80,160,0.10), 0 0 0 1px rgba(96,80,160,0.12);
+      }
+      .btn-magnetic {
+        transition: transform 0.2s cubic-bezier(0.175,0.885,0.32,1.275), box-shadow 0.2s ease;
+      }
+      .btn-magnetic:hover {
+        transform: translateY(-1px) scale(1.03);
+        box-shadow: 0 6px 20px rgba(96,80,160,0.18);
+      }
+    `;
+    document.head.appendChild(style);
+    return () => { document.getElementById(id)?.remove(); };
+  }, []);
+  return null;
+}
+
+// ─────────────────────────────────────────────
 // MAIN APP
 // ─────────────────────────────────────────────
 export default function App() {
@@ -1839,7 +2027,9 @@ export default function App() {
 
         {showAuth && <AuthModal onClose={() => setShowAuth(false)} onAuth={u => setUser(u)} />}
         <ChatWidget user={user} />
-        <BackgroundOrbs />
+        <GlowingMouseOrb />
+        <GlobalQuantumStyles />
+        <CosmicBackground />
       </main>
     );
   }
@@ -1883,7 +2073,9 @@ export default function App() {
 
       {showAuth && <AuthModal onClose={() => setShowAuth(false)} onAuth={u => setUser(u)} />}
       <ChatWidget user={user} />
-      <BackgroundOrbs />
+      <GlowingMouseOrb />
+      <GlobalQuantumStyles />
+      <CosmicBackground />
     </main>
   );
 }

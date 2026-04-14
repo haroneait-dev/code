@@ -12,40 +12,40 @@
 
 :root {
   /* ── Background ── */
-  --bg-dark:    #0b0a09;
-  --bg-surface: #0f0e0d;
-  --bg-card:    #141310;
-  --bg-hover:   #1a1816;
+  --bg-dark:    #faf8f4;
+  --bg-surface: #f5f1eb;
+  --bg-card:    #ffffff;
+  --bg-hover:   #ede8e0;
 
   /* ── Borders ── */
-  --border: #252220;
+  --border: #ddd8d0;
 
-  /* ── Beige palette ── */
-  --beige:       #d4cdc0;
-  --beige-dim:   #9a9080;
-  --beige-muted: #5c5448;
-  --beige-light: #e8e2d8;
+  /* ── Beige palette (inversé pour thème clair) ── */
+  --beige:       #2a2018;
+  --beige-dim:   #5a5048;
+  --beige-muted: #9a9080;
+  --beige-light: #1a1410;
 
-  /* ── Legacy aliases (for callouts/code) ── */
-  --accent:       #c8baa0;
-  --accent-dim:   rgba(200, 186, 160, 0.08);
-  --accent-border:rgba(200, 186, 160, 0.18);
-  --accent-light: #d4cdc0;
-  --purple:       #9080b8;
-  --purple-light: #b0a0d0;
-  --purple-dim:   rgba(144, 128, 184, 0.1);
-  --orange:       #b88060;
-  --orange-dim:   rgba(184, 128, 96, 0.1);
-  --green:        #70a070;
-  --green-dim:    rgba(112, 160, 112, 0.1);
-  --blue:         #6080b0;
-  --blue-dim:     rgba(96, 128, 176, 0.1);
+  /* ── Legacy aliases ── */
+  --accent:       #6b5d4e;
+  --accent-dim:   rgba(100, 85, 65, 0.08);
+  --accent-border:rgba(100, 85, 65, 0.18);
+  --accent-light: #5a4e3e;
+  --purple:       #6050a0;
+  --purple-light: #7060b8;
+  --purple-dim:   rgba(96, 80, 160, 0.08);
+  --orange:       #b86040;
+  --orange-dim:   rgba(184, 96, 64, 0.08);
+  --green:        #508050;
+  --green-dim:    rgba(80, 128, 80, 0.08);
+  --blue:         #4060a0;
+  --blue-dim:     rgba(64, 96, 160, 0.08);
 
   /* ── Text ── */
-  --text:         #d4cdc0;
-  --text-dim:     #9a9080;
-  --text-muted:   #5c5448;
-  --text-primary: #d4cdc0;
+  --text:         #2a2018;
+  --text-dim:     #5a5048;
+  --text-muted:   #9a9080;
+  --text-primary: #2a2018;
 }
 
 html,
@@ -75,7 +75,7 @@ main {
   border-radius: 9999px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #3a3a4a;
+  background: #c8c0b8;
 }
 
 /* Prose styles for lesson content */
@@ -143,7 +143,7 @@ main {
 
 /* Code block */
 .code-block {
-  background: #0a0908;
+  background: #f0ece4;
   border: 1px solid var(--border);
   border-radius: 6px;
   margin: 1rem 0;
@@ -154,7 +154,7 @@ main {
   align-items: center;
   justify-content: space-between;
   padding: 0.4rem 0.875rem;
-  background: #0f0e0c;
+  background: #e8e2d8;
   border-bottom: 1px solid var(--border);
 }
 .code-block-lang {
@@ -185,17 +185,17 @@ main {
   font-family: 'JetBrains Mono', monospace;
   font-size: 0.82rem;
   line-height: 1.7;
-  color: #c9d1d9;
+  color: #2a2018;
 }
 
 /* Syntax-like coloring */
-.tok-kw { color: #ff79c6; }
-.tok-str { color: #f1fa8c; }
-.tok-cmd { color: #50fa7b; }
-.tok-flag { color: #8be9fd; }
-.tok-comment { color: #6272a4; font-style: italic; }
-.tok-num { color: #bd93f9; }
-.tok-path { color: #ffb86c; }
+.tok-kw { color: #7040a8; }
+.tok-str { color: #507840; }
+.tok-cmd { color: #305890; }
+.tok-flag { color: #406880; }
+.tok-comment { color: #9a9080; font-style: italic; }
+.tok-num { color: #9060a0; }
+.tok-path { color: #9a6030; }
 
 /* Tip / callout boxes */
 .callout {
@@ -387,7 +387,7 @@ kbd {
   100% { background-position: 0% 50%; }
 }
 .gradient-text {
-  background: linear-gradient(135deg, #e8e2d8 0%, #b0a0d8 30%, #6080c8 55%, #9060c0 75%, #e8e2d8 100%);
+  background: linear-gradient(135deg, #2a2018 0%, #6050a8 30%, #3860b8 55%, #8040b0 75%, #2a2018 100%);
   background-size: 300% 300%;
   animation: grad-shift 7s ease infinite;
   -webkit-background-clip: text;
@@ -406,8 +406,8 @@ kbd {
 
 /* Chat button glow */
 @keyframes chat-glow {
-  0%,100% { box-shadow: 0 0 18px rgba(120,96,200,0.4), 0 4px 24px rgba(0,0,0,0.4); }
-  50%      { box-shadow: 0 0 36px rgba(120,96,200,0.75), 0 4px 24px rgba(0,0,0,0.4); }
+  0%,100% { box-shadow: 0 0 18px rgba(96,80,160,0.25), 0 4px 24px rgba(0,0,0,0.12); }
+  50%      { box-shadow: 0 0 36px rgba(96,80,160,0.45), 0 4px 24px rgba(0,0,0,0.15); }
 }
 .chat-btn-glow {
   animation: chat-glow 3s ease-in-out infinite;
@@ -421,9 +421,10 @@ kbd {
 
 /* Glassmorphism nav */
 .glass-nav {
-  background: rgba(11,10,9,0.75) !important;
+  background: rgba(250,248,244,0.82) !important;
   backdrop-filter: blur(16px) saturate(180%);
   -webkit-backdrop-filter: blur(16px) saturate(180%);
+  box-shadow: 0 1px 0 rgba(0,0,0,0.06);
 }
 
 /* Module row hover glow */
@@ -432,8 +433,8 @@ kbd {
   border-radius: 6px;
 }
 .mod-row:hover {
-  background: rgba(120,96,200,0.04);
-  box-shadow: inset 0 0 0 1px rgba(120,96,200,0.15);
+  background: rgba(96,80,160,0.04);
+  box-shadow: inset 0 0 0 1px rgba(96,80,160,0.12);
 }
 
 /* Animated badge on hero */
@@ -467,4 +468,26 @@ kbd {
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
+}
+
+/* Typewriter cursor blink */
+@keyframes blink {
+  0%,100% { opacity: 1; }
+  50%      { opacity: 0; }
+}
+
+/* CountUp stat card */
+@keyframes stat-pop {
+  0%   { transform: scale(0.85); opacity: 0; }
+  70%  { transform: scale(1.05); }
+  100% { transform: scale(1); opacity: 1; }
+}
+.stat-pop {
+  animation: stat-pop 0.5s cubic-bezier(0.175,0.885,0.32,1.275) forwards;
+}
+
+/* Floating code tag */
+@keyframes float-tag {
+  0%,100% { transform: translateY(0px) rotate(-2deg); }
+  50%      { transform: translateY(-10px) rotate(2deg); }
 }
