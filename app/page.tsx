@@ -795,8 +795,9 @@ function AuthModal({ onClose, onAuth }: { onClose: () => void; onAuth: (user: Us
 
   return (
     <>
-      <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.8)", zIndex: 500 }} />
-      <div className="fade-in" style={{ position: "fixed", top: "50%", left: "50%", transform: "translate(-50%,-50%)", width: "420px", maxWidth: "calc(100vw - 2rem)", background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: "12px", zIndex: 501, padding: "2rem" }}>
+      <div style={{ position: "fixed", inset: 0, zIndex: 500, display: "flex", alignItems: "center", justifyContent: "center", padding: "1rem" }}>
+        <div onClick={onClose} style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.8)" }} />
+      <div className="fade-in" style={{ position: "relative", width: "420px", maxWidth: "100%", background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: "12px", zIndex: 1, padding: "2rem", maxHeight: "90vh", overflowY: "auto" }}>
         {/* Close */}
         <button onClick={onClose} style={{ position: "absolute", top: "1rem", right: "1rem", background: "none", border: "none", color: "var(--beige-muted)", cursor: "pointer", fontSize: "1rem", padding: "0.25rem", lineHeight: 1 }}>✕</button>
 
@@ -869,6 +870,7 @@ function AuthModal({ onClose, onAuth }: { onClose: () => void; onAuth: (user: Us
             </button>
           </div>
         )}
+      </div>
       </div>
     </>
   );
