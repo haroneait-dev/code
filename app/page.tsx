@@ -947,9 +947,7 @@ function WikiView({ isMobile, isAdmin }: { isMobile: boolean; isAdmin: boolean }
     if (!res.ok) { setSubmitError(data.error ?? "Erreur serveur."); setSubmitting(false); return; }
     setTips(prev => [data, ...prev]);
     setSubmitSuccess(true);
-    setFormTitle(""); setFormContent(""); setFormAuthor(""); setFormCategory("Tips & Tricks");
     setSubmitting(false);
-    setTimeout(() => { setShowForm(false); setSubmitSuccess(false); }, 1200);
   };
 
   return (
@@ -1109,8 +1107,19 @@ function WikiView({ isMobile, isAdmin }: { isMobile: boolean; isAdmin: boolean }
             </div>
 
             {submitSuccess ? (
-              <div className="check-pop" style={{ padding: "2rem 0", textAlign: "center", color: "var(--beige)", fontSize: "0.9rem" }}>
-                ✓ Contribution publiée, merci !
+              <div className="check-pop" style={{ padding: "2rem 0", textAlign: "center" }}>
+                <div style={{ fontSize: "1.5rem", marginBottom: "0.75rem" }}>✓</div>
+                <p style={{ fontSize: "0.9rem", color: "var(--beige)", marginBottom: "1.25rem" }}>Contribution publiée, merci !</p>
+                <div style={{ display: "flex", gap: "0.75rem", justifyContent: "center" }}>
+                  <button onClick={() => { setSubmitSuccess(false); setFormTitle(""); setFormContent(""); setFormAuthor(""); setFormCategory("Tips & Tricks"); }}
+                    style={{ padding: "0.5rem 1.1rem", background: "var(--beige)", border: "none", borderRadius: "6px", color: "var(--bg-dark)", fontSize: "0.825rem", fontWeight: 600, cursor: "pointer" }}>
+                    + Ajouter un autre
+                  </button>
+                  <button onClick={() => { setShowForm(false); setSubmitSuccess(false); }}
+                    style={{ padding: "0.5rem 1.1rem", background: "none", border: "1px solid var(--border)", borderRadius: "6px", color: "var(--beige-dim)", fontSize: "0.825rem", cursor: "pointer" }}>
+                    Fermer
+                  </button>
+                </div>
               </div>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
@@ -1217,9 +1226,7 @@ function SkillsView({ isMobile }: { isMobile: boolean }) {
     if (!res.ok) { setSubmitError(data.error ?? "Erreur serveur."); setSubmitting(false); return; }
     setSkills(prev => [data, ...prev]);
     setSubmitSuccess(true);
-    setFormName(""); setFormLevel("Débutant"); setFormDescription(""); setFormAuthor("");
     setSubmitting(false);
-    setTimeout(() => { setShowForm(false); setSubmitSuccess(false); }, 1200);
   };
 
   const levelFilters = ["Tous", ...SKILL_LEVELS];
@@ -1240,7 +1247,7 @@ function SkillsView({ isMobile }: { isMobile: boolean }) {
             );
           })}
         </div>
-        <button onClick={() => setShowForm(true)}
+        <button onClick={() => { setShowForm(true); setSubmitSuccess(false); setSubmitError(""); }}
           style={{ flexShrink: 0, padding: "0.45rem 0.9rem", background: "var(--beige)", border: "none", borderRadius: "6px", color: "var(--bg-dark)", fontSize: "0.78rem", fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}
           onMouseEnter={e => (e.currentTarget.style.background = "var(--beige-light)")}
           onMouseLeave={e => (e.currentTarget.style.background = "var(--beige)")}>
@@ -1316,8 +1323,19 @@ function SkillsView({ isMobile }: { isMobile: boolean }) {
             </div>
 
             {submitSuccess ? (
-              <div className="check-pop" style={{ padding: "2rem 0", textAlign: "center", color: "var(--beige)", fontSize: "0.9rem" }}>
-                ✓ Compétence ajoutée, merci !
+              <div className="check-pop" style={{ padding: "2rem 0", textAlign: "center" }}>
+                <div style={{ fontSize: "1.5rem", marginBottom: "0.75rem" }}>✓</div>
+                <p style={{ fontSize: "0.9rem", color: "var(--beige)", marginBottom: "1.25rem" }}>Compétence ajoutée, merci !</p>
+                <div style={{ display: "flex", gap: "0.75rem", justifyContent: "center" }}>
+                  <button onClick={() => { setSubmitSuccess(false); setFormName(""); setFormLevel("Débutant"); setFormDescription(""); setFormAuthor(""); }}
+                    style={{ padding: "0.5rem 1.1rem", background: "var(--beige)", border: "none", borderRadius: "6px", color: "var(--bg-dark)", fontSize: "0.825rem", fontWeight: 600, cursor: "pointer" }}>
+                    + Ajouter une autre
+                  </button>
+                  <button onClick={() => { setShowForm(false); setSubmitSuccess(false); }}
+                    style={{ padding: "0.5rem 1.1rem", background: "none", border: "1px solid var(--border)", borderRadius: "6px", color: "var(--beige-dim)", fontSize: "0.825rem", cursor: "pointer" }}>
+                    Fermer
+                  </button>
+                </div>
               </div>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
