@@ -1,0 +1,98 @@
+---
+title: "Partage d'état entre agents"
+description: "Transmettre résultats et fichiers entre subagents : retour de message, fichiers temporaires, sortie structurée."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+Les subagents Claude Code sont conçus pour être **étanches** : chacun a son propre contexte, son propre historique, ses propres tokens. C'est une force pour l'isolation, mais ça pose un problème dès qu'on veut chaîner plusieurs agents. Comment passer un résultat de A à B ? Trois mécanismes coexistent, chacun avec ses cas d'usage.
+
+## Mécanisme 1 — Le retour de message
+
+C'est le plus simple : le subagent termine en produisant un message texte que l'agent parent reçoit comme valeur de retour de l'appel `Task`. Ce message devient alors disponible dans le contexte du parent.
+
+Avantages :
+
+- Aucun stockage externe, tout vit en mémoire.
+- Fonctionne pour des retours courts (résumé, liste, verdict).
+- Traçable directement dans le transcript.
+
+Limites :
+
+- Si le subagent a généré 50 KB de logs, vous ne voulez pas tout coller dans le parent.
+- Le format est libre — donc fragile à parser côté parent.
+- Pas adapté à transmettre des **fichiers** ou des **artefacts** binaires.
+
+Règle pratique : utilisez le retour de message pour tout résultat **synthétique** qui tient en moins de 2000 tokens (un résumé, un statut, une décision).
+
+## Mécanisme 2 — Les fichiers temporaires
+
+Quand le volume grandit, on bascule sur le disque. Le subagent écrit son résultat dans `/tmp/<nom>.json` (ou un répertoire de scratch convenu) et retourne au parent juste le chemin. Le parent lit ensuite le fichier quand il en a besoin.
+
+Pattern type :
+
+```
+parent → spawn "explorer" → écrit /tmp/exploration-42.json
+parent ← reçoit "résultats dans /tmp/exploration-42.json"
+parent → spawn "planner" avec ce chemin
+planner → lit le fichier, produit /tmp/plan-42.md
+```
+
+Avantages :
+
+- Pas de limite de taille pratique.
+- Le contexte parent reste léger (un chemin = 50 tokens).
+- Le fichier peut être inspecté manuellement pour debug.
+
+Précautions :
+
+- Nommez les fichiers avec un identifiant unique (UUID, timestamp + PID) pour éviter les collisions entre runs parallèles.
+- Nettoyez à la fin de la session, ou utilisez `mktemp` qui gère ça pour vous.
+- N'écrivez **jamais** de secrets dans `/tmp` sans chiffrement.
+
+## Mécanisme 3 — La sortie structurée
+
+C'est l'évolution du retour de message : on impose au subagent un format strict (JSON Schema, XML, YAML). Le parent peut alors parser sans heuristique.
+
+Exemple de contrat avec un reviewer :
+
+```json
+{
+  "verdict": "approve" | "request_changes" | "block",
+  "findings": [
+    { "file": "...", "line": 42, "severity": "major", "message": "..." }
+  ],
+  "summary": "..."
+}
+```
+
+Combiné à une validation côté parent (Zod, JSON Schema), c'est le pattern le plus robuste pour des pipelines multi-agents. Vous obtenez du typage de fait entre maillons.
+
+Le piège : le subagent peut produire du JSON cassé (virgule en trop, guillemets non échappés). Prévoyez toujours :
+
+1. Un prompt qui dit "réponds **uniquement** avec le JSON, sans markdown".
+2. Une validation côté parent avec retry automatique si le parse échoue.
+3. Un fallback (re-spawn avec instruction plus stricte) après 2 échecs.
+
+## Quel mécanisme choisir
+
+| Cas | Mécanisme |
+|-----|-----------|
+| Verdict court (oui/non, statut) | Retour de message |
+| Plan de quelques étapes | Sortie structurée (JSON) |
+| Résultats volumineux (logs, code généré, dataset) | Fichier temporaire |
+| Pipeline multi-étapes avec contrat fort | Sortie structurée + fichier |
+
+Vous pouvez bien sûr combiner : le subagent écrit le gros dans `/tmp` et retourne un JSON `{ "path": "...", "summary": "..." }`. C'est en général la formule gagnante.
+
+## Anti-patterns à éviter
+
+- **Variable globale partagée** : ça n'existe pas entre subagents. Toute tentative ressemblera à un fichier `/tmp` mal nommé.
+- **Communication horizontale** : un subagent B ne peut pas "demander" à un subagent C. Seul le parent orchestre.
+- **État implicite via le repo** : commiter un fichier juste pour qu'un autre agent le lise est lent, pollue l'historique git, et casse en concurrence.
+
+## Pour aller plus loin
+
+- Définir vos schémas de sortie une fois pour toutes dans `.claude/agents/<nom>.md` et les réutiliser.
+- Mettre en place un répertoire `.claude/scratch/` git-ignoré pour les artefacts inter-agents d'une même session.
+- Lire l'article sur la sous-traitance récursive pour voir comment l'état circule dans un arbre de plusieurs niveaux.

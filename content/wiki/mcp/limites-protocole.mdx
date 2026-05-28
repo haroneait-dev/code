@@ -1,0 +1,71 @@
+---
+title: "Limites du protocole MCP"
+description: "Ce que MCP ne sait pas (encore) faire : streaming partiel, état persistant, multi-tenant, et pistes d'évolution."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+MCP est jeune (première spec fin 2024) et résout brillamment le problème de **connecter un LLM à des outils**. Mais il y a des cas d'usage où l'on bute encore sur des limites du protocole. Les connaître évite des architectures bancales.
+
+## Pas de streaming partiel des résultats d'outils
+
+Aujourd'hui, un appel d'outil MCP est **request/response** : le serveur exécute, puis renvoie un payload complet. Pour un outil qui produit beaucoup de tokens (génération vidéo, scrape long, build), le LLM doit attendre la fin sans visibilité.
+
+Conséquences pratiques :
+
+- Pas de feedback intermédiaire ("frame 12/300 rendue").
+- Timeouts difficiles à régler — soit trop courts, soit l'utilisateur attend dans le noir.
+- Impossible d'annuler proprement un outil long en cours.
+
+Workaround actuel : découper l'opération en outils plus petits (`start_job`, `poll_status`, `get_result`) et laisser le LLM orchestrer. C'est verbeux mais ça marche.
+
+## État de session limité
+
+Le protocole considère chaque outil comme **stateless** vis-à-vis du serveur. Les `resources` apportent un état lisible, mais il n'y a pas de concept de "transaction" ou de "session utilisateur" portée par MCP.
+
+Si vous voulez :
+
+- Garder un curseur de pagination entre deux appels,
+- Maintenir une connexion DB ouverte avec un context manager,
+- Synchroniser plusieurs outils sur un même objet métier,
+
+…c'est à vous de gérer l'état **dans votre serveur** (in-memory dict, Redis, etc.) et de l'exposer via des identifiants opaques que le LLM trimballe.
+
+## Pas de notifications proactives (encore)
+
+Le protocole supporte techniquement des notifications JSON-RPC (`notifications/resources/updated`), mais peu de clients les implémentent vraiment. Un serveur ne peut donc pas, en pratique :
+
+- Réveiller le LLM quand un événement externe arrive ("nouveau mail").
+- Pousser une mise à jour de ressource sans que le client la redemande.
+
+Pour du vrai temps réel (chat, alerting), MCP n'est pas encore la bonne couche. On reste sur WebSockets côté app, et on appelle le LLM en réaction.
+
+## Multi-tenant et auth fine
+
+La spec 2025 a introduit OAuth pour le transport HTTP, mais la granularité reste grossière. Concrètement :
+
+- Pas de notion native de "rôle" ou de "scope par outil" — vous devez réimplémenter.
+- Les serveurs stdio sont mono-utilisateur par design (un process = un user).
+- Pour un SaaS avec milliers d'utilisateurs, il faut un proxy MCP qui multiplexe et applique l'auth.
+
+C'est un chantier actif de la communauté ; attendez-vous à des évolutions rapides en 2026.
+
+## Pas de typage runtime fort
+
+Les `inputSchema` sont du JSON Schema, donc déclaratifs. Mais :
+
+- La validation côté client n'est **pas obligatoire** dans la spec.
+- Les types complexes (unions discriminées, refs circulaires) sont mal supportés par certains LLM.
+- Pas d'équivalent à gRPC ou GraphQL pour générer des clients typés.
+
+En pratique, validez **systématiquement côté serveur** avec Pydantic ou Zod — ne comptez pas sur le LLM pour respecter le schema.
+
+## Pas de composition d'outils côté serveur
+
+Un serveur MCP expose une liste plate d'outils. Pas de moyen natif de dire "cet outil dépend de celui-là" ou "exécute ces trois outils en transaction". L'orchestration revient toujours au LLM, ce qui est élégant mais coûteux en tokens.
+
+## Pour aller plus loin
+
+- Suivez les **RFCs** dans `modelcontextprotocol/specification` : streaming et notifications sont les sujets chauds.
+- Pour du long-running, regardez les patterns "job queue + polling tool" qui émergent.
+- Si vous avez besoin de vrai temps réel, combinez MCP (commande) + WebSocket app (data plane).

@@ -1,0 +1,113 @@
+---
+title: "Thèmes et accessibilité"
+description: "Personnaliser les couleurs, le contraste et la densité d'affichage de Claude Code, et tirer parti du support lecteurs d'écran dans le terminal."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+Un CLI qu'on regarde huit heures par jour doit être confortable. Claude Code embarque plusieurs thèmes, un mode compact et un support explicite des lecteurs d'écran. Cette page passe en revue les options d'accessibilité et comment les configurer durablement.
+
+## Choisir un thème
+
+Quatre thèmes sont fournis par défaut : `dark`, `light`, `dark-daltonized`, `light-daltonized`. Les deux variantes « daltonized » remplacent le rouge/vert par du bleu/orange pour le daltonisme deutéranope et protanope.
+
+Pour changer le thème de façon interactive :
+
+```bash
+/config         # ouvre l'éditeur de paramètres
+# puis sélectionner "theme"
+```
+
+Pour le fixer dans la configuration utilisateur :
+
+```json
+{
+  "theme": "dark-daltonized",
+  "verbose": false
+}
+```
+
+Le fichier vit dans `~/.claude/settings.json`. Vous pouvez aussi l'imposer par projet via `.claude/settings.json` pour homogénéiser l'équipe pendant les sessions de pair programming.
+
+## Contraste et lisibilité
+
+Claude Code respecte les couleurs ANSI du terminal. Si votre thème de terminal est mal calibré, les blocs de code peuvent devenir illisibles. Quelques règles :
+
+- Visez un ratio de contraste **WCAG AA** minimum (4.5:1) pour le texte normal.
+- Sur macOS, l'option « Increase contrast » dans Préférences Système renforce les bordures des panneaux du CLI.
+- Évitez les fonds purement noirs (#000000) sur écran OLED : préférez un gris très sombre (#0b0a09 par exemple) pour réduire la fatigue oculaire.
+- Pour les polices, JetBrains Mono, Fira Code ou Berkeley Mono offrent une excellente discrimination des caractères (`O`/`0`, `l`/`1`).
+
+```bash
+# Vérifier les codes couleur supportés par votre terminal
+echo $COLORTERM        # devrait afficher "truecolor"
+tput colors            # idéalement 256 ou plus
+```
+
+## Mode compact et densité
+
+Le mode compact réduit les marges, supprime les ASCII art décoratifs et resserre l'historique. Utile sur des écrans 13 pouces ou en split-screen.
+
+```json
+{
+  "compactMode": true,
+  "spinnerStyle": "minimal"
+}
+```
+
+Vous pouvez aussi désactiver les éléments visuels lourds :
+
+```bash
+# Désactiver les animations de spinner
+export CLAUDE_DISABLE_ANIMATIONS=1
+
+# Réduire la verbosité des messages d'outils
+claude --verbose=false
+```
+
+## Support des lecteurs d'écran
+
+Claude Code détecte automatiquement la présence d'un lecteur d'écran (VoiceOver, NVDA, Orca) via la variable `TERM_PROGRAM` et certaines variables d'environnement spécifiques. Quand c'est le cas, il :
+
+- Annonce les changements d'état (« Claude réfléchit », « Édition de fichier en cours »).
+- Sépare les blocs de code des commentaires par des marqueurs textuels explicites.
+- Désactive les animations qui troublent la synthèse vocale.
+- Sort le contenu en flux linéaire plutôt que dans des panneaux ANSI complexes.
+
+Pour forcer le mode accessible :
+
+```bash
+export CLAUDE_ACCESSIBILITY=1
+claude
+```
+
+Ou en configuration persistante :
+
+```json
+{
+  "accessibility": {
+    "screenReader": true,
+    "announceToolCalls": true,
+    "reducedMotion": true
+  }
+}
+```
+
+## Navigation clavier
+
+Quelques raccourcis utiles pour rester productif sans souris :
+
+- `Ctrl+C` : interrompt la génération en cours sans tuer la session.
+- `Ctrl+D` : sortie propre.
+- `Esc Esc` : revient à un point antérieur de la conversation (rollback).
+- `Shift+Tab` : bascule entre les modes (auto-accept, plan, normal).
+- `↑` / `↓` : historique des prompts dans la session.
+
+Tous ces raccourcis sont remappables via `~/.claude/keybindings.json`.
+
+## Pour aller plus loin
+
+- Consultez la section [Accessibility](https://docs.claude.com/claude-code) de la doc officielle pour la liste exhaustive des variables d'environnement.
+- Pour les utilisateurs de Neovim ou Helix, des intégrations existent pour piloter Claude sans quitter l'éditeur — utile pour ceux qui dépendent d'un workflow clavier complet.
+- Si vous avez besoin d'un thème custom, ouvrez une issue : le projet accepte les contributions de palettes spécifiques.
+- Pensez à signaler les problèmes d'accessibilité rencontrés ; le support lecteur d'écran évolue rapidement.

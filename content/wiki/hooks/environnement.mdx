@@ -1,0 +1,107 @@
+---
+title: "Hooks et environnement d'exécution"
+description: "Quelles variables d'environnement, quel cwd, quel payload JSON sur stdin ? Comprendre le contexte d'exécution des hooks Claude Code."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+Un hook ne tombe pas du ciel : il s'exécute dans un environnement précis, avec un `cwd`, des variables d'environnement injectées, et un payload JSON poussé sur `stdin`. Comprendre ces canaux d'information est la clé pour écrire des hooks portables, qui ne cassent pas dès qu'on lance Claude Code depuis un autre répertoire.
+
+## Le payload JSON sur stdin
+
+Chaque hook reçoit, sur `stdin`, un objet JSON décrivant l'événement. La structure varie selon le type de hook (`PreToolUse`, `PostToolUse`, `UserPromptSubmit`, `Notification`, `Stop`, `SubagentStop`, `PreCompact`, `SessionStart`, `SessionEnd`) mais l'enveloppe est constante :
+
+```bash
+#!/usr/bin/env bash
+INPUT="$(cat)"
+echo "$INPUT" | jq .
+# {
+#   "session_id": "abc-123",
+#   "transcript_path": "/Users/h/.claude/projects/.../session.jsonl",
+#   "cwd": "/Users/h/mon-projet",
+#   "hook_event_name": "PreToolUse",
+#   "tool_name": "Edit",
+#   "tool_input": { "file_path": "src/app.ts", "old_string": "...", "new_string": "..." }
+# }
+```
+
+Pour les hooks `PostToolUse`, on a en plus un `tool_response`. Pour `UserPromptSubmit`, un champ `prompt`. Pour `SessionStart`, un `source` qui vaut `startup`, `resume` ou `clear`.
+
+## Les variables d'environnement injectées
+
+Claude Code expose plusieurs variables utiles dans tous les hooks :
+
+- **`CLAUDE_PROJECT_DIR`** : racine du projet, utile pour résoudre des chemins même quand le hook est lancé depuis un sous-dossier.
+- **`PATH`** : hérité du shell parent ayant lancé `claude`, donc attention si vous utilisez `nvm` ou `pyenv`.
+- **`HOME`, `USER`, `SHELL`** : standards Unix.
+
+`CLAUDE_PROJECT_DIR` est particulièrement précieux : elle pointe vers la racine que Claude Code considère comme le projet (généralement le dossier contenant `.claude/`), même si l'agent travaille dans `packages/web/src/`.
+
+```json
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/.claude/scripts/post-edit.sh"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+## Le répertoire de travail
+
+Le `cwd` au moment de l'exécution du hook est le répertoire courant de la session Claude Code — pas forcément celui où vous avez tapé `claude`, car le modèle a pu faire `cd` via `Bash`. Pour éviter les surprises, deux approches :
+
+1. Lire `cwd` depuis le JSON (`jq -r .cwd`) et l'utiliser explicitement.
+2. Toujours préfixer les chemins par `$CLAUDE_PROJECT_DIR`.
+
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+INPUT="$(cat)"
+CWD="$(echo "$INPUT" | jq -r '.cwd')"
+cd "$CWD"
+# À partir d'ici, on est dans le bon dossier
+git status --porcelain
+```
+
+## Codes de sortie et communication retour
+
+Le hook communique son verdict via le code de sortie et `stdout`/`stderr` :
+
+- `exit 0` : succès, on continue.
+- `exit 2` (sur un `PreToolUse`) : bloque l'appel d'outil et envoie `stderr` au modèle.
+- Autre code non-zéro : warning, mais n'interrompt pas.
+
+Pour `UserPromptSubmit`, `stdout` est ajouté au contexte du modèle — pratique pour injecter du contexte projet dynamique :
+
+```bash
+#!/usr/bin/env bash
+echo "Branche git actuelle: $(git -C "$CLAUDE_PROJECT_DIR" branch --show-current)"
+echo "Tâches TODO en cours: $(grep -r TODO "$CLAUDE_PROJECT_DIR/src" | wc -l)"
+exit 0
+```
+
+## Isolation et secrets
+
+Les hooks héritent de l'environnement complet du shell parent, y compris les secrets. Si vous lancez Claude Code depuis un terminal où `OPENAI_API_KEY` est exporté, vos hooks y ont accès. Pour limiter la fuite :
+
+```bash
+#!/usr/bin/env bash
+# Nettoyer l'environnement avant d'appeler un sous-processus tiers
+env -i PATH="$PATH" HOME="$HOME" /usr/local/bin/script-tiers.sh
+```
+
+## Pour aller plus loin
+
+- Logger une fois `env | sort > /tmp/hook-env.txt` pour cartographier précisément ce qui est dispo dans votre setup.
+- Tester un hook isolément : `echo '{"cwd":"/tmp","tool_name":"Edit"}' | ./mon-hook.sh`.
+- Documenter en commentaire les champs JSON utilisés — le schéma peut évoluer entre versions.
+- Versionner `.claude/settings.json` mais pas `settings.local.json`, qui contient les overrides personnels.

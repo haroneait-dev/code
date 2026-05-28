@@ -1,0 +1,68 @@
+---
+title: "Extensions navigateur non officielles pour Claude.ai"
+description: "Outils tiers pour améliorer l'UI/UX web de Claude : export markdown, thèmes, raccourcis."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+L'interface web de Claude.ai est volontairement épurée, mais une communauté active a publié plusieurs extensions de navigateur pour l'enrichir : export propre en Markdown, thèmes alternatifs, raccourcis clavier supplémentaires, gestion avancée des conversations. Ces outils ne sont pas développés par Anthropic — il faut donc les choisir avec discernement, surtout vis-à-vis de la confidentialité de vos prompts.
+
+## Pourquoi utiliser une extension
+
+L'UI officielle reste minimaliste par design. Pour certains usages, ça frustre :
+
+- Pas d'export natif d'une conversation en Markdown propre.
+- Peu de thèmes, palette imposée.
+- Recherche dans l'historique parfois limitée.
+- Absence de templates ou de prompts réutilisables côté UI.
+
+Les extensions tierces comblent ces manques avec une logique très "userscript" : elles injectent du JS et du CSS dans la page `claude.ai` pour ajouter boutons, raccourcis ou panneaux.
+
+## Catégories d'extensions populaires
+
+**Export et archivage** — La fonctionnalité la plus demandée. Plusieurs extensions ajoutent un bouton "Export Markdown" qui sérialise la conversation entière (messages + artifacts + blocs de code) dans un fichier `.md` propre. Certaines proposent aussi l'export PDF avec mise en page lisible.
+
+**Thèmes et apparence** — Skins sombres alternatifs, polices custom (souvent JetBrains Mono pour le code), densité d'affichage réduite. Pratique pour les longues sessions ou les écrans particuliers.
+
+**Raccourcis clavier** — Navigation entre conversations au clavier, raccourcis pour insérer des prompts pré-définis, focus rapide sur la barre de recherche.
+
+**Gestion de bibliothèque de prompts** — Stockage local de prompts favoris injectables d'un clic, organisation par dossiers, variables paramétrables. C'est l'équivalent d'un "snippet manager" dédié à Claude.
+
+**Améliorations Artifacts** — Boutons "copier tout le code", "ouvrir dans un nouvel onglet", export ZIP d'un projet multi-fichiers.
+
+## Risques à connaître
+
+Une extension navigateur s'exécute avec les mêmes permissions que la page Claude.ai. Concrètement, elle peut :
+
+- Lire **tout** ce que vous tapez et tout ce que Claude répond.
+- Accéder à votre session authentifiée (cookies, tokens).
+- Envoyer ces données vers un serveur tiers si son code le décide.
+
+C'est exactement le scénario que vous voulez éviter pour des prompts contenant du code propriétaire, des secrets, ou des données client. Avant d'installer, vérifiez systématiquement :
+
+1. **La source** — Préférez l'open-source avec un repo GitHub actif et un historique de commits cohérent.
+2. **Les permissions** — Une extension qui demande accès à "tous les sites" pour une feature limitée à claude.ai est suspecte.
+3. **Le nombre d'utilisateurs et les reviews** — Une extension obscure publiée la semaine dernière mérite plus de prudence qu'un projet établi.
+4. **La politique de mise à jour** — Les extensions Chrome peuvent être mises à jour silencieusement et changer de comportement.
+
+## Alternatives plus sûres
+
+Si vous voulez les bénéfices sans les risques :
+
+- **Userscripts via Tampermonkey/Violentmonkey** — Vous lisez le code avant de l'activer et il est figé jusqu'à votre validation manuelle.
+- **Bookmarklets** — Un simple JavaScript dans un favori, sans installation persistante, idéal pour un export Markdown one-shot.
+- **API officielle** — Pour de l'export ou de l'automatisation propre, le SDK Anthropic vous donne un contrôle total sans dépendre du DOM de claude.ai.
+- **Claude Code** — Pour les workflows développeur, le CLI couvre déjà la plupart des besoins (export, templates, scripting).
+
+## Recommandations pratiques
+
+- Testez toujours une extension sur un compte secondaire avant de l'utiliser avec votre compte principal.
+- Désactivez les extensions tierces lorsque vous travaillez avec des données sensibles.
+- Tenez à jour la liste des extensions installées et faites un audit trimestriel.
+- En entreprise, demandez à votre équipe sécurité avant d'installer quoi que ce soit qui touche à un outil IA.
+
+## Pour aller plus loin
+
+- Le repo GitHub [awesome-claude](https://github.com/topics/claude-ai) liste des outils communautaires régulièrement mis à jour.
+- Pour exporter sans extension, regardez les bookmarklets partagés sur les forums Anthropic.
+- Si vos besoins UI dépassent ce que les extensions offrent, envisagez de construire votre propre client via l'API — c'est exactement ce que permet `@anthropic-ai/sdk`.

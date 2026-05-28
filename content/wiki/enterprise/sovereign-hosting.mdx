@@ -1,0 +1,104 @@
+---
+title: "Sovereign hosting & résidence des données"
+description: "EU Data Boundary, RGPD, HIPAA et SOC 2 Type II : héberger Claude en respectant la souveraineté."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+La souveraineté numérique est devenue un pré-requis pour les organisations européennes, le secteur public et la santé. Déployer Claude tout en respectant la résidence des données, le RGPD, HIPAA et SOC 2 Type II est possible en combinant les bonnes régions cloud, les bons engagements contractuels et une architecture défensive.
+
+## Cadre légal applicable
+
+Trois piliers structurent la conformité :
+
+- **RGPD** (UE) : minimisation, finalité, droits des personnes, transferts hors UE encadrés.
+- **HIPAA** (US santé) : PHI protégée, BAA obligatoire avec le sous-traitant.
+- **SOC 2 Type II** : audit indépendant des contrôles de sécurité sur 6 à 12 mois.
+
+Anthropic fournit un **DPA** (RGPD), un **BAA** (HIPAA, sur demande pour certaines offres) et publie son rapport **SOC 2 Type II** via son Trust Center.
+
+## EU Data Boundary
+
+Pour rester dans la frontière européenne, deux options principales :
+
+```yaml
+eu_residency:
+  option_1_vertex:
+    provider: gcp_vertex_ai
+    regions:
+      - europe-west1   # Belgique
+      - europe-west4   # Pays-Bas
+  option_2_bedrock:
+    provider: aws_bedrock
+    regions:
+      - eu-central-1   # Francfort
+      - eu-west-3      # Paris
+  option_3_api:
+    provider: anthropic_api
+    note: "Routage global, vérifier engagement contractuel EU-only"
+```
+
+Le choix Vertex ou Bedrock garantit que prompts et complétions ne quittent pas l'UE, sous condition d'utiliser exclusivement les régions européennes (forcer le `region` côté SDK).
+
+## HIPAA et santé
+
+Pour traiter des informations de santé identifiables (PHI) aux US :
+
+```bash
+# 1. Signer un BAA avec AWS (déjà actif sur la plupart des comptes)
+# 2. Activer les régions HIPAA-eligible
+aws bedrock list-foundation-models --region us-east-1
+
+# 3. Activer CloudTrail + KMS + chiffrement at-rest
+# 4. Documenter le flux PHI dans le registre des traitements
+```
+
+Bedrock est *HIPAA eligible* pour les modèles Claude lorsque le BAA AWS est en place. Côté Anthropic API, un BAA spécifique est négociable pour les offres Enterprise.
+
+## SOC 2 Type II : ce que cela couvre
+
+SOC 2 Type II atteste des contrôles **Security**, **Availability**, **Confidentiality**, **Processing Integrity** et **Privacy** sur une période d'audit (typiquement 12 mois).
+
+```json
+{
+  "soc2_trust_services_criteria": {
+    "security": ["access_control", "encryption", "vulnerability_mgmt"],
+    "availability": ["sla_monitoring", "dr_plan", "backup"],
+    "confidentiality": ["data_classification", "ndas", "least_privilege"],
+    "processing_integrity": ["change_mgmt", "qa_testing"],
+    "privacy": ["consent", "data_minimization", "retention"]
+  }
+}
+```
+
+Demander le rapport via `trust.anthropic.com` (NDA standard requis).
+
+## Architecture défensive recommandée
+
+Au-delà du choix de région, des couches additionnelles renforcent la posture :
+
+```yaml
+defense_in_depth:
+  network:
+    - vpc_service_controls         # GCP
+    - privatelink_endpoints        # AWS
+    - egress_filtering
+  data:
+    - cmek_kms_byok
+    - tokenization_pii
+    - zero_data_retention
+  identity:
+    - sso_saml_oidc
+    - mfa_obligatoire
+    - just_in_time_access
+  audit:
+    - siem_export
+    - immutable_logs
+    - dpia_documentee
+```
+
+## Pour aller plus loin
+
+- Trust Center Anthropic : DPA, BAA, SOC 2, ISO 27001/42001
+- CNIL : recommandations IA générative et RGPD
+- Articles wiki : `data-privacy`, `aws-bedrock`, `gcp-vertex`, `resilience-multi-cloud`

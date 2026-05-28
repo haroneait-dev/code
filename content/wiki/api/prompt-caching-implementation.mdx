@@ -1,0 +1,122 @@
+---
+title: "Implémentation technique du Prompt Caching"
+description: "Activer cache_control, gérer le TTL, mesurer les économies et structurer ses prompts pour maximiser le cache hit."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+Le **Prompt Caching** d'Anthropic permet de mettre en cache côté serveur les portions stables d'un prompt (system, outils, documents, exemples) pour ne pas les facturer plein tarif à chaque appel. Les tokens en cache hit coûtent **10% du tarif d'entrée standard**, soit **-90% d'économies** sur la partie cachée. C'est le levier d'optimisation #1 sur l'API Claude en 2026.
+
+## Activer le caching
+
+Le caching est **généralement disponible** (GA) — plus besoin du header beta `anthropic-beta: prompt-caching-2024-07-31` sur les modèles récents, mais il reste accepté pour compatibilité. Vous marquez les *breakpoints* de cache via `cache_control: { type: "ephemeral" }`.
+
+```python
+import anthropic
+
+client = anthropic.Anthropic()
+
+response = client.messages.create(
+    model="claude-sonnet-4-6",
+    max_tokens=1024,
+    system=[
+        {
+            "type": "text",
+            "text": "Tu es un assistant juridique expert en droit français...",
+            "cache_control": {"type": "ephemeral"}
+        },
+        {
+            "type": "text",
+            "text": LONG_LEGAL_CORPUS,  # 50k tokens
+            "cache_control": {"type": "ephemeral"}
+        }
+    ],
+    messages=[{"role": "user", "content": "Analyse ce contrat..."}]
+)
+
+print(response.usage)
+# cache_creation_input_tokens: 50234 (1er appel)
+# cache_read_input_tokens: 50234 (appels suivants)
+```
+
+## TTL : 5 minutes ou 1 heure
+
+Par défaut, le cache vit **5 minutes** depuis le dernier accès (TTL glissant). Pour des workloads moins fréquents, vous pouvez demander un TTL d'**1 heure** :
+
+```json
+{
+  "type": "text",
+  "text": "...",
+  "cache_control": { "type": "ephemeral", "ttl": "1h" }
+}
+```
+
+Le TTL 1h est légèrement plus cher à l'écriture (≈ 2× le tarif d'entrée standard contre 1.25× pour le 5min), mais reste rentable dès **3-4 hits** sur l'heure.
+
+## Où placer les breakpoints
+
+Vous avez droit à **4 breakpoints** `cache_control` par requête. La règle d'or : **du plus stable au plus volatile**, dans cet ordre :
+
+1. `tools` (rarement modifiés)
+2. `system` (instructions de base + corpus de référence)
+3. Premiers messages `user` contenant des documents fixes
+4. Exemples few-shot
+
+```ts
+const msg = await client.messages.create({
+  model: "claude-sonnet-4-6",
+  max_tokens: 1024,
+  tools: [...largeToolset, { ...lastTool, cache_control: { type: "ephemeral" }}],
+  system: [
+    { type: "text", text: SYSTEM_PROMPT, cache_control: { type: "ephemeral" }},
+  ],
+  messages: [
+    { role: "user", content: [
+      { type: "text", text: KNOWLEDGE_BASE, cache_control: { type: "ephemeral" }},
+      { type: "text", text: userQuestion }
+    ]}
+  ]
+});
+```
+
+Tout ce qui se trouve **avant** un breakpoint est caché. Tout ce qui se trouve **après** ne l'est pas.
+
+## Mesurer les économies
+
+Le champ `usage` retourne 4 compteurs :
+
+```json
+{
+  "input_tokens": 120,
+  "cache_creation_input_tokens": 0,
+  "cache_read_input_tokens": 50234,
+  "output_tokens": 432
+}
+```
+
+Calcul du coût sur Sonnet 4.6 (prix indicatifs : input $3/M, cache write 5min $3.75/M, cache read $0.30/M) :
+
+```python
+def cost(u, model_in=3, model_cache_write=3.75, model_cache_read=0.30):
+    return (
+        u["input_tokens"] * model_in
+      + u["cache_creation_input_tokens"] * model_cache_write
+      + u["cache_read_input_tokens"] * model_cache_read
+    ) / 1_000_000
+```
+
+Sur un agent qui réutilise 50k tokens de contexte 100 fois/heure, le caching économise typiquement **80 à 92%** de la facture d'entrée.
+
+## Pièges courants
+
+- **Min 1024 tokens** (Sonnet/Opus) ou **2048** sur Haiku pour qu'un bloc soit cachable.
+- Toute modification — même un espace — **invalide** le cache du bloc et de tout ce qui suit.
+- Le cache est **scopé par organisation + API key + modèle** : pas de partage entre clés.
+- Combinable avec **Batch API** : les économies se cumulent.
+
+## Pour aller plus loin
+
+- Documentation : `docs.anthropic.com/claude/docs/prompt-caching`
+- Auditez vos prompts avec un script qui logue `cache_read / (cache_read + cache_creation + input)` — visez > 0.9 en régime stable.
+- Pour les agents Claude Code et MCP, le caching des `tools` à lui seul économise déjà 40 à 60% sur les boucles agentiques.
+- Surveillez les coûts dans la Console Anthropic : un onglet dédié sépare désormais cache write / cache read.

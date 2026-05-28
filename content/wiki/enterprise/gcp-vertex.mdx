@@ -1,0 +1,101 @@
+---
+title: "Déployer Claude sur Google Cloud Vertex AI"
+description: "Intégrer Claude via Vertex AI : authentification GCP, chiffrement CMEK, SDKs officiels."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+Vertex AI Model Garden héberge les modèles Claude dans l'infrastructure Google Cloud. Pour les entreprises déjà investies dans GCP (BigQuery, IAM, VPC Service Controls), c'est la voie la plus naturelle pour adopter Claude sans changer de cloud provider.
+
+## Activer Claude dans Model Garden
+
+Depuis la console Vertex AI, naviguer dans **Model Garden** > rechercher *Claude* > **Enable**. L'activation passe par un agrément commercial (clic-through) et débloque l'usage dans les régions supportées : `us-east5`, `europe-west1`, `asia-southeast1`.
+
+```bash
+gcloud services enable aiplatform.googleapis.com
+gcloud auth application-default login
+```
+
+## Authentification GCP
+
+Vertex AI utilise l'**Application Default Credentials (ADC)**. En production, privilégier la fédération d'identité ou les Workload Identity (GKE) plutôt qu'une clé JSON de service account.
+
+```yaml
+authentication:
+  recommended:
+    - workload_identity_federation
+    - gke_workload_identity
+  acceptable:
+    - service_account_impersonation
+  avoid:
+    - service_account_json_keys
+```
+
+Le rôle minimal à attribuer : `roles/aiplatform.user`.
+
+## Appel via le SDK Anthropic
+
+Le SDK Python officiel supporte Vertex nativement via `AnthropicVertex` :
+
+```python
+from anthropic import AnthropicVertex
+
+client = AnthropicVertex(region="europe-west1", project_id="mon-projet-gcp")
+
+message = client.messages.create(
+    model="claude-sonnet-4-6@20260101",
+    max_tokens=1024,
+    messages=[{"role": "user", "content": "Génère un résumé exécutif."}]
+)
+
+print(message.content[0].text)
+```
+
+Les versions TypeScript (`@anthropic-ai/vertex-sdk`) et Go existent également. Le format de payload est identique à l'API Anthropic standard, ce qui facilite la portabilité.
+
+## Chiffrement CMEK
+
+Pour respecter une politique de **Customer-Managed Encryption Keys**, créer une clé Cloud KMS et l'associer à la ressource Vertex. Ainsi, Google ne peut pas déchiffrer les données sans la clé du client.
+
+```bash
+gcloud kms keyrings create vertex-ring --location=europe-west1
+gcloud kms keys create claude-key \
+  --location=europe-west1 \
+  --keyring=vertex-ring \
+  --purpose=encryption
+
+gcloud ai endpoints create \
+  --region=europe-west1 \
+  --display-name=claude-endpoint \
+  --encryption-kms-key-name=projects/mon-projet/locations/europe-west1/keyRings/vertex-ring/cryptoKeys/claude-key
+```
+
+Combiné aux **VPC Service Controls**, on obtient un périmètre étanche : aucune exfiltration possible vers des projets non autorisés.
+
+## Quotas, régions et coûts
+
+Vertex applique des quotas régionaux (requêtes par minute, tokens par minute). Surveiller via Cloud Monitoring et demander une augmentation préventive avant un go-live.
+
+```json
+{
+  "monitoring": {
+    "metrics": [
+      "aiplatform.googleapis.com/prediction/online/request_count",
+      "aiplatform.googleapis.com/prediction/online/error_count",
+      "aiplatform.googleapis.com/prediction/online/response_latencies"
+    ],
+    "alerts": {
+      "error_rate_threshold": 0.02,
+      "p95_latency_ms": 5000
+    }
+  }
+}
+```
+
+La facturation est intégrée au compte GCP (idéal pour consolider les crédits EDP/CUD existants).
+
+## Pour aller plus loin
+
+- Documentation Google : *Use Claude models on Vertex AI*
+- SDK : `pip install "anthropic[vertex]"`
+- Articles wiki : `data-privacy`, `resilience-multi-cloud`

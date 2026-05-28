@@ -1,0 +1,66 @@
+---
+title: "Itérer sur un prompt"
+description: "Méthodologie pour améliorer un prompt en production : eval sets, A/B, rollback et discipline d'ingénierie."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+Un prompt n'est jamais "fini". Il évolue avec le modèle, les cas d'usage, les retours utilisateurs. Mais contrairement au code classique, un changement de prompt n'a pas de type checker ni de test unitaire évident : une formulation peut sembler meilleure sur trois exemples et dégrader la qualité sur cent autres. Itérer proprement demande donc une vraie discipline d'ingénierie.
+
+## Partir d'une baseline mesurable
+
+Avant de toucher un prompt en production, il faut savoir **où on part**. Cela suppose :
+
+- Un **eval set** : 30 à 200 exemples représentatifs des cas réels (succès, échecs, edge cases).
+- Une **métrique** : exact match, score LLM-as-judge, taux de tool calls corrects, latence, coût.
+- Une **baseline chiffrée** : "le prompt v1 scorefait 78 % sur l'eval, à 1.2 s de latence médiane".
+
+Sans baseline, toute itération est un pari. Avec, chaque changement devient falsifiable.
+
+## Le cycle d'itération
+
+Un cycle sain ressemble à ceci :
+
+1. **Observer** un échec en production (logs, feedback utilisateur, ticket).
+2. **Reproduire** dans l'eval set en ajoutant le cas problématique.
+3. **Formuler une hypothèse** : "le modèle hallucine parce que la consigne d'output JSON est noyée dans le system prompt".
+4. **Modifier** le prompt sur une seule variable (un changement à la fois).
+5. **Mesurer** sur l'eval complet — pas juste le cas qui a déclenché la modif.
+6. **Décider** : merge, rollback, ou affiner.
+
+Le piège classique : changer trois choses en même temps "parce qu'elles vont ensemble". Si le score bouge, on ne sait pas laquelle a aidé.
+
+## A/B testing en production
+
+Pour les changements à fort impact, l'eval offline ne suffit pas. Il faut tester en conditions réelles :
+
+- **Split utilisateurs** : 90 % sur v1, 10 % sur v2 pendant 48 h.
+- **Métriques produit** : taux de complétion de tâche, temps passé, retours négatifs, taux de retry.
+- **Significativité** : ne pas conclure sur 50 requêtes. Viser 500-1000 minimum par variante.
+
+Le `model` et la `system_prompt` étant versionnés, on peut router via un simple flag d'environnement ou un système de feature flags (LaunchDarkly, Statsig, ou table Postgres maison).
+
+## Versioning et rollback
+
+Traiter les prompts comme du code :
+
+- **Fichier dédié** (`prompts/agent-v3.md`) versionné dans git, pas une string hardcodée.
+- **Commit message explicite** : "prompt v3.2 : ajout règle no-hallucination URLs, +4 % accuracy sur eval".
+- **Tag de version** envoyé en metadata à l'API pour pouvoir corréler logs et version.
+- **Rollback en un commit** : si v3 dégrade en prod, on revert et on redéploie en 5 minutes.
+
+Stocker l'eval set à côté du prompt dans le repo permet de rejouer l'historique : un changement de modèle (Sonnet 4.6 → 4.7) peut être validé contre les eval sets de tous les prompts du projet en une commande.
+
+## Outils d'aide à l'itération
+
+- **Anthropic Workbench** : interface web pour tester un prompt sur plusieurs inputs en parallèle.
+- **Prompt improver** : générateur d'amélioration assisté, utile pour casser un plateau.
+- **Logs structurés** : tous les appels API avec input/output/usage stockés dans une table queryable (BigQuery, Snowflake).
+- **LLM-as-judge** : utiliser Claude lui-même pour scorer les outputs sur des critères qualitatifs (cohérence, ton, exhaustivité).
+
+## Pour aller plus loin
+
+- Lire *Tester un prompt* pour la mécanique d'évaluation systématique
+- Lire *Anti-patterns prompt engineering* pour repérer les formulations qui freinent
+- Documentation : [Prompt engineering overview](https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/overview)
+- Outils : promptfoo, Langfuse, Helicone, Braintrust pour industrialiser l'évaluation

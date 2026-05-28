@@ -1,0 +1,60 @@
+---
+title: "Skills tiers populaires"
+description: "Sélection des meilleurs skills communautaires pour Claude Code : claude-mem, vercel, supabase et autres incontournables."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+L'écosystème des skills tiers de Claude Code a explosé en 2026. Plusieurs projets communautaires se distinguent par leur qualité, leur maintenance régulière et leur adoption massive. Voici une sélection des skills incontournables, classés par catégorie d'usage.
+
+## claude-mem : la mémoire persistante
+
+`claude-mem` est probablement le skill tiers le plus populaire. Il dote Claude Code d'une mémoire persistante cross-session, capturant automatiquement les observations de chaque conversation pour les rendre interrogeables plus tard.
+
+```bash
+npx claude-mem install
+```
+
+Le skill expose plusieurs commandes utiles : `mem-search` pour retrouver des solutions passées, `learn-codebase` pour primer un nouveau projet, `make-plan` pour générer un plan détaillé phasé, et `do` pour exécuter ce plan via des subagents. Sa sous-commande `pathfinder` audite l'architecture d'un projet et propose une unification des duplications.
+
+C'est typiquement le premier skill tiers à installer après une fresh install de Claude Code.
+
+## La suite Vercel
+
+Vercel maintient une **suite officielle non-Anthropic** très complète. Bien que développée par Vercel, elle est considérée comme tierce vis-à-vis d'Anthropic. Elle couvre tout le cycle de vie d'un projet Next.js déployé sur la plateforme.
+
+Les skills les plus utilisés sont `vercel:deploy` (déploiement preview ou prod), `vercel:env` (gestion des variables d'environnement), `vercel:nextjs` (guidance experte App Router), et `vercel:shadcn` pour shadcn/ui. La suite inclut aussi `vercel:ai-sdk` pour les apps IA, `vercel:turbopack` pour le bundler, et `vercel:workflow` pour les workflows durables.
+
+```bash
+claude /vercel:deploy prod
+claude /vercel:env pull
+```
+
+## Les skills Supabase
+
+Supabase fournit ses propres skills d'agent, focalisés sur les workflows backend critiques. Le projet recommande d'installer son skill agent pour bénéficier de garde-fous sur les migrations et la sécurité RLS.
+
+```bash
+npx skills add supabase/agent-skills
+```
+
+Ces skills couvrent l'application de migrations, le branching de bases de données, la génération de types TypeScript et le déploiement d'edge functions. Pour un projet utilisant Supabase en production, ils évitent beaucoup d'erreurs classiques sur les politiques de sécurité.
+
+## Les skills GitHub et CI/CD
+
+Plusieurs skills tiers améliorent l'expérience GitHub au-delà de ce qu'offre `gh-init`. `babysit` (de la suite claude-mem) surveille une PR jusqu'à sa fusion, en répondant aux commentaires de review et en relançant les CI échouées.
+
+D'autres skills communautaires gèrent la génération de changelogs sémantiques, la création de release notes à partir de commits conventionnels, ou l'automatisation de releases multi-packages dans les monorepos.
+
+## Skills spécialisés par framework
+
+L'écosystème compte désormais des skills dédiés pour la plupart des frameworks majeurs. Au-delà de Next.js (couvert par Vercel), on trouve des skills tiers pour Remix, SvelteKit, Astro, Nuxt et Solid. Côté backend, des skills existent pour FastAPI, NestJS, Rails et Django.
+
+Côté outils de dev, des skills populaires aident à la migration entre ORMs (Prisma vers Drizzle est devenu un classique), à la configuration de Tailwind v4, ou à la mise en place de pipelines de tests Playwright. La qualité varie fortement : privilégiez les skills avec plus de 1000 downloads hebdomadaires et un commit récent.
+
+## Pour aller plus loin
+
+- Registry communautaire `claude-skills.dev` pour découvrir et noter les skills
+- Liste curated `awesome-claude-skills` sur GitHub
+- Critères de sélection : maintenance active, provenance npm signée, README clair, SKILL.md déterministe
+- Toujours auditer le contenu d'un skill tiers avant installation : il a accès à votre shell et vos fichiers

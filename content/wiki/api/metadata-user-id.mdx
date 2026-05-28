@@ -1,0 +1,80 @@
+---
+title: "Métadonnées (metadata.user_id)"
+description: "Tracking et isolation des requêtes par utilisateur final avec metadata.user_id pour la prévention des abus."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+L'API Anthropic expose un champ `metadata` sur chaque requête `messages.create`. Le sous-champ le plus important est `metadata.user_id` : un identifiant opaque que vous associez à votre utilisateur final. Bien utilisé, il permet à Anthropic d'isoler les comportements suspects au niveau d'un utilisateur individuel plutôt qu'au niveau de votre clé API — ce qui protège votre application entière contre une suspension.
+
+## Pourquoi c'est critique en production
+
+Sans `user_id`, toute activité abusive (jailbreak répété, scraping, génération de contenu interdit) est attribuée à votre clé API globale. Si un utilisateur malveillant déclenche les systèmes anti-abuse, c'est l'ensemble de votre trafic qui peut être rate-limité ou suspendu. Avec `user_id`, Anthropic peut cibler la mitigation sur cet utilisateur précis, laissant le reste de votre base intact.
+
+C'est exactement le même pattern que `metadata.user` chez OpenAI ou les claims `sub` dans un JWT : un identifiant stable, par utilisateur, qui sert de point d'ancrage pour la sécurité.
+
+## Format et bonnes pratiques
+
+```ts
+await client.messages.create({
+  model: "claude-sonnet-4-6",
+  max_tokens: 1024,
+  metadata: {
+    user_id: "usr_a8f3b91c-2d4e-4f8a-9c1d-7e5b3a2f1c8d"
+  },
+  messages: [{ role: "user", content: prompt }]
+});
+```
+
+Règles strictes :
+
+- **Opaque** : utilisez un UUID, un hash, ou un identifiant interne. Jamais d'email, de nom, d'IP ou de donnée personnelle.
+- **Stable** : le même utilisateur doit toujours envoyer le même `user_id` à travers les sessions.
+- **Unique** : un identifiant par utilisateur réel. Ne pas réutiliser pour un groupe.
+- **Longueur raisonnable** : restez sous 128 caractères.
+
+## Intégration avec Supabase Auth
+
+Dans une stack Next.js + Supabase comme la nôtre, le `user.id` Supabase est un UUID parfait pour ce rôle :
+
+```ts
+const { data: { user } } = await supabase.auth.getUser(token);
+
+const response = await anthropic.messages.create({
+  model: "claude-sonnet-4-6",
+  max_tokens: 2048,
+  metadata: { user_id: user.id },
+  messages
+});
+```
+
+Aucune transformation nécessaire — l'UUID Supabase est déjà opaque, stable et unique.
+
+## Tracking interne et observabilité
+
+`metadata.user_id` ne sert pas qu'à Anthropic. Loggé côté serveur avec la `request_id` retournée dans les headers, il devient la pierre angulaire de votre observabilité :
+
+- Quel utilisateur a consommé combien de tokens ce mois-ci ?
+- Quelle session a généré l'erreur 529 ?
+- Quel pattern de prompt déclenche le plus de refus ?
+
+Stockez `{ user_id, request_id, input_tokens, output_tokens, model, latency_ms, ts }` dans une table dédiée. Vous pourrez ensuite construire des dashboards de coût par utilisateur, détecter les power users, et facturer à l'usage si besoin.
+
+## Anti-abuse côté application
+
+Le `user_id` permet aussi d'implémenter votre propre rate-limiting avant même d'atteindre l'API :
+
+```ts
+const recentCalls = await redis.incr(`anthropic:rate:${user.id}`);
+if (recentCalls === 1) await redis.expire(`anthropic:rate:${user.id}`, 60);
+if (recentCalls > 30) throw new Error("Rate limit utilisateur dépassé");
+```
+
+Combiné à la mitigation Anthropic, vous obtenez une défense en profondeur : un abuseur est freiné chez vous avant même d'apparaître dans les signaux Anthropic.
+
+## Pour aller plus loin
+
+- Documentation officielle : `Messages API` → champ `metadata` sur docs.anthropic.com.
+- Combinez `user_id` avec les **Usage & Cost Admin APIs** pour une réconciliation facturation par utilisateur.
+- Pour les applications multi-tenant, ajoutez un préfixe : `org_<orgId>_usr_<userId>` reste opaque mais permet une analyse par tenant.
+- Pensez RGPD : documentez dans votre politique de confidentialité que cet identifiant pseudonymisé est transmis à un sous-traitant (Anthropic).

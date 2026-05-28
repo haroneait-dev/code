@@ -1,0 +1,115 @@
+---
+title: "Tool use (function calling) avec l'API Anthropic"
+description: "Définir des outils JSON Schema que Claude peut appeler via les blocs tool_use et tool_result."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+Le **tool use** (aussi appelé *function calling*) permet à Claude d'appeler des fonctions que vous définissez côté serveur. C'est la brique fondamentale pour construire des agents capables d'interagir avec des bases de données, des APIs externes, des outils internes, ou pour structurer des sorties JSON fiables. Le modèle décide quand appeler un outil, avec quels arguments, puis vous renvoyez le résultat pour qu'il poursuive son raisonnement.
+
+## Définir un outil avec JSON Schema
+
+Chaque outil est décrit par un nom, une description et un `input_schema` au format JSON Schema. La description est cruciale : c'est ce que Claude lit pour décider quand utiliser l'outil.
+
+```python
+tools = [
+    {
+        "name": "get_weather",
+        "description": "Récupère la météo actuelle pour une ville donnée.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "city": {"type": "string", "description": "Nom de la ville"},
+                "unit": {"type": "string", "enum": ["celsius", "fahrenheit"]}
+            },
+            "required": ["city"]
+        }
+    }
+]
+```
+
+Plus la description est précise, moins Claude hallucine d'arguments. Indiquez les unités attendues, les formats de date, les valeurs par défaut.
+
+## Le cycle tool_use / tool_result
+
+Quand Claude décide d'appeler un outil, sa réponse contient un bloc `tool_use` avec un `id`, le nom de l'outil et les arguments. Le `stop_reason` vaut `tool_use`. Vous devez alors exécuter l'outil et renvoyer un bloc `tool_result` dans un message `user`.
+
+```python
+import anthropic
+
+client = anthropic.Anthropic()
+
+response = client.messages.create(
+    model="claude-sonnet-4-6",
+    max_tokens=1024,
+    tools=tools,
+    messages=[{"role": "user", "content": "Quel temps à Paris ?"}]
+)
+
+# Si stop_reason == "tool_use"
+tool_use = next(b for b in response.content if b.type == "tool_use")
+result = my_weather_api(tool_use.input["city"])
+
+followup = client.messages.create(
+    model="claude-sonnet-4-6",
+    max_tokens=1024,
+    tools=tools,
+    messages=[
+        {"role": "user", "content": "Quel temps à Paris ?"},
+        {"role": "assistant", "content": response.content},
+        {"role": "user", "content": [{
+            "type": "tool_result",
+            "tool_use_id": tool_use.id,
+            "content": str(result)
+        }]}
+    ]
+)
+```
+
+## Forcer ou contraindre l'usage des outils
+
+Le paramètre `tool_choice` permet de piloter le comportement :
+
+```json
+{ "tool_choice": { "type": "auto" } }
+{ "tool_choice": { "type": "any" } }
+{ "tool_choice": { "type": "tool", "name": "get_weather" } }
+```
+
+- `auto` : Claude choisit s'il faut appeler un outil (défaut).
+- `any` : il **doit** appeler un outil, n'importe lequel.
+- `tool` : il doit appeler exactement cet outil — idéal pour extraire une sortie structurée.
+
+## Parallel tool use
+
+Claude peut renvoyer plusieurs blocs `tool_use` dans une seule réponse pour paralléliser les appels. Vous devez répondre avec **tous** les `tool_result` correspondants dans le message suivant, dans un seul bloc `content`.
+
+```ts
+const results = response.content
+  .filter(b => b.type === "tool_use")
+  .map(tu => ({
+    type: "tool_result",
+    tool_use_id: tu.id,
+    content: JSON.stringify(executeTool(tu.name, tu.input)),
+  }));
+```
+
+## Gestion des erreurs
+
+Si votre outil échoue, renvoyez le `tool_result` avec `is_error: true`. Claude saura qu'il doit réessayer, demander à l'utilisateur ou changer de stratégie.
+
+```json
+{
+  "type": "tool_result",
+  "tool_use_id": "toolu_01A...",
+  "content": "Timeout après 5s",
+  "is_error": true
+}
+```
+
+## Pour aller plus loin
+
+- Documentation officielle : `docs.anthropic.com/claude/docs/tool-use`
+- Combinez avec le **prompt caching** sur le tableau `tools` pour économiser sur les longues définitions.
+- Pour des agents complexes, regardez le pattern *agentic loop* : boucle `while stop_reason == "tool_use"`.
+- En production, validez toujours les arguments renvoyés par Claude avant exécution (zod, pydantic).

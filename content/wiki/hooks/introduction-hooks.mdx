@@ -1,0 +1,122 @@
+---
+title: "Qu'est-ce qu'un hook ?"
+description: "Comprendre le concept des hooks dans Claude Code, leurs cas d'usage et leur philosophie."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+Les hooks sont l'un des mécanismes les plus puissants pour transformer Claude Code en un véritable agent intégré à votre workflow. Contrairement à une instruction donnée dans `CLAUDE.md`, qui repose sur la bonne volonté du modèle, un hook est un **script shell exécuté par le harness lui-même** à des moments précis du cycle de vie d'une session. Le harness garantit son exécution — Claude ne peut ni l'oublier, ni le contourner.
+
+## Définition et philosophie
+
+Un hook est une commande shell (bash, zsh, sh, Python, Node, n'importe quoi qui s'exécute) que vous déclarez dans votre `settings.json`. Quand un événement précis se produit — par exemple juste avant qu'un outil soit appelé — le harness exécute votre commande, lui passe un contexte JSON via `stdin`, et lit son code de sortie ainsi que sa `stdout` pour décider quoi faire.
+
+La philosophie est simple : **déterministe plutôt que probabiliste**. Quand vous écrivez "lance toujours `prettier` après une édition" dans `CLAUDE.md`, vous comptez sur le modèle. Quand vous écrivez un hook `PostToolUse` qui lance `prettier`, c'est garanti à 100%.
+
+## Pourquoi utiliser des hooks ?
+
+Les cas d'usage les plus fréquents :
+
+- **Auto-formatage** : lancer `prettier`, `ruff`, `gofmt` après chaque édition de fichier.
+- **Garde-fous de sécurité** : bloquer un `rm -rf`, refuser une édition de `.env`, détecter un secret avant commit.
+- **Notifications** : envoyer une notification système ou Slack quand Claude attend une réponse.
+- **Audit log** : tracer chaque action de Claude dans un fichier journal pour conformité ou debug.
+- **Injection de contexte** : ajouter des informations dynamiques (branche git, date, état du build) au prompt utilisateur.
+- **Observabilité** : envoyer des traces vers OpenTelemetry, Langfuse, Phoenix.
+
+## Les événements disponibles
+
+Claude Code expose plusieurs événements de cycle de vie. Les principaux :
+
+- `PreToolUse` — avant l'exécution d'un outil
+- `PostToolUse` — après l'exécution d'un outil
+- `UserPromptSubmit` — quand l'utilisateur soumet un prompt
+- `Notification` — quand le harness veut notifier l'utilisateur
+- `Stop` — quand l'agent termine sa réponse
+- `SubagentStop` — quand un sous-agent termine
+- `PreCompact` — avant la compaction du contexte
+- `SessionStart` — au démarrage d'une session
+- `SessionEnd` — à la fin d'une session
+
+Chaque événement reçoit un payload JSON différent. Reportez-vous à la [documentation officielle](https://docs.claude.com/en/docs/claude-code/hooks) pour le détail.
+
+## Structure d'un hook dans `settings.json`
+
+Voici la forme canonique d'un hook :
+
+```json
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "prettier --write \"$CLAUDE_FILE_PATHS\""
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+Le `matcher` filtre les outils concernés (regex sur le nom de l'outil). Le `command` est exécuté avec le payload JSON sur `stdin`.
+
+## Un premier exemple concret
+
+Imaginons un hook qui notifie macOS quand Claude termine sa réponse :
+
+```json
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "osascript -e 'display notification \"Claude a terminé\" with title \"Claude Code\"'"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+C'est tout. Plus jamais besoin de surveiller le terminal du coin de l'œil.
+
+## Code de sortie et contrôle de flux
+
+Les hooks communiquent avec le harness via :
+
+- **exit code 0** : succès, on continue.
+- **exit code 2** : blocage — le harness annule l'action en cours (utile pour `PreToolUse`).
+- **exit code autre** : erreur non bloquante, loggée mais ignorée.
+- **stdout JSON** : permet de renvoyer une réponse structurée (`decision`, `reason`, etc.).
+
+Ce mécanisme rend les hooks **interactifs** : ils peuvent influencer le déroulement de la session, pas juste observer.
+
+> ⚠️ Attention : un hook s'exécute avec les droits de l'utilisateur courant. Il peut littéralement faire n'importe quoi sur votre machine. Ne copiez jamais un hook trouvé sur internet sans le lire ligne par ligne.
+
+## Quand préférer un hook à une instruction ?
+
+Règle d'or : **si la règle doit s'appliquer à 100% des cas, c'est un hook**. Si la règle est contextuelle ("si possible", "quand pertinent"), une instruction `CLAUDE.md` suffit.
+
+Exemples de bons candidats hooks :
+- "Lance `npm run lint` après chaque édition d'un `.ts`"
+- "Refuse toute modification de `migrations/`"
+- "Envoie-moi un ping Slack quand Claude attend une validation"
+
+Exemples de mauvais candidats hooks :
+- "Préfère TypeScript à JavaScript" → c'est une convention
+- "Écris des tests quand c'est pertinent" → c'est subjectif
+
+## Pour aller plus loin
+
+- [Documentation officielle des hooks](https://docs.claude.com/en/docs/claude-code/hooks)
+- [Guide pratique des hooks](https://docs.claude.com/en/docs/claude-code/hooks-guide)
+- Article wiki : « PreToolUse / PostToolUse »
+- Article wiki : « Sécurité : éviter le RCE »
+- Article wiki : « Exemples pratiques »

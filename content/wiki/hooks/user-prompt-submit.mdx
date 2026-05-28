@@ -1,0 +1,164 @@
+---
+title: "UserPromptSubmit"
+description: "Modifier, enrichir ou rejeter un prompt avant qu'il ne soit envoyé à Claude."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+`UserPromptSubmit` est un hook un peu particulier : il se déclenche juste **après** que l'utilisateur ait validé son message, mais **avant** que celui-ci soit envoyé au modèle. C'est le point d'interception parfait pour enrichir, sanitiser, ou bloquer une requête.
+
+## Cas d'usage
+
+- **Enrichir** le prompt avec du contexte dynamique (date, branche git, ticket Jira lié).
+- **Rejeter** un prompt qui contient des secrets ou des PII.
+- **Réécrire** un prompt pour ajouter des instructions implicites (ex : "réponds toujours en français").
+- **Logger** chaque prompt utilisateur pour audit ou analyse.
+
+## Payload reçu
+
+```json
+{
+  "session_id": "abc-123",
+  "transcript_path": "/Users/me/.claude/projects/.../transcript.jsonl",
+  "cwd": "/Users/me/projet",
+  "hook_event_name": "UserPromptSubmit",
+  "prompt": "Refactor le module auth"
+}
+```
+
+## Configuration de base
+
+```json
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/prompt-guard.sh"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+Pas de `matcher` : l'événement est unique, il s'applique à chaque prompt.
+
+## Exemple 1 : injecter le contexte git
+
+```bash
+#!/usr/bin/env bash
+input=$(cat)
+branch=$(git -C "$CLAUDE_PROJECT_DIR" branch --show-current 2>/dev/null)
+status=$(git -C "$CLAUDE_PROJECT_DIR" status --porcelain | wc -l | tr -d ' ')
+
+# Sortie texte ajoutée au contexte de la session
+cat <<EOF
+[Contexte ajouté automatiquement]
+Branche : $branch
+Fichiers modifiés non commités : $status
+EOF
+exit 0
+```
+
+Le `stdout` est ajouté en complément du prompt utilisateur — Claude le voit comme un message système additionnel [à vérifier].
+
+## Exemple 2 : bloquer les prompts contenant des secrets
+
+```bash
+#!/usr/bin/env bash
+input=$(cat)
+prompt=$(echo "$input" | jq -r '.prompt')
+
+# Patterns de clés courantes
+if echo "$prompt" | grep -E "(sk-ant-[A-Za-z0-9-]{20,}|AKIA[0-9A-Z]{16}|ghp_[A-Za-z0-9]{36})" >/dev/null; then
+  jq -n '{
+    decision: "block",
+    reason: "Le prompt contient ce qui ressemble à un secret (clé API, token). Retire-le avant de continuer."
+  }'
+  exit 0
+fi
+exit 0
+```
+
+> ⚠️ Attention : Claude voit tout ce qui transite par le prompt. Un secret leaké à Claude est aussi leaké à Anthropic (logs, training potentiel selon vos accords). Ce type de hook est une protection essentielle en entreprise.
+
+## Exemple 3 : ajouter un préambule métier
+
+Vous avez un repo avec des conventions strictes ? Forcez-les à chaque prompt :
+
+```bash
+#!/usr/bin/env bash
+cat <<EOF
+[Rappel automatique]
+- Code en TypeScript strict
+- Aucun any sans commentaire justifiant
+- Tests Vitest obligatoires pour toute nouvelle fonction publique
+EOF
+exit 0
+```
+
+## Exemple 4 : enrichir avec un ticket Jira
+
+Si l'utilisateur tape un ID de ticket, on enrichit le contexte :
+
+```bash
+#!/usr/bin/env bash
+input=$(cat)
+prompt=$(echo "$input" | jq -r '.prompt')
+
+ticket=$(echo "$prompt" | grep -oE "PROJ-[0-9]+" | head -1)
+[ -z "$ticket" ] && exit 0
+
+# Récupère le ticket via l'API Jira
+desc=$(curl -s -u "$JIRA_USER:$JIRA_TOKEN" \
+  "$JIRA_BASE/rest/api/3/issue/$ticket" | jq -r '.fields.summary')
+
+cat <<EOF
+[Ticket $ticket]
+$desc
+EOF
+exit 0
+```
+
+Claude reçoit alors le résumé du ticket sans que l'utilisateur ait eu à le copier-coller.
+
+## Exemple 5 : audit log
+
+Pour un usage en équipe régulé :
+
+```bash
+#!/usr/bin/env bash
+input=$(cat)
+prompt=$(echo "$input" | jq -r '.prompt')
+session=$(echo "$input" | jq -r '.session_id')
+
+echo "$(date -u +%FT%TZ) | $USER | $session | $prompt" \
+  >> "$HOME/.claude/audit.log"
+exit 0
+```
+
+## Différences avec `CLAUDE.md`
+
+`CLAUDE.md` est chargé **une fois** au démarrage de la session. `UserPromptSubmit` est exécuté **à chaque prompt**. Trois conséquences :
+
+1. Le contenu peut être **dynamique** (état git, date, build status).
+2. Il consomme des tokens à **chaque tour** — gardez-le concis.
+3. Il peut **réagir** au contenu du prompt (regex, parsing).
+
+## Bonnes pratiques
+
+- Garder le hook **rapide** (< 200 ms) car il bloque la soumission du prompt.
+- Toujours `exit 0` même en cas d'erreur réseau (sauf si vous voulez explicitement bloquer).
+- Logger les rejets dans un fichier dédié pour analyser les faux positifs.
+- Tester chaque pattern de blocage avec des prompts réels avant de le déployer.
+
+## Pour aller plus loin
+
+- [Documentation hooks](https://docs.claude.com/en/docs/claude-code/hooks)
+- Article wiki : « Sécurité : éviter le RCE »
+- Article wiki : « Exemples pratiques »
+- Article wiki : « Hooks et environnement »

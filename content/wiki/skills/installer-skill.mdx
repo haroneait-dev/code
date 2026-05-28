@@ -1,0 +1,142 @@
+---
+title: "Installer un Skill : npx, manuel ou depuis Git"
+description: "Toutes les méthodes pour installer un Skill Claude Code, de la commande npx à l'installation depuis un dépôt privé."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+Un Skill se distribue comme du code : npm, Git, ou simple copie de dossier. Chaque méthode a ses cas d'usage. Tour d'horizon pour ne plus jamais hésiter au moment d'ajouter un skill à votre stack.
+
+## Méthode 1 : via `claude-mem` (recommandée)
+
+`claude-mem` est l'outil officiel de gestion de skills et de mémoire pour Claude Code. La commande `add` télécharge, vérifie et installe en une seule étape.
+
+```bash
+npx claude-mem add anthropic/skill-security-review
+```
+
+Le skill est déposé dans `~/.claude/skills/` et activable immédiatement dans n'importe quelle session. Pour vérifier :
+
+```bash
+npx claude-mem list
+```
+
+Pour mettre à jour :
+
+```bash
+npx claude-mem update anthropic/skill-security-review
+```
+
+## Méthode 2 : installation manuelle
+
+Si vous préférez tout contrôler ou que le skill n'est pas publié, copiez simplement le dossier.
+
+```bash
+git clone https://github.com/acme/skill-pdf-tools.git \
+  ~/.claude/skills/pdf-tools
+```
+
+Au prochain démarrage de Claude Code, le skill apparaît. Aucune compilation, aucun manifeste à régénérer.
+
+Pour un skill **projet** (versionné avec votre repo, partagé avec l'équipe) :
+
+```bash
+mkdir -p .claude/skills
+cp -r ~/Downloads/skill-pdf-tools .claude/skills/pdf-tools
+git add .claude/skills/pdf-tools
+git commit -m "feat(skills): ajout pdf-tools"
+```
+
+## Méthode 3 : depuis npm
+
+Beaucoup de skills sont publiés comme paquets npm classiques. Deux variantes :
+
+### Skill global
+
+```bash
+npm install -g @acme/skill-pdf-tools
+```
+
+Le script `postinstall` du paquet copie le skill dans `~/.claude/skills/`.
+
+### Skill projet via `package.json`
+
+```json
+{
+  "devDependencies": {
+    "@acme/skill-pdf-tools": "^0.3.1"
+  },
+  "claudeSkills": [
+    "@acme/skill-pdf-tools"
+  ]
+}
+```
+
+Au `npm install`, Claude Code détectera l'entrée `claudeSkills` et chargera le skill depuis `node_modules/`. C'est la méthode idéale pour qu'un nouveau membre de l'équipe ait immédiatement les bons skills après un simple `npm install`.
+
+## Méthode 4 : depuis Git (dépôt privé)
+
+Pour les skills internes hébergés sur GitLab/Bitbucket privés :
+
+```bash
+npx claude-mem add git+ssh://git@gitlab.acme.com/tools/skill-deploy.git
+```
+
+Ou via `package.json` :
+
+```json
+{
+  "dependencies": {
+    "@acme/skill-deploy": "git+ssh://git@gitlab.acme.com/tools/skill-deploy.git#v1.2.0"
+  }
+}
+```
+
+Le tag (`#v1.2.0`) verrouille la version installée — précieux pour reproductibilité.
+
+## Méthode 5 : pendant une session
+
+Vous pouvez aussi demander à Claude lui-même :
+
+```
+> installe le skill anthropic/skill-pdf-tools
+```
+
+Claude exécutera `npx claude-mem add ...` après votre confirmation. Pratique quand vous découvrez un skill dont vous avez besoin **maintenant**.
+
+## Vérifier qu'un skill est bien chargé
+
+```bash
+npx claude-mem list --verbose
+```
+
+Sortie typique :
+
+```
+ACTIVE  pdf-tools          0.3.1   ~/.claude/skills/pdf-tools
+ACTIVE  security-review    1.0.4   ~/.claude/skills/security-review
+INERT   draft-skill        0.0.1   ~/.claude/skills/draft-skill  (no SKILL.md)
+```
+
+Le statut `INERT` indique un skill mal formé : généralement un `SKILL.md` manquant ou un frontmatter invalide.
+
+## Désinstallation
+
+```bash
+npx claude-mem remove pdf-tools
+```
+
+Ou pour un skill projet, supprimez le dossier et committez.
+
+## Bonnes pratiques
+
+- **Skills d'équipe** : préférez l'installation via `.claude/skills/` dans le repo. Cohérence garantie.
+- **Skills perso** : `~/.claude/skills/` via `claude-mem add`.
+- **Versionnez tout** : un skill sans version est un skill qui cassera silencieusement.
+- **Auditez** avant d'installer : un skill peut contenir des scripts Bash. Lisez `SKILL.md` et les `scripts/` avant le premier usage.
+
+## Pour aller plus loin
+
+- Article wiki « Publier un skill » pour faire l'inverse.
+- Article wiki « Versioning des skills » pour gérer les mises à jour proprement.
+- Doc officielle : https://docs.claude.com/en/docs/claude-code/skills

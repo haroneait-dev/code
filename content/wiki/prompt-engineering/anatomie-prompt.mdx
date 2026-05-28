@@ -1,0 +1,86 @@
+---
+title: "Anatomie d'un prompt"
+description: "Décomposez un prompt efficace pour Claude en cinq composants : contexte, instructions, format, exemples, tâche."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+Un prompt n'est pas une simple question lancée à Claude. C'est une structure pensée, presque architecturale, qui guide le modèle vers la réponse exacte que vous attendez. Comprendre les composants d'un prompt vous fait passer d'un usage approximatif à une utilisation professionnelle de Claude.
+
+## Le contexte : poser le décor
+
+Le contexte explique à Claude qui il est, pour qui il travaille, et dans quel environnement il opère. Sans contexte, le modèle improvise — avec contexte, il s'aligne. Un bon contexte précise le domaine métier, le niveau du destinataire, les contraintes implicites (ton, langue, vocabulaire).
+
+```text
+Tu es un assistant juridique spécialisé en droit du travail français.
+Tu réponds à des DRH non-juristes. Tes réponses doivent être
+prudentes, sourcées, et toujours recommander une vérification par
+un avocat pour les cas complexes.
+```
+
+Notez que ce contexte fixe trois choses : le rôle, l'audience, et la posture (prudence + recommandation systématique). Claude n'aura pas à deviner.
+
+## Les instructions : décrire le comportement
+
+Les instructions sont des règles persistantes qui s'appliquent à toutes les réponses. Elles diffèrent de la tâche : la tâche change, les instructions restent. Préférez des règles positives ("réponds en markdown") aux négations ("n'utilise pas de HTML"), Claude suit mieux les directives affirmatives.
+
+Listez vos instructions plutôt que de les noyer dans un paragraphe :
+
+```text
+Règles de réponse :
+1. Réponds toujours en français.
+2. Cite le ou les articles du Code du travail concernés.
+3. Si la question dépasse ton domaine, dis-le clairement.
+4. Formate les listes avec des tirets, pas des numéros.
+```
+
+## Le format de sortie : cadrer la réponse
+
+Spécifier le format réduit drastiquement les itérations. JSON strict, markdown structuré, tableau, ou texte brut — choisissez et imposez. Pour les sorties machine, fournissez un schéma exact ; pour les sorties humaines, donnez un squelette de sections.
+
+```text
+Format de réponse attendu :
+
+## Résumé
+(2 phrases maximum)
+
+## Articles applicables
+- Article XXX-X : description
+
+## Recommandation
+(action concrète à entreprendre)
+```
+
+## Les exemples : montrer plutôt que décrire
+
+Un exemple vaut dix lignes d'instructions. Claude est particulièrement performant en imitation : montrez-lui un input et l'output idéal correspondant, et il alignera son style, sa structure et son niveau de détail. C'est le principe du few-shot prompting, à utiliser dès que la sortie doit suivre un patron précis.
+
+Encadrez vos exemples avec des balises XML pour que Claude distingue clairement l'exemple du reste du prompt :
+
+```xml
+<exemple>
+  <question>Un salarié peut-il refuser une mutation géographique ?</question>
+  <reponse>
+    ## Résumé
+    Cela dépend de la clause de mobilité du contrat...
+  </reponse>
+</exemple>
+```
+
+## La tâche : l'instruction du moment
+
+La tâche est ce que vous demandez ici et maintenant. Elle arrive en dernier, après tout le cadrage. Mettez-la en évidence — Claude accorde plus de poids à la fin du prompt, surtout pour les contextes longs. Une formulation directe et impérative fonctionne mieux qu'une question vague.
+
+```text
+Question du DRH :
+"Mon salarié refuse de venir au bureau trois jours par semaine
+depuis qu'on a mis fin au full-remote. Que puis-je faire ?"
+
+Réponds en suivant le format défini ci-dessus.
+```
+
+## Pour aller plus loin
+
+- Lisez l'article sur les balises XML pour structurer chaque composant proprement.
+- Explorez le few-shot prompting pour exploiter la puissance des exemples.
+- Consultez l'article system vs user prompt pour savoir où placer chaque composant.

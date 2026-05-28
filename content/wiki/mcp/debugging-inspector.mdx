@@ -1,0 +1,78 @@
+---
+title: "Debugging avec mcp inspector"
+description: "L'outil officiel pour inspecter, tester et déboguer un serveur MCP en local avant de l'intégrer à un client."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+Quand un serveur MCP ne fait pas ce qu'il devrait dans Claude Desktop ou Claude Code, le réflexe est de fouiller les logs… qui sont souvent muets. La bonne approche : utiliser **`mcp inspector`**, l'outil officiel qui agit comme un client MCP graphique, avec console réseau intégrée.
+
+## Lancer l'inspector
+
+L'inspector est distribué via npm et se lance sans installation :
+
+```bash
+npx @modelcontextprotocol/inspector uvx my-mcp-server
+```
+
+Ou pour un serveur Node :
+
+```bash
+npx @modelcontextprotocol/inspector node ./build/server.js
+```
+
+L'inspector ouvre une UI web (par défaut `http://localhost:5173`) qui :
+
+- lance votre serveur comme sous-process,
+- établit la connexion MCP (initialize, list_tools, list_resources),
+- vous laisse appeler chaque outil avec un formulaire généré depuis le JSON Schema.
+
+## Inspecter les capacités
+
+L'onglet **Tools** affiche tous les outils déclarés, leur description et leur schéma. C'est la première chose à vérifier : ce que le LLM "voit" est exactement ce qui s'affiche ici. Si une description est ambiguë ou un paramètre obligatoire absent, ça se voit immédiatement.
+
+Idem pour **Resources** (URIs lisibles) et **Prompts** (templates exposés). Si une section est vide alors que vous avez écrit le code, c'est probablement un problème d'enregistrement côté serveur.
+
+## Appeler un outil et lire la réponse
+
+Le formulaire d'appel permet de tester chaque outil avec des arguments arbitraires. La réponse s'affiche en JSON pretty-printed, avec :
+
+- le contenu retourné (text, image, embedded resource),
+- la durée d'exécution,
+- les éventuelles erreurs (avec stack si le serveur les renvoie).
+
+C'est précieux pour valider qu'un outil renvoie le bon **shape**. Un outil qui renvoie `{result: "ok"}` au lieu de `{"content": [{"type": "text", "text": "ok"}]}` ne sera pas affichable par le LLM, et vous le verrez tout de suite ici.
+
+## La console réseau
+
+L'onglet **Notifications / History** est le killer feature : il affiche toutes les requêtes JSON-RPC échangées, avec :
+
+- la méthode (`tools/call`, `resources/read`, etc.),
+- les params envoyés,
+- la réponse brute,
+- l'horodatage.
+
+C'est exactement ce que verrait Claude. Si quelque chose cloche en intégration (résultat tronqué, erreur de schéma), comparez ce que l'inspector reçoit avec ce que vous attendez.
+
+## Tester l'auth et le transport HTTP
+
+L'inspector supporte aussi les serveurs HTTP/SSE. Au lancement :
+
+```bash
+npx @modelcontextprotocol/inspector
+```
+
+…puis dans l'UI, choisissez **Transport: SSE** et entrez l'URL. Pour les serveurs OAuth, l'inspector déclenche le flow et stocke le token le temps de la session — utile pour itérer sur des serveurs distants sans tout reconfigurer dans Claude Desktop.
+
+## Astuces pratiques
+
+- **Recharger sans redémarrer** : le bouton "Restart server" relance le sous-process en gardant la connexion UI. Combiné à un watcher (`tsx watch`, `uvicorn --reload`), on itère très vite.
+- **Variables d'env** : passez-les via `-e KEY=value` avant la commande, l'inspector les transmet au sous-process.
+- **Logs serveur** : ils sortent dans le terminal où vous avez lancé l'inspector, pas dans l'UI. Gardez les deux côte à côte.
+- **Debug d'un serveur installé** : si vous voulez inspecter un serveur déjà configuré dans Claude Desktop, copiez sa ligne de commande depuis `claude_desktop_config.json` et passez-la à l'inspector.
+
+## Pour aller plus loin
+
+- L'inspector est open source (`modelcontextprotocol/inspector` sur GitHub) — vous pouvez l'auto-héberger ou le forker.
+- Combiné à `mcp-scan` pour l'analyse statique, c'est une boîte à outils complète avant mise en prod.
+- Pensez aussi à ajouter un mode `--dry-run` dans vos serveurs pour faciliter les tests dans l'inspector.

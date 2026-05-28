@@ -1,0 +1,139 @@
+---
+title: "Modes interactif vs one-shot"
+description: "Quand utiliser le REPL interactif et quand préférer une exécution one-shot scriptable."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+Claude Code propose deux modes d'exécution radicalement différents : le **mode interactif** (REPL) où vous dialoguez en temps réel, et le **mode one-shot** (commande unique) idéal pour l'automatisation et les pipelines CI/CD. Comprendre quand utiliser chacun double votre efficacité.
+
+## Mode interactif : le REPL
+
+C'est le mode par défaut, lancé sans argument :
+
+```bash
+claude
+```
+
+Vous obtenez un prompt clignotant, vous tapez des messages, Claude répond et exécute des outils en temps réel. Idéal pour :
+
+- **Exploration** : comprendre un nouveau codebase
+- **Itération** : ajuster une feature au fur et à mesure
+- **Debug en direct** : voir les fichiers lus, les commandes lancées
+- **Pair programming** : discussion fluide avec contexte qui s'enrichit
+
+Le mode interactif maintient un **historique de conversation** : Claude se souvient de ce qui a été dit plus haut dans la session.
+
+## Mode one-shot : `-p` (print)
+
+Le flag `-p` (ou `--print`) lance Claude avec un prompt unique, attend la réponse, puis quitte :
+
+```bash
+claude -p "Liste les TODO du dossier src/ avec leur fichier"
+```
+
+La sortie est imprimée sur **stdout**, ce qui rend ce mode parfait pour :
+
+- **Scripts shell** : intégrer Claude dans un pipeline bash
+- **CI/CD** : générer un changelog, valider un PR
+- **Tâches répétitives** : automatiser un audit hebdomadaire
+- **Cron jobs** : maintenance, monitoring, rapports
+
+Exemple d'intégration dans un script :
+
+```bash
+#!/bin/bash
+SUMMARY=$(claude -p "Résume les commits depuis hier en 5 bullet points")
+echo "$SUMMARY" | mail -s "Daily digest" team@example.com
+```
+
+## Comparaison rapide
+
+| Critère | Interactif | One-shot (`-p`) |
+|---|---|---|
+| Lancement | `claude` | `claude -p "<prompt>"` |
+| Historique | Oui (session) | Non (sauf `--resume`) |
+| Sortie | Terminal coloré | stdout brut |
+| Permissions | Demande à chaque action | Configurable via flags |
+| Idéal pour | Dev exploratoire | Automation, CI |
+| Streaming visible | Oui | Optionnel (`--output-format stream-json`) |
+
+## Formats de sortie one-shot
+
+Le mode `-p` accepte plusieurs formats via `--output-format` :
+
+```bash
+# Texte brut (défaut)
+claude -p "Compte les lignes de TypeScript du repo"
+
+# JSON structuré (parsable)
+claude -p "Liste les dépendances obsolètes" --output-format json
+
+# Stream JSON (un objet par événement, idéal pour pipes)
+claude -p "Analyse les logs/" --output-format stream-json
+```
+
+Le format `json` renvoie un objet contenant la réponse, les tool calls, le coût en tokens et la durée — utile pour observability.
+
+## Permissions en mode one-shot
+
+En interactif, Claude demande votre validation à chaque action sensible. En one-shot, ce comportement bloquerait le script. Trois options :
+
+```bash
+# Mode planning seulement (aucune écriture/exécution)
+claude -p "Audite la sécurité du repo" --permission-mode plan
+
+# Auto-accepte les actions standards
+claude -p "Lance les tests et corrige les échecs" --permission-mode acceptEdits
+
+# Mode dangereux (à utiliser avec extrême prudence, en sandbox)
+claude -p "..." --dangerously-skip-permissions
+```
+
+> N'utilisez jamais `--dangerously-skip-permissions` en dehors d'un environnement isolé (container, VM). C'est l'équivalent d'un `rm -rf` en mode aveugle.
+
+## Reprendre une session one-shot
+
+Vous pouvez chaîner des appels one-shot en conservant l'historique :
+
+```bash
+# Premier appel : démarre une conversation
+SESSION_ID=$(claude -p "Initialise un projet Next.js" --output-format json | jq -r '.session_id')
+
+# Deuxième appel : reprend la même session
+claude -p "Ajoute Tailwind" --resume "$SESSION_ID"
+```
+
+Cela permet de construire des workflows multi-étapes scriptés.
+
+## Quand choisir quoi ?
+
+**Choisissez interactif quand :**
+- Vous découvrez un projet
+- La tâche demande des allers-retours (debug, design)
+- Vous voulez voir/valider chaque action
+- Le contexte évolue au fur et à mesure
+
+**Choisissez one-shot quand :**
+- La tâche est bien définie à l'avance
+- Vous l'exécutez régulièrement (cron, CI)
+- Vous voulez piper la sortie dans un autre outil
+- Vous automatisez sans présence humaine
+
+## Exemple hybride : commit assistant
+
+Un cas pratique qui combine les deux modes — un alias git qui génère un message de commit :
+
+```bash
+# Dans ~/.gitconfig
+[alias]
+  aicommit = !git add -A && git commit -m \"$(claude -p 'Génère un message de commit conventionnel à partir de git diff --cached')\"
+```
+
+Vous tapez `git aicommit`, Claude analyse le diff stagé et compose le message — sans ouvrir d'interface interactive.
+
+## Pour aller plus loin
+
+- [Votre premier prompt](/wiki/demarrer/premier-prompt) — bases du REPL
+- [Permissions et sandbox](/wiki/demarrer/permissions-sandbox) — sécuriser le mode one-shot
+- [Documentation `claude -p`](https://docs.claude.com/claude-code/cli-reference) — flags complets

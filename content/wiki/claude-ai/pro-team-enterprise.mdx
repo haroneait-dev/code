@@ -1,0 +1,45 @@
+---
+title: "Claude Pro vs Team vs Enterprise"
+description: "Comparatif des plans payants de Claude.ai : limites, SLA, SSO, gouvernance et tarification."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+Anthropic propose quatre offres autour de Claude.ai : Free, Pro, Team et Enterprise. Le choix du plan dépend rarement du modèle disponible (tous donnent accès à Sonnet et Opus) mais de la gouvernance, du volume d'usage, et des besoins de collaboration. Voici comment trancher entre Pro, Team et Enterprise quand on dépasse l'usage individuel léger du Free.
+
+## Claude Pro : l'usage individuel intensif
+
+Claude Pro (20 $/mois ou 200 $/an) cible le professionnel solo. Il offre environ 5x plus de messages que le plan Free, l'accès prioritaire en heures de pointe, et toutes les fonctionnalités produit : Artifacts, Projects, Computer Use en bêta, et la connexion à Google Drive ou GitHub. Les Projects sont limités à un usage personnel : pas de partage d'espace de travail, pas de console d'administration.
+
+C'est le bon plan pour un développeur freelance, un consultant ou un chercheur qui consomme beaucoup de tokens mais ne mutualise pas son travail avec une équipe.
+
+## Claude Team : collaboration et facturation centralisée
+
+Team (30 $/utilisateur/mois, minimum 5 sièges, engagement annuel à 25 $) introduit la notion d'espace partagé. Les Projects deviennent collaboratifs : plusieurs membres peuvent contribuer aux mêmes bases de connaissances et instructions personnalisées. Un administrateur gère les sièges, la facturation unifiée et la révocation d'accès.
+
+Côté usage, Team augmente encore les quotas par utilisateur. Les fonctionnalités de sécurité restent légères : pas de SSO, pas de SCIM, pas de logs d'audit avancés. C'est l'offre adaptée aux startups de 5 à 100 personnes, aux agences et aux équipes produit qui veulent partager des Projects sans passer par un déploiement IT lourd.
+
+## Claude Enterprise : gouvernance, SSO et conformité
+
+Enterprise (tarification sur devis, généralement à partir de 60 $/utilisateur/mois pour de gros volumes) ajoute la couche entreprise attendue :
+
+- **SSO SAML** (Okta, Microsoft Entra ID, Google Workspace) et **SCIM** pour le provisioning automatique
+- **Rôles administrateurs granulaires** et logs d'audit exportables
+- **Fenêtre de contexte étendue** (jusqu'à 500 000 tokens selon le contrat)
+- **Data retention configurable** et garantie que les conversations ne servent pas à l'entraînement
+- **Intégration native GitHub** avec indexation de dépôts entiers
+- **SLA contractuel** sur la disponibilité et le support dédié
+
+Anthropic propose en option des modules de conformité (HIPAA, accords BAA) et un cadre DPA RGPD négociable.
+
+## Critères de choix concrets
+
+Trois questions tranchent en pratique :
+
+1. **Combien d'utilisateurs ?** En dessous de 5, Pro suffit. Entre 5 et 100, Team est presque toujours le bon choix. Au-delà, Enterprise devient pertinent pour la gouvernance.
+2. **L'IT impose-t-elle du SSO ?** Si oui, Enterprise est obligatoire — Team ne supporte que l'authentification email + Google.
+3. **Traitez-vous des données régulées ?** Santé, finance, secteur public : seul Enterprise offre les garanties contractuelles (DPA, retention, no-training) exigées par les directions juridiques.
+
+## Pour aller plus loin
+
+Avant de souscrire Enterprise, négociez les engagements de volume sur l'API en parallèle : les équipes qui consomment Claude via Claude.ai finissent presque toujours par bâtir des intégrations API, et un contrat groupé donne une meilleure visibilité budgétaire. Pensez aussi à séparer les usages "exploration" (Pro/Team) des usages "production" (API), pour ne pas payer des sièges Enterprise à des utilisateurs occasionnels.

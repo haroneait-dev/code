@@ -1,0 +1,124 @@
+---
+title: "Évaluations (Evals) automatisées"
+description: "Mettre en place des evals automatisées avec promptfoo et le framework Anthropic, intégrées à votre CI."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+Modifier un prompt système sans evals automatisées, c'est déployer du code sans tests unitaires. Vous croyez améliorer la qualité sur trois cas vus à la main, et vous régressez silencieusement sur quinze autres. Les **evals** sont la discipline qui transforme le prompt engineering d'artisanat en ingénierie reproductible.
+
+## Le problème : tester du non-déterministe
+
+Un LLM produit des sorties qui varient à chaque appel (même avec `temperature: 0`, des micro-variations existent). Un test classique `assert output === "X"` est inadapté. Les evals adoptent donc trois stratégies :
+
+1. **Assertions structurelles** : vérifier qu'une sortie JSON respecte un schéma, qu'un tool call est appelé, qu'un mot-clé est présent.
+2. **LLM-as-judge** : un second LLM note la qualité de la réponse selon une rubrique.
+3. **Métriques objectives** : exactitude sur un dataset gold, BLEU, exact match, F1.
+
+## promptfoo : la solution open source
+
+[`promptfoo`](https://promptfoo.dev) est devenu le standard de fait. Il s'installe via npm et se configure avec un simple YAML :
+
+```yaml
+# promptfooconfig.yaml
+providers:
+  - id: anthropic:messages:claude-sonnet-4-6
+  - id: anthropic:messages:claude-haiku-4-5
+
+prompts:
+  - file://prompts/assistant-v1.txt
+  - file://prompts/assistant-v2.txt
+
+tests:
+  - vars:
+      question: "Quelle est la capitale du Mali ?"
+    assert:
+      - type: contains
+        value: "Bamako"
+      - type: llm-rubric
+        value: "La réponse est factuelle, concise et en français"
+
+  - vars:
+      question: "Écris un email de relance"
+    assert:
+      - type: is-json
+      - type: javascript
+        value: output.subject.length < 80
+```
+
+Lancez `promptfoo eval` : vous obtenez une matrice prompts × modèles × tests avec scores et diffs. Vous voyez immédiatement qu'une nouvelle version régresse de 12 % sur les questions factuelles.
+
+## Le framework Anthropic d'evals
+
+Anthropic propose son propre cookbook d'evals (`anthropic-cookbook` sur GitHub) avec des recettes pour :
+
+- **Classification** : confusion matrix, précision/rappel par classe
+- **Génération libre** : LLM-as-judge avec Claude Opus 4.7 comme juge
+- **Tool use** : vérification de la séquence d'outils appelés
+- **RAG** : faithfulness, context relevance, answer relevance
+
+Le pattern recommandé :
+
+```python
+from anthropic import Anthropic
+client = Anthropic()
+
+def judge(question, expected, actual):
+    prompt = f"""Note la réponse de 1 à 5 selon ces critères:
+- Exactitude factuelle
+- Pertinence
+- Clarté
+
+Question: {question}
+Attendu: {expected}
+Réponse: {actual}
+
+Retourne uniquement un JSON: {{"score": int, "rationale": str}}"""
+    msg = client.messages.create(
+        model="claude-opus-4-7",
+        max_tokens=300,
+        messages=[{"role": "user", "content": prompt}]
+    )
+    return json.loads(msg.content[0].text)
+```
+
+## Construire un dataset d'évaluation
+
+Un bon dataset eval contient 50 à 500 cas couvrant :
+
+- Le **happy path** (cas nominaux fréquents)
+- Les **edge cases** (entrées vides, très longues, ambiguës)
+- Les **adversarial cases** (tentatives de jailbreak, prompts injection)
+- Les **regression cases** (chaque bug fixé devient un test permanent)
+
+Stockez-le en JSONL versionné dans Git, séparément du code. Faites-le grossir : chaque ticket utilisateur résolu = un nouveau cas eval.
+
+## Intégration CI
+
+Le but final : empêcher un merge qui dégrade la qualité. Dans GitHub Actions :
+
+```yaml
+- name: Run evals
+  env:
+    ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+  run: |
+    npx promptfoo eval -c promptfooconfig.yaml \
+      --output results.json
+    node scripts/check-thresholds.js results.json
+```
+
+Le script vérifie qu'aucune métrique ne descend sous un seuil (ex : précision > 92 %). Sinon, le job échoue et la PR est bloquée. Vous pouvez aussi commenter le diff de scores directement sur la PR avec `promptfoo eval --share`.
+
+## Bonnes pratiques
+
+- **Lancez Haiku pour le dev quotidien**, Sonnet/Opus pour la CI nightly (coût × 10 mais qualité d'évaluation supérieure).
+- **Cachez les réponses** : promptfoo cache automatiquement, évitant de re-payer chaque run.
+- **Isolez le LLM-juge** : utilisez un modèle différent du modèle testé pour éviter le biais d'auto-évaluation.
+- **Reviewez manuellement 10 %** des verdicts du juge pour calibrer la rubrique.
+
+## Pour aller plus loin
+
+- `anthropic-cookbook` sur GitHub : sections `misc/illustrated_responses.ipynb` et `skills/evals/`.
+- `promptfoo` red-team mode pour générer automatiquement des cas adversariaux.
+- Inspect (`UK AISI`) pour des evals plus avancées et reproductibles.
+- Mesurez aussi le **coût par eval run** : un dataset de 500 cas × 3 prompts × 2 modèles = 3 000 appels API.

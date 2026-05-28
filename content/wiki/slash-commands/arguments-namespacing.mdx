@@ -1,0 +1,155 @@
+---
+title: "Arguments et namespacing des slash commands"
+description: "Passer des arguments à une commande et organiser ses commandes en sous-dossiers."
+updatedAt: "2026-05-19"
+readingMinutes: 5
+---
+
+Une slash command qui ne prend pas d'arguments reste limitée à une seule façon d'être appelée. Dès qu'on veut paramétrer le comportement — un numéro de PR, un fichier, un mode — il faut savoir injecter ces valeurs dans le prompt via `$ARGUMENTS`. Et dès qu'on dépasse une dizaine de commandes, le namespacing par sous-dossiers évite que `/help` devienne illisible.
+
+## $ARGUMENTS : la variable magique
+
+Tout ce que vous tapez après le nom de la commande est injecté dans le placeholder `$ARGUMENTS` du fichier `.md`. Exemple basique, `.claude/commands/explain.md` :
+
+```md
+---
+description: "Explique un concept ou un fichier"
+argument-hint: "<concept|chemin de fichier>"
+---
+
+Explique simplement : $ARGUMENTS
+
+Si c'est un chemin de fichier, lis-le et résume son rôle.
+Sinon, explique le concept en 3 paragraphes max.
+```
+
+Appels possibles :
+
+```bash
+> /explain RLS Supabase
+> /explain lib/curriculum.ts
+> /explain le pattern Proxy dans lib/supabase.ts
+```
+
+Dans les trois cas, la chaîne après `/explain` remplace `$ARGUMENTS`. Le prompt envoyé à Claude est résolu côté harness avant l'appel API.
+
+## Plusieurs arguments
+
+`$ARGUMENTS` contient **toute** la chaîne d'arguments en bloc. Pour distinguer plusieurs paramètres, deux approches :
+
+**Approche 1 — laisser Claude parser** : décrivez la convention dans le prompt et laissez le modèle découper.
+
+```md
+---
+description: "Crée une route API : /api-route <méthode> <chemin>"
+argument-hint: "<GET|POST|PUT|DELETE> <chemin>"
+---
+
+Génère une route Next.js App Router à partir de : $ARGUMENTS
+
+Convention attendue : <méthode HTTP> <chemin relatif sous app/api/>
+Exemple : POST wiki/comments → app/api/wiki/comments/route.ts
+```
+
+Usage :
+
+```bash
+> /api-route POST wiki/comments
+Creating app/api/wiki/comments/route.ts (POST handler)...
+```
+
+**Approche 2 — utiliser des arguments positionnels** (selon les versions de Claude Code) : `$1`, `$2`, etc. captent chaque mot séparé par un espace. Vérifiez votre version : c'est supporté dans les builds récentes.
+
+```md
+Méthode : $1
+Chemin  : $2
+```
+
+## Namespacing par sous-dossiers
+
+Quand votre `.claude/commands/` commence à compter 20+ fichiers, organisez-les en sous-dossiers : chaque sous-dossier devient un préfixe.
+
+Arborescence :
+
+```
+.claude/commands/
+  db/
+    migrate.md
+    rollback.md
+    seed.md
+  pr/
+    review.md
+    summary.md
+  test/
+    unit.md
+    e2e.md
+```
+
+Donne les commandes :
+
+```bash
+/db:migrate
+/db:rollback
+/db:seed
+/pr:review
+/pr:summary
+/test:unit
+/test:e2e
+```
+
+Le séparateur `:` permet l'auto-complétion par namespace : tapez `/db:` puis Tab pour voir uniquement les commandes du domaine base de données. C'est aussi un excellent moyen de communiquer la structure : un nouveau venu comprend immédiatement les grands domaines d'outillage du repo.
+
+## Mélanger arguments et namespacing
+
+Rien n'empêche d'avoir des arguments dans une commande namespacée :
+
+```md
+---
+description: "Génère une migration Supabase"
+argument-hint: "<nom-de-migration>"
+allowed-tools: [Bash(supabase migration:*), Write]
+---
+
+Crée une nouvelle migration Supabase nommée `$ARGUMENTS`.
+
+1. Lance `supabase migration new $ARGUMENTS`
+2. Édite le SQL généré selon ma demande qui suit
+3. Affiche le diff
+```
+
+Usage :
+
+```bash
+> /db:migrate add_wiki_votes_table
+Created: supabase/migrations/20260519_add_wiki_votes_table.sql
+Now editing...
+```
+
+## Patterns d'arguments utiles
+
+- **Argument optionnel avec fallback** :
+
+```md
+Si `$ARGUMENTS` est vide, utilise la branche courante.
+Sinon, utilise `$ARGUMENTS` comme numéro de PR.
+```
+
+- **Argument structuré JSON** : pour des cas avancés, demandez à l'utilisateur de passer un JSON et laissez Claude le parser :
+
+```bash
+> /deploy {"env": "staging", "skipTests": true}
+```
+
+- **Flags personnalisés** : conventionnez `--dry-run`, `--verbose`, etc. dans le prompt et laissez Claude les interpréter.
+
+## Limites à connaître
+
+- `$ARGUMENTS` est une simple substitution de chaîne : pas d'échappement, pas de validation. Si l'utilisateur tape des guillemets, ils arrivent tels quels.
+- Le nom de la commande est dérivé du nom de fichier (sans `.md`) : `release.md` → `/release`.
+- Le namespacing par dossier ne descend qu'à un niveau dans la plupart des versions : `.claude/commands/db/migrations/new.md` n'est pas garanti de devenir `/db:migrations:new`. Vérifiez la version.
+
+## Pour aller plus loin
+
+- Doc officielle : https://docs.claude.com/en/docs/claude-code/slash-commands
+- Guide "Slash commands avec arguments complexes" pour parser regex et flags
+- Guide "Partage et centralisation en équipe" pour structurer un gros `.claude/commands/`

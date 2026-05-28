@@ -1,0 +1,134 @@
+---
+title: "L'outil TodoWrite"
+description: "Gérer une liste de tâches pendant une session Claude Code — états, bonnes pratiques, visibilité utilisateur."
+updatedAt: "2026-05-19"
+readingMinutes: 5
+---
+
+`TodoWrite` est l'outil de **planification visible** de Claude Code. Il permet à l'assistant de matérialiser sa liste de tâches en cours, de la mettre à jour en temps réel et d'offrir à l'utilisateur une visibilité sur l'avancement. Pour les tâches complexes en plusieurs étapes, c'est l'outil qui transforme un long monologue en une checklist suivable.
+
+## À quoi sert TodoWrite
+
+- **Découper** une tâche complexe en sous-tâches concrètes ;
+- **Tracker l'avancement** étape par étape ;
+- **Communiquer le plan** à l'utilisateur sans avoir à le répéter en texte ;
+- **Détecter l'oubli** d'une étape (la todo reste pending) ;
+- **Itérer** en ajoutant ou retirant des items selon ce qu'on découvre.
+
+## Quand l'utiliser
+
+**OUI** dès que la tâche compte ≥ 3 étapes distinctes :
+
+- implémenter une feature multi-fichiers ;
+- débugger en suivant une piste à étapes (reproduire, diagnostiquer, corriger, tester) ;
+- migration ou refactoring qui touche plusieurs zones ;
+- audit en plusieurs axes.
+
+**NON** pour :
+
+- une tâche unique ("corrige cette typo") ;
+- une réponse de pure conversation ;
+- une question simple qui ne demande pas d'exécution.
+
+## Format des items
+
+Chaque todo a typiquement :
+
+| Champ | Type | Description |
+|-------|------|-------------|
+| `content` | string | Description impérative ("Ajouter la route /api/x") |
+| `status` | string | `pending`, `in_progress`, `completed` |
+| `activeForm` | string | Forme progressive pour l'affichage (ex. "Ajout de la route") |
+
+Conventions :
+
+- **un seul item `in_progress` à la fois** ;
+- `completed` dès que l'item est réellement fini (pas "presque") ;
+- supprimer ou marquer obsolète les items qui ne sont plus pertinents.
+
+## Exemples concrets
+
+### Implémentation d'une feature
+
+```ts
+TodoWrite(todos=[
+  { content: "Lire les fichiers concernés", status: "in_progress", activeForm: "Lecture des fichiers" },
+  { content: "Créer la route API /api/feedback", status: "pending", activeForm: "Création de la route" },
+  { content: "Ajouter le formulaire React", status: "pending", activeForm: "Ajout du formulaire" },
+  { content: "Écrire les tests", status: "pending", activeForm: "Rédaction des tests" },
+  { content: "Mettre à jour la doc", status: "pending", activeForm: "Mise à jour de la doc" },
+])
+```
+
+Au fil de l'exécution, Claude rappelle `TodoWrite` pour basculer les statuts.
+
+### Debug à étapes
+
+```ts
+TodoWrite(todos=[
+  { content: "Reproduire le bug en dev", status: "in_progress", activeForm: "Reproduction" },
+  { content: "Identifier la fonction fautive", status: "pending", activeForm: "Localisation" },
+  { content: "Lire les tests existants pour cette zone", status: "pending", activeForm: "Lecture tests" },
+  { content: "Implémenter le fix", status: "pending", activeForm: "Implémentation fix" },
+  { content: "Vérifier que les tests passent", status: "pending", activeForm: "Validation tests" },
+])
+```
+
+## Mise à jour
+
+À chaque step franchie, rappelez `TodoWrite` avec la liste **complète** mise à jour. Ne faites pas d'updates partielles — chaque appel écrase la liste précédente.
+
+```ts
+TodoWrite(todos=[
+  { content: "Lire les fichiers concernés", status: "completed", activeForm: "Lecture des fichiers" },
+  { content: "Créer la route API /api/feedback", status: "in_progress", activeForm: "Création de la route" },
+  // ... reste pending
+])
+```
+
+## Pièges courants
+
+**TodoWrite jamais mis à jour.** Si Claude crée une liste puis ne la touche plus, c'est inutile. La règle : un update après chaque action importante.
+
+**Tout `in_progress` à la fois.** Confus pour l'utilisateur. Un seul item actif.
+
+**Items trop vagues.** "Faire le truc" n'aide personne. Préférez "Ajouter le hook `useAuth` au layout".
+
+**Items trop fins.** "Ouvrir l'éditeur", "Taper la lettre 'i'" — ridicule. Granularité : une étape = quelques outils ou une responsabilité claire.
+
+**Marqué `completed` alors qu'incomplet.** Tentation de "valider" pour avancer visuellement. Si les tests échouent, l'item n'est pas done. Soyez honnête.
+
+**Utilisé sur des tâches triviales.** Pour "ajoute un import", pas besoin. TodoWrite a un coût visuel — réservez-le aux vrais workflows.
+
+## Visibilité utilisateur
+
+TodoWrite s'affiche dans l'interface Claude Code sous forme de checklist en temps réel. C'est un **outil de communication** autant que de tracking :
+
+- l'utilisateur voit où vous en êtes ;
+- il peut interrompre si une étape semble inutile ;
+- il garde confiance car le plan est explicite.
+
+C'est particulièrement précieux sur les tâches longues (plusieurs minutes) où sans TodoWrite l'utilisateur ne sait pas si vous êtes coincé.
+
+## Combiner avec ExitPlanMode
+
+Workflow recommandé pour une tâche complexe :
+
+1. **Mode plan** : Claude analyse, lit, propose un plan via `ExitPlanMode`.
+2. **Validation** : l'utilisateur approuve ou modifie le plan.
+3. **TodoWrite** : Claude matérialise le plan validé en checklist.
+4. **Exécution** : Claude avance sur la checklist, met à jour les statuts.
+5. **Clôture** : tous les items en `completed`, Claude récapitule.
+
+## Bonnes pratiques
+
+- **3 à 8 items idéalement.** Au-delà, redécoupez ou créez des sous-tâches.
+- **Verbe d'action en tête.** "Ajouter", "Corriger", "Vérifier", "Lire" — pas "Le composant".
+- **Format `activeForm` cohérent.** "Lecture des fichiers", "Création de la route" — forme nominale ou progressive.
+- **Suppression d'items obsolètes.** Si vous réalisez qu'un item n'est plus pertinent, retirez-le plutôt que de le laisser pending éternellement.
+
+## Pour aller plus loin
+
+- [Documentation Claude Code](https://docs.claude.com/en/docs/claude-code)
+- Voir aussi : `ExitPlanMode` pour la phase de planification, `Task` pour déléguer une sous-tâche.
+- Astuce : sur les tâches > 10 minutes, TodoWrite est quasi obligatoire — sans lui, l'utilisateur perd confiance et risque d'interrompre prématurément.

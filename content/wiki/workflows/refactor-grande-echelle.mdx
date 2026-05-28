@@ -1,0 +1,91 @@
+---
+title: "Refactor à grande échelle"
+description: "Renommer ou restructurer des centaines de fichiers via Claude Code et ses subagents."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+Renommer une API, déplacer un dossier, migrer d'une lib à une autre : les refactors massifs sont historiquement la zone rouge des codebases. Claude Code change la donne en parallélisant le travail via des subagents, avec un agent orchestrateur qui pilote des dizaines d'agents enfants chacun responsable d'un fragment.
+
+## Quand sortir l'artillerie lourde
+
+Un simple `find` + `sed` suffit pour un renommage textuel. On bascule sur Claude dès qu'il faut :
+
+- Comprendre le contexte sémantique (renommer `User` en `Account` sans casser `UserAgent`).
+- Adapter les imports en cascade après un déplacement de dossier.
+- Migrer une API (par ex. `useState` vers une lib de state management) avec adaptation des appels.
+- Mettre à jour la documentation et les tests en même temps que le code.
+
+## Pattern : un orchestrateur, N subagents
+
+L'idée centrale : un agent principal lit la carte du repo, découpe le travail en chunks indépendants (par dossier, par feature) et délègue chaque chunk à un subagent. Chaque subagent travaille en isolation puis remonte un diff.
+
+```text
+Tu es l'orchestrateur d'un refactor : renommer le module `payments` en `billing`.
+Étapes :
+1. Liste tous les fichiers qui importent depuis `lib/payments` ou `app/payments`.
+2. Groupe-les par feature (max 15 fichiers par groupe).
+3. Pour chaque groupe, lance un subagent avec la tâche :
+   "Mets à jour les imports, les noms de fonctions et les commentaires de ces fichiers."
+4. Une fois tous les subagents revenus, lance `npm run build` et corrige les erreurs résiduelles.
+```
+
+L'avantage : chaque subagent a un contexte propre, ne pollue pas la fenêtre principale, et plusieurs peuvent tourner en parallèle.
+
+## Préparer le terrain avant de lancer
+
+Un refactor massif réussi se prépare. Avant de lancer Claude :
+
+```bash
+git checkout -b refactor/payments-to-billing
+git status                       # repo propre
+npm run test -- --passWithNoTests
+npm run build                    # baseline verte
+```
+
+Cette baseline permet à Claude de comparer après chaque batch. Si le build casse, on sait que la régression vient du dernier batch — pas d'un bug préexistant.
+
+## Découper en batchs vérifiables
+
+Plutôt qu'un seul commit géant, demandez à Claude de committer après chaque batch validé :
+
+```text
+Pour chaque feature refactorée :
+1. Modifie les fichiers du groupe.
+2. Lance `npm run build` — si KO, corrige sans toucher aux autres groupes.
+3. Lance les tests liés à cette feature.
+4. Commit avec le message : "refactor(billing): rename X in <feature>".
+Ne passe au groupe suivant que si les 3 étapes précédentes ont réussi.
+```
+
+Cette discipline permet un `git bisect` simple si une régression apparaît plus tard.
+
+## Exemple concret : migration de Pages Router vers App Router
+
+Sur un projet Next.js de 300 fichiers, on peut formuler la tâche ainsi :
+
+```text
+Migre toutes les pages de `pages/` vers `app/` selon le mapping :
+- pages/api/* → app/api/*/route.ts (handler GET/POST exporté)
+- pages/[slug].tsx → app/[slug]/page.tsx
+- getServerSideProps → fetch dans le composant async
+Préserve les comportements existants, mets à jour les tests Playwright,
+et regroupe les changements par segment de route.
+```
+
+Lancer ça à la main prend deux semaines. Avec Claude orchestrateur, comptez deux à trois jours avec validation humaine entre chaque batch.
+
+## Validation et garde-fous
+
+Trois règles non négociables pour éviter le carnage :
+
+- Toujours partir d'une branche dédiée, jamais sur `main`.
+- Demander à Claude de produire un plan écrit avant la première modification.
+- Réviser le premier batch à la main avant de laisser tourner les suivants.
+
+## Pour aller plus loin
+
+- Lire la doc des subagents Claude Code (`Task` tool) et le pattern d'orchestration.
+- Combiner avec `ast-grep` pour les transformations purement syntaxiques (plus rapide et déterministe).
+- Utiliser `git worktree` pour faire tourner plusieurs refactors en parallèle sans conflit.
+- Mesurer la couverture de tests avant/après pour s'assurer qu'aucun chemin n'est passé à la trappe.

@@ -1,0 +1,62 @@
+---
+title: "Sous-traitance récursive : agents qui créent des agents"
+description: "Comprendre les limites de profondeur, les boucles infinies et les arbres de dépendances quand un subagent en spawn un autre."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+La sous-traitance récursive désigne le cas où un subagent Claude Code délègue à son tour une partie de sa tâche à un autre subagent. Cette technique est puissante : elle permet de décomposer un problème complexe en arborescence de spécialistes (un agent "architecte" qui appelle un agent "backend" qui appelle un agent "DB"). Mais sans garde-fous, elle vire vite au cauchemar : explosion du contexte, coût qui dérape, boucles infinies. Voyons comment l'utiliser sans tout faire exploser.
+
+## Pourquoi déléguer en cascade
+
+L'intérêt principal est l'isolation de contexte. Chaque subagent reçoit uniquement le brief qu'on lui transmet, pas l'historique du parent. Cela permet :
+
+- de paralléliser plusieurs explorations (un agent par module à analyser),
+- de garder le contexte du parent léger (on ne renvoie qu'un résumé),
+- de spécialiser chaque niveau (un orchestrateur, des exécutants, des vérificateurs).
+
+Quand un agent backend a besoin d'un audit SQL pointu, il est plus efficace de spawn un agent "dba-reviewer" dédié que de polluer son propre contexte avec 12 fichiers de migration.
+
+## Limites de profondeur
+
+Claude Code applique une limite implicite à la profondeur d'imbrication (généralement 2 à 3 niveaux selon la configuration). Au-delà, l'appel Task échoue ou est refusé. Cette limite n'est pas un caprice : chaque niveau ajoute de la latence, multiplie les tokens et complique le debug.
+
+Bonne pratique : restez à **2 niveaux maximum** en production. Un orchestrateur, des exécutants. Si vous sentez le besoin d'un troisième niveau, c'est souvent que votre arbre est mal découpé — un exécutant fait trop de choses, ou l'orchestrateur sous-décompose. Aplatissez l'arbre plutôt que de l'allonger.
+
+## Boucles infinies et détection
+
+Le scénario classique : l'agent A spawn B avec le prompt "résous X". B échoue partiellement et spawn A pour "réessayer X". A re-spawn B. Boom — coût exponentiel, contexte qui ne progresse pas.
+
+Pour s'en prémunir :
+
+1. **Pas d'auto-référence par nom** : un subagent ne devrait jamais invoquer un subagent du même type que lui.
+2. **Compteur de profondeur dans le prompt** : passez `depth: 2` et exigez que l'agent refuse de descendre plus bas.
+3. **Critère d'arrêt explicite** : chaque délégation doit avoir une condition de succès vérifiable (test qui passe, fichier qui existe, valeur retournée non vide).
+4. **Budget en tokens** : surveillez le compteur ; au-delà d'un seuil, l'agent doit remonter un état partiel au parent au lieu de relancer.
+
+## Arbres de dépendances
+
+Visualisez toujours votre arbre avant de coder. Un schéma simple :
+
+```
+orchestrator
+  ├── explorer (lit le repo)
+  ├── planner (produit la todo)
+  └── executor
+        ├── coder
+        └── tester
+```
+
+Chaque nœud a une responsabilité unique et une interface claire (entrée = prompt, sortie = résumé structuré). Si deux nœuds frères ont besoin de partager un état, c'est au parent de l'orchestrer — jamais une communication horizontale entre subagents, qui n'existe pas dans le modèle.
+
+Attention aux **dépendances en losange** : si l'agent A appelle B et C, et que B et C ont tous deux besoin d'un agent D, ne spawn pas D deux fois. Soit le parent exécute D une fois et passe le résultat aux deux, soit D devient un outil partagé (MCP, script).
+
+## Coût et observabilité
+
+Chaque subagent = un appel API complet, souvent avec son propre system prompt long. Une cascade à 3 niveaux peut facilement multiplier la facture par 10. Loggez systématiquement le `depth`, le `parent_id` et le prompt initial de chaque spawn pour pouvoir reconstituer l'arbre a posteriori et identifier les branches inutiles.
+
+## Pour aller plus loin
+
+- Lire l'article wiki sur le partage d'état entre agents pour orchestrer les retours sans tout faire remonter manuellement.
+- Configurer un hook `SubagentStop` qui logge la profondeur et le coût de chaque branche.
+- Tester l'arbre sur une tâche jouet avant de le lancer sur un vrai repo : un cycle à blanc révèle 80 % des boucles avant qu'elles ne coûtent.

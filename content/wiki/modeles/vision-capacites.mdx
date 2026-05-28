@@ -1,0 +1,49 @@
+---
+title: "Claude Vision : capacités de lecture graphique"
+description: "Tour d'horizon des capacités visuelles de Claude 4.x : OCR, lecture de diagrammes, analyse d'UI et limites techniques."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+Depuis Claude 3, l'API Anthropic accepte nativement les images en entrée, et la famille Claude 4.x (Opus 4.7, Sonnet 4.6, Haiku 4.5) pousse encore plus loin la qualité du raisonnement visuel. Que ce soit pour transformer un mockup Figma en code, extraire des données d'un PDF scanné ou comprendre un diagramme d'architecture, Vision est devenu un pilier des workflows. Voici ce qu'il faut savoir pour bien l'exploiter.
+
+## Formats supportés et limites de résolution
+
+Claude accepte les formats classiques : JPEG, PNG, GIF (non animé) et WebP. Vous pouvez envoyer une image en base64 directement dans le message, ou via une URL publique. La limite par image est de 5 Mo en base64, et un message peut contenir jusqu'à 100 images (20 recommandées pour rester fluide).
+
+Côté résolution, Claude redimensionne automatiquement les images dont le plus grand côté dépasse 1568 pixels. Au-delà, vous payez plus de tokens sans gagner en précision. À l'inverse, une image trop petite (sous 200 px) perd en lisibilité OCR. La règle pratique : viser 1000-1500 px sur le côté le plus long, en PNG pour le texte fin et en JPEG pour les photos.
+
+## OCR et lecture de texte
+
+Claude 4.x lit le texte imprimé avec une fiabilité proche d'un OCR dédié, et il dépasse largement les solutions classiques sur le texte manuscrit, les tableaux complexes et les langues mixtes. Contrairement à Tesseract, il comprend le contexte : il peut corriger une faute d'OCR évidente, restituer la structure d'un tableau en Markdown, ou extraire uniquement les champs pertinents d'une facture.
+
+Pour les documents longs scannés, mieux vaut découper page par page et passer chaque image dans un appel séparé — cela évite la saturation du contexte visuel et améliore nettement la précision.
+
+## Lecture de diagrammes et schémas
+
+C'est l'un des points forts du modèle. Claude lit avec aisance les diagrammes UML, les schémas d'architecture cloud, les graphiques matplotlib, les organigrammes ou les flowcharts. Il identifie les nœuds, les flèches, les labels et reconstitue la logique. Sur Opus 4.7, il peut même critiquer un diagramme (composant manquant, cycle non géré) ou le transcrire en code Mermaid.
+
+Les graphiques avec axes (barres, courbes, scatter) sont également bien interprétés : Claude lit les ordres de grandeur, identifie les tendances, et extrait des valeurs approximatives. Pour des valeurs exactes, joignez toujours le dataset brut en complément.
+
+## Cas d'usage UI/UX
+
+C'est probablement le domaine où Vision a le plus d'impact :
+
+- **Mockup → code** : envoyer un screenshot Figma et demander un composant React/Tailwind fidèle.
+- **Audit d'interface** : pointer les problèmes d'accessibilité, de contraste, de hiérarchie visuelle.
+- **Recette visuelle** : comparer une maquette et un rendu réel pour détecter les écarts pixel-near.
+- **Reverse engineering** : reconstituer la structure DOM d'une capture d'écran d'app concurrente.
+
+Opus 4.7 est nettement supérieur sur ces tâches : il identifie correctement les composants shadcn/ui, distingue un padding 4 d'un padding 6, et propose des structures sémantiques propres.
+
+## Limites à connaître
+
+Claude reste limité sur quelques points : il ne lit pas les vidéos (uniquement des frames extraites), il a du mal avec les très petits éléments d'interface (icônes 16x16, badges), et il ne renvoie pas de coordonnées pixel-précises pour faire du bounding box fiable. Pour ces cas, des modèles spécialisés (YOLO, Florence-2) restent plus adaptés.
+
+Autre point : pas de génération d'image. Claude lit, mais n'écrit pas — il faut un modèle dédié (Imagen, FLUX, etc.) pour produire des visuels.
+
+## Pour aller plus loin
+
+- Documentation officielle : [docs.anthropic.com/en/docs/build-with-claude/vision](https://docs.anthropic.com/en/docs/build-with-claude/vision)
+- Article wiki [Choisir le bon modèle](/wiki/modeles/choisir-bon-modele) pour décider quand utiliser Opus vs Sonnet sur du visuel
+- Article wiki [Pricing et tokens](/wiki/modeles/pricing-tokens) pour comprendre le coût des images (~1600 tokens pour une image 1000x1000)

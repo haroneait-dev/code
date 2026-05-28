@@ -1,0 +1,55 @@
+---
+title: "Historique et export des données"
+description: "Procédures RGPD, rétention et export complet des conversations Claude.ai."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+L'historique des conversations sur Claude.ai constitue rapidement un actif personnel ou professionnel précieux : prompts éprouvés, raisonnements de Claude, documents produits. Anthropic propose plusieurs mécanismes pour consulter, exporter et supprimer ces données, en conformité avec le RGPD pour les utilisateurs européens. Voici les procédures à connaître pour rester maître de vos contenus.
+
+## Rétention par défaut
+
+Les conversations sont conservées indéfiniment tant que vous ne les supprimez pas, à l'exception de cas particuliers :
+
+- **Conversations supprimées par l'utilisateur** : envoyées en corbeille pendant 30 jours, puis effacées définitivement des bases actives. Les sauvegardes système peuvent encore les contenir jusqu'à 90 jours supplémentaires.
+- **Comptes inactifs** : aucune purge automatique pour les comptes payants. Les comptes gratuits inactifs depuis plus de deux ans peuvent voir leurs données archivées puis supprimées après notification.
+- **Données de modération** : tout contenu ayant déclenché un filtre de sécurité est conservé jusqu'à 2 ans pour audit, même si vous supprimez la conversation côté interface.
+
+Les fichiers téléversés suivent la même politique que les conversations auxquelles ils sont attachés.
+
+## Données envoyées à l'entraînement
+
+Par défaut, sur les plans Free et Pro consommateur, vos conversations ne sont pas utilisées pour entraîner les modèles, sauf si vous activez explicitement l'option "Contribuer à l'amélioration des modèles" dans les paramètres Confidentialité. Sur les plans Team, Enterprise et API, aucune donnée n'est utilisée pour l'entraînement, c'est un engagement contractuel. Les conversations signalées (thumbs down, rapports de bug) peuvent être consultées par des reviewers Anthropic, anonymisées, dans une logique d'amélioration produit.
+
+## Export complet
+
+La procédure d'export RGPD se trouve dans **Paramètres → Confidentialité → Exporter mes données**. Vous cliquez sur "Demander l'export", Anthropic prépare une archive ZIP envoyée par email sous 24 à 72 heures (souvent moins d'une heure en pratique). L'archive contient :
+
+- Toutes vos conversations au format JSON (une entrée par conversation, avec timestamps, modèle utilisé, messages user/assistant complets, tool calls et résultats)
+- Les fichiers que vous avez téléversés, dans un dossier `attachments/`
+- Les Projects avec leurs instructions personnalisées et fichiers de contexte
+- Les Artifacts et Pages générés
+- Les métadonnées de compte (date de création, plan, préférences)
+
+Le format JSON est lisible et facilement parsable. Il n'y a pas (encore) d'export Markdown ou PDF natif pour une lecture humaine : vous devez convertir vous-même si nécessaire (des scripts open-source existent sur GitHub).
+
+## Export d'une conversation isolée
+
+Pour exporter une seule conversation sans passer par l'archive complète, ouvrez la conversation, cliquez sur le menu "..." en haut à droite, et choisissez "Exporter". Trois formats disponibles : Markdown (le plus lisible), JSON (le plus complet), et PDF (pour archivage). Cette fonction est pratique pour partager un échange précis à un collègue ou pour conserver une trace d'un raisonnement important.
+
+## Suppression et droit à l'oubli
+
+Trois niveaux de suppression :
+
+1. **Conversation seule** : icône corbeille dans la liste latérale. Effacement effectif après 30 jours.
+2. **Toutes les conversations** : Paramètres → Confidentialité → "Supprimer toutes mes conversations". Action irréversible après le délai de grâce.
+3. **Compte entier** : "Supprimer mon compte" en bas des paramètres. Anthropic supprime alors profil, conversations, fichiers, Projects, et historique de paiement (anonymisé pour les obligations comptables).
+
+Pour exercer un droit RGPD spécifique (rectification, opposition, portabilité formelle), contactez **privacy@anthropic.com** avec une copie de pièce d'identité. Le délai de réponse légal est d'un mois.
+
+## Pour aller plus loin
+
+- Page officielle "Privacy Policy" d'Anthropic
+- DPA (Data Processing Addendum) pour les plans Team et Enterprise
+- Scripts open-source pour convertir l'export JSON en Markdown ou Obsidian
+- Différences de rétention entre Claude.ai et l'API Anthropic

@@ -1,0 +1,91 @@
+---
+title: "Publier un skill"
+description: "Guide complet pour packager, versionner et publier un skill Claude Code sur npm avec une organisation propre."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+Publier un skill Claude Code, c'est transformer un dossier local en module réutilisable que toute la communauté peut installer en une commande. La distribution se fait aujourd'hui principalement via **npm**, avec une convention claire : un package qui expose un `SKILL.md` et des assets associés. Ce guide couvre toutes les étapes, de la structure initiale à la signature du package.
+
+## Préparer la structure du package
+
+Un skill publiable suit une arborescence standard. Le `SKILL.md` est obligatoire et doit décrire ce que fait le skill, quand l'invoquer et quels outils sont nécessaires.
+
+```md
+# my-skill
+
+## Description
+Génère des migrations Prisma à partir d'un schéma SQL legacy.
+
+## Triggers
+- "migre cette table vers Prisma"
+- fichiers .sql modifiés dans /legacy
+
+## Steps
+1. Lire le schéma source
+2. Inférer les relations
+3. Écrire prisma/schema.prisma
+```
+
+Le `package.json` doit pointer vers ce fichier et inclure les bons mots-clés pour la découvrabilité.
+
+## Organiser le code et les assets
+
+Évitez de tout mettre à la racine. Une organisation propre facilite la maintenance et permet à Claude de naviguer dans le skill sans charger des fichiers inutiles.
+
+- `SKILL.md` — point d'entrée, lu par Claude
+- `scripts/` — helpers bash ou node invoqués par le skill
+- `templates/` — fichiers modèles à copier
+- `README.md` — documentation humaine, distincte du SKILL.md
+- `.skillignore` — exclut les fichiers de la distribution
+
+Le `README.md` cible les développeurs qui parcourent npm, tandis que le `SKILL.md` cible Claude. Les deux audiences ont des besoins différents : l'un veut des badges et des exemples visuels, l'autre veut des instructions impératives et déterministes.
+
+## Versionner avec SemVer
+
+Les skills suivent le semantic versioning classique. Une **patch** corrige un bug d'instruction, une **minor** ajoute un nouveau trigger ou une nouvelle étape rétrocompatible, une **major** change la signature ou supprime des comportements.
+
+```bash
+npm version patch -m "fix: clarifie le trigger SQL"
+npm version minor -m "feat: ajoute support PostgreSQL"
+npm version major -m "breaking: renomme le skill"
+```
+
+Pensez à publier un `CHANGELOG.md` à la racine. Claude le lit parfois pour comprendre l'évolution, et les utilisateurs y reviennent avant chaque mise à jour.
+
+## Publier sur npm
+
+Avant le premier push, créez une **organisation npm** dédiée (`@mon-org/skill-name`). Les skills scoped sont plus faciles à identifier et évitent les conflits de noms.
+
+```bash
+npm login
+npm init --scope=@mon-org
+npm publish --access public
+```
+
+Vérifiez le contenu du tarball avant publication. Trop de fichiers gonflent le téléchargement et ralentissent l'installation des utilisateurs.
+
+```bash
+npm pack --dry-run
+```
+
+Ajoutez un champ `files` dans `package.json` pour ne publier que l'essentiel : `SKILL.md`, `scripts/`, `templates/`, `README.md`.
+
+## Signer et sécuriser
+
+La signature des packages devient un standard sur npm avec **Sigstore**. Activez la provenance lors du publish pour prouver que votre skill vient bien de votre dépôt GitHub.
+
+```bash
+npm publish --provenance --access public
+```
+
+La provenance lie le package à un workflow GitHub Actions, ce qui rassure les utilisateurs sensibles à la chaîne d'approvisionnement. Pour les entreprises, c'est souvent une exigence interne avant d'autoriser l'installation d'un skill tiers.
+
+Pensez aussi à activer la 2FA sur votre compte npm et à utiliser des **automation tokens** pour vos workflows CI plutôt que votre token personnel.
+
+## Pour aller plus loin
+
+- Documentation officielle Claude Code sur le format SKILL.md
+- Guide npm Sigstore et provenance
+- Convention de nommage `@anthropic/skill-*` pour les skills inspirés des officiels
+- Outils de lint comme `skill-lint` (communautaire) pour vérifier la structure avant publish

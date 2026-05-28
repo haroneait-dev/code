@@ -1,0 +1,130 @@
+---
+title: "/init, /review, /security-review : bootstrap et audit"
+description: "Trois commandes natives pour démarrer un projet, relire une PR et auditer la sécurité du code."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+Trois commandes intégrées encapsulent des workflows qu'on lance des centaines de fois en équipe : `/init` pour découvrir un codebase et générer un `CLAUDE.md`, `/review` pour relire automatiquement une pull request, et `/security-review` pour auditer les changements pendants. Elles sont fournies par Anthropic, maintenues à jour, et constituent un excellent point de départ avant d'écrire ses propres commandes custom.
+
+## /init — générer un CLAUDE.md
+
+`/init` analyse votre repo et crée (ou met à jour) le fichier `CLAUDE.md` à la racine, qui sert de mémoire persistante à Claude pour ce projet. La commande lit votre `package.json`, parcourt l'arborescence, détecte le framework, et propose un résumé de la stack, des conventions et des commandes principales.
+
+```bash
+> /init
+Analyzing repository...
+- Detected: Next.js 16 App Router, TypeScript, Supabase
+- Found: package.json, tsconfig.json, .env.example
+- Scanning app/ for routes...
+Writing CLAUDE.md...
+```
+
+Le `CLAUDE.md` généré inclut typiquement :
+
+```md
+# Project
+
+## Stack
+- Next.js 16, TypeScript, Tailwind
+- Supabase (auth + Postgres)
+
+## Commands
+- npm run dev    # dev server
+- npm run build  # production build
+- npm test       # run tests
+
+## Conventions
+- Server components by default
+- API routes in app/api/
+```
+
+Lancez `/init` à chaque grosse refonte ou quand vous arrivez sur un projet existant : le fichier produit devient le contexte par défaut chargé à chaque session.
+
+## /review — relire une PR
+
+`/review` automatise la revue de code sur une pull request. Selon la version, vous pouvez la lancer sur la branche courante, sur un numéro de PR, ou sur un diff :
+
+```bash
+> /review
+Reviewing current branch against main...
+- 4 files changed, +127 -43
+- Running checks: types, tests, conventions, security
+```
+
+Le rapport remonte les problèmes triés par sévérité : bugs probables, régressions de typage, manquements aux conventions du `CLAUDE.md`, tests manquants. C'est l'équivalent d'un reviewer humain rigoureux, sans l'attente.
+
+Bonnes pratiques :
+
+- Lancez `/review` **avant** d'ouvrir la PR sur GitHub : vous corrigez les remarques bénignes vous-même
+- Pointez vers une PR spécifique : `/review 1234` pour relire celle d'un collègue
+- Combinez avec un hook `PreCommit` pour bloquer les commits qui échouent la revue
+
+## /security-review — auditer la sécurité
+
+`/security-review` est une variante focalisée sur les vulnérabilités. Elle examine les changements en attente sur la branche courante en cherchant les patterns connus : injection SQL, secrets en clair, XSS, autorisation manquante sur des routes API, configuration RLS incorrecte côté Supabase, etc.
+
+```bash
+> /security-review
+Auditing pending changes for security issues...
+
+[HIGH] app/api/wiki/[id]/route.ts:23
+  DELETE endpoint missing auth check.
+  Anyone can delete any wiki entry.
+
+[MED] lib/db.ts:14
+  SQL query uses string concatenation with user input.
+  Use parameterized queries instead.
+
+[LOW] .env.example
+  Contains placeholder that looks like a real key prefix.
+```
+
+Sur un projet Next.js avec Supabase, `/security-review` attrape régulièrement :
+
+- Des routes API sans vérification du token Bearer
+- Des appels à `SUPABASE_SERVICE_ROLE_KEY` exposés côté client
+- Des composants `"use client"` qui importent des variables sans préfixe `NEXT_PUBLIC_`
+- Des RLS désactivées sur des tables sensibles
+
+## Quand les enchaîner
+
+Sur un projet neuf :
+
+```bash
+> /init                # crée CLAUDE.md
+> /review              # premier audit de qualité
+> /security-review     # premier audit sécurité
+```
+
+Sur une feature branch avant de pousser :
+
+```bash
+> /review              # qualité générale
+> /security-review     # focus sécu
+> git push
+```
+
+## Personnaliser ces commandes
+
+Les trois commandes sont scriptables : vous pouvez créer une version maison dans `.claude/commands/security-review.md` qui override l'officielle avec vos propres règles d'équipe (ex : interdire l'usage de `dangerouslySetInnerHTML`, vérifier la présence d'un header CSP).
+
+```md
+---
+description: "Audit sécurité spécifique à notre stack"
+allowed-tools: [Read, Grep, Bash]
+---
+
+Tu es un auditeur sécurité. Examine les changements pendants
+et vérifie en plus de la checklist standard :
+
+- Aucun appel à `dangerouslySetInnerHTML`
+- Toutes les routes API vérifient le JWT Supabase
+- Aucune RLS désactivée
+```
+
+## Pour aller plus loin
+
+- Documentation officielle : https://docs.claude.com/en/docs/claude-code/slash-commands
+- Couplez `/review` à un GitHub Action pour reviewer automatiquement chaque PR ouverte
+- Versionnez votre `/security-review` custom dans `.claude/commands/` pour le partager en équipe

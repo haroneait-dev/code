@@ -1,0 +1,53 @@
+---
+title: "Les Artifacts : fonctionnement et architecture"
+description: "Comment Claude.ai génère et rend les Artifacts en live : React, HTML, SVG, Markdown, et le sandboxing iframe."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+Les Artifacts sont le mécanisme par lequel Claude.ai sort un contenu structuré du fil de conversation pour l'afficher dans un panneau dédié, à droite du chat. Plutôt que d'inonder le thread avec 300 lignes de code ou un long document, Claude détache l'objet, le rend interactif quand c'est possible, et permet de l'itérer version après version. Comprendre leur architecture aide à mieux les déclencher et à diagnostiquer les rendus qui cassent.
+
+## Quand un Artifact est déclenché
+
+Le modèle décide de créer un Artifact à partir de signaux implicites : contenu substantiel (plus de ~15 lignes), réutilisable (pas une réponse jetable), autonome (compréhensible hors du chat), ou explicitement demandé. Les types supportés sont aujourd'hui :
+
+- **Application React** (single-file, avec Tailwind, shadcn/ui et Recharts pré-chargés)
+- **Page HTML** complète avec CSS et JS inline
+- **SVG** rendu vectoriellement
+- **Markdown** formaté
+- **Mermaid** pour les diagrammes
+- **Code source** dans n'importe quel langage (sans exécution)
+
+Vous pouvez forcer ou bloquer le comportement dans les paramètres : "Artifacts" peut être désactivé pour les utilisateurs qui préfèrent tout en ligne.
+
+## Pipeline de génération
+
+Côté infrastructure, Claude émet une balise XML spéciale dans le stream — typiquement `<antartifact identifier="..." type="application/vnd.ant.react" title="...">` — que le frontend de Claude.ai intercepte. Le contenu de la balise n'est plus affiché en Markdown mais routé vers le panneau Artifacts. Quand on demande une mise à jour, deux modes coexistent :
+
+- **Update** : patch ciblé d'une portion du code (économise des tokens, plus rapide)
+- **Rewrite** : régénération complète (utilisée pour les refontes structurelles)
+
+Chaque modification crée une nouvelle version navigable via les flèches en bas du panneau.
+
+## Rendu live et sandboxing
+
+Pour React et HTML, le rendu se fait dans une **iframe isolée** servie depuis un sous-domaine séparé (`*.artifacts.anthropic.com`). Cette isolation cross-origin empêche l'Artifact d'accéder aux cookies de session Claude.ai ou au DOM parent. Le bundler embarqué transpile le JSX à la volée via une version d'esbuild côté client, injecte React 18, Tailwind via CDN et expose une poignée de dépendances autorisées (`lucide-react`, `recharts`, `shadcn/ui`, `framer-motion`, `papaparse`, `lodash`).
+
+Les contraintes principales :
+
+- Pas de `fetch` vers des domaines arbitraires (CORS strict)
+- Pas d'import npm libre — seules les libs whitelistées sont disponibles
+- Pas de `localStorage` persistant (sandboxé par session)
+- Les images doivent venir d'URLs publiques ou être encodées en base64
+
+## SVG, Mermaid et documents
+
+Les SVG sont rendus directement dans le DOM Claude.ai (pas d'iframe) après assainissement contre les scripts inline. Mermaid passe par la lib officielle Mermaid.js côté client. Les documents Markdown bénéficient d'un rendu typographique soigné et d'un bouton d'export vers PDF ou copie.
+
+## Publier et partager
+
+Depuis 2024, les Artifacts React peuvent être publiés via un lien public (`claude.site/artifacts/...`). Le lien sert le bundle compilé sans exposer la conversation source. C'est devenu une mini-plateforme de partage de mini-apps, comparable à un CodePen embarqué dans Claude.
+
+## Pour aller plus loin
+
+Pour maximiser la qualité d'un Artifact React, soyez explicite sur les contraintes : "single-file, Tailwind, shadcn/ui, pas de fetch externe, données mockées en haut du fichier". Si un rendu casse, ouvrez la console du navigateur (clic droit dans l'iframe → Inspecter) : la plupart des erreurs viennent d'imports manquants ou de versions Tailwind incompatibles. Pour des prototypes complexes, mieux vaut basculer sur un vrai projet Next.js et utiliser l'API plutôt que de pousser les limites du sandbox.

@@ -1,0 +1,159 @@
+---
+title: "Créer un serveur MCP TypeScript : déploiement"
+description: "NPM publish, Docker, variables d'env, distribution."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+Une fois votre serveur MCP TypeScript fonctionnel en local, l'étape suivante consiste à le distribuer pour que vos collègues (ou la communauté) puissent l'installer en une commande. Trois canaux dominent : **npm** pour la simplicité, **Docker** pour l'isolation, et le **transport HTTP/SSE** pour les déploiements cloud. Ce guide couvre les trois.
+
+## Préparer le package npm
+
+Le moyen le plus simple de distribuer un serveur MCP est de le publier sur npm avec un binaire exécutable via `npx`. Configurez le `package.json` pour pointer vers un script exécutable.
+
+```json
+{
+  "name": "@monorg/mcp-mon-serveur",
+  "version": "1.0.0",
+  "type": "module",
+  "bin": {
+    "mcp-mon-serveur": "./dist/index.js"
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc",
+    "prepublishOnly": "npm run build"
+  }
+}
+```
+
+Ajoutez impérativement le shebang en tête de `src/index.ts` :
+
+```ts
+#!/usr/bin/env node
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+// ...
+```
+
+Publiez ensuite :
+
+```bash
+npm login
+npm publish --access public
+```
+
+L'utilisateur final l'installe directement dans sa config Claude :
+
+```json
+{
+  "mcpServers": {
+    "mon-serveur": {
+      "command": "npx",
+      "args": ["-y", "@monorg/mcp-mon-serveur@latest"]
+    }
+  }
+}
+```
+
+## Gérer les variables d'environnement
+
+La plupart des serveurs ont besoin de tokens (API keys, DB URLs). Lisez-les via `process.env` et validez au démarrage pour échouer vite.
+
+```ts
+const API_KEY = process.env.MON_API_KEY;
+if (!API_KEY) {
+  console.error("MON_API_KEY est requis");
+  process.exit(1);
+}
+```
+
+Côté client, les variables sont passées dans le champ `env` de la config :
+
+```json
+{
+  "mcpServers": {
+    "mon-serveur": {
+      "command": "npx",
+      "args": ["-y", "@monorg/mcp-mon-serveur"],
+      "env": { "MON_API_KEY": "sk-xxxxx" }
+    }
+  }
+}
+```
+
+Pour éviter de stocker des secrets en clair, beaucoup d'utilisateurs branchent un secret manager : `op read op://Personal/api/token` ou `pass show api/token`.
+
+## Distribuer via Docker
+
+Pour des serveurs avec dépendances natives (Playwright, FFmpeg, drivers DB), Docker isole proprement l'exécution.
+
+```bash
+# Dockerfile
+FROM node:22-alpine
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci --omit=dev
+COPY dist ./dist
+ENTRYPOINT ["node", "dist/index.js"]
+```
+
+Build et publication :
+
+```bash
+docker build -t monorg/mcp-mon-serveur:1.0.0 .
+docker push monorg/mcp-mon-serveur:1.0.0
+```
+
+Config client correspondante :
+
+```json
+{
+  "mcpServers": {
+    "mon-serveur": {
+      "command": "docker",
+      "args": [
+        "run", "-i", "--rm",
+        "-e", "MON_API_KEY",
+        "monorg/mcp-mon-serveur:1.0.0"
+      ],
+      "env": { "MON_API_KEY": "sk-xxxxx" }
+    }
+  }
+}
+```
+
+## Transport HTTP/SSE pour le cloud
+
+Pour un serveur multi-utilisateurs hébergé (ex : Vercel, Cloudflare Workers), utilisez le transport HTTP plutôt que stdio.
+
+```ts
+import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
+import express from "express";
+
+const app = express();
+app.use(express.json());
+
+app.post("/mcp", async (req, res) => {
+  const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
+  await server.connect(transport);
+  await transport.handleRequest(req, res, req.body);
+});
+
+app.listen(3000);
+```
+
+L'utilisateur s'y connecte ainsi :
+
+```bash
+claude mcp add mon-serveur --transport http https://mcp.monorg.com/mcp
+```
+
+## CI/CD et versioning
+
+Automatisez les releases avec GitHub Actions : tag git → publish npm + push Docker. Respectez le SemVer strict, le SDK MCP évolue vite et certaines breaking changes sont silencieuses (validation Zod plus stricte, format de réponse).
+
+## Pour aller plus loin
+
+- Smithery.ai : registre communautaire qui packagent automatiquement les serveurs MCP en Docker
+- MCP Registry officiel : soumettre votre serveur via PR
+- Article suivant : créer un serveur MCP en Python avec FastMCP

@@ -1,0 +1,94 @@
+---
+title: "Time-To-First-Token tuning"
+description: "Optimiser le TTFT de l'API Anthropic : streaming, prompts courts, prompt caching et choix du modèle."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+Le **Time-To-First-Token** (TTFT) est le délai entre l'envoi de votre requête et la réception du premier token de la réponse. Pour une UX conversationnelle, c'est la métrique perçue la plus importante : un TTFT sous 500 ms donne l'impression d'un assistant vif, au-delà de 2 s l'utilisateur croit l'application figée. Voici les leviers concrets pour le réduire.
+
+## 1. Streamer systématiquement
+
+Sans streaming, le TTFT est confondu avec le temps total de génération : vous attendez toute la réponse avant le premier caractère. Avec `stream: true`, le premier token arrive dès que le modèle commence à générer — typiquement entre 200 ms et 1 s selon le contexte.
+
+```ts
+const stream = await anthropic.messages.stream({
+  model: "claude-haiku-4-5",
+  max_tokens: 1024,
+  messages
+});
+
+for await (const event of stream) {
+  if (event.type === "content_block_delta") {
+    process.stdout.write(event.delta.text);
+  }
+}
+```
+
+Côté client, lisez le `ReadableStream` directement et affichez chaque chunk dès réception. C'est le gain le plus simple et le plus spectaculaire.
+
+## 2. Raccourcir le prompt d'entrée
+
+Le TTFT est dominé par le temps de **prefill** — le modèle doit lire tout votre contexte avant de générer le premier token. Ce temps croît quasi linéairement avec la taille du prompt :
+
+- 1 K tokens d'entrée → ~150 ms de prefill
+- 10 K tokens → ~700 ms
+- 100 K tokens → 5 s et plus
+
+Auditez votre prompt système : avez-vous vraiment besoin de 3 000 tokens d'instructions ? Souvent, 500 tokens bien rédigés produisent de meilleurs résultats qu'un pavé verbeux. Supprimez les exemples redondants, factorisez les règles, et déplacez le contexte volatile vers les messages utilisateur.
+
+## 3. Activer le prompt caching
+
+Le **prompt caching** est l'arme la plus puissante contre le TTFT sur les prompts longs. Vous marquez les portions stables de votre contexte avec `cache_control`, et Anthropic mémorise leur représentation interne pendant ~5 minutes (ou 1 h en cache étendu).
+
+```ts
+await anthropic.messages.create({
+  model: "claude-sonnet-4-6",
+  system: [
+    {
+      type: "text",
+      text: SYSTEM_PROMPT_LONG, // ex: 8000 tokens
+      cache_control: { type: "ephemeral" }
+    }
+  ],
+  messages
+});
+```
+
+Sur un cache hit, le prefill de la portion cachée passe de plusieurs secondes à quelques dizaines de millisecondes. Idéal pour un RAG où vous réinjectez les mêmes documents, ou pour un agent avec un long system prompt.
+
+## 4. Choisir le bon modèle
+
+Les modèles de la famille Claude ont des TTFT très différents :
+
+- **Claude Haiku 4.5** : le plus rapide, idéal pour les tâches simples, autocomplétion, classification.
+- **Claude Sonnet 4.6** : excellent équilibre vitesse/qualité pour la majorité des cas.
+- **Claude Opus 4.7** : le plus puissant mais avec un TTFT plus élevé — réservez-le aux tâches de raisonnement profond.
+
+Pattern fréquent : router selon la complexité. Une heuristique simple (longueur du prompt, présence de mots-clés) ou un classifieur Haiku peuvent décider à la volée.
+
+## 5. Mesurer avant d'optimiser
+
+Instrumentez vos appels :
+
+```ts
+const t0 = performance.now();
+const stream = await anthropic.messages.stream({ ... });
+let firstTokenAt: number | null = null;
+
+for await (const event of stream) {
+  if (event.type === "content_block_delta" && !firstTokenAt) {
+    firstTokenAt = performance.now() - t0;
+    metrics.record("ttft_ms", firstTokenAt);
+  }
+}
+```
+
+Loggez `ttft_ms` avec le modèle, la taille du prompt, le cache hit ratio. Vous identifierez les requêtes pathologiques en quelques heures de production.
+
+## Pour aller plus loin
+
+- Documentation prompt caching : `docs.anthropic.com/en/docs/build-with-claude/prompt-caching`.
+- Combinez Haiku 4.5 + streaming + cache pour des interfaces conversationnelles sous 300 ms de TTFT.
+- Pour les agents tool-using, comptez aussi le **inter-turn latency** : chaque tool call ajoute un aller-retour.
+- Anthropic publie des SLA de latence par région — déployez vos workers proches du datacenter cible.

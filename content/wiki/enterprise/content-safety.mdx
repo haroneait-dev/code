@@ -1,0 +1,63 @@
+---
+title: "Filtres de modération et Content Safety"
+description: "Guardrails Anthropic pour contenus toxiques/illégaux : politiques d'usage, classifieurs internes et stratégies de défense en profondeur."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+La sécurité du contenu est un pilier incontournable de tout déploiement Claude en entreprise. Au-delà du modèle lui-même, Anthropic applique une chaîne de filtres et de politiques qui définissent ce que l'API peut produire, refuser, ou signaler. Comprendre ces garde-fous permet de construire des applications qui respectent à la fois la Usage Policy d'Anthropic et les obligations réglementaires de votre secteur (RGPD, DSA, AI Act, normes sectorielles).
+
+## Les couches de Content Safety chez Anthropic
+
+Claude est entraîné via Constitutional AI : les sorties indésirables (haineuses, dangereuses, sexuelles non consenties, instructions pour des armes CBRN, etc.) sont activement pénalisées pendant l'entraînement. Mais ce filtrage intrinsèque est complété par des classifieurs en aval qui scorent chaque réponse avant qu'elle ne soit livrée à votre application. Ces classifieurs peuvent déclencher un refus, un raffinement, ou un drapeau de modération transmis dans la réponse de l'API.
+
+Pour les workloads sensibles, vous pouvez aussi activer la Usage Policy Reporting via votre compte Console : les violations répétées d'une politique remontent dans les logs d'audit et peuvent suspendre une clé API.
+
+## Catégories de contenu surveillées
+
+Anthropic publie une taxonomie publique. Les catégories principales :
+
+- **CSAM, contenu sexuel impliquant des mineurs** — tolérance zéro, blocage absolu.
+- **Conseils opérationnels armes CBRN** (chimique, biologique, radiologique, nucléaire).
+- **Discours haineux ciblé**, harcèlement, incitation à la violence.
+- **Activités illégales** spécifiques selon juridiction (fraude, vente d'armes, etc.).
+- **Manipulation politique** et désinformation à grande échelle.
+- **Privacy violations** — révélation de PII sans consentement.
+
+Chaque catégorie a un seuil d'action différent : certaines déclenchent un refus systématique, d'autres une réponse modulée selon le contexte (recherche académique vs déploiement grand public).
+
+## Construire vos propres guardrails applicatifs
+
+Les garde-fous Anthropic ne dispensent pas de filtres maison. Pour un assistant client par exemple, vous devez ajouter :
+
+- Un **pré-filtre d'entrée** qui détecte les requêtes manifestement abusives avant de payer un appel Claude.
+- Un **post-filtre de sortie** qui re-classifie la réponse selon vos critères métier (mentions de concurrents, conseils juridiques, promesses commerciales).
+- Une **politique de fallback** : que renvoyer si le filtre rejette ? Un message générique, une escalade humaine, un log enrichi.
+
+L'approche la plus robuste reste de chaîner un petit modèle classifieur (Claude Haiku, ou un modèle dédié comme Llama Guard) en amont et en aval, plutôt que de tout faire faire au modèle principal.
+
+## Logging et audit pour la conformité
+
+Pour le DSA et l'AI Act, vous devez démontrer un dispositif de modération traçable. Conservez (avec rotation appropriée) :
+
+- Le hash du prompt utilisateur.
+- Le verdict du filtre d'entrée et la justification.
+- La catégorie remontée par Claude si refus.
+- L'action prise côté application.
+
+Stockez ces logs hors du contexte conversationnel pour respecter la minimisation des données et facilitez l'export pour les régulateurs.
+
+## Tests adversariaux et red-teaming continu
+
+Un guardrail qui n'est pas testé est un guardrail théorique. Mettez en place :
+
+- Un corpus de prompts adversariaux versionné (jailbreaks publics + prompts métier sensibles).
+- Une CI qui rejoue ce corpus à chaque mise à jour de modèle ou de system prompt.
+- Un canal de signalement interne pour que les opérateurs remontent les outputs problématiques.
+
+## Pour aller plus loin
+
+- Usage Policy officielle Anthropic et taxonomie de risques.
+- Llama Guard 3 et Prompt Guard de Meta pour classifieurs open source.
+- AI Act européen, articles relatifs aux systèmes à haut risque.
+- Documentation Anthropic sur les `stop_reason` et codes de modération.

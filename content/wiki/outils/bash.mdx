@@ -1,0 +1,158 @@
+---
+title: "L'outil Bash"
+description: "Exécuter des commandes shell depuis Claude Code — sandbox, timeouts, background, et règles de sécurité."
+updatedAt: "2026-05-19"
+readingMinutes: 8
+---
+
+L'outil `Bash` permet à Claude Code d'exécuter n'importe quelle commande shell — `git`, `npm`, `python`, `curl`, ou vos propres scripts. C'est le pont entre Claude et votre système. Sa puissance vient avec une responsabilité : une commande Bash peut tout faire, y compris détruire votre projet. Heureusement, le harness Claude Code expose un système de permissions, des timeouts et un mode background pour cadrer son usage.
+
+## À quoi sert Bash
+
+Bash est utilisé pour :
+
+- exécuter des **commandes de build** (`npm run build`, `cargo build`) ;
+- lancer des **tests** (`npm test`, `pytest`) ;
+- interagir avec **Git** (`git status`, `git diff`, `git commit`) ;
+- gérer les **dépendances** (`npm install`, `pip install`) ;
+- exécuter des **scripts utilitaires** ;
+- requêter une **API** (`curl`, `gh api`) ;
+- créer ou déplacer des fichiers (`mkdir`, `mv`, `cp`).
+
+Pour lire ou écrire des fichiers, **n'utilisez pas Bash** : Read/Write/Edit sont plus sûrs et alimentent correctement le contexte.
+
+## Paramètres
+
+| Paramètre | Type | Obligatoire | Description |
+|-----------|------|-------------|-------------|
+| `command` | string | oui | La commande shell à exécuter |
+| `description` | string | non | Description courte (active voice, 5-10 mots) |
+| `timeout` | integer | non | Timeout en ms (max 600000 = 10 min) |
+| `run_in_background` | boolean | non | Lance en arrière-plan |
+| `dangerouslyDisableSandbox` | boolean | non | Désactive le sandbox (rare) |
+
+Le `cwd` est réinitialisé entre chaque appel — utilisez **toujours des chemins absolus** et évitez `cd`.
+
+## Exemples concrets
+
+### Lancer les tests
+
+```bash
+Bash(
+  command="npm test -- --run",
+  description="Run test suite once"
+)
+```
+
+### Git status + diff en parallèle
+
+Au lieu de deux appels séquentiels, lancez les deux dans un même message (plusieurs tool calls) :
+
+```bash
+Bash(command="git status", description="Show working tree status")
+Bash(command="git diff", description="Show unstaged changes")
+```
+
+### Build long en arrière-plan
+
+```bash
+Bash(
+  command="npm run build",
+  description="Build production bundle",
+  run_in_background=true,
+  timeout=300000
+)
+```
+
+Vous serez notifié à la fin — pas besoin de polling.
+
+### Créer un commit (méthode HEREDOC)
+
+```bash
+Bash(
+  command=`git commit -m "$(cat <<'EOF'
+feat: ajoute le composant Hero
+
+Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>
+EOF
+)"`,
+  description="Create commit"
+)
+```
+
+Le HEREDOC garantit un message multilignes correctement formaté, même avec des caractères spéciaux.
+
+## Sandbox et sécurité
+
+Claude Code tourne par défaut dans un environnement sandboxé qui restreint certaines opérations (accès réseau, écriture en dehors du projet, etc. — selon la configuration). Le paramètre `dangerouslyDisableSandbox` est à éviter sauf cas explicite.
+
+Les **permissions** sont configurées dans `.claude/settings.json` :
+
+```json
+{
+  "permissions": {
+    "allow": ["Bash(npm:*)", "Bash(git status)", "Bash(git diff:*)"],
+    "deny": ["Bash(rm -rf:*)"]
+  }
+}
+```
+
+Cela permet d'autoriser certaines commandes sans prompt et d'en bloquer d'autres dur.
+
+## Bonnes pratiques
+
+**1. Chemins absolus partout.** `cd` ne persiste pas entre les appels. Préférez `npm --prefix /path/to/projet test` à `cd /path && npm test`.
+
+**2. Pas de cd inutile.** Si vous devez vraiment chaîner, faites-le **dans la même commande** : `cd /path && npm test`. Mais évitez d'enchaîner avec une commande git ensuite — `git` opère sur le cwd au moment de l'appel.
+
+**3. Parallélisez les commandes indépendantes.** `git status` et `git diff` sont indépendantes : un seul message, deux tool calls Bash. Bien plus rapide.
+
+**4. Préférez `&&` à `;`.** `cmd1 && cmd2` exécute cmd2 seulement si cmd1 réussit. `;` exécute toujours — utile rarement.
+
+**5. Pas de sleep en boucle de polling.** Si une commande est longue, utilisez `run_in_background=true`. Pour attendre une condition, utilisez `Monitor` (si dispo) ou laissez l'utilisateur vous notifier.
+
+**6. Quote les chemins avec espaces.** `cd "/path with spaces/projet"` — pas `cd /path with spaces/projet`.
+
+## Pièges courants
+
+**Commandes interactives.** `git rebase -i`, `git add -i`, `vim`, `ssh` interactif — Claude ne peut pas répondre à des prompts interactifs. Le shell se bloque. Utilisez les variantes non interactives (`git rebase` simple, `git add <files>`).
+
+**Hooks Git qui demandent une entrée.** Si votre pre-commit hook demande une saisie, le commit bloquera. Adaptez le hook ou désactivez-le ponctuellement (avec autorisation explicite — jamais `--no-verify` en douce).
+
+**`find /` au lieu de `find .`.** Scanner toute la racine du système épuise les ressources. Toujours partir de `.` ou d'un chemin précis.
+
+**Pas de `cat`, `head`, `tail`, `sed`, `awk`, `echo` pour fichiers.** Utilisez les outils dédiés (Read, Edit, Write). Bash est pour les commandes système.
+
+**Timeout par défaut court.** 2 minutes par défaut. Pour un build de 5 min, montez à 360000 ms.
+
+**Newlines dans `command`.** Évitez les newlines littéraux pour séparer des commandes — utilisez `&&` ou `;`. Les newlines dans des strings quotées (HEREDOC) sont OK.
+
+## Background processes
+
+Les processus lancés avec `run_in_background=true` :
+
+- ne bloquent pas la conversation ;
+- envoient une notification à la fin ;
+- peuvent être inspectés via leur sortie ;
+- doivent toujours avoir un timeout raisonnable.
+
+Cas typiques : `npm run dev` (serveur de dev), `npm run build` (build long), `pytest` sur une grosse suite.
+
+## Combiner avec d'autres outils
+
+```bash
+# 1. Trouver les fichiers
+Glob(pattern="**/*.test.ts")
+
+# 2. Lancer les tests
+Bash(command="npm test", description="Run tests")
+
+# 3. Si échec, lire le log
+Read(file_path="/path/to/test-output.log")
+```
+
+## Pour aller plus loin
+
+- [Documentation Claude Code — Permissions](https://docs.claude.com/en/docs/claude-code)
+- Voir aussi : `Monitor` pour suivre un background, skill `fewer-permission-prompts` pour réduire les confirmations.
+- Bonne pratique : configurez votre `.claude/settings.json` pour autoriser vos commandes les plus fréquentes (`npm:*`, `git status`, `git diff:*`) et travaillez sans interruption.

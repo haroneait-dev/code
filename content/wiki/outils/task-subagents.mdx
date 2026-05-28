@@ -1,0 +1,145 @@
+---
+title: "L'outil Task (subagents)"
+description: "Déléguer une tâche à un subagent spécialisé dans Claude Code — quand, comment, et limites."
+updatedAt: "2026-05-19"
+readingMinutes: 7
+---
+
+L'outil `Task` permet à Claude Code de lancer un **subagent** — une instance de Claude avec son propre contexte, son propre prompt et son propre périmètre — pour accomplir une sous-tâche autonome. C'est l'un des leviers les plus puissants du harness : il permet de paralléliser, d'isoler des recherches lourdes, et de réutiliser des "personnalités" spécialisées.
+
+## À quoi sert Task
+
+- **Isoler une recherche large** sans polluer le contexte principal (ex. "lis tous les fichiers du dossier X et fais-moi un résumé") ;
+- **Déléguer à un agent spécialisé** (security-review, code-review, init...) ;
+- **Paralléliser** plusieurs investigations indépendantes ;
+- **Encapsuler un workflow récurrent** sous forme de subagent réutilisable.
+
+L'idée centrale : le subagent dispose d'une fenêtre de contexte fraîche et ne renvoie au parent que sa **réponse finale** (texte). Tous les fichiers qu'il a lus, les commandes qu'il a exécutées, restent dans son contexte à lui.
+
+## Paramètres
+
+| Paramètre | Type | Obligatoire | Description |
+|-----------|------|-------------|-------------|
+| `subagent_type` | string | oui | Type de subagent (`general-purpose`, `security-review`, etc.) |
+| `description` | string | oui | Description courte (3-10 mots) |
+| `prompt` | string | oui | Instructions complètes pour le subagent |
+
+Le `prompt` doit être **autonome** : le subagent ne voit pas l'historique du parent, vous devez tout lui expliquer.
+
+## Exemples concrets
+
+### Recherche large isolée
+
+```ts
+Task(
+  subagent_type="general-purpose",
+  description="Audit architecture monorepo",
+  prompt=`Explore le monorepo /Users/harone/projet, identifie les apps, les packages partagés, les conventions de nommage. Retourne un résumé structuré : apps trouvées, packages, dépendances clés, points d'attention.`
+)
+```
+
+Le parent reçoit le résumé. Les ~50 Read et Glob que le subagent a faits ne consomment **pas** le contexte du parent.
+
+### Subagent spécialisé : security review
+
+```ts
+Task(
+  subagent_type="security-review",
+  description="Review security of auth changes",
+  prompt="Analyse les changements pendants sur la branche courante pour identifier d'éventuelles vulnérabilités d'authentification ou d'autorisation."
+)
+```
+
+### Paralléliser plusieurs explorations
+
+Dans un même message, lancez 3 Task en parallèle :
+
+```ts
+Task(subagent_type="general-purpose", description="Audit composants UI", prompt="...")
+Task(subagent_type="general-purpose", description="Audit routes API", prompt="...")
+Task(subagent_type="general-purpose", description="Audit migrations DB", prompt="...")
+```
+
+Vous récupérez 3 résumés indépendants en parallèle, là où en séquentiel cela prendrait 3x le temps.
+
+## Quand utiliser un subagent
+
+**OUI :**
+
+- la tâche demande > 10 lectures de fichiers exploratoires ;
+- la tâche est large mais le résultat utile au parent est court (résumé, liste, conclusion) ;
+- vous voulez paralléliser plusieurs investigations indépendantes ;
+- vous avez un subagent spécialisé qui code mieux que le général sur ce domaine.
+
+**NON :**
+
+- la tâche tient en 1-3 outils → fais-la toi-même ;
+- vous avez besoin de l'output complet (le subagent renvoie un résumé textuel) ;
+- vous voulez ensuite éditer les fichiers que le subagent a lus → mieux vaut lire dans le parent ;
+- la tâche est interactive et nécessite des allers-retours avec l'utilisateur.
+
+## Subagents disponibles
+
+Selon votre installation Claude Code et les plugins installés, vous pouvez disposer de subagents prédéfinis :
+
+| Type | Usage typique |
+|------|---------------|
+| `general-purpose` | Polyvalent, recherche, audit |
+| `security-review` | Audit de sécurité d'un diff/PR |
+| `code-review` | Revue de code structurée |
+| `init` | Initialiser un CLAUDE.md |
+| `babysit` | Surveiller un PR jusqu'à merge |
+
+Des skills (`Skill` tool) peuvent aussi définir des comportements proches d'un subagent sans utiliser Task.
+
+## Pièges courants
+
+**Prompt incomplet.** Le subagent ne voit pas votre conversation. Si vous écrivez "continue ce que j'ai commencé", il ne sait rien. Donnez tout le contexte nécessaire.
+
+**Attendre un fichier en retour.** Un subagent ne "rend" pas des fichiers — il renvoie du texte. Si vous voulez qu'il modifie des fichiers, ses Edits seront persistés sur disque, mais ne lui demandez pas de "vous passer le contenu" — relisez-le vous-même via Read après.
+
+**Lancer un subagent pour une micro-tâche.** Overhead non négligeable (latence + tokens). Pour 1-2 Read, faites-les vous-même.
+
+**Subagent dans un subagent.** Évitez la récursion (selon implémentation). Préférez plusieurs subagents parallèles au niveau du parent.
+
+**Modifications conflictuelles.** Si deux subagents parallèles éditent le même fichier, le dernier gagne. Coordonnez les périmètres pour éviter les chevauchements.
+
+## Patterns avancés
+
+### Map-reduce sur un grand corpus
+
+```ts
+// Lancez N subagents qui chacun analyse un sous-dossier
+Task(prompt="Analyse src/auth/...")
+Task(prompt="Analyse src/billing/...")
+Task(prompt="Analyse src/admin/...")
+// Puis vous (le parent) faites la synthèse des 3 résumés
+```
+
+### Pipeline avec validation
+
+```ts
+// 1. Subagent qui propose un refactoring
+Task(subagent_type="general-purpose", prompt="Propose un plan de refactoring pour ...")
+
+// 2. Subagent qui critique le plan
+Task(subagent_type="code-review", prompt="Voici un plan : ... Identifie les risques.")
+
+// 3. Vous décidez de l'appliquer ou non
+```
+
+### Long-running babysitting
+
+Le subagent `babysit` peut surveiller un PR pendant des minutes/heures sans bloquer le parent. Utile en CI/CD.
+
+## Coût et limites
+
+- Chaque Task consomme des tokens (input prompt + output + outils internes du subagent).
+- Plusieurs Task parallèles consomment en parallèle — surveillez votre budget.
+- La latence d'un subagent dépend de la complexité de sa tâche.
+
+## Pour aller plus loin
+
+- [Documentation Claude Code — Subagents](https://docs.claude.com/en/docs/claude-code)
+- Voir aussi : `TodoWrite` pour planifier une tâche multi-étapes côté parent, `ExitPlanMode` pour valider un plan avant exécution.
+- Astuce : pour un audit complet d'un repo, lancez 3-5 subagents `general-purpose` en parallèle, chacun sur un axe (sécurité, perf, deps, tests, docs). Vous obtenez en quelques minutes un rapport multi-perspectives.

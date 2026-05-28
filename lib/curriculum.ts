@@ -1,3 +1,5 @@
+import { extraModules } from "./modules/_index";
+
 export interface CodeExample {
   lang: string;
   label?: string;
@@ -219,12 +221,12 @@ export const curriculum: Module[] = [
         duration: "8 min",
         tag: "Setup",
         intro:
-          "L'installation de Claude Code se fait en une commande npm. Vous aurez besoin d'une clé API Anthropic et de Node.js ≥ 18.",
+          "L'installation de Claude Code se fait en une commande npm. Vous aurez besoin d'une clé API Anthropic et de Node.js ≥ 20 (la 24 LTS est recommandée).",
         sections: [
           {
             heading: "Prérequis",
             bullets: [
-              "Node.js version 18 ou supérieure",
+              "Node.js version 20 ou supérieure (24 LTS recommandée)",
               "npm ou yarn",
               "Un compte Anthropic avec accès API",
               "Une clé API Anthropic (console.anthropic.com)",
@@ -990,7 +992,7 @@ kill $(lsof -t -i:3000)`,
               label: "~/.claude/settings.json",
               code: `{
   // Modèle Claude à utiliser
-  "model": "claude-opus-4-6",
+  "model": "claude-opus-4-7",
 
   // Outils explicitement autorisés (sans demander)
   "allowedTools": ["Read", "Edit", "Bash(git *)"],
@@ -1031,6 +1033,11 @@ kill $(lsof -t -i:3000)`,
                   "bypassPermissions",
                   "Aucune confirmation demandée",
                   "Scripts automatisés",
+                ],
+                [
+                  "plan",
+                  "Claude propose un plan détaillé sans exécuter",
+                  "Refactor / tâche risquée",
                 ],
               ],
             },
@@ -1497,6 +1504,13 @@ server.setRequestHandler("tools/call", async (req) => {
                 ["/config", "Affiche la configuration actuelle"],
                 ["/cost", "Affiche le coût de la session en cours"],
                 ["/fast", "Bascule en mode Fast (même modèle, output plus rapide)"],
+                ["/review", "Lance une revue de code sur le diff courant"],
+                ["/security-review", "Audit de sécurité du diff courant (vulnérabilités, secrets)"],
+                ["/init", "Bootstrap un CLAUDE.md initial pour le projet"],
+                ["/agents", "Affiche et gère les subagents configurés"],
+                ["/permissions", "Configure interactivement les permissions"],
+                ["/mcp", "Liste et gère les serveurs MCP"],
+                ["/resume", "Reprend une session interrompue"],
               ],
             },
           },
@@ -1732,7 +1746,7 @@ console.log(parsed.result);`,
           },
           {
             heading: "La fenêtre de contexte",
-            body: "Le modèle a une limite de tokens qu'il peut traiter en une fois — c'est la fenêtre de contexte. Claude claude-sonnet-4-6 et Opus 4.6 ont une fenêtre de 200 000 tokens (~150 000 mots). Tout ce que Claude peut \"voir\" à un instant T (historique, fichiers lus, instructions) doit tenir dans cette fenêtre.",
+            body: "Le modèle a une limite de tokens qu'il peut traiter en une fois — c'est la fenêtre de contexte. Claude Sonnet 4.6 et Opus 4.7 ont une fenêtre de 200 000 tokens (~150 000 mots). Tout ce que Claude peut \"voir\" à un instant T (historique, fichiers lus, instructions) doit tenir dans cette fenêtre.",
           },
           {
             heading: "Le mécanisme d'attention",
@@ -1773,7 +1787,7 @@ console.log(parsed.result);`,
             table: {
               headers: ["Modèle", "Input (MTok)", "Output (MTok)", "Usage idéal"],
               rows: [
-                ["claude-opus-4-6", "~$15", "~$75", "Tâches complexes, architecture"],
+                ["claude-opus-4-7", "~$15", "~$75", "Tâches complexes, architecture"],
                 ["claude-sonnet-4-6", "~$3", "~$15", "Usage quotidien équilibré"],
                 ["claude-haiku-4-5", "~$0.25", "~$1.25", "Tâches simples, CI/CD"],
               ],
@@ -1977,10 +1991,18 @@ Validez ce plan ? Je commence par le backend.
             table: {
               headers: ["Type", "Spécialité", "Outils disponibles"],
               rows: [
-                ["general-purpose", "Tâches générales", "Tous les outils"],
-                ["Explore", "Exploration de codebase", "Glob, Grep, Read, Bash (lecture)"],
-                ["Plan", "Architecture & planification", "Analyse seulement, pas d'édition"],
+                ["general-purpose", "Tâches générales (catch-all)", "Tous les outils"],
+                ["Explore", "Recherche / exploration de code (read-only)", "Glob, Grep, Read, Bash lecture"],
+                ["Plan", "Architecture, planification, design doc", "Analyse seulement, pas d'édition"],
+                ["code-reviewer", "Revue de code indépendante d'une PR ou d'un diff", "Read, Glob, Grep + analyse"],
               ],
+            },
+          },
+          {
+            callout: {
+              type: "tip",
+              icon: "🧩",
+              text: "<strong>Subagents custom :</strong> Vous pouvez créer vos propres types dans <code>.claude/agents/&lt;nom&gt;.md</code> avec un frontmatter (<code>name</code>, <code>description</code>, <code>tools</code>, <code>model</code>) et un prompt système — idéal pour des audits métier récurrents.",
             },
           },
           {
@@ -2330,6 +2352,9 @@ cd projet && git checkout fix/bugs && claude
     ],
   },
 ];
+
+// Merge in extra modules from lib/modules/
+curriculum.push(...extraModules);
 
 export const totalLessons = curriculum.reduce(
   (acc, mod) => acc + mod.lessons.length,

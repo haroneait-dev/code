@@ -1,0 +1,196 @@
+---
+title: "PreToolUse et PostToolUse"
+description: "Intercepter avant ou après chaque appel d'outil pour valider, formater ou logger."
+updatedAt: "2026-05-19"
+readingMinutes: 8
+---
+
+`PreToolUse` et `PostToolUse` sont sans doute les deux hooks les plus utilisés au quotidien. Ils permettent d'**encadrer chaque appel d'outil** — `Bash`, `Edit`, `Write`, `Read`, etc. — soit pour bloquer une action dangereuse, soit pour réagir à son résultat (formatage, lint, audit).
+
+## Différence fondamentale
+
+- `PreToolUse` se déclenche **avant** l'exécution. Il peut **bloquer** l'outil (exit code 2 ou `decision: "block"`).
+- `PostToolUse` se déclenche **après** l'exécution. Il ne peut pas annuler l'action, mais peut réagir : formater, notifier, vérifier le résultat, demander à Claude de corriger.
+
+## Le matcher : filtrer les outils ciblés
+
+Les deux hooks acceptent un champ `matcher` qui est une regex sur le nom de l'outil. Quelques exemples :
+
+```json
+{
+  "matcher": "Edit|Write|MultiEdit"
+}
+```
+
+Cible toutes les opérations d'écriture de fichier.
+
+```json
+{
+  "matcher": "Bash"
+}
+```
+
+Cible uniquement les commandes shell.
+
+```json
+{
+  "matcher": ".*"
+}
+```
+
+Capte tous les outils (utile pour un audit log global).
+
+## Payload reçu sur `stdin`
+
+Quand le hook se déclenche, il reçoit un JSON sur `stdin` qui ressemble à :
+
+```json
+{
+  "session_id": "abc-123",
+  "transcript_path": "/Users/me/.claude/projects/.../transcript.jsonl",
+  "cwd": "/Users/me/projet",
+  "hook_event_name": "PreToolUse",
+  "tool_name": "Bash",
+  "tool_input": {
+    "command": "rm -rf node_modules",
+    "description": "Nettoie les dépendances"
+  }
+}
+```
+
+Pour `PostToolUse`, vous avez en plus `tool_response` qui contient ce que l'outil a renvoyé.
+
+## Exemple 1 : bloquer `rm -rf /`
+
+```json
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/guard-rm.sh"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+```bash
+#!/usr/bin/env bash
+# .claude/hooks/guard-rm.sh
+input=$(cat)
+cmd=$(echo "$input" | jq -r '.tool_input.command // ""')
+
+if echo "$cmd" | grep -E "rm\s+-rf?\s+/($|\s)" >/dev/null; then
+  echo "Commande dangereuse refusée: $cmd" >&2
+  exit 2
+fi
+exit 0
+```
+
+L'exit code 2 indique au harness de **bloquer** l'exécution. Le `stderr` est renvoyé à Claude pour qu'il comprenne pourquoi.
+
+> ⚠️ Attention : la regex ci-dessus est volontairement simple. Un attaquant motivé peut la contourner (`rm -r -f /`, `/bin/rm`, etc.). Un hook de sécurité doit être pensé comme une **défense en profondeur**, pas comme une protection absolue.
+
+## Exemple 2 : auto-format après une édition
+
+```json
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/format.sh"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+```bash
+#!/usr/bin/env bash
+# .claude/hooks/format.sh
+input=$(cat)
+file=$(echo "$input" | jq -r '.tool_input.file_path // empty')
+
+[ -z "$file" ] && exit 0
+
+case "$file" in
+  *.ts|*.tsx|*.js|*.jsx|*.json|*.md)
+    npx prettier --write "$file" 2>/dev/null
+    ;;
+  *.py)
+    ruff format "$file" 2>/dev/null
+    ;;
+  *.go)
+    gofmt -w "$file"
+    ;;
+esac
+exit 0
+```
+
+## Exemple 3 : demander à Claude de revoir un test qui échoue
+
+`PostToolUse` peut renvoyer un JSON sur `stdout` pour donner du feedback à Claude :
+
+```bash
+#!/usr/bin/env bash
+input=$(cat)
+file=$(echo "$input" | jq -r '.tool_input.file_path // empty')
+
+if [[ "$file" == *.ts ]] && ! npx tsc --noEmit "$file" 2>/tmp/tsc.log; then
+  jq -n --arg msg "$(cat /tmp/tsc.log)" '{
+    decision: "block",
+    reason: ("TypeScript errors:\n" + $msg)
+  }'
+fi
+```
+
+Le harness va renvoyer la `reason` à Claude, qui pourra corriger ses erreurs dans la foulée.
+
+## Combiner plusieurs matchers
+
+Vous pouvez déclarer plusieurs blocs hooks pour le même événement :
+
+```json
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [{ "type": "command", "command": ".claude/hooks/guard-bash.sh" }]
+      },
+      {
+        "matcher": "Edit|Write",
+        "hooks": [{ "type": "command", "command": ".claude/hooks/guard-secrets.sh" }]
+      }
+    ]
+  }
+}
+```
+
+Chaque bloc est filtré indépendamment. Plusieurs hooks peuvent matcher le même outil — ils s'exécutent en parallèle [à vérifier].
+
+## Bonnes pratiques
+
+1. **Toujours `exit 0` par défaut**. Un hook qui plante silencieusement bloque la session.
+2. **Logger ce que vous bloquez** dans un fichier dédié — vous serez content de retrouver pourquoi.
+3. **Tester avec `--debug`** : Claude Code affiche les hooks exécutés et leur output.
+4. **Garder le hook rapide** (< 500 ms idéalement). Un hook lent fige toute la session.
+
+## Pour aller plus loin
+
+- [Référence des hooks](https://docs.claude.com/en/docs/claude-code/hooks)
+- Article wiki : « Sécurité : éviter le RCE »
+- Article wiki : « Hooks et performance »
+- Article wiki : « Debugging hooks »

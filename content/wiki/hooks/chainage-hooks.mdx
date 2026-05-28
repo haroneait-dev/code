@@ -1,0 +1,77 @@
+---
+title: "Chaînage de hooks (pipeline)"
+description: "Ordre d'exécution quand plusieurs scripts écoutent le même event, et propagation des exit codes."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+Dès qu'un projet dépasse un ou deux hooks, on se retrouve à brancher plusieurs scripts sur le même event : un linter sur `PostToolUse`, un logger pour l'observabilité, un guard de sécurité, etc. Comprendre comment Claude Code chaîne ces hooks — l'ordre, la propagation des exit codes et l'interaction entre matchers — est essentiel pour éviter les comportements imprévisibles.
+
+## Modèle d'exécution
+
+Pour un event donné, Claude Code parcourt la liste des entrées `hooks` dans `settings.json` **dans l'ordre de déclaration**. Pour chaque entrée dont le `matcher` correspond, tous les sous-hooks de la propriété `hooks` sont exécutés séquentiellement.
+
+```json
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          { "type": "command", "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/01-format.sh" },
+          { "type": "command", "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/02-lint.sh" }
+        ]
+      },
+      {
+        "matcher": ".*",
+        "hooks": [
+          { "type": "command", "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/99-log.sh" }
+        ]
+      }
+    ]
+  }
+}
+```
+
+Pour un `Edit`, l'ordre sera : `01-format.sh` → `02-lint.sh` → `99-log.sh`. Convention utile : préfixer les scripts par un numéro pour rendre l'ordre lisible.
+
+## Sources multiples : projet, user, enterprise
+
+Les hooks peuvent provenir de trois fichiers : `~/.claude/settings.json` (user), `.claude/settings.json` (project) et la config managée (enterprise). Claude Code les fusionne. L'ordre exact peut varier selon les versions ; en cas de doute, utilisez `claude --debug` pour vérifier la séquence réelle. Évitez de dépendre fortement de cet ordre inter-sources : préférez consolider dans un seul fichier les hooks dont la priorité est critique.
+
+## Propagation des exit codes
+
+Chaque script s'exécute dans son propre process. Les codes de sortie suivent ces règles :
+
+- **`exit 0`** : succès, le script suivant s'exécute.
+- **`exit 2`** sur un event « bloquant » (`PreToolUse`, `UserPromptSubmit`, `PreCompact`) : l'action est refusée, et **les hooks suivants ne sont pas exécutés** dans certaines versions. À tester sur votre version.
+- **Autre code non nul** : erreur non bloquante. Claude Code l'affiche à l'utilisateur mais continue la chaîne.
+
+Conséquence pratique : un script qui veut bloquer doit le faire tôt dans la chaîne, sinon des hooks ultérieurs peuvent produire des effets de bord avant le rejet.
+
+## Partager de l'état entre hooks
+
+Chaque script reçoit le même JSON sur stdin mais ne peut pas modifier celui transmis au suivant. Pour partager de l'état :
+
+- Utiliser un fichier temporaire indexé par `session_id`.
+- Utiliser des variables d'environnement initialisées par un hook `SessionStart`.
+
+```bash
+#!/usr/bin/env bash
+input=$(cat)
+sid=$(echo "$input" | jq -r '.session_id')
+mkdir -p "/tmp/claude/$sid"
+echo "$input" > "/tmp/claude/$sid/last-event.json"
+```
+
+Le script suivant peut alors lire `/tmp/claude/$sid/last-event.json` pour enrichir son comportement.
+
+## Anti-patterns à éviter
+
+- **Hooks lents en tête de chaîne** : si `01-format.sh` met 10 s, il retarde tout le pipeline. Mettez les scripts longs en fin de chaîne ou rendez-les asynchrones (`nohup script &`).
+- **Dépendances cachées** : un hook qui suppose qu'un autre a déjà tourné rend la config fragile. Documentez ces dépendances en commentaire.
+- **Effets de bord avant validation** : ne modifiez pas le repo dans un hook `PreToolUse` qui pourrait être bloqué par un hook suivant.
+
+## Pour aller plus loin
+
+Quand le nombre de hooks augmente, envisagez de créer un seul script « dispatcher » qui lit le JSON et appelle les sous-traitements internes selon l'event et l'outil. Vous gagnez en testabilité (un seul point d'entrée) et vous contrôlez explicitement l'ordre, plutôt que de dépendre du parsing implicite de `settings.json`. Pensez aussi à versionner ces scripts dans le repo, sous `.claude/hooks/`, pour qu'ils soient partagés par toute l'équipe.

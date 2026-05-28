@@ -1,0 +1,63 @@
+---
+title: "Prompt Caching : concepts et stratégies"
+description: "Comprendre le prompt caching d'Anthropic et structurer ses prompts pour maximiser le cache hit rate."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+Le **prompt caching** est l'une des optimisations les plus rentables qu'on puisse mettre en place sur l'API Anthropic. En réutilisant intelligemment des portions de contexte d'une requête à l'autre, on peut réduire la latence jusqu'à 80 % et le coût des tokens d'entrée jusqu'à 90 %. Encore faut-il structurer son prompt correctement : le cache ne fonctionne que si la partie en tête de prompt est strictement identique entre deux appels.
+
+## Comment fonctionne le cache
+
+Anthropic cache les préfixes de prompts marqués avec `cache_control: { type: "ephemeral" }`. Quand un nouveau message arrive, l'API compare le préfixe à ses caches actifs (TTL par défaut de 5 minutes, extensible à 1 heure). Si tout le contenu jusqu'au marqueur de cache est identique au token près, on obtient un **cache hit** : les tokens cachés sont facturés à 10 % du prix normal et ne nécessitent pas de re-tokenisation.
+
+Quatre blocs peuvent être cachés : `system`, `tools`, `messages`, et les blocs `content` individuels. Le minimum requis est de **1024 tokens** pour Sonnet/Opus et 2048 pour Haiku — en dessous, le marqueur est ignoré silencieusement.
+
+## La règle d'or : statique en premier
+
+C'est le principe le plus important du prompt caching : **tout ce qui ne change pas doit être placé au début, tout ce qui varie à la fin**. L'ordre canonique est :
+
+1. **Tools** (définitions de fonctions, schémas JSON)
+2. **System prompt** (instructions, persona, règles métier)
+3. **Documents de contexte** (RAG, fichiers de référence, exemples few-shot)
+4. **Historique de conversation** (messages précédents)
+5. **Message utilisateur courant** (la seule partie vraiment dynamique)
+
+Inverser cet ordre — par exemple injecter la date du jour ou un user ID en tête de system prompt — invalide tout le cache à chaque requête.
+
+## Stratégies de placement des marqueurs
+
+L'API autorise jusqu'à **4 marqueurs `cache_control`** par requête, ce qui permet de créer plusieurs points de cache imbriqués. Une stratégie classique pour un agent conversationnel :
+
+- Marqueur 1 : fin des `tools`
+- Marqueur 2 : fin du `system` + documents stables
+- Marqueur 3 : fin de l'historique conversationnel (réécrit à chaque tour pour étendre le cache)
+- Marqueur 4 : réservé pour un contexte temporaire
+
+Le 3ᵉ marqueur permet d'étendre progressivement le cache au fil de la conversation : chaque tour ajoute les derniers messages au préfixe cachable, ce qui fait grossir le cache hit avec le temps.
+
+## Éviter les invalidations silencieuses
+
+Quelques pièges classiques qui cassent le cache sans erreur visible :
+
+- **Timestamps dans le system prompt** : `"Tu es un assistant. Date : 2026-05-18T14:32:01Z"` invalide tout. Mettre la date en fin de prompt utilisateur à la place.
+- **IDs dynamiques** : user_id, session_id, request_id doivent vivre dans le `user` message, pas dans le `system`.
+- **Outils réordonnés** : si vous générez vos `tools` depuis un objet JS, l'ordre des clés peut varier. Utiliser un tri stable.
+- **Whitespace** : une espace en trop, un `\n` Windows vs Unix, et le hash change.
+
+## Mesurer son cache hit rate
+
+L'API renvoie dans `usage` les champs `cache_creation_input_tokens` et `cache_read_input_tokens`. Le ratio à viser :
+
+```
+hit_rate = cache_read / (cache_read + cache_creation + input_tokens)
+```
+
+Un agent bien optimisé tourne entre 70 et 95 % de hit rate après chauffage. En dessous de 50 %, il y a presque toujours un timestamp ou un ID qui pollue le préfixe.
+
+## Pour aller plus loin
+
+- Documentation officielle : [Prompt caching](https://docs.anthropic.com/en/docs/build-with-claude/prompt-caching)
+- TTL étendu 1 heure : utile pour les agents long-running et les batchs documentaires
+- Combiner avec le **batch API** pour 50 % de réduction supplémentaire sur les workloads asynchrones
+- Lire aussi : *Itérer sur un prompt* et *Tester un prompt* pour mesurer l'impact d'un changement avant de casser un cache rentable

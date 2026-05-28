@@ -1,0 +1,106 @@
+---
+title: "Intégration de la Vision API d'Anthropic"
+description: "Encoder des images en base64, construire des payloads multi-modaux et exploiter la vision de Claude."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+Tous les modèles Claude récents (Sonnet 4.6+, Opus 4.7) sont **multi-modaux** : ils acceptent du texte et des images dans le même message. Cela ouvre la porte à l'OCR avancé, à l'analyse de captures d'écran, au diagnostic de graphiques, à la lecture de documents scannés ou à la description d'interfaces. L'API ne nécessite aucun endpoint séparé : on passe simplement des blocs `image` dans le `content` d'un message.
+
+## Encoder une image en base64
+
+Pour envoyer une image locale, encodez-la en base64 et précisez son `media_type` (`image/jpeg`, `image/png`, `image/gif`, `image/webp`).
+
+```python
+import anthropic, base64, pathlib
+
+img_bytes = pathlib.Path("schema.png").read_bytes()
+img_b64 = base64.standard_b64encode(img_bytes).decode("utf-8")
+
+client = anthropic.Anthropic()
+response = client.messages.create(
+    model="claude-sonnet-4-6",
+    max_tokens=1024,
+    messages=[{
+        "role": "user",
+        "content": [
+            {
+                "type": "image",
+                "source": {
+                    "type": "base64",
+                    "media_type": "image/png",
+                    "data": img_b64,
+                },
+            },
+            {"type": "text", "text": "Décris ce schéma d'architecture."}
+        ],
+    }],
+)
+print(response.content[0].text)
+```
+
+## Référencer une image par URL
+
+Plus simple si l'image est déjà hébergée : utilisez `source.type = "url"`. L'API télécharge l'image côté Anthropic.
+
+```ts
+import Anthropic from "@anthropic-ai/sdk";
+
+const client = new Anthropic();
+const msg = await client.messages.create({
+  model: "claude-sonnet-4-6",
+  max_tokens: 1024,
+  messages: [{
+    role: "user",
+    content: [
+      { type: "image", source: { type: "url", url: "https://exemple.com/photo.jpg" } },
+      { type: "text", text: "Que vois-tu sur cette photo ?" },
+    ],
+  }],
+});
+```
+
+## Payloads multi-images
+
+Vous pouvez passer plusieurs images dans le même message — utile pour comparer des versions, des avant/après ou plusieurs pages d'un document. Numérotez-les dans le texte pour aider Claude.
+
+```json
+{
+  "role": "user",
+  "content": [
+    { "type": "image", "source": { "type": "url", "url": "https://.../v1.png" } },
+    { "type": "image", "source": { "type": "url", "url": "https://.../v2.png" } },
+    { "type": "text", "text": "Image 1 = avant, Image 2 = après. Liste les différences." }
+  ]
+}
+```
+
+## Contraintes et bonnes pratiques
+
+- **Taille max** : 5 Mo par image en base64, 100 Mo via URL.
+- **Résolution recommandée** : ≤ 1568 px sur le grand côté. Au-delà, l'image est redimensionnée et vous payez des tokens inutiles.
+- **Coût** : une image de 1000×1000 ≈ 1334 tokens d'entrée. Multipliez par le nombre d'images.
+- **Formats supportés** : JPEG, PNG, GIF (non animé), WebP. Pas de PDF natif — convertissez chaque page en image, ou utilisez l'API Files.
+- Placez le texte **après** les images dans le `content` : la documentation indique de meilleurs résultats dans cet ordre.
+
+## Cas d'usage typiques
+
+```python
+# OCR de facture
+"Extrais en JSON : fournisseur, date, total HT, total TTC, lignes."
+
+# Description accessibilité
+"Génère un alt text concis (< 125 caractères) pour cette image."
+
+# Diagnostic UI
+"Cette capture montre un bug. Identifie le problème visible et propose un fix."
+```
+
+Couplez la vision avec le **tool use** pour structurer la sortie (schéma JSON garanti) et avec le **prompt caching** si vous réutilisez les mêmes images dans plusieurs requêtes.
+
+## Pour aller plus loin
+
+- Documentation : `docs.anthropic.com/claude/docs/vision`
+- Pour les PDFs, regardez l'API Files qui supporte le mime `application/pdf` nativement depuis 2025.
+- Évaluez la qualité OCR sur vos propres documents : Claude excelle sur les tableaux et le manuscrit, mais reste à benchmarker contre Textract sur des volumes industriels.
+- Streamez les réponses (`stream=True`) pour les analyses longues d'images riches.

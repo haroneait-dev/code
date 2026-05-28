@@ -1,0 +1,53 @@
+---
+title: "Project Knowledge Base : limites et partage"
+description: "Comprendre les quotas de tokens des Projects Claude.ai, optimiser la mémoire contextuelle et partager en équipe."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+La Project Knowledge Base de Claude.ai joue le rôle d'une mémoire de long terme attachée à chaque Project. Tout ce qu'on y dépose est rechargé à chaque message de chaque thread du Project. C'est puissant — mais ce mécanisme a des limites strictes qu'il faut connaître pour ne pas saturer le contexte ni gaspiller son quota.
+
+## Comment la base se charge dans le contexte
+
+À chaque tour de conversation, Claude.ai construit le prompt envoyé au modèle ainsi : instructions personnalisées + contenu de la knowledge base + historique du thread + nouveau message. La fenêtre de contexte est de 200 000 tokens sur Pro et Team, et peut atteindre 500 000 tokens sur Enterprise. La barre de remplissage visible sous la zone de saisie indique le taux d'occupation **avant** votre message.
+
+Au-delà de 80 % de remplissage, la qualité chute : Claude commence à oublier le début du thread, à mélanger des sources, et à survoler les fichiers les plus longs. Au-delà de 100 %, le système tronque automatiquement les sources les plus anciennes — ce qui peut produire des réponses fausses sans avertissement.
+
+## Limites pratiques par fichier et par Project
+
+Les ordres de grandeur officiels (au 2026-05) :
+
+- **Taille par fichier** : jusqu'à 30 Mo, 500 pages environ pour un PDF
+- **Nombre de fichiers** : pas de plafond strict, mais la somme doit tenir dans la fenêtre
+- **Types acceptés** : PDF, DOCX, TXT, MD, CSV, code source, images (analysées par vision)
+- **Pas de pièce vidéo ni audio** dans la base elle-même
+
+Une page PDF moyenne représente 500 à 1 000 tokens. Un Project bien dimensionné pour usage quotidien tient idéalement sous **40 % de remplissage**, ce qui laisse de la marge pour l'historique de conversation.
+
+## Maximiser le ratio signal/bruit
+
+Trois techniques rentables :
+
+1. **Résumer avant d'attacher.** Plutôt qu'un PDF de 200 pages, demandez à Claude de produire un résumé structuré, puis attachez le résumé. Vous gardez le PDF original en pièce jointe ponctuelle dans un thread quand le détail compte.
+2. **Indexer par tags Markdown.** Découpez vos sources en sections avec des headings clairs (`## Politique de retour`, `## Tarifs B2B`). Claude les retrouve mieux et cite plus précisément.
+3. **Purger régulièrement.** Tous les trois mois, relisez la base : ce qui n'a pas servi sort. Une base maigre est plus performante qu'une base exhaustive.
+
+## Partage en Team et Enterprise
+
+Sur Pro, les Projects sont strictement personnels. Sur Team et Enterprise, ils peuvent être :
+
+- **Privés** : visibles uniquement par leur créateur
+- **Partagés à l'équipe** : tous les membres du workspace y accèdent en lecture/écriture
+
+Tout membre peut alors ajouter des fichiers, modifier les instructions et démarrer des threads. Les threads individuels restent privés par défaut — ce sont la connaissance et les instructions qui sont mutualisées. Sur Enterprise, on peut restreindre l'écriture à des rôles spécifiques et auditer les modifications.
+
+## Pièges classiques
+
+- **Dupliquer la même information** dans plusieurs fichiers : Claude pondère mal et peut se contredire.
+- **Mettre du code obsolète** sans le marquer comme tel : le modèle le considère comme source de vérité.
+- **Charger des données sensibles** dans un Project partagé sans vérifier la politique de retention de l'organisation.
+- **Confondre Project knowledge et pièce jointe** : la pièce jointe d'un thread n'est lue que dans ce thread, alors que la knowledge l'est dans tous.
+
+## Pour aller plus loin
+
+Si votre base dépasse régulièrement 60 % de remplissage ou si plusieurs utilisateurs ont besoin de requêtes filtrées (par client, par produit), passez à une architecture RAG dédiée via l'API : embeddings + vector store + récupération à la demande. Vous gardez Claude.ai pour la conversation et l'itération, et vous laissez la recherche documentaire à un système conçu pour scaler.

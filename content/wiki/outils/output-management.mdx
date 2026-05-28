@@ -1,0 +1,165 @@
+---
+title: "Output management"
+description: "Comment Claude Code gère et tronque les outputs longs — limites, pagination, stratégies."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+Quand un outil retourne une sortie volumineuse — un build de 50 000 lignes, un dump SQL, un test runner verbeux — Claude Code ne peut pas tout absorber dans son contexte. Le harness applique alors des stratégies d'**output management** : troncature, pagination, redirection vers fichier, ou filtrage. Comprendre ces mécanismes vous évite des frustrations et vous aide à structurer vos commandes pour rester productif.
+
+## Pourquoi tronquer
+
+La fenêtre de contexte de Claude est large (200k tokens et plus) mais finie. Un seul `npm run build` peut produire 100k tokens d'output Webpack/Turbopack. Si tout était injecté, vous saturiez le contexte en une commande.
+
+Le harness :
+
+- **tronque** les outputs trop longs (souvent en gardant le début + la fin) ;
+- **signale** la troncature explicitement ;
+- vous laisse **réinspecter** la portion qui vous intéresse via Read/Bash.
+
+## Comportement par défaut
+
+Pour l'outil `Bash` :
+
+- les outputs sont **streamés** au fil de l'exécution ;
+- au-delà d'un certain seuil (varie selon version, typiquement quelques centaines de lignes), la sortie est tronquée ;
+- un message "[output truncated]" est inséré ;
+- l'output complet peut souvent être retrouvé via le mode background ou un fichier de log.
+
+Pour les autres outils (Read, Grep, Glob) :
+
+- `Read` a un `limit` par défaut à 2000 lignes ;
+- `Grep` retourne par défaut ce qui rentre dans une réponse raisonnable — utilisez `head_limit` ;
+- `Glob` peut retourner des milliers de chemins, restez précis dans le pattern.
+
+## Stratégies pour gérer les outputs longs
+
+### 1. Rediriger vers un fichier
+
+```bash
+Bash(
+  command="npm run build > /tmp/build.log 2>&1",
+  description="Build with log to file",
+  timeout=300000
+)
+
+# Puis lire les parties intéressantes
+Bash(command="tail -100 /tmp/build.log", description="Tail of build log")
+```
+
+Vous gardez le log complet sur disque et n'injectez que ce qui vous intéresse.
+
+### 2. Filtrer à la source
+
+```bash
+Bash(
+  command="npm test 2>&1 | grep -E '(FAIL|Error|✗)'",
+  description="Test failures only"
+)
+```
+
+Vous laissez `grep` faire le tri avant que l'output n'atteigne Claude.
+
+### 3. Compter, puis cibler
+
+```bash
+# 1. Combien d'erreurs ?
+Bash(command="npm run lint 2>&1 | grep -c 'error'", description="Count errors")
+
+# 2. Voir un sample
+Bash(command="npm run lint 2>&1 | grep 'error' | head -20", description="Sample errors")
+```
+
+### 4. Pagination explicite
+
+Pour un fichier de log énorme :
+
+```bash
+Read(file_path="/tmp/build.log", offset=5000, limit=200)
+```
+
+### 5. Background avec inspection différée
+
+```bash
+Bash(
+  command="npm run e2e",
+  run_in_background=true,
+  description="Run e2e tests"
+)
+# Vous serez notifié — pas besoin de polling
+```
+
+## Détection de troncature
+
+Quand un output a été tronqué, surveillez :
+
+- la mention `[truncated]`, `[output cut]`, ou similaire ;
+- un nombre de lignes suspicieux (ex. exactement 200 alors que vous attendiez beaucoup plus) ;
+- l'absence de la fin attendue (pas de "exit code", pas de "Tests passed").
+
+Si vous suspectez une troncature, ré-exécutez en redirigeant vers un fichier puis lisez par tranches.
+
+## Pièges courants
+
+**Demander un dump complet sans filtre.** `cat huge.log` via Bash → tronqué et inutile. Préférez un pipe `grep` ou un `tail`.
+
+**Tester avec des reporters verbeux.** `pytest -v -s` peut produire 10x plus d'output que `pytest --tb=short`. Choisissez le reporter en fonction du contexte.
+
+**Logs npm/yarn bavards.** Préfixez avec `npm run X --silent` ou `yarn X --silent` quand vous n'avez besoin que du résultat.
+
+**Output binaire.** Si vous `cat` un PDF ou une image, vous polluez le contexte avec du JSON/binaire illisible. Read gère ces formats correctement — utilisez Read.
+
+**Recursion `find /`.** Scanner toute la racine → des millions de chemins. Restez ciblé.
+
+## Cas spécifiques
+
+### Builds Next.js / Turbopack
+
+Les builds peuvent produire beaucoup de lignes. Astuce : capturez tout dans un fichier et n'examinez que les erreurs.
+
+```bash
+Bash(
+  command="npm run build > /tmp/build.log 2>&1; echo exit=$?",
+  description="Build with logging"
+)
+Bash(
+  command="grep -nE '(error|Error|fail)' /tmp/build.log | head -50",
+  description="Extract errors"
+)
+```
+
+### Test runners
+
+```bash
+# Jest / Vitest — reporter compact
+Bash(command="npm test -- --reporter=basic", description="Run tests, compact reporter")
+
+# Pytest
+Bash(command="pytest --tb=line --no-header -q", description="Run pytest compactly")
+```
+
+### Git diff énormes
+
+```bash
+# Plutôt qu'un diff complet
+Bash(command="git diff --stat", description="Diff stats only")
+
+# Ou par fichier
+Bash(command="git diff -- specific/file.ts", description="Diff specific file")
+```
+
+## Bonnes pratiques de conception de commande
+
+| Au lieu de | Préférez |
+|------------|----------|
+| `cat huge.log` | `tail -100 huge.log` ou `grep ... huge.log` |
+| `npm install` | `npm install --silent --no-audit --no-fund` |
+| `cargo build` | `cargo build --quiet` |
+| `pytest -v` | `pytest -q` |
+| Tout l'output Webpack | Build avec `> /tmp/log 2>&1` puis `grep` |
+
+## Pour aller plus loin
+
+- [Documentation Claude Code](https://docs.claude.com/en/docs/claude-code)
+- Voir aussi : `Bash` pour les flags des commandes, `Read` pour paginer les fichiers, `Grep` pour filtrer.
+- Astuce : créez un wrapper shell `qbuild()` qui fait `npm run build > /tmp/build.log 2>&1 | grep -E "error|warn"` — vous capturez le détail dans un fichier et n'envoyez que l'essentiel à Claude.

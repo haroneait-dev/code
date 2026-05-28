@@ -1,0 +1,107 @@
+---
+title: "Notification hook"
+description: "Déclencher des notifications système, Slack ou Discord quand Claude Code attend une action de l'utilisateur."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+Le hook `Notification` se déclenche chaque fois que Claude Code souhaite attirer ton attention : demande de permission pour exécuter un outil, prompt resté inactif trop longtemps, ou message explicite envoyé par l'agent. C'est le canal idéal pour ne plus rater une session qui tourne en arrière-plan pendant que tu fais autre chose.
+
+## Quand le hook se déclenche
+
+Trois cas concrets déclenchent un évènement `Notification` :
+
+1. Claude demande l'autorisation d'utiliser un outil non auto-approuvé (par exemple `Bash` sur une commande inconnue).
+2. Un prompt reste sans réponse au-delà de 60 secondes (paramètre `idle_notifications`).
+3. Claude appelle explicitement la fonction `notify` côté harness pour signaler un évènement.
+
+À chaque déclenchement, le harness passe sur stdin un JSON contenant `session_id`, `transcript_path`, `message` et `title`. Tu lis ces champs depuis ton script.
+
+## Notification système macOS
+
+Voici une configuration minimale qui envoie une notification native via `osascript` sur macOS :
+
+```json
+{
+  "hooks": {
+    "Notification": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/notify-macos.sh"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+Et le script associé :
+
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+
+INPUT=$(cat)
+MESSAGE=$(echo "$INPUT" | jq -r '.message // "Claude attend une réponse"')
+TITLE=$(echo "$INPUT" | jq -r '.title // "Claude Code"')
+
+osascript -e "display notification \"${MESSAGE//\"/\\\"}\" with title \"${TITLE//\"/\\\"}\" sound name \"Submarine\""
+```
+
+Pense à le rendre exécutable : `chmod +x .claude/hooks/notify-macos.sh`.
+
+## Envoi vers Slack
+
+Pour une équipe qui partage un agent long-running (build de doc, refactor de masse), poste plutôt sur un webhook Slack :
+
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+
+INPUT=$(cat)
+MESSAGE=$(echo "$INPUT" | jq -r '.message')
+SESSION=$(echo "$INPUT" | jq -r '.session_id')
+
+curl -sS -X POST -H 'Content-type: application/json' \
+  --data "$(jq -n --arg text "Claude (session ${SESSION:0:8}) : $MESSAGE" '{text: $text}')" \
+  "$SLACK_WEBHOOK_URL" > /dev/null
+```
+
+Stocke `SLACK_WEBHOOK_URL` dans `~/.zshrc` (ou via `direnv`), jamais en clair dans `settings.json` qui peut être commit.
+
+## Filtrer le bruit
+
+Sans filtre, tu vas recevoir un ping à chaque demande de permission. Deux stratégies pour rester sain :
+
+- Côté script : ignore les messages contenant `permission` si tu utilises déjà l'auto-approve sur un large périmètre.
+- Côté harness : règle `idle_notifications_threshold_ms` dans `settings.json` pour repousser le seuil d'inactivité.
+
+```json
+{
+  "idle_notifications_threshold_ms": 180000,
+  "hooks": {
+    "Notification": [
+      { "matcher": "", "hooks": [{ "type": "command", "command": ".claude/hooks/notify-filtered.sh" }] }
+    ]
+  }
+}
+```
+
+## Tester rapidement
+
+Le moyen le plus simple : lance une session, demande à Claude un `Bash` sur une commande inhabituelle (ex. `git push --force-with-lease`). La demande de permission déclenche le hook. Tu peux aussi simuler en pipant un JSON directement dans ton script :
+
+```bash
+echo '{"session_id":"abc","message":"test","title":"Demo"}' | .claude/hooks/notify-macos.sh
+```
+
+## Pour aller plus loin
+
+- Combine `Notification` avec `Stop` pour distinguer « Claude attend » vs « Claude a fini ».
+- Sur Linux, remplace `osascript` par `notify-send` (paquet `libnotify-bin`).
+- Pour Discord, utilise un webhook avec le même pattern `curl` que Slack.
+- Si tu utilises tmux, ajoute `tmux display-message` dans ton script pour superposer un toast dans ton terminal actif.

@@ -1,0 +1,136 @@
+---
+title: "ExitPlanMode"
+description: "Le mode planification de Claude Code et son outil de sortie — quand planifier avant d'agir."
+updatedAt: "2026-05-19"
+readingMinutes: 5
+---
+
+Le **mode planification** (plan mode) de Claude Code permet à l'assistant de **réfléchir à voix haute** sans toucher au système. Pendant ce mode, Claude peut lire, explorer, mais ne peut ni écrire, ni exécuter de commandes destructives. La sortie de ce mode se fait via l'outil `ExitPlanMode`, qui présente un plan structuré et demande validation à l'utilisateur avant d'agir.
+
+## À quoi sert le mode plan
+
+- **Aligner** l'assistant et l'utilisateur sur la stratégie avant d'exécuter ;
+- **Éviter les surprises** : pas d'action irréversible tant que le plan n'est pas validé ;
+- **Documenter** la démarche prévue (utile pour les audits, les revues) ;
+- **Itérer** sur l'approche sans craindre les effets de bord.
+
+C'est particulièrement précieux sur :
+
+- les refactorings touchant beaucoup de fichiers ;
+- les migrations (base de données, framework) ;
+- les opérations destructives potentielles (suppression, écrasement) ;
+- les workflows que vous voulez valider étape par étape.
+
+## Comment entrer en plan mode
+
+Selon votre interface Claude Code :
+
+- via la palette de commande (Shift+Tab dans certaines versions) ;
+- via un raccourci clavier configuré ;
+- déclenchement automatique pour certains scénarios.
+
+L'utilisateur peut explicitement demander : "passe en mode plan pour cette tâche".
+
+## L'outil ExitPlanMode
+
+Quand Claude estime avoir un plan suffisant, il appelle `ExitPlanMode` avec le plan formulé. L'utilisateur reçoit le plan et peut :
+
+1. **Approuver** → Claude sort du plan mode et exécute ;
+2. **Rejeter ou modifier** → Claude reste en plan mode et ajuste.
+
+## Paramètres
+
+| Paramètre | Type | Obligatoire | Description |
+|-----------|------|-------------|-------------|
+| `plan` | string | oui | Plan structuré en markdown |
+
+Le `plan` doit être :
+
+- **concret** : étapes numérotées, fichiers ciblés, outils prévus ;
+- **lisible** : markdown, listes, sections ;
+- **borné** : périmètre clair de ce qui sera fait (et ce qui ne sera pas fait).
+
+## Exemple de plan bien formulé
+
+```markdown
+## Objectif
+Migrer le système d'authentification de Clerk vers Supabase Auth.
+
+## Périmètre
+- Routes : `/app/login`, `/app/signup`, `/app/auth/callback`
+- Middleware : `/middleware.ts`
+- Composants : `<UserButton>`, `<SignInForm>`
+
+## Hors périmètre
+- Tables existantes en DB (à migrer dans un second temps)
+- Synchronisation des sessions actives
+
+## Étapes
+1. Installer `@supabase/ssr` et configurer le client
+2. Réécrire `/middleware.ts` pour utiliser `createServerClient`
+3. Remplacer les `<UserButton>` Clerk par un équivalent Supabase
+4. Adapter les callbacks OAuth dans `/app/auth/callback/route.ts`
+5. Désinstaller `@clerk/nextjs`
+6. Vérifier en local + mettre à jour le README
+
+## Risques
+- Sessions existantes invalidées (prévoir un message utilisateur)
+- Variables d'env à mettre à jour côté Vercel
+```
+
+## Pièges courants
+
+**Plan trop vague.** "Je vais migrer l'auth" → l'utilisateur ne peut pas valider. Soyez concret : fichiers, ordre, risques.
+
+**Plan trop long.** Si le plan fait 200 lignes, redécoupez la tâche. Un plan se lit en < 2 minutes.
+
+**Sortir trop tôt.** Si vous n'avez pas exploré le code, votre plan repose sur des suppositions. Lisez d'abord, planifiez ensuite.
+
+**Sortir trop tard.** Si vous lisez 30 fichiers avant de proposer un plan, vous brûlez du contexte. Trouvez l'équilibre : assez pour comprendre, pas plus.
+
+**Oublier les risques.** Un bon plan mentionne ce qui peut casser. Sans cela, l'utilisateur ne peut pas évaluer.
+
+**Modifier le plan après l'avoir présenté.** Si vous changez d'avis, présentez à nouveau un plan révisé — ne sautez pas l'étape de validation.
+
+## Que peut-on faire en plan mode
+
+Selon l'implémentation :
+
+| Action | Plan mode |
+|--------|-----------|
+| Read | autorisé |
+| Glob / Grep | autorisé |
+| WebFetch / WebSearch | autorisé |
+| Bash (lecture seule : ls, git status) | autorisé |
+| Bash (mutation) | bloqué |
+| Edit / Write / NotebookEdit | bloqué |
+| Task | autorisé (subagent peut lire mais pas écrire selon contexte) |
+
+L'idée : explorer librement, mais ne rien casser.
+
+## Quand préférer ne pas utiliser plan mode
+
+Pour les tâches **simples et claires** :
+
+- "ajoute un import" → fais-le directement ;
+- "corrige cette typo" → idem ;
+- "renomme cette variable" → idem.
+
+Plan mode ajoute de la friction. Réservez-le aux opérations à risque ou à fort impact.
+
+## Combiner avec TodoWrite
+
+Workflow recommandé :
+
+1. **Plan mode** : Claude explore et propose un plan via `ExitPlanMode`.
+2. Utilisateur **valide** ou ajuste.
+3. Claude **sort du plan mode** et matérialise le plan en `TodoWrite`.
+4. Claude **exécute** en mettant à jour les todos au fil de l'eau.
+
+Cette séparation rend la collaboration transparente et auditable.
+
+## Pour aller plus loin
+
+- [Documentation Claude Code](https://docs.claude.com/en/docs/claude-code)
+- Voir aussi : `TodoWrite` pour le suivi d'exécution, `Task` pour déléguer des explorations dans la phase de plan.
+- Astuce : sur les migrations critiques (DB, auth, API breaking), demandez systématiquement à Claude de passer en plan mode. Le surcoût de validation est négligeable face au risque d'une opération mal cadrée.

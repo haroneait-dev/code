@@ -1,0 +1,93 @@
+---
+title: "Citations API pour RAG"
+description: "Forcer et récupérer les pointeurs vers sources (numéros de lignes, paragraphes) avec la Citations API d'Anthropic."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+La Citations API d'Anthropic est une fonctionnalité native qui permet à Claude de citer précisément les passages des documents fournis en contexte. Contrairement à une approche RAG classique où l'on doit demander au modèle de mentionner ses sources via le prompt, ici les citations sont **structurées, vérifiables et garanties** par l'API. C'est l'outil idéal pour bâtir des assistants juridiques, médicaux ou de support client où la traçabilité est non négociable.
+
+## Pourquoi utiliser les citations natives ?
+
+Les hallucinations restent le talon d'Achille des LLM en production. Demander dans un system prompt « cite tes sources » ne suffit pas : le modèle peut inventer un numéro de page, déformer une phrase ou attribuer une citation au mauvais document. Avec la Citations API, chaque citation retournée pointe exactement vers un index de caractère, un numéro de ligne ou un index de bloc dans le document source. Vous pouvez donc surligner le passage dans votre UI ou rejeter automatiquement les réponses sans citation.
+
+## Activer les citations sur un document
+
+Pour activer les citations, il suffit d'ajouter `citations: { enabled: true }` au bloc `document` dans votre message. Anthropic supporte trois formats sources : texte brut, PDF et `content blocks` personnalisés.
+
+```python
+import anthropic
+
+client = anthropic.Anthropic()
+
+response = client.messages.create(
+    model="claude-sonnet-4-6",
+    max_tokens=1024,
+    messages=[{
+        "role": "user",
+        "content": [
+            {
+                "type": "document",
+                "source": {
+                    "type": "text",
+                    "media_type": "text/plain",
+                    "data": "Article 1. Le contrat prend effet le 1er juin.\nArticle 2. La durée est de 12 mois.",
+                },
+                "title": "Contrat A",
+                "citations": {"enabled": True},
+            },
+            {"type": "text", "text": "Quand le contrat prend-il effet ?"},
+        ],
+    }],
+)
+```
+
+## Lire les citations dans la réponse
+
+Chaque bloc `text` retourné peut contenir un tableau `citations`. Chaque citation indique le type de localisation (`char_location`, `page_location`, `content_block_location`) et les bornes exactes.
+
+```ts
+for (const block of response.content) {
+  if (block.type !== "text") continue;
+  console.log(block.text);
+  for (const c of block.citations ?? []) {
+    console.log(`source: ${c.document_title}`);
+    console.log(`extrait: "${c.cited_text}"`);
+    console.log(`offset: ${c.start_char_index}-${c.end_char_index}`);
+  }
+}
+```
+
+## Documents personnalisés en blocs
+
+Pour un RAG sur des paragraphes pré-chunkés, utilisez `type: "content"`. Chaque chunk devient une unité de citation indépendante, ce qui facilite l'affichage côté UI.
+
+```python
+{
+    "type": "document",
+    "source": {
+        "type": "content",
+        "content": [
+            {"type": "text", "text": "Paragraphe sur la garantie."},
+            {"type": "text", "text": "Paragraphe sur la résiliation."},
+        ],
+    },
+    "citations": {"enabled": True},
+}
+```
+
+Claude retournera alors un `content_block_location` avec `start_block_index` et `end_block_index`, parfait pour mettre en surbrillance le bon paragraphe dans l'interface.
+
+## Forcer la présence d'une citation
+
+Anthropic ne propose pas (encore) de mode strict « no citation = no answer », mais on peut s'en approcher avec deux techniques :
+
+1. **System prompt explicite** : « Si tu ne trouves pas la réponse dans les documents fournis, réponds exactement *INFO_NON_TROUVÉE*. »
+2. **Validation côté serveur** : rejeter toute réponse dont les blocs `text` n'ont pas de tableau `citations`. Si le ratio caractères_cités / caractères_totaux est inférieur à un seuil (ex. 30 %), redemander une réponse plus ancrée.
+
+## Pour aller plus loin
+
+- Combinez les citations avec le **prompt caching** : les longs documents sources sont parfaits pour être mis en cache, vous économisez jusqu'à 90 % sur l'input.
+- Pour les PDF, Anthropic retourne automatiquement le numéro de page via `page_location`, vous n'avez rien à parser.
+- Côté UI, créez un composant `<Citation>` qui ouvre une modale avec le `cited_text` surligné, c'est un game-changer UX pour la confiance utilisateur.
+- Limitez les chunks à ~500 tokens pour des citations granulaires et lisibles dans l'interface.

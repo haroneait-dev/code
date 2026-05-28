@@ -1,0 +1,77 @@
+---
+title: "Lost in the Middle"
+description: "Comment structurer un document de 150K tokens pour éviter que Claude rate les informations placées au milieu du contexte."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+Le phénomène **"Lost in the Middle"** a été décrit dans un papier de Stanford (Liu et al., 2023) : les LLMs à long contexte récupèrent très bien les informations placées au **début** et à la **fin** du prompt, mais ratent souvent celles placées au **milieu**. La courbe de précision en fonction de la position forme un U caractéristique.
+
+Claude (avec ses 200K tokens de contexte) est bien meilleur que la moyenne, mais le phénomène existe. Quand vous lui passez un document de 150K tokens, une instruction noyée à la ligne 8 000 sur 16 000 a beaucoup moins de poids qu'une instruction placée juste avant la question finale.
+
+## Le bon réflexe : structurer, pas empiler
+
+La première erreur est de balancer tout le contexte en vrac. Un bon prompt long suit la structure :
+
+```
+[System prompt court : rôle, ton, contraintes]
+
+<documents>
+  <document index="1" title="...">...</document>
+  <document index="2" title="...">...</document>
+</documents>
+
+[Instructions détaillées de la tâche]
+
+[Question finale de l'utilisateur]
+```
+
+Les balises XML aident énormément Claude à savoir où regarder. Quand vous lui demandez "selon le document 2…", il sait précisément où chercher.
+
+## Mettre les instructions à la fin
+
+Pour un long contexte, **placez les instructions et la question juste avant la fin du prompt**, pas au début. Claude accordera beaucoup plus d'attention à ce qui précède immédiatement sa génération.
+
+Mauvais pattern :
+```
+Tu dois extraire les dates de ces documents.
+<documents>... 140K tokens ...</documents>
+```
+
+Bon pattern :
+```
+<documents>... 140K tokens ...</documents>
+Rappel : tu dois extraire toutes les dates mentionnées, format ISO 8601.
+Réponds en JSON.
+```
+
+Anthropic recommande même de **répéter** les instructions critiques : une fois au début et une fois à la fin. La redondance compense la dilution.
+
+## Demander une citation explicite
+
+Pour forcer Claude à vraiment lire le milieu du document, demandez-lui de **citer** les passages exacts qu'il utilise pour répondre :
+
+```
+Pour chaque affirmation de ta réponse, cite entre <quote>...</quote>
+le passage exact du document source, avec le numéro de document.
+```
+
+Cette technique réduit drastiquement les hallucinations et oblige Claude à scanner l'ensemble du contexte plutôt que se reposer sur ses extrémités.
+
+## Découper en chunks avec prompt caching
+
+Si vous traitez plusieurs questions sur le même corpus de 150K tokens, activez le **prompt caching** Anthropic. Le contexte est mis en cache (jusqu'à 1h sur Sonnet 4.6), divisant le coût par 10 et la latence par 3.
+
+Combinez ça avec une stratégie de **map-reduce** : posez la même question sur chaque document séparément, puis demandez à Claude de synthétiser les réponses partielles. Vous évitez le lost-in-the-middle en ne mettant jamais plus de 20K tokens dans un seul appel.
+
+## Tester avec une "needle in a haystack"
+
+Avant de mettre en prod un pipeline long contexte, testez-le. Insérez une phrase artificielle au milieu de votre document ("Le code secret est BANANE42") et demandez à Claude de la retrouver. Si ça échoue, votre structure de prompt est défaillante — ce n'est pas la peine d'espérer qu'il trouvera les vraies infos métier.
+
+Anthropic publie régulièrement ses propres benchmarks needle-in-haystack ; Sonnet 4.6 atteint plus de 99 % de rappel sur 200K tokens **quand le prompt est bien structuré**.
+
+## Pour aller plus loin
+
+- Papier original : Liu et al., "Lost in the Middle: How Language Models Use Long Contexts" (2023)
+- Documentation prompt caching Anthropic
+- Voir aussi l'article Prefilling pour verrouiller le format de réponse sur les longs contextes

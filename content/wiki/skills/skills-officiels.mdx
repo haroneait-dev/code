@@ -1,0 +1,55 @@
+---
+title: "Skills officiels Anthropic"
+description: "Tour d'horizon des skills maintenus par Anthropic, leurs cas d'usage et comment les installer dans Claude Code."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+Anthropic maintient une collection de skills officiels qui couvrent les besoins les plus fréquents des développeurs utilisant Claude Code. Ces skills bénéficient d'une qualité élevée, d'une maintenance régulière et d'une intégration native avec les évolutions du produit. Cet écosystème évolue **très rapidement** : vérifiez toujours la liste actuelle sur le dépôt officiel avant d'intégrer un skill en production.
+
+## La famille des skills d'initialisation
+
+Le skill `init` est souvent le premier que les utilisateurs rencontrent. Il analyse un dépôt et génère un `CLAUDE.md` adapté à la stack détectée. C'est la porte d'entrée recommandée sur un nouveau projet.
+
+```bash
+claude /init
+```
+
+À côté, on trouve `gh-init` qui crée un dépôt GitHub à partir du projet local, commit l'état courant et le pousse. Ces deux skills sont conçus pour fonctionner ensemble sur un projet vierge.
+
+## Les skills de revue et qualité
+
+Anthropic propose plusieurs skills dédiés à la qualité du code. Le plus connu est `review`, qui effectue une revue complète d'une pull request en analysant les diffs, les conventions du projet et les risques fonctionnels.
+
+Le skill `security-review` se concentre sur les vulnérabilités classiques : injection, exposition de secrets, mauvaise gestion d'authentification, dépendances obsolètes. Il s'exécute sur les changements en cours et produit un rapport priorisé.
+
+Le skill `simplify` complète cet arsenal en proposant des refactorings concrets sur du code récemment modifié, en cherchant les opportunités de réutilisation et les complexités évitables.
+
+## Les skills de configuration du harness
+
+Plusieurs skills officiels ciblent la configuration de Claude Code lui-même. `update-config` gère les modifications de `settings.json` (permissions, hooks, variables d'environnement). C'est lui qu'il faut invoquer pour automatiser un comportement récurrent.
+
+```bash
+claude /update-config "autorise toutes les commandes npm"
+```
+
+`keybindings-help` accompagne la personnalisation des raccourcis clavier dans `~/.claude/keybindings.json`, et `fewer-permission-prompts` analyse vos transcripts pour générer une allowlist de commandes courantes, réduisant drastiquement la friction quotidienne.
+
+## Les skills d'orchestration
+
+Anthropic expérimente beaucoup sur l'orchestration de tâches longues. `schedule` permet de créer des agents distants exécutés sur un cron, parfaits pour des tâches récurrentes (revue de PR matinale, génération de rapports). `loop` exécute un prompt ou un slash command à intervalle régulier dans la session courante.
+
+Ces skills sont en évolution active : leurs interfaces changent encore, et de nouveaux skills d'orchestration apparaissent au rythme des releases. Consultez la documentation à jour avant de bâtir un workflow critique dessus.
+
+## Le skill claude-api
+
+Pour les développeurs qui construisent des applications avec le SDK Anthropic, le skill `claude-api` est indispensable. Il guide la construction, le debug et l'optimisation des apps utilisant `@anthropic-ai/sdk`, gère les migrations entre versions de modèles (4.5 → 4.6 → 4.7) et impose les bonnes pratiques comme le **prompt caching**.
+
+C'est typiquement le skill à invoquer dès qu'un fichier importe `anthropic` ou `@anthropic-ai/sdk`, ou quand on tune une feature comme le thinking, le tool use ou la compaction.
+
+## Pour aller plus loin
+
+- Dépôt GitHub `anthropics/claude-code-skills` (vérifier la dernière version)
+- Changelog hebdomadaire de Claude Code pour suivre les nouveaux skills officiels
+- Documentation `claude.ai/docs/skills` pour la spécification complète
+- Convention : tout skill préfixé par `@anthropic/` est officiel et signé

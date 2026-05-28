@@ -1,0 +1,94 @@
+---
+title: "Le hook OnModelError"
+description: "Intercepter rate limits, overloaded, timeouts pour retry et notifier — un pattern communautaire."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+> **Note** : `OnModelError` n'est pas (encore) un événement officiel de Claude Code. C'est un pattern communautaire qui simule cet hook en combinant `Stop`, `SubagentStop` et l'analyse des transcripts. À vérifier régulièrement dans la documentation officielle, l'API évolue vite.
+
+Quand l'API Anthropic renvoie un `429 rate_limit_error`, un `529 overloaded_error` ou un timeout réseau, Claude Code remonte l'erreur dans la TUI puis s'arrête. En production — surtout dans un pipeline CI ou un agent batch — on souhaite souvent réagir : retry exponentiel, notification Slack, fallback vers un modèle moins chargé. C'est précisément le rôle qu'un hook « OnModelError » remplit.
+
+## Pourquoi ce hook est utile
+
+Sans interception, chaque erreur transitoire interrompt un workflow long. Les cas d'usage typiques :
+
+- **Retry intelligent** : relancer une tâche après un `Retry-After` reçu sur un 429.
+- **Notification** : alerter une équipe sur Slack/Discord en cas d'`overloaded` persistant.
+- **Fallback** : basculer temporairement de `claude-sonnet-4-6` vers `claude-haiku-4-6` pour absorber un pic.
+- **Métriques** : compter les erreurs par type dans Prometheus ou Datadog.
+
+## Le pattern communautaire
+
+L'événement `Stop` se déclenche quand l'agent termine — y compris en cas d'erreur. En parsant le `transcript_path` qui figure dans le payload, on peut détecter la cause.
+
+```bash
+#!/usr/bin/env bash
+# ~/.claude/hooks/on-model-error.sh
+input=$(cat)
+transcript=$(echo "$input" | jq -r '.transcript_path')
+
+# Dernière entrée du transcript
+last=$(tail -n 1 "$transcript")
+error_type=$(echo "$last" | jq -r '.error.type // empty')
+
+case "$error_type" in
+  rate_limit_error)
+    /usr/local/bin/notify-slack "Rate limit hit on $(hostname)"
+    ;;
+  overloaded_error)
+    /usr/local/bin/notify-slack "Anthropic overloaded — switching to fallback"
+    echo "claude-haiku-4-6" > /tmp/claude-fallback-model
+    ;;
+  api_error|timeout)
+    /usr/local/bin/retry-task "$input"
+    ;;
+esac
+exit 0
+```
+
+## Configuration
+
+Dans `settings.json`, branchez le script sur `Stop` et `SubagentStop` pour couvrir les deux cas (agent principal et sous-agents) :
+
+```json
+{
+  "hooks": {
+    "Stop": [
+      { "hooks": [{ "type": "command", "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/on-model-error.sh" }] }
+    ],
+    "SubagentStop": [
+      { "hooks": [{ "type": "command", "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/on-model-error.sh" }] }
+    ]
+  }
+}
+```
+
+## Stratégie de retry
+
+Le retry naïf est dangereux : il peut amplifier un incident. Adoptez un backoff exponentiel borné avec jitter, et respectez toujours le header `Retry-After` quand il est présent.
+
+```bash
+attempt=${ATTEMPT:-1}
+max=5
+if (( attempt > max )); then
+  /usr/local/bin/notify-slack "Abandon après $max tentatives"
+  exit 0
+fi
+sleep $(( (2 ** attempt) + RANDOM % 3 ))
+ATTEMPT=$((attempt + 1)) claude -p "$(cat /tmp/last-prompt)"
+```
+
+## Limites et précautions
+
+Ce pattern reste imparfait car :
+
+- Le `Stop` se déclenche aussi pour les arrêts normaux ; il faut filtrer.
+- Le format du transcript peut évoluer entre versions de Claude Code.
+- Les erreurs réseau côté client (DNS, proxy) ne sont pas toujours sérialisées de la même façon que les erreurs API.
+
+Testez votre hook avec des erreurs simulées (proxy renvoyant 529, coupure réseau) avant de le déployer en production.
+
+## Pour aller plus loin
+
+Combinez ce hook avec un système d'observabilité (voir l'article sur OpenTelemetry) pour suivre l'évolution du taux d'erreur dans le temps. Et restez attentif aux changelogs officiels : un véritable `OnModelError` natif ferait gagner beaucoup de robustesse à ce pattern actuellement empirique.

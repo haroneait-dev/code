@@ -1,0 +1,99 @@
+---
+title: "Files API"
+description: "Uploader des fichiers réutilisables côté Anthropic, file_id, lifecycle et bonnes pratiques."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+La Files API d'Anthropic permet d'uploader un fichier une seule fois sur les serveurs Anthropic et de le réutiliser ensuite dans plusieurs requêtes via un simple `file_id`. Fini les payloads de plusieurs Mo envoyés à chaque appel : vous gagnez en latence, en coût et en simplicité d'architecture.
+
+## À quoi sert la Files API ?
+
+Avant la Files API, pour analyser un PDF ou une image, il fallait l'encoder en base64 et le réinjecter dans chaque message. Pour un document de 5 Mo utilisé 10 fois dans la journée, cela représente 50 Mo de bande passante et un overhead de parsing à chaque requête. Avec la Files API :
+
+- **Upload une fois**, référencez le fichier par `file_id` partout (Messages, Batch, Code Execution, tools).
+- **TTL configurable** (par défaut 30 jours), parfait pour des documents long-lived.
+- **Compatible** avec les PDF, images, fichiers texte et bientôt vidéo/audio.
+
+## Uploader un fichier
+
+L'endpoint est `POST /v1/files` et nécessite le header `anthropic-beta: files-api-2025-04-14`.
+
+```python
+import anthropic
+
+client = anthropic.Anthropic()
+
+uploaded = client.beta.files.upload(
+    file=("rapport.pdf", open("./rapport.pdf", "rb"), "application/pdf"),
+)
+
+print(uploaded.id)  # file_01ABC...
+print(uploaded.size_bytes)
+print(uploaded.mime_type)
+```
+
+Le `file_id` retourné est immédiatement utilisable. La taille max est de 32 Mo par fichier et 100 Go au total par workspace.
+
+## Référencer un fichier dans Messages
+
+Une fois uploadé, on l'injecte dans n'importe quelle conversation avec un bloc de type `document` ou `image` selon le MIME.
+
+```ts
+import Anthropic from "@anthropic-ai/sdk";
+
+const client = new Anthropic();
+
+const msg = await client.beta.messages.create({
+  model: "claude-sonnet-4-6",
+  max_tokens: 1024,
+  betas: ["files-api-2025-04-14"],
+  messages: [{
+    role: "user",
+    content: [
+      {
+        type: "document",
+        source: { type: "file", file_id: "file_01ABC..." },
+      },
+      { type: "text", text: "Résume les conclusions du rapport." },
+    ],
+  }],
+});
+```
+
+Pour une image, remplacez `document` par `image` avec la même structure de source.
+
+## Lifecycle : list, retrieve, delete
+
+La Files API expose un CRUD complet. C'est important de penser au **nettoyage** : un fichier oublié consomme votre quota et reste accessible tant qu'il n'est pas supprimé.
+
+```python
+# Lister tous les fichiers
+for f in client.beta.files.list(limit=100):
+    print(f.id, f.filename, f.created_at)
+
+# Récupérer les metadata
+meta = client.beta.files.retrieve("file_01ABC...")
+
+# Télécharger le contenu (utile pour debug)
+content = client.beta.files.download("file_01ABC...")
+
+# Supprimer
+client.beta.files.delete("file_01ABC...")
+```
+
+Stratégie recommandée : taguer le `filename` à l'upload avec un identifiant métier (`user_42_invoice_2026Q1.pdf`) puis créer un cron qui liste et supprime les fichiers plus vieux que N jours.
+
+## Cas d'usage typiques
+
+- **Assistants documentaires** : upload du PDF utilisateur au login, réutilisation pendant toute la session.
+- **Code Execution** : passez un CSV en `file_id` à l'outil `code_execution`, Claude peut le lire avec pandas sans le recharger.
+- **Batch processing** : combinez Files API + Message Batches API pour traiter 1 000 documents à -50 % du prix sans réuploader à chaque batch.
+- **Multi-tenant** : isolez les fichiers par workspace pour respecter la séparation des données clients.
+
+## Pour aller plus loin
+
+- La Files API est en **beta**, n'oubliez pas le header `anthropic-beta` et surveillez la changelog.
+- Combinez avec **prompt caching** : un fichier de 100 pages référencé via `file_id` peut être mis en cache pour 90 % de réduction sur l'input des appels suivants.
+- Pour les uploads volumineux, prévoyez une **retry policy** avec backoff exponentiel — l'upload peut timeout sur des connexions lentes.
+- Côté sécurité, traitez le `file_id` comme un secret : qui possède l'ID peut interroger le contenu via votre clé API.

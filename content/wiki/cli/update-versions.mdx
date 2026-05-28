@@ -1,0 +1,134 @@
+---
+title: "Mise à jour et versions"
+description: "Mettre à jour Claude Code, revenir à une version antérieure, et gérer plusieurs versions en parallèle."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+Claude Code évolue vite : nouvelles features, corrections, changements de modèle par défaut. Savoir gérer ses versions évite les mauvaises surprises en équipe ou en CI. Ce guide couvre la mise à jour, le downgrade, l'épinglage et l'installation parallèle.
+
+## Vérifier la version installée
+
+Avant tout, on inspecte la version courante.
+
+```bash
+claude --version
+```
+
+Sortie type :
+
+```bash
+2.0.14 (Claude Code)
+```
+
+On peut aussi obtenir des infos plus détaillées avec `claude doctor`, qui vérifie l'installation, l'auth et la connectivité réseau.
+
+```bash
+claude doctor
+```
+
+## Mettre à jour vers la dernière version
+
+L'installation officielle se fait via npm en global. La mise à jour utilise le tag `@latest`.
+
+```bash
+npm i -g @anthropic-ai/claude-code@latest
+```
+
+Si vous avez utilisé l'installeur natif (`curl -fsSL claude.ai/install.sh | bash`), la commande embarquée fait le job.
+
+```bash
+claude update
+```
+
+Claude affiche les changelog notables après une mise à jour majeure. Pensez à relire les notes avant d'appliquer en production.
+
+## Épingler une version précise
+
+En CI ou en équipe, on épingle pour garantir la reproductibilité.
+
+```bash
+npm i -g @anthropic-ai/claude-code@2.0.10
+```
+
+Dans une GitHub Action :
+
+```bash
+- name: Install Claude Code
+  run: npm i -g @anthropic-ai/claude-code@2.0.10
+```
+
+Pour vérifier que l'épinglage tient :
+
+```bash
+npm list -g @anthropic-ai/claude-code
+```
+
+## Downgrade vers une version antérieure
+
+Si une nouvelle release casse votre workflow, on revient en arrière par le même mécanisme.
+
+```bash
+npm uninstall -g @anthropic-ai/claude-code
+npm i -g @anthropic-ai/claude-code@2.0.8
+```
+
+Pour lister les versions publiées :
+
+```bash
+npm view @anthropic-ai/claude-code versions --json
+```
+
+Pensez à signaler le bug rencontré sur le repo `anthropics/claude-code` avant de figer une vieille version trop longtemps.
+
+## Gérer plusieurs versions en parallèle
+
+Plusieurs approches existent selon vos besoins.
+
+### Avec npx (sans installation globale)
+
+```bash
+npx -y @anthropic-ai/claude-code@2.0.12 -p "Test sur cette version"
+```
+
+Utile pour tester ponctuellement sans toucher à votre install globale.
+
+### Avec un alias shell
+
+On peut maintenir une version stable globale et une version preview via alias.
+
+```bash
+alias claude-next="npx -y @anthropic-ai/claude-code@latest"
+alias claude-stable="claude"
+```
+
+### Avec un version manager Node
+
+Si vous utilisez `nvm`, chaque version de Node a son propre dossier global. On peut donc avoir plusieurs Claude Code installés en parallèle.
+
+```bash
+nvm use 20
+npm i -g @anthropic-ai/claude-code@2.0.8
+
+nvm use 22
+npm i -g @anthropic-ai/claude-code@latest
+```
+
+## Auto-update et configuration
+
+Claude Code peut s'auto-mettre à jour. Le comportement se contrôle via `settings.json`.
+
+```json
+{
+  "autoUpdates": false
+}
+```
+
+En CI, désactivez `autoUpdates` pour éviter qu'une mise à jour silencieuse change le comportement entre deux runs.
+
+## Pour aller plus loin
+
+- Suivre le repo `anthropics/claude-code` pour les release notes et les breaking changes.
+- Tester chaque nouvelle version sur un projet bac à sable avant de l'imposer en équipe.
+- Documenter la version cible dans le `README.md` ou un `.tool-versions` du projet.
+- En cas de bug, capturer la sortie de `claude doctor` et de `claude --version` dans votre rapport d'issue.

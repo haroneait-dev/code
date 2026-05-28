@@ -1,0 +1,58 @@
+---
+title: "Limites et quotas"
+description: "Comprendre les rate limits Anthropic, les tiers d'usage, et apprendre à lire les headers anthropic-ratelimit-* pour piloter vos applications en production."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+L'API Anthropic applique des limites de débit (rate limits) à plusieurs niveaux : requêtes par minute (RPM), tokens d'entrée par minute (ITPM), tokens de sortie par minute (OTPM) et un quota mensuel global. Comprendre ces limites est indispensable pour éviter les erreurs `429 Too Many Requests` en production et dimensionner correctement vos batchs.
+
+## Les tiers d'usage
+
+Anthropic segmente les comptes en quatre tiers (1 à 4), chacun débloquant des plafonds plus élevés. Les seuils varient par modèle, mais l'esprit est constant :
+
+- **Tier 1** : compte fraîchement créé, environ 50 RPM et quelques dizaines de milliers d'ITPM. Idéal pour prototyper, insuffisant pour servir du trafic réel.
+- **Tier 2** : débloqué après un dépôt initial (généralement 40 $) et 7 jours d'historique. Les limites doublent ou triplent.
+- **Tier 3** : nécessite environ 200 $ de dépenses cumulées et 7 jours supplémentaires. C'est le palier minimum pour une app SaaS naissante.
+- **Tier 4** : seuil professionnel (environ 400 $ et 14 jours). Les limites montent significativement (plusieurs millions d'ITPM sur Sonnet).
+
+Au-delà du tier 4, vous pouvez demander des limites custom via le formulaire Anthropic. Pour les workloads très volumineux, l'API Batch (50 % moins cher, async) ne consomme pas les mêmes quotas et reste un excellent levier.
+
+## Comment monter en tier
+
+La progression est automatique : Anthropic vérifie deux conditions sur votre console — montant total facturé et ancienneté du compte. Vous n'avez rien à demander, le passage se déclenche dès que les seuils sont atteints.
+
+Astuces pour accélérer :
+
+1. Activer le prepayment (carte rechargeable) plutôt que la facturation post-paid.
+2. Concentrer la consommation sur un seul `Organization` pour cumuler les seuils.
+3. Surveiller la page **Plans & Billing** de la console pour voir le tier actif et la progression.
+
+Si vous avez un besoin urgent (lancement produit, pic de trafic prévu), contactez le support avec un descriptif de votre cas d'usage.
+
+## Lire les headers anthropic-ratelimit-*
+
+Chaque réponse de l'API contient des headers précieux pour piloter votre logique de retry et de backpressure :
+
+- `anthropic-ratelimit-requests-limit` : RPM max sur le tier actuel.
+- `anthropic-ratelimit-requests-remaining` : requêtes restantes dans la fenêtre courante.
+- `anthropic-ratelimit-requests-reset` : timestamp ISO 8601 du reset de la fenêtre.
+- `anthropic-ratelimit-input-tokens-limit` / `-remaining` / `-reset` : équivalent pour les tokens d'entrée.
+- `anthropic-ratelimit-output-tokens-limit` / `-remaining` / `-reset` : tokens de sortie.
+- `retry-after` (uniquement sur 429) : nombre de secondes avant de retenter.
+
+Un client robuste lit ces headers à chaque réponse, calcule le ratio `remaining / limit`, et ralentit proactivement (token bucket local) avant de toucher le mur. Le SDK officiel `@anthropic-ai/sdk` expose `response.headers` via le mode `withResponse()`.
+
+## Stratégies de gestion des 429
+
+Trois patterns éprouvés :
+
+1. **Exponential backoff avec jitter** : retry avec délais croissants (1s, 2s, 4s...) plus un aléa pour éviter la synchronisation des clients.
+2. **Queue prioritaire** : segmenter les requêtes (UI temps réel vs jobs batch) et drainer la queue selon les headers restants.
+3. **Fallback multi-modèles** : basculer vers Haiku quand Sonnet sature, ou vers une autre clé/organisation de secours.
+
+## Pour aller plus loin
+
+- Documentation officielle : [Anthropic Rate Limits](https://docs.anthropic.com/en/api/rate-limits)
+- Voir aussi le wiki interne sur l'API Batch pour les jobs offline.
+- Pensez au prompt caching : il ne change pas vos RPM mais réduit drastiquement les ITPM facturés.

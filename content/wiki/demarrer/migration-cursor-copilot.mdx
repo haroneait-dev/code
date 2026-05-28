@@ -1,0 +1,73 @@
+---
+title: "Migrer depuis Cursor ou Copilot"
+description: "Comprendre les différences de paradigme et adopter Claude Code en venant de Cursor ou GitHub Copilot."
+updatedAt: "2026-05-19"
+readingMinutes: 8
+---
+
+Cursor et GitHub Copilot sont des IDE qui intègrent un assistant IA. **Claude Code est un agent terminal** : il vit dans votre shell, exécute des commandes, modifie des fichiers et planifie des tâches multi-étapes. La transition demande un ajustement mental — moins d'autocomplétion inline, plus de délégation explicite.
+
+## Différences fondamentales
+
+| Dimension | Copilot | Cursor | Claude Code |
+|-----------|---------|--------|-------------|
+| Interface | IDE | IDE | Terminal |
+| Mode dominant | Complétion inline | Chat + complétion | Agent autonome |
+| Exécution commandes | ❌ | ⚠️ partiel | ✅ natif |
+| Édition multi-fichiers | ❌ | ✅ | ✅ |
+| Sessions persistantes | ❌ | ❌ | ✅ (`/resume`) |
+| Hooks/automation | ❌ | ⚠️ | ✅ riche |
+| Modèles | GPT/Claude | GPT/Claude/Gemini | Claude uniquement |
+
+Là où Copilot complète une ligne, Claude Code fait toute la tâche : il lit le fichier, comprend le contexte, modifie plusieurs fichiers, lance les tests et corrige les erreurs.
+
+## Changer ses habitudes
+
+### Penser en tâches, pas en lignes
+
+Plutôt que d'attendre l'autocomplétion, formulez une intention :
+
+```bash
+# Avant (Copilot mental model)
+# Tab tab tab pour générer ligne par ligne
+
+# Après (Claude Code)
+> Ajoute un endpoint POST /api/users qui valide l'email avec Zod
+> et insère dans Supabase. Mets aussi à jour le client TS.
+```
+
+### Laisser Claude exécuter
+
+Copilot ne touche pas votre shell. Claude Code lance vos tests, votre linter, vos migrations. Une vraie boucle : edit → run → fix → re-run.
+
+```bash
+> Lance les tests, corrige les rouges et relance jusqu'à ce que tout passe.
+```
+
+### Utiliser le mode plan
+
+Pour les tâches lourdes, le mode plan affiche un plan d'action sans rien exécuter — vous validez avant que Claude bouge un doigt. C'est l'équivalent d'un design review automatique.
+
+## Conserver ce qui marchait
+
+Vous pouvez utiliser Claude Code **en parallèle** de votre IDE. Beaucoup de devs gardent Cursor/VS Code ouvert pour la navigation visuelle et utilisent Claude Code dans un terminal séparé pour les gros chantiers.
+
+Si vous voulez la complétion inline en plus, l'extension **Claude pour VS Code/JetBrains** existe — elle complète l'agent CLI, pas le remplace.
+
+## Bénéfices à attendre
+
+- **Refactors multi-fichiers** : Claude Code excelle là où Copilot capitule (renommer un concept dans 40 fichiers, migrer une dépendance).
+- **Sessions reprenables** : `/resume` repart où vous vous êtes arrêté hier. Copilot n'a pas de mémoire.
+- **Workflows automatisés** : hooks `PreToolUse` et `PostToolUse` pour formatter, signer, auditer chaque modification.
+
+## Pièges fréquents en migration
+
+- Vouloir tout faire en une commande. Claude excelle en délégation **délimitée**. Décomposez.
+- Oublier `CLAUDE.md`. Ce fichier remplace les "Cursor rules" — c'est le contexte du projet que Claude lit à chaque session.
+- Désactiver les permissions par flemme (`bypassPermissions`) au lieu de configurer un allowlist propre.
+
+## Pour aller plus loin
+
+- Article : [Le fichier CLAUDE.md](/wiki/demarrer/claude-md)
+- Article : [Configurer les IDE](/wiki/demarrer/ide-vscode-cursor-windsurf)
+- Article : [Workflows production](/wiki/workflows/refactor-grande-echelle)

@@ -1,0 +1,106 @@
+---
+title: "/cost et /compact : maîtriser tokens et contexte"
+description: "Suivre la consommation de tokens et compacter une conversation longue sans tout perdre."
+updatedAt: "2026-05-19"
+readingMinutes: 5
+---
+
+Deux commandes économisent silencieusement des heures et des dollars à qui les utilise : `/cost` pour mesurer la consommation en temps réel, et `/compact` pour résumer une conversation longue afin de continuer à travailler sans repartir de zéro. Ensemble, elles transforment une session qui s'embourbe en outil productif sur plusieurs heures.
+
+## /cost — savoir où va l'argent
+
+`/cost` affiche les tokens consommés et le coût estimé de la session courante. La sortie typique :
+
+```bash
+> /cost
+Session usage:
+  Input tokens (uncached):  12,430
+  Input tokens (cached read): 84,210
+  Output tokens:             3,872
+  Cache write tokens:        8,120
+
+Estimated cost: $0.42
+Model: claude-sonnet-4-6
+```
+
+Trois choses à comprendre :
+
+1. **Le cache fait toute la différence** : les `cached read` coûtent ~10% du tarif normal. Une session avec beaucoup de cached read est saine ; une session avec peu de cache veut dire que Claude relit constamment les mêmes fichiers.
+2. **Output coûte plus cher que input** : un Claude bavard double rapidement la facture. Demandez des réponses concises.
+3. **Le cumulé monte vite** : sur une journée de pair-programming intensif, un développeur dépasse facilement $5–10 sans s'en rendre compte.
+
+Quand l'utiliser :
+
+- Après une grosse tâche pour mesurer son coût réel
+- Quand vous sentez Claude "ramer" — souvent le signe d'un contexte saturé
+- Avant un `/clear`, pour comparer avant/après
+
+## /compact — résumer pour continuer
+
+`/compact` remplace l'historique détaillé de la conversation par un résumé condensé, tout en préservant le contexte sémantique : ce qui a été décidé, les fichiers touchés, les TODO en cours. Vous gardez la main sur la même tâche, mais avec un contexte 5 à 10 fois plus léger.
+
+```bash
+> /compact
+Compacting conversation...
+Before: 84,210 tokens in context
+After:  9,340 tokens (summary preserved)
+
+Summary:
+- Refactored auth module to use @supabase/ssr
+- Fixed RLS policy on wiki_tips (vote count)
+- TODO: write tests for the new callback route
+```
+
+Le moment idéal pour `/compact` :
+
+- Après 30–45 minutes de travail dense sur la même feature
+- Avant de partir en pause déjeuner pour revenir sur un contexte allégé
+- Quand vous remarquez que les réponses ralentissent ou deviennent imprécises
+
+À l'inverse, `/compact` est une mauvaise idée si :
+
+- Vous comptez bientôt poser une question très spécifique sur un détail vu il y a 10 messages (le détail risque d'être perdu)
+- Vous changez complètement de sujet : préférez `/clear`
+
+## /cost + /compact : la boucle vertueuse
+
+Le workflow gagnant :
+
+```bash
+> /cost              # 84k tokens, $0.42
+> /compact           # condensation
+> /cost              # 9k tokens, coût futur divisé par ~9
+... 30 minutes plus tard ...
+> /cost              # 45k tokens
+> /compact           # on recommence
+```
+
+Sur une session de 4 heures, cette discipline divise la facture par 3 à 5 et évite le pic de latence qui survient autour de 150k tokens de contexte.
+
+## Compact automatique
+
+Claude Code peut déclencher `/compact` automatiquement quand le contexte approche de la limite. Vous pouvez ajuster ce comportement via la config, et certains hooks personnalisés permettent même de logger systématiquement le résumé produit dans un fichier `.claude/sessions/<date>.md` pour garder une trace lisible des décisions.
+
+```bash
+# exemple : hook qui sauvegarde chaque compact
+# .claude/settings.json
+{
+  "hooks": {
+    "PreCompact": [
+      { "command": "echo 'Compacting at $(date)' >> .claude/sessions.log" }
+    ]
+  }
+}
+```
+
+## Erreurs classiques
+
+- **Ne jamais regarder `/cost`** : on découvre la facture à la fin du mois sur le dashboard.
+- **`/compact` trop tôt** : si la conversation fait 5 messages, le résumé n'apporte rien et peut faire perdre du détail.
+- **`/compact` au lieu de `/clear`** : si vous changez de sujet, le résumé devient un parasite. `/clear` est plus honnête.
+
+## Pour aller plus loin
+
+- Doc officielle : https://docs.claude.com/en/docs/claude-code/slash-commands
+- Étudiez l'impact du prompt caching d'Anthropic sur vos `/cost`
+- Mettez en place un hook qui alerte au-delà de $5 / session

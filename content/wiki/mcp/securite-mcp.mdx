@@ -1,0 +1,69 @@
+---
+title: "Sécurité des serveurs MCP"
+description: "Comprendre les risques (RCE, exfiltration, prompt injection) et appliquer les bonnes pratiques de scoping et d'audit."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+Un serveur MCP, c'est un **process tiers qui tourne avec vos droits** et auquel un LLM peut envoyer des paramètres arbitraires. Autant dire qu'il vaut mieux comprendre la surface d'attaque avant d'en installer trois douzaines.
+
+## Le modèle de menace
+
+Trois grandes familles de risques :
+
+- **Exécution de code arbitraire (RCE)** : un outil mal conçu qui interpole les arguments dans un shell, et le LLM peut être manipulé pour exécuter `rm -rf ~`.
+- **Exfiltration de données** : un serveur qui lit des fichiers locaux peut envoyer leur contenu vers un domaine attaquant si son endpoint est compromis ou malveillant.
+- **Prompt injection indirecte** : un outil retourne du contenu externe (issue GitHub, page web, email) qui contient des instructions cachées. Le LLM les exécute comme si elles venaient de l'utilisateur.
+
+À ces trois s'ajoutent les classiques : supply chain (package npm/PyPI compromis), credential leak via variables d'environnement, et persistance d'état malveillant entre sessions.
+
+## Scoping : le principe le plus important
+
+Un serveur MCP doit avoir **le moins de privilèges possibles**. Concrètement :
+
+- Si un serveur lit des fichiers, donnez-lui un **dossier racine explicite**, pas `$HOME`.
+- Si un serveur appelle une API, utilisez un **token scoped** (read-only, repo unique) plutôt qu'un PAT global.
+- Lancez les serveurs sensibles dans un **conteneur** ou un **sandbox** (Firejail, macOS Sandbox, Docker avec `--read-only`).
+
+Le SDK MCP n'impose rien — c'est à vous de poser ces garde-fous au niveau OS.
+
+## Valider les entrées côté serveur
+
+Ne faites jamais confiance aux arguments du LLM. Côté implémentation d'outil :
+
+```python
+@server.tool()
+def read_file(path: str) -> str:
+    p = Path(path).resolve()
+    if not p.is_relative_to(ALLOWED_ROOT):
+        raise ValueError("Path outside sandbox")
+    return p.read_text()
+```
+
+Validez systématiquement : chemins, URLs (allowlist de domaines), tailles, et types. Tout argument utilisé dans un appel système doit passer par `shlex.quote` ou être interdit.
+
+## Auditer ce que vous installez
+
+Avant d'ajouter un serveur tiers :
+
+- Lisez le code source (la plupart sont sur GitHub et font moins de 1000 lignes).
+- Vérifiez la liste des outils exposés et leurs descriptions — c'est ce que le LLM voit.
+- Regardez les dépendances réseau : un serveur "filesystem" qui importe `requests` est suspect.
+- Préférez les serveurs **officiels** (Anthropic, vendeur de l'API) ou ceux avec une vraie traction communautaire.
+
+`mcp inspector` permet de lister les outils d'un serveur en local pour confirmer qu'ils correspondent à la doc.
+
+## Mitiger la prompt injection
+
+C'est le risque le plus subtil. Quelques contre-mesures :
+
+- **Confirmation utilisateur** sur les outils à effets de bord (écriture, envoi email, paiement). Claude Code le fait par défaut.
+- **Séparer lecture et écriture** : un serveur "lecture web" ne doit pas pouvoir écrire des fichiers.
+- **Logger toutes les invocations** d'outils avec leurs arguments — un audit trail est précieux après un incident.
+- **Limiter les tokens** : un LLM qui peut écrire mais ne peut pas exfiltrer (pas de réseau sortant arbitraire) limite les dégâts.
+
+## Pour aller plus loin
+
+- L'équipe Anthropic publie un **MCP security advisory** régulièrement — surveillez le repo `modelcontextprotocol/specification`.
+- Outils émergents : `mcp-scan` (analyse statique des serveurs), sandboxes managées chez les vendeurs cloud.
+- Pour les déploiements multi-utilisateurs, regardez l'auth OAuth + scopes par session, désormais dans la spec.

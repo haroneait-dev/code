@@ -1,0 +1,178 @@
+---
+title: "Le fichier CLAUDE.md"
+description: "Anatomie complète d'un CLAUDE.md efficace pour guider Claude Code dans votre projet."
+updatedAt: "2026-05-19"
+readingMinutes: 8
+---
+
+`CLAUDE.md` est le fichier le plus important de votre projet quand vous utilisez Claude Code. C'est un **prompt système permanent** que Claude lit à chaque session : ses instructions remplacent ou complètent ses comportements par défaut. Un bon `CLAUDE.md` divise par dix le nombre de prompts nécessaires et élimine les erreurs récurrentes.
+
+## Comment Claude découvre `CLAUDE.md`
+
+Claude Code cherche le fichier à plusieurs niveaux, dans l'ordre :
+
+1. `./CLAUDE.md` — racine du projet courant
+2. `./CLAUDE.local.md` — overrides personnels (à `.gitignore`)
+3. Tous les `CLAUDE.md` des dossiers parents jusqu'à `$HOME`
+4. `~/.claude/CLAUDE.md` — config globale utilisateur
+
+Tous les fichiers trouvés sont **concaténés et injectés** dans le contexte système. Plus le fichier est proche du projet, plus il a de poids.
+
+> Utilisez `/memory` dans le REPL pour voir exactement ce qui est chargé.
+
+## Structure recommandée
+
+Un bon `CLAUDE.md` reste **court (300-800 mots)** et structuré en sections claires. Voici un template éprouvé :
+
+```markdown
+# Nom du Projet
+
+Description en une phrase de ce que fait le projet.
+
+## Stack
+- Framework principal + version
+- Langage + version
+- Bases de données / services tiers
+- Outils de build et de test
+
+## Architecture
+Vue d'ensemble des dossiers principaux et de leur rôle.
+
+## Commandes
+| Commande | Usage |
+|---|---|
+| `npm run dev` | Démarrer en local |
+| `npm test` | Lancer la suite de tests |
+
+## Conventions de code
+Règles non négociables (TypeScript strict, naming, imports...).
+
+## À éviter
+Dossiers, fichiers ou patterns à ne pas toucher.
+
+## Workflow git
+Branches, conventions de commits, processus PR.
+```
+
+## Exemple concret : projet Next.js + Supabase
+
+```markdown
+# Mon SaaS
+
+Application SaaS de gestion de tâches multi-tenants.
+
+## Stack
+- Next.js 16 App Router + TypeScript strict
+- Supabase (Auth + Postgres + RLS)
+- Tailwind CSS + shadcn/ui
+- Tests : Vitest + Playwright
+
+## Architecture
+- `app/` — App Router, un dossier = une route
+- `components/` — composants UI réutilisables
+- `lib/` — utilitaires (supabase client, helpers)
+- `types/` — types TypeScript partagés
+
+## Commandes
+- `pnpm dev` — dev server
+- `pnpm build` — build production
+- `pnpm test` — tests unitaires
+- `pnpm e2e` — tests Playwright
+
+## Conventions
+- Toujours TypeScript strict, pas de `any`
+- Composants en PascalCase, hooks en `useX`
+- Server Components par défaut, `'use client'` seulement si nécessaire
+- Imports absolus via `@/`
+- Tailwind classes triées (prettier-plugin-tailwindcss)
+
+## Patterns importants
+- Toute query Supabase passe par `lib/supabase-server.ts` côté serveur
+- L'auth est gérée via `middleware.ts` (redirige les non-connectés)
+- Les Server Actions sont dans `app/**/actions.ts`
+
+## À éviter
+- Ne pas modifier `supabase/migrations/` à la main → utiliser `pnpm db:migrate`
+- Ne pas committer dans `main` directement → toujours via PR
+- Pas de `console.log` dans le code livré (utiliser `lib/logger.ts`)
+```
+
+## Les sections qui rapportent le plus
+
+D'expérience, ces sections produisent le meilleur ROI :
+
+| Section | Pourquoi |
+|---|---|
+| **Commandes** | Claude utilise la bonne commande du premier coup |
+| **À éviter** | Évite les régressions sur du code legacy |
+| **Conventions** | Style cohérent dès la première écriture |
+| **Patterns importants** | Architecture respectée sans rappel constant |
+
+## Erreurs courantes
+
+**Trop long.** Un `CLAUDE.md` de 5000 mots pollue le contexte. Visez 300-800 mots maximum. Si vous avez plus à dire, créez des fichiers thématiques liés (`ARCHITECTURE.md`, `STYLE_GUIDE.md`) et référencez-les.
+
+**Trop vague.** "Respecter les bonnes pratiques" n'aide pas. Préférez : "Pas de `any` en TypeScript, utiliser `unknown` si le type est inconnu".
+
+**Pas à jour.** Si vous changez de stack, mettez `CLAUDE.md` à jour. Un fichier obsolète induit Claude en erreur de façon active.
+
+**Mélange instructions et documentation.** `CLAUDE.md` est pour les **instructions à Claude**, pas pour expliquer le projet aux humains (c'est le rôle du README).
+
+## Hiérarchie projet/utilisateur/local
+
+Vous pouvez stratifier vos instructions :
+
+```text
+~/.claude/CLAUDE.md          → préférences globales (langue, ton)
+~/projets/CLAUDE.md          → conventions de tous vos projets
+~/projets/app/CLAUDE.md      → spécifique au projet
+~/projets/app/CLAUDE.local.md → overrides perso (à .gitignore)
+```
+
+Exemple de `~/.claude/CLAUDE.md` personnel :
+
+```markdown
+# Préférences globales
+
+- Répondre en français
+- Privilégier des explications concises
+- Pas d'emoji dans les commits
+- Toujours utiliser `pnpm` plutôt que `npm` si possible
+```
+
+## Importer d'autres fichiers
+
+Vous pouvez référencer d'autres fichiers depuis `CLAUDE.md` via `@chemin/fichier` :
+
+```markdown
+## Conventions
+Voir @docs/STYLE_GUIDE.md pour les détails complets.
+
+## Architecture
+Voir @docs/ARCHITECTURE.md.
+```
+
+Claude lira ces fichiers au besoin sans surcharger le contexte initial.
+
+## Mettre à jour CLAUDE.md depuis Claude
+
+Vous pouvez demander à Claude lui-même de proposer une mise à jour :
+
+```text
+Lis CLAUDE.md, puis ajoute une section "Tests" qui documente
+notre stack Vitest + Playwright, avec les commandes principales.
+```
+
+Ou utilisez la commande slash dédiée :
+
+```text
+/init
+```
+
+Cette commande analyse le projet et génère/met à jour `CLAUDE.md` automatiquement.
+
+## Pour aller plus loin
+
+- [Configurer un projet](/wiki/demarrer/configurer-projet) — préparation complète d'un repo
+- [Le fichier de config globale](/wiki/demarrer/config-globale) — config utilisateur
+- [Documentation memory](https://docs.claude.com/claude-code/memory) — référence Anthropic

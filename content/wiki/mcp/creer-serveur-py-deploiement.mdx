@@ -1,0 +1,105 @@
+---
+title: "Créer un serveur MCP Python : déploiement"
+description: "Packager et distribuer un serveur MCP Python : PyPI, Docker, scripts d'entrée et bonnes pratiques."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+Construire un serveur MCP en Python est rapide grâce au SDK officiel `mcp`. Le vrai défi commence quand il faut le **distribuer** : utilisateurs sur macOS/Linux/Windows, runtimes Python différents, dépendances natives… Voici un parcours complet pour passer du prototype local à un serveur installable en une commande.
+
+## Structurer le projet
+
+Un layout `src/` propre facilite le packaging :
+
+```
+my-mcp-server/
+  pyproject.toml
+  src/my_mcp_server/
+    __init__.py
+    __main__.py
+    server.py
+```
+
+Dans `pyproject.toml`, déclarez un **entry point console** pour que `pipx` ou `uvx` exposent une commande :
+
+```toml
+[project]
+name = "my-mcp-server"
+version = "0.1.0"
+dependencies = ["mcp>=1.0", "httpx"]
+
+[project.scripts]
+my-mcp-server = "my_mcp_server.server:main"
+```
+
+C'est ce binaire que Claude Desktop ou Claude Code lanceront via `command`.
+
+## Publier sur PyPI
+
+Le standard de fait pour les serveurs MCP Python est PyPI, car `uvx` peut alors **exécuter votre serveur sans installation préalable** :
+
+```bash
+uv build
+uv publish  # nécessite un token PyPI
+```
+
+Côté utilisateur, la config devient triviale :
+
+```json
+{
+  "mcpServers": {
+    "my-server": {
+      "command": "uvx",
+      "args": ["my-mcp-server"]
+    }
+  }
+}
+```
+
+`uvx` crée un environnement isolé, télécharge le package, et lance le serveur. Aucun `pip install` global, aucun conflit de version.
+
+## Conteneuriser avec Docker
+
+Pour les déploiements serveur (mode HTTP/SSE) ou les environnements verrouillés, Docker reste roi :
+
+```dockerfile
+FROM python:3.12-slim
+WORKDIR /app
+COPY . .
+RUN pip install --no-cache-dir .
+EXPOSE 8080
+CMD ["my-mcp-server", "--transport", "sse", "--port", "8080"]
+```
+
+Pensez à un utilisateur non-root (`USER 1000`) et à un `HEALTHCHECK` qui ping l'endpoint MCP. Pour la prod, publiez l'image sur GHCR ou Docker Hub et versionnez-la avec le tag PyPI correspondant.
+
+## Gérer les dépendances natives
+
+Certains serveurs MCP ont besoin de libs C (pillow, lxml, drivers DB). Trois règles :
+
+- **Wheels manylinux** : `uv build` produit des wheels portables si vos deps en publient.
+- **Lock files** : commitez `uv.lock` pour des installs reproductibles.
+- **Extras optionnels** : isolez les drivers lourds avec `[project.optional-dependencies]` pour ne pas alourdir le install par défaut.
+
+## Versionner et automatiser
+
+Utilisez `hatch version` ou `bumpver` pour incrémenter, puis un workflow GitHub Actions qui publie sur tag :
+
+```yaml
+on: { push: { tags: ["v*"] } }
+jobs:
+  publish:
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+      - run: uv build && uv publish
+        env: { UV_PUBLISH_TOKEN: ${{ secrets.PYPI_TOKEN }} }
+```
+
+Ajoutez un job qui build et push l'image Docker en parallèle. Vos utilisateurs voient une nouvelle version disponible en quelques minutes.
+
+## Pour aller plus loin
+
+- Documentez un `CHANGELOG.md` lisible — les utilisateurs MCP épinglent souvent des versions.
+- Ajoutez un sous-commande `--check` qui valide la config et les credentials sans lancer le serveur.
+- Pour les serveurs commerciaux, regardez le transport HTTP/SSE + auth OAuth, désormais standardisé dans la spec MCP.

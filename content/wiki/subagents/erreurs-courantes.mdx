@@ -1,0 +1,46 @@
+---
+title: "Erreurs courantes avec les subagents"
+description: "Subagent qui ne renvoie rien d'utile, prompt trop vague, oubli de contexte : les pièges classiques et comment les éviter."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+Les subagents échouent rarement de façon spectaculaire : ils renvoient quelque chose, mais ce quelque chose est inexploitable. Voici les modes d'échec les plus fréquents, comment les reconnaître et comment les corriger.
+
+## Erreur 1 : le prompt trop vague
+
+C'est de loin le problème numéro un. « Regarde le code et dis-moi ce que tu en penses » va produire une analyse générique qui n'aide à rien. Un subagent n'a pas le contexte de la conversation principale : il ne sait pas pourquoi vous lui demandez ça, ni ce que vous comptez en faire.
+
+Le correctif : un bon prompt de subagent contient toujours quatre éléments. Le périmètre exact (« regarde uniquement les fichiers dans `app/api/wiki/` »), l'objectif business (« je veux savoir si l'auth est correctement vérifiée »), le format de sortie attendu (« liste des routes avec une colonne OK/KO et la ligne fautive »), et un exemple si possible.
+
+## Erreur 2 : oubli de transmettre le contexte
+
+Le subagent ne voit pas votre conversation. Si vous avez décidé il y a 5 messages que la table s'appelle `wiki_tips` et pas `tips`, il ne le sait pas. Si votre projet a une convention particulière (par exemple : toujours utiliser le service role key dans les routes API), il l'ignore.
+
+Le correctif : copier-coller dans le prompt du subagent les conventions, noms de tables, contraintes ou décisions pertinentes. Mieux vaut un prompt de 500 tokens bien briefé qu'un subagent qui invente.
+
+## Erreur 3 : le subagent qui renvoie un résumé inutilisable
+
+Vous lui demandez d'auditer 30 fichiers et il vous renvoie « j'ai regardé les fichiers, ils semblent corrects ». Aucune ligne, aucun nom de fichier, aucune preuve. Impossible de vérifier, impossible d'agir.
+
+Le correctif : exigez des preuves dans le prompt. « Pour chaque problème trouvé, donne le chemin du fichier, le numéro de ligne, et la ligne fautive ». Si vous voulez une réponse vide en cas d'absence de problème, dites-le explicitement : « réponds "RAS" si tu ne trouves rien ». Sans cette instruction, le subagent va broder.
+
+## Erreur 4 : déléguer une tâche qu'on aurait dû faire soi-même
+
+Lancer un subagent pour lire un fichier qu'on connaît déjà, ou pour faire ce qu'un `grep` ferait en 50 ms, c'est un anti-pattern. Vous payez le prompt système, l'overhead de l'orchestration, et vous attendez 10 à 30 secondes pour quelque chose d'instantané.
+
+Le correctif : avant de lancer un subagent, demandez-vous si un outil simple (grep, ls, glob) ne suffirait pas. La délégation se justifie quand il y a un vrai travail d'analyse ou de lecture massive, pas pour un look-up.
+
+## Erreur 5 : subagent qui édite sans qu'on lui demande
+
+Certains subagents (selon leur configuration) peuvent écrire dans des fichiers. Si vous voulez juste une analyse, soyez explicite : « ne modifie aucun fichier, contente-toi de m'envoyer le diff proposé en texte ». Sinon vous risquez de découvrir après coup que cinq fichiers ont changé et il faut tout `git diff` pour comprendre quoi.
+
+## Erreur 6 : trop d'allers-retours pour un sujet simple
+
+Si vous relancez trois fois le même subagent en raffinant le prompt, c'est que le problème n'était pas mûr pour la délégation. Mieux vaut clarifier dans la conversation principale, puis lancer un seul subagent bien briefé, plutôt que d'itérer en aveugle sur quelque chose dont vous ne voyez pas le raisonnement.
+
+## Pour aller plus loin
+
+- Article voisin : `quand-deleguer` pour identifier les tâches qui méritent vraiment un subagent.
+- Article voisin : `parallelisation` pour ne pas multiplier les erreurs par dix d'un coup.
+- Article voisin : `cout-token-budgeting` pour mesurer ce que coûte un subagent qui rate sa cible.

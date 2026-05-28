@@ -1,0 +1,118 @@
+---
+title: "Hook lifecycle"
+description: "Comprendre l'ordre exact d'exécution des hooks Claude Code, du démarrage de session jusqu'à sa fermeture."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+Les hooks Claude Code ne se déclenchent pas au hasard : chaque évènement correspond à un moment précis du cycle de vie d'une session. Connaître l'ordre exact évite des bugs subtils (un hook qui modifie un fichier que le suivant lit, par exemple) et te permet de composer des chaînes fiables.
+
+## Vue d'ensemble du cycle
+
+Voici la séquence d'évènements pour une session typique avec quelques tours de conversation :
+
+```
+SessionStart
+  └─ UserPromptSubmit   (tour 1)
+      ├─ PreToolUse     (Read)
+      ├─ PostToolUse    (Read)
+      ├─ PreToolUse     (Edit)
+      ├─ PostToolUse    (Edit)
+      └─ Stop
+  └─ UserPromptSubmit   (tour 2)
+      ├─ Notification   (demande permission)
+      ├─ PreToolUse     (Bash)
+      ├─ PostToolUse    (Bash)
+      └─ Stop
+  └─ PreCompact         (si seuil atteint)
+SessionEnd
+```
+
+Chaque flèche `└─` est synchrone : Claude attend que le hook termine (ou timeout) avant de passer à l'étape suivante.
+
+## SessionStart : avant le premier prompt
+
+`SessionStart` est déclenché une fois, quand tu lances `claude` ou reprends une session (`claude --resume`). Le hook reçoit un champ `source` qui vaut `startup`, `resume` ou `clear`.
+
+```json
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "",
+        "hooks": [{ "type": "command", "command": ".claude/hooks/inject-context.sh" }]
+      }
+    ]
+  }
+}
+```
+
+Ton script peut écrire sur stdout du contexte additionnel (état Git, todo du jour, version d'API) qui sera injecté comme message système. C'est l'unique évènement où tu peux pré-charger du contexte avant le premier tour.
+
+## UserPromptSubmit : à chaque message utilisateur
+
+Déclenché juste après que tu appuies sur Entrée, **avant** que Claude ne lise le prompt. Tu peux :
+
+- Logger le prompt (audit, dataset d'entraînement).
+- Ajouter du contexte dynamique (résultat d'une requête SQL, etc.) via stdout.
+- **Bloquer** le prompt avec `exit 2` et un message sur stderr (filtrage de secrets, par exemple).
+
+```bash
+#!/usr/bin/env bash
+INPUT=$(cat)
+PROMPT=$(echo "$INPUT" | jq -r '.prompt')
+
+if echo "$PROMPT" | grep -qE 'sk-[a-zA-Z0-9]{32,}'; then
+  echo "Prompt bloqué : clé API détectée" >&2
+  exit 2
+fi
+exit 0
+```
+
+## PreToolUse et PostToolUse : autour de chaque outil
+
+Pour chaque appel d'outil (`Read`, `Edit`, `Bash`, `Write`, MCP…), deux hooks s'exécutent :
+
+- `PreToolUse` reçoit `tool_name` et `tool_input`. Peut bloquer avec `exit 2` (Claude verra l'erreur et pourra réessayer).
+- `PostToolUse` reçoit en plus `tool_response`. Pratique pour formater, linter, ou auditer le résultat.
+
+Le `matcher` filtre par nom d'outil :
+
+```json
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [{ "type": "command", "command": "npx prettier --write" }]
+      }
+    ]
+  }
+}
+```
+
+## Notification, Stop, SubagentStop
+
+- `Notification` : quand Claude demande une permission ou reste idle.
+- `Stop` : Claude a fini sa réponse (tour terminé). Peut être bloqué avec `exit 2` pour forcer une continuation.
+- `SubagentStop` : équivalent pour un sous-agent (`Task` tool). Se déclenche **avant** le `Stop` du parent.
+
+L'ordre dans un tour avec subagent :
+
+```
+PreToolUse(Task) → [subagent runs] → SubagentStop → PostToolUse(Task) → Stop
+```
+
+## PreCompact et SessionEnd : nettoyage
+
+- `PreCompact` : juste avant compression du contexte (auto ou manuel).
+- `SessionEnd` : quand tu fais `/exit`, Ctrl+D, ou fermes le terminal. Champ `reason` = `clear`, `logout`, `prompt_input_exit`, `other`.
+
+`SessionEnd` est ta dernière chance pour persister de l'état. Garde-le rapide (< 5s) sinon le terminal semble freezer.
+
+## Pour aller plus loin
+
+- Active `CLAUDE_HOOKS_DEBUG=1` pour logger chaque déclenchement avec timing.
+- Les hooks s'exécutent **en parallèle** s'il y en a plusieurs sur le même évènement avec le même matcher — ne dépends pas d'un ordre entre eux.
+- Le timeout par défaut est 60s ; configurable par hook via `"timeout": 30000` (millisecondes).
+- Pour debugger l'ordre exact, ajoute un `echo "$(date +%s.%N) $0" >> /tmp/hooks.log` au début de chaque script.

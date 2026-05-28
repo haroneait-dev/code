@@ -1,0 +1,89 @@
+---
+title: "Architecture client/serveur de MCP"
+description: "Comment Claude (client) dialogue avec un serveur MCP via JSON-RPC, stdio ou SSE."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+MCP repose sur une architecture **client/serveur** classique, héritée des protocoles type LSP (Language Server Protocol). Claude — qu'il s'exécute dans Claude Desktop, Claude Code ou un IDE compatible — joue le rôle de **client**. Les outils et sources de données sont exposés par des **serveurs MCP**, chacun étant un processus indépendant.
+
+## Trois acteurs, trois rôles
+
+- **Host** : l'application utilisateur (Claude Desktop, Claude Code, Cursor…). Elle héberge un ou plusieurs clients MCP.
+- **Client** : la couche dans le host qui maintient une connexion 1:1 avec un serveur.
+- **Server** : un processus séparé qui expose des **resources** (données lisibles), des **tools** (actions exécutables) et des **prompts** (templates réutilisables).
+
+Cette séparation stricte est cruciale : un serveur compromis ne peut pas escalader vers d'autres serveurs. Chaque connexion vit dans sa propre sandbox de communication.
+
+## JSON-RPC 2.0 comme langage commun
+
+Tous les échanges entre client et serveur utilisent **JSON-RPC 2.0**. Le client envoie une requête, le serveur répond, parfois avec des notifications asynchrones dans les deux sens. Exemple d'appel d'outil :
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 42,
+  "method": "tools/call",
+  "params": {
+    "name": "read_file",
+    "arguments": { "path": "/tmp/notes.md" }
+  }
+}
+```
+
+La réponse arrive avec le même `id`, contenant soit un `result`, soit une `error`. Cette structure simple permet de tracer chaque appel, de logger les échanges et de déboguer facilement.
+
+## Deux transports : stdio et SSE
+
+MCP définit deux transports principaux pour acheminer ces messages JSON-RPC :
+
+**stdio (standard input/output)** — Le serveur est lancé comme processus enfant du host. La communication passe par stdin/stdout du processus. C'est le mode par défaut, parfait pour les serveurs locaux : pas de réseau, pas de port à ouvrir, latence minimale.
+
+**SSE (Server-Sent Events)** — Le serveur tourne comme un service HTTP, le client se connecte via un endpoint SSE. Utile pour les serveurs distants, partagés entre plusieurs utilisateurs, ou hébergés dans le cloud.
+
+Un troisième transport — **Streamable HTTP** — est apparu en 2025 et tend à remplacer SSE pour les déploiements modernes.
+
+## Le cycle de vie d'une session
+
+Une session MCP suit toujours les mêmes étapes :
+
+1. **Initialisation** — le client envoie `initialize` avec sa version de protocole et ses capacités. Le serveur répond avec les siennes.
+2. **Découverte** — le client appelle `tools/list`, `resources/list`, `prompts/list` pour savoir ce qui est disponible.
+3. **Utilisation** — quand le modèle décide d'appeler un outil, le client envoie `tools/call`.
+4. **Shutdown** — la session se ferme proprement à la fin du processus host.
+
+## Exemple minimal de serveur en TypeScript
+
+Voici un serveur qui expose un seul outil "ping" :
+
+```ts
+import { Server } from "@modelcontextprotocol/sdk/server/index.js";
+import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+
+const server = new Server(
+  { name: "ping-server", version: "1.0.0" },
+  { capabilities: { tools: {} } }
+);
+
+server.setRequestHandler("tools/list", async () => ({
+  tools: [{ name: "ping", description: "Renvoie pong", inputSchema: { type: "object" } }],
+}));
+
+server.setRequestHandler("tools/call", async (req) => ({
+  content: [{ type: "text", text: "pong" }],
+}));
+
+await server.connect(new StdioServerTransport());
+```
+
+Une trentaine de lignes suffisent : c'est précisément ce minimalisme qui a fait décoller l'écosystème.
+
+## Pourquoi cette architecture
+
+Le découplage processus-par-serveur apporte trois bénéfices : **isolation** (un crash ne contamine pas le host), **langage agnostique** (Python, TS, Go, Rust…), et **versionnage indépendant** (chaque serveur évolue à son rythme).
+
+## Pour aller plus loin
+
+- Spec JSON-RPC 2.0 : [jsonrpc.org/specification](https://www.jsonrpc.org/specification)
+- SDK officiels : `@modelcontextprotocol/sdk` (TS), `mcp` (Python)
+- Article suivant : **Installer un serveur MCP** pour mettre tout cela en pratique

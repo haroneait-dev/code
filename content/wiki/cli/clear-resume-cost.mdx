@@ -1,0 +1,66 @@
+---
+title: "/clear, /resume, /cost : gérer ses sessions Claude Code"
+description: "Maîtriser les commandes de gestion de session : effacer le contexte, reprendre une conversation et suivre le coût d'utilisation."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+Les sessions Claude Code peuvent vite devenir longues et coûteuses. Trois commandes intégrées vous permettent de garder le contrôle : `/clear` pour repartir d'une page blanche, `/resume` pour reprendre une conversation antérieure, et `/cost` pour surveiller votre consommation en temps réel. Bien utilisées, elles font la différence entre un workflow fluide et un agent qui dérape (contexte saturé, hallucinations, factures inattendues).
+
+## /clear : repartir d'un contexte propre
+
+Quand votre conversation accumule trop de fichiers lus, de logs et d'allers-retours, Claude commence à perdre en précision. La fenêtre de contexte se remplit, le coût par tour explose et le modèle a du mal à se concentrer sur la tâche courante.
+
+```bash
+/clear
+```
+
+Cette commande purge entièrement le contexte de la session active. Elle est idéale entre deux tâches indépendantes : vous venez de finir une refonte du front, vous voulez attaquer une migration de base de données — `/clear` évite que Claude continue de raisonner sur des fichiers React qui ne sont plus pertinents. Les fichiers `CLAUDE.md` du projet restent injectés automatiquement à chaque nouveau message, donc votre agent ne perd pas ses repères.
+
+Astuce : prenez le réflexe de `/clear` toutes les 30 à 60 minutes d'usage intensif, ou dès que vous changez de domaine fonctionnel.
+
+## /resume : reprendre une conversation antérieure
+
+Claude Code conserve l'historique de vos sessions sur disque (généralement dans `~/.claude/projects/`). La commande `/resume` ouvre un sélecteur interactif qui liste vos dernières sessions, avec un aperçu du premier message et la date.
+
+```bash
+/resume
+```
+
+Sélectionnez une session avec les flèches et appuyez sur Entrée : Claude recharge l'intégralité du contexte (fichiers lus, décisions prises, code écrit) et vous pouvez continuer comme si vous n'aviez jamais quitté. Pratique pour :
+
+- reprendre un debug complexe le lendemain matin
+- continuer une refonte démarrée la veille sans réexpliquer le contexte
+- récupérer une session interrompue par un crash terminal
+
+Vous pouvez aussi passer un identifiant directement : `claude --resume <session-id>` depuis le shell pour relancer Claude Code directement sur une session précise.
+
+## /cost : suivre la dépense en temps réel
+
+Anthropic facture chaque token consommé. Sur les modèles haut de gamme (Opus, Sonnet), une grosse session peut coûter plusieurs dollars sans qu'on s'en rende compte. La commande `/cost` affiche un récapitulatif clair :
+
+```bash
+/cost
+```
+
+Vous obtenez le total dépensé sur la session courante, ventilé par modèle utilisé, ainsi que le nombre de tokens d'entrée, de sortie, et de cache hit/miss. Le cache (prompt caching) est crucial : un bon ratio de cache hit divise la facture par 5 ou 10.
+
+Vérifiez `/cost` régulièrement, surtout quand vous travaillez sur de gros monorepos ou que vous laissez tourner des sous-agents en autonomie.
+
+## Combiner les trois dans un workflow sain
+
+Une routine efficace :
+
+1. Démarrer une session avec un objectif précis
+2. Vérifier `/cost` toutes les 20 à 30 minutes
+3. Lancer `/clear` dès qu'on change de domaine
+4. Quitter proprement et reprendre via `/resume` le lendemain
+
+Cette discipline maintient les performances du modèle, limite les hallucinations dues à un contexte pollué, et garde la facture sous contrôle.
+
+## Pour aller plus loin
+
+- Documentation officielle des slash commands : `claude.com/docs`
+- Configurer une status line custom pour afficher le coût en permanence (voir l'article dédié)
+- Utiliser `/compact` comme alternative douce à `/clear` : Claude résume le contexte au lieu de l'effacer
+- Définir `MAX_THINKING_TOKENS` dans `settings.json` pour borner la dépense par tour

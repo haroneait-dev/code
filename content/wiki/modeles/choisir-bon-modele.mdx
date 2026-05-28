@@ -1,0 +1,77 @@
+---
+title: "Choisir le bon modèle"
+description: "Arbre de décision pratique entre Opus 4.7, Sonnet 4.6 et Haiku 4.5 selon vos critères de coût, latence et qualité."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+La famille Claude 4.x se décline en trois niveaux : **Opus 4.7** (haut de gamme), **Sonnet 4.6** (équilibre), **Haiku 4.5** (rapide et économique). Choisir le bon modèle, c'est arbitrer en permanence entre qualité, coût et latence. Voici une méthode simple pour ne pas se tromper.
+
+## Les trois axes de décision
+
+Avant même de regarder les modèles, posez-vous trois questions sur votre cas d'usage :
+
+1. **Qualité requise** : tolérez-vous des erreurs occasionnelles, ou chaque réponse doit-elle être irréprochable ?
+2. **Budget par appel** : combien êtes-vous prêt à dépenser par requête utilisateur ?
+3. **Latence acceptable** : l'utilisateur attend-il en direct, ou s'agit-il d'un job batch ?
+
+Les trois modèles sont ensuite à placer sur ces axes.
+
+## Haiku 4.5 — la commodité
+
+- **Prix** : 1 $ / 5 $ par million de tokens (input/output)
+- **Vitesse** : 150-200 tokens/seconde, latence first-token ~300 ms
+- **Quand l'utiliser** : classification, extraction d'entités, modération, routing, autocomplétion, résumés courts, dispatch d'agents, recherche structurée dans une base.
+
+Haiku 4.5 est étonnamment bon sur les tâches simples mais bien cadrées. Il égale Sonnet 4.0 (génération précédente) sur beaucoup de benchmarks tout en coûtant 3× moins. C'est le choix par défaut pour tout ce qui est massif et bien défini.
+
+À éviter pour : raisonnement multi-étapes complexe, génération de code non-trivial, analyse nuancée.
+
+## Sonnet 4.6 — le couteau suisse
+
+- **Prix** : 3 $ / 15 $ par million de tokens
+- **Vitesse** : 80-100 tokens/seconde
+- **Quand l'utiliser** : assistants conversationnels production, génération de code de qualité, agents avec outils, analyse documentaire approfondie, support client niveau 2, rédaction longue.
+
+Sonnet 4.6 est le modèle que vous voulez par défaut pour un produit en production. Il fait 80% de ce qu'Opus fait, à 20% du coût, avec une latence acceptable pour du temps réel. C'est aussi le modèle utilisé par défaut dans Claude Code et la plupart des intégrations Anthropic.
+
+À éviter pour : tâches triviales (gâchis), ou recherche scientifique de pointe / agents très autonomes (préférer Opus).
+
+## Opus 4.7 — le poids lourd
+
+- **Prix** : 15 $ / 75 $ par million de tokens
+- **Vitesse** : 40-60 tokens/seconde
+- **Quand l'utiliser** : raisonnement scientifique complexe, refactoring d'architecture, agents autonomes sur plusieurs heures, rédaction stratégique, audit de code sécurité, génération de spécifications techniques.
+
+Opus 4.7 est le modèle pour les moments où l'erreur coûte cher. C'est aussi le modèle qui exploite le mieux l'extended thinking : on lui donne un budget de réflexion, et il décompose mentalement le problème avant de répondre. Pour les agents de longue durée (>1h), c'est le seul vraiment fiable.
+
+À éviter pour : tout ce qui peut être fait par Sonnet — vous payez 5× plus cher pour un gain marginal.
+
+## Le pattern de cascade
+
+Plutôt que de choisir un seul modèle, **combinez-les**. C'est le pattern le plus rentable en production :
+
+1. **Haiku** filtre/route la requête : est-elle valide ? quel type de tâche ?
+2. **Sonnet** traite 80% des cas standards
+3. **Opus** prend la main uniquement quand Sonnet signale un cas complexe ou que la requête est explicitement haut-risque
+
+Sur un assistant support, cette cascade peut diviser la facture par 4 à qualité égale.
+
+## Le tableau de décision rapide
+
+| Situation | Modèle |
+|---|---|
+| Classifier 10 000 tickets/jour | Haiku 4.5 |
+| Chatbot produit pour utilisateurs finaux | Sonnet 4.6 |
+| Génération de code dans un IDE | Sonnet 4.6 (+ Opus en fallback) |
+| Agent autonome de refactoring | Opus 4.7 |
+| Résumé d'emails | Haiku 4.5 |
+| Analyse juridique d'un contrat | Opus 4.7 |
+| Recherche web + synthèse | Sonnet 4.6 |
+| Modération de commentaires | Haiku 4.5 |
+
+## Pour aller plus loin
+
+- Article wiki [Pricing et tokens](/wiki/modeles/pricing-tokens) pour calculer les coûts précis
+- Article wiki [Comparatif modèles](/wiki/modeles/comparatif-modeles) pour les benchmarks détaillés
+- Documentation officielle : [docs.anthropic.com/en/docs/about-claude/models](https://docs.anthropic.com/en/docs/about-claude/models)

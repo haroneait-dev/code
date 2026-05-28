@@ -1,0 +1,51 @@
+---
+title: "Migration de stack"
+description: "Faire migrer un codebase d'un framework à un autre (Vue → React, Express → Hono) avec Claude Code."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+Migrer un codebase d'un framework à un autre est un travail long, fastidieux et plein de pièges. Claude Code transforme cette corvée en pipeline orchestré : analyse, plan, exécution incrémentale, vérification. La clé n'est pas de demander « réécris en React » d'un coup, mais de découper le travail en couches isolées et vérifiables.
+
+## Cartographier l'existant
+
+Avant toute ligne de code, demande à Claude de produire un inventaire structuré. Par exemple : `Liste tous les composants Vue dans src/, leur props, leurs émissions d'événements et leurs dépendances`. Tu obtiens une carte qui sert de base au plan de migration. Pose les questions qui font mal : quels composants partagent du state ? Lesquels utilisent des plugins spécifiques (Vue Router, Pinia) ? Quels patterns sont idiomatiques côté source mais étrangers à la cible ?
+
+C'est aussi le bon moment pour identifier les zones grises : code mort, abstractions inutiles, tests absents. Une migration est l'occasion parfaite pour faire le ménage, mais consigne ces décisions à part pour ne pas mélanger refacto et portage.
+
+## Construire un plan par couches
+
+Un bon plan de migration ressemble à un oignon : on part de la couche la plus stable (utilitaires, types) vers la plus volatile (UI, état global). Demande à Claude un plan en phases, par exemple :
+
+1. Outils de build et configuration TypeScript
+2. Modèles de données et helpers purs
+3. Couche réseau (axios → fetch wrapper, Express routes → Hono routes)
+4. Composants feuilles sans état
+5. Composants conteneurs
+6. Routing et navigation
+7. State management global
+
+Chaque phase doit produire un commit vert, c'est-à-dire qui build et passe les tests existants (même partiellement). Évite la tentation du big bang : un PR de 8000 lignes est invérifiable.
+
+## Exécuter par lots vérifiables
+
+Pour chaque phase, alimente Claude avec un contexte précis : `Migre uniquement les composants du dossier src/widgets/, garde l'API publique identique, écris un test Vitest pour chaque composant migré`. Laisse-le proposer un diff, relis, ajuste. Utilise les subagents pour paralléliser : un agent par dossier, chacun avec sa todo-list.
+
+Mets en place un script de comparaison comportementale quand c'est possible. Sur une API Express → Hono, lance les deux versions côte à côte et rejoue les mêmes requêtes avec `curl` ou un script de diff JSON. Sur du front, un Storybook avec snapshots visuels capture les régressions silencieuses.
+
+## Gérer les divergences sémantiques
+
+Tous les frameworks ne sont pas équivalents : `v-model` n'a pas de pendant exact en React, les middlewares Hono diffèrent d'Express sur le typage des contextes. Documente ces points dans un fichier `MIGRATION_NOTES.md` que tu places dans le repo et que tu cites systématiquement dans tes prompts. Claude appliquera les conventions définies plutôt que d'improviser à chaque fichier.
+
+Pour les fonctionnalités sans équivalent direct, demande à Claude trois options avec leurs trade-offs avant de coder. Tu gardes la main sur l'architecture pendant que l'IA gère le grunt work.
+
+## Verrouiller la non-régression
+
+Avant de merger la dernière phase, fais générer par Claude une suite de tests E2E qui couvrent les parcours critiques. Compare les métriques de production (latence, taille de bundle, time-to-interactive) entre l'ancien et le nouveau. Une migration réussie ne se prouve pas par « ça compile », elle se prouve par des chiffres.
+
+## Pour aller plus loin
+
+- Tiens un journal de migration par PR : décisions, surprises, dette créée volontairement
+- Utilise un feature flag pour basculer progressivement entre l'ancienne et la nouvelle stack en prod
+- Fais relire les phases sensibles (auth, paiement) par un humain ; n'automatise pas tout
+- Garde l'ancien code dans une branche `legacy/` pendant 3 à 6 mois après le cutover

@@ -1,0 +1,93 @@
+---
+title: "Résolution des conflits d'installation"
+description: "Erreurs Node.js/NPM, conflits Python, pare-feu, permissions — debug install."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+L'installation de Claude Code échoue rarement, mais lorsqu'elle bloque c'est presque toujours pour les mêmes raisons : version de Node trop ancienne, droits insuffisants sur le dossier global NPM, conflit avec une installation Python qui shadow le binaire, ou pare-feu d'entreprise qui filtre `registry.npmjs.org`. Voici un parcours de diagnostic pour reprendre la main en quelques minutes.
+
+## Vérifier l'environnement
+
+Avant toute chose, capturez l'état du système :
+
+```bash
+node -v        # >= 20.10
+npm -v         # >= 10
+which claude   # doit pointer vers ~/.npm-global/bin ou /usr/local/bin
+claude --version
+```
+
+Si `node -v` retourne moins que 20.10, mettez à jour via `nvm install 20 --lts` puis `nvm use 20`. Une version trop ancienne provoque l'erreur classique `SyntaxError: Unexpected token '?'`.
+
+## Erreurs NPM courantes
+
+| Erreur                            | Cause probable                       | Correctif                                        |
+|-----------------------------------|--------------------------------------|--------------------------------------------------|
+| `EACCES: permission denied`       | NPM global dans `/usr/local`         | Configurer un prefix utilisateur (voir ci-bas)   |
+| `ETIMEDOUT` / `ECONNRESET`        | Proxy ou pare-feu                    | Définir `HTTPS_PROXY` et `npm config set proxy`  |
+| `ENOTFOUND registry.npmjs.org`    | DNS bloqué                           | Tester `npm config set registry https://...`     |
+| `EBADENGINE`                      | Mauvaise version Node                | `nvm use 20`                                     |
+
+Pour éviter `sudo` à vie, basculez NPM en mode utilisateur :
+
+```bash
+mkdir -p ~/.npm-global
+npm config set prefix ~/.npm-global
+echo 'export PATH=~/.npm-global/bin:$PATH' >> ~/.zshrc
+source ~/.zshrc
+npm install -g @anthropic-ai/claude-code
+```
+
+## Conflits Python et binaires fantômes
+
+Certains environnements (notamment macOS avec Homebrew + pyenv) installent un wrapper `claude` non lié à Anthropic. Inspectez le PATH :
+
+```bash
+type -a claude
+echo $PATH | tr ':' '\n'
+```
+
+Si plusieurs binaires apparaissent, supprimez ceux qui ne sont pas dans `~/.npm-global/bin` ou réordonnez le PATH. Sur Windows, vérifiez aussi `where claude` dans PowerShell — un alias chocolatey peut intercepter la commande.
+
+## Pare-feu d'entreprise et certificats
+
+Derrière un proxy MITM (Zscaler, Netskope), Claude Code échoue à l'authentification ou au streaming. Exportez le certificat racine de l'entreprise et indiquez-le à Node :
+
+```bash
+export NODE_EXTRA_CA_CERTS=/etc/ssl/certs/corporate-root.pem
+export HTTPS_PROXY=http://proxy.corp:3128
+export NO_PROXY=localhost,127.0.0.1
+```
+
+Ajoutez ces lignes à votre `.zshrc` ou `.bashrc` pour qu'elles persistent. Si le proxy bloque les WebSockets, le streaming SSE de l'API échouera avec `socket hang up` — il faudra demander un bypass sur `api.anthropic.com`.
+
+## Permissions macOS et Windows
+
+Sur macOS, le premier lancement déclenche Gatekeeper. Si le binaire est « damaged », purgez la quarantaine :
+
+```bash
+xattr -dr com.apple.quarantine ~/.npm-global/bin/claude
+```
+
+Sur Windows, exécutez PowerShell en administrateur pour la première install globale, puis revenez à un terminal utilisateur. Activez le mode développeur si la création de symlinks échoue.
+
+## Réinstallation propre
+
+En dernier recours, repartez de zéro sans casser le reste :
+
+```bash
+npm uninstall -g @anthropic-ai/claude-code
+rm -rf ~/.claude/cache ~/.npm/_logs
+npm cache clean --force
+npm install -g @anthropic-ai/claude-code@latest
+claude doctor
+```
+
+La commande `claude doctor` (intégrée) effectue un check-up automatique : versions, permissions, accès réseau, dossier `~/.claude`. Lisez son rapport avant d'ouvrir un ticket support.
+
+## Pour aller plus loin
+
+- [Guide officiel de troubleshooting](https://docs.claude.com/claude-code/troubleshooting)
+- [Configurer NPM derrière un proxy](https://docs.npmjs.com/cli/v10/using-npm/config#proxy)
+- [Forum communautaire Claude Code](https://github.com/anthropics/claude-code/discussions)

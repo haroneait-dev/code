@@ -1,0 +1,112 @@
+---
+title: "L'outil Write"
+description: "Créer ou écraser un fichier avec Claude Code — règles de sécurité, idempotence et bonnes pratiques."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+L'outil `Write` permet à Claude Code d'écrire un fichier sur le disque, soit pour le créer, soit pour le remplacer intégralement. C'est l'outil le plus "destructif" du trio Read/Write/Edit : il écrase sans demander confirmation si le fichier existe déjà. Bien utilisé, il est parfait pour bootstrap un nouveau composant, générer un fichier de configuration ou réécrire complètement un module. Mal utilisé, il efface du travail.
+
+## À quoi sert Write
+
+Write sert à :
+
+- **créer un nouveau fichier** qui n'existe pas encore (ex. un nouveau composant React, un script Python) ;
+- **réécrire intégralement** un fichier existant lorsque la majorité du contenu change (refactoring complet, regénération depuis un template) ;
+- **matérialiser un fichier de configuration** (`.env.example`, `tsconfig.json`, `vercel.json`) ;
+- **écrire un fichier généré** (snapshot, output d'un build, fichier de migration).
+
+Pour modifier seulement quelques lignes d'un fichier, préférez `Edit` : il est plus sûr, plus rapide, et n'envoie que le diff.
+
+## Syntaxe et paramètres
+
+| Paramètre | Type | Obligatoire | Description |
+|-----------|------|-------------|-------------|
+| `file_path` | string | oui | Chemin absolu du fichier (les répertoires parents doivent exister) |
+| `content` | string | oui | Contenu intégral du fichier |
+
+Write ne crée pas les répertoires parents automatiquement. Si vous écrivez dans `/Users/harone/projet/lib/utils/format.ts` mais que `lib/utils/` n'existe pas, l'appel échoue. Faites un `mkdir -p` via `Bash` au préalable.
+
+## Règles à connaître
+
+**1. Lire avant d'écraser.** Si le fichier existe déjà, Claude doit l'avoir lu dans la conversation courante avant d'appeler Write. Cette garantie évite d'effacer du contenu inattendu.
+
+**2. Préférer Edit pour des changements ciblés.** Write réécrit tout le fichier — c'est plus de tokens, plus de risques, et le diff est moins lisible dans une review.
+
+**3. Pas de création de docs spontanée.** Par convention, Claude Code ne crée pas de `*.md` ou de `README.md` à votre place, sauf demande explicite. Cela évite la pollution du repo.
+
+**4. Pas d'emojis non sollicités.** Claude n'ajoute pas d'emojis dans les fichiers sauf si vous le demandez. Important pour les codebases sérieuses.
+
+## Exemples concrets
+
+### Créer un nouveau composant React
+
+```ts
+Write(
+  file_path="/Users/harone/projet/components/Button.tsx",
+  content=`export function Button({ children }: { children: React.ReactNode }) {
+  return <button className="px-4 py-2 rounded bg-blue-500">{children}</button>;
+}
+`
+)
+```
+
+Notez le `\n` final : convention POSIX, évite les warnings de certains linters.
+
+### Réécrire un fichier de configuration
+
+```bash
+Write(
+  file_path="/Users/harone/projet/.eslintrc.json",
+  content='{"extends": ["next/core-web-vitals"], "rules": {"no-console": "warn"}}'
+)
+```
+
+Ici Write est légitime : le fichier de config est petit et change intégralement.
+
+### Bootstrap un script Python
+
+```python
+Write(
+  file_path="/Users/harone/scripts/migrate.py",
+  content="""#!/usr/bin/env python3
+import sys
+from pathlib import Path
+
+def main():
+    for path in Path('.').rglob('*.txt'):
+        print(path)
+
+if __name__ == '__main__':
+    main()
+"""
+)
+```
+
+## Pièges courants
+
+**Écraser un gros fichier sans l'avoir lu.** Si vous demandez "remplace `app/page.tsx` par X" sans avoir lu le fichier, Claude refusera (ou devrait refuser) jusqu'à avoir lu le fichier. C'est une protection — ne la contournez pas.
+
+**Oublier le répertoire parent.** Si `mkdir -p` n'a pas été fait, Write échoue. Vérifiez l'arborescence avec `ls` avant.
+
+**Réécrire au lieu d'éditer.** Sur un fichier de 1000 lignes pour changer 3 lignes : c'est un mauvais réflexe. Trois `Edit` valent mieux qu'un Write géant.
+
+**Encodage et fin de ligne.** Write écrit en UTF-8 sans BOM, avec des `\n` Unix. Si vous travaillez sur Windows avec des `\r\n`, Edit conservera l'existant mais Write impose Unix.
+
+**Contenu trop volumineux.** Au-delà de 50–100 KB, vous saturez votre fenêtre de contexte. Pour générer un dataset, écrivez plutôt un script qui produit le fichier.
+
+## Quand préférer Edit
+
+Règle simple : **si moins de 30 % du fichier change, utilisez Edit**. Pour tout le reste — bootstrap, regénération, refactoring lourd — Write est plus rapide à raisonner.
+
+Exemple : ajouter un export à un fichier de barrel `index.ts` → `Edit`. Reconstruire intégralement un fichier de seed après changement de schéma → `Write`.
+
+## Sécurité
+
+Write ne demande pas de confirmation par défaut. Sur un projet sensible, configurez les permissions dans `.claude/settings.json` pour exiger une confirmation sur certains chemins (ex. tout ce qui touche à `prisma/schema.prisma` ou `.env*`).
+
+## Pour aller plus loin
+
+- [Documentation Claude Code](https://docs.claude.com/en/docs/claude-code)
+- Voir aussi : `Edit` pour les modifications ciblées, `NotebookEdit` pour les `.ipynb`.
+- Bonne pratique : après un Write, faites un `Read` du fichier produit pour vérifier le résultat — surtout sur les fichiers de config où une virgule manquante casse tout.

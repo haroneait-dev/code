@@ -1,0 +1,169 @@
+---
+title: "/config et modifications à chaud du CLI"
+description: "Modifier les variables internes de Claude Code en pleine session sans redémarrer."
+updatedAt: "2026-05-19"
+readingMinutes: 5
+---
+
+`/config` ouvre une interface pour ajuster les paramètres internes de Claude Code en pleine session : thème, modèle par défaut, comportement du compact, niveau de verbosité... Ces changements sont persistés dans `settings.json` et appliqués immédiatement, sans redémarrer le CLI. C'est l'outil pour adapter Claude à votre workflow sans passer par l'éditeur.
+
+## Lancer /config
+
+Tapez `/config` dans une session pour ouvrir l'interface :
+
+```bash
+> /config
+Settings
+  General
+    [✓] Theme: dark
+    [ ] Auto-update: enabled
+    Model: claude-sonnet-4-6
+  Editor
+    Diff style: side-by-side
+  Notifications
+    Stop sound: ping.mp3
+```
+
+Selon la version, l'interface est un menu interactif (flèches + entrée), un éditeur direct du JSON, ou les deux. Les modifications sont écrites dans :
+
+- `~/.claude/settings.json` pour les préférences globales
+- `.claude/settings.json` pour les paramètres versionnés du projet
+- `.claude/settings.local.json` pour les overrides locaux non versionnés
+
+## Paramètres modifiables à chaud
+
+Tout ce qui ne nécessite pas de recharger un binaire externe peut être changé en live. Exemples typiques :
+
+**Thème et UI** :
+
+```json
+{
+  "theme": "dark",
+  "diff": { "style": "side-by-side" }
+}
+```
+
+**Modèle par défaut** :
+
+```json
+{
+  "model": "claude-opus-4-7"
+}
+```
+
+Bascule entre Opus / Sonnet / Haiku selon la tâche. Plus simple que de fermer et rouvrir avec `claude --model ...`.
+
+**Comportement du compact** :
+
+```json
+{
+  "autoCompact": {
+    "enabled": true,
+    "thresholdTokens": 150000
+  }
+}
+```
+
+**Verbosité et logs** :
+
+```json
+{
+  "verbose": true,
+  "logLevel": "debug"
+}
+```
+
+## Paramètres qui nécessitent un redémarrage
+
+Certains champs sont chargés une seule fois au démarrage et requièrent de relancer la session :
+
+- `mcpServers` : ajouter/supprimer un MCP demande un redémarrage du process MCP. La modif est faite à chaud mais ne prend effet qu'à la prochaine session, ou via `/mcp restart <nom>`.
+- `hooks` : selon la version, certains hooks sont enregistrés au démarrage. Vérifiez si `SessionStart` se déclenche après modif.
+- Variables d'environnement comme `ANTHROPIC_API_KEY` : doivent être présentes au lancement.
+
+`/config` vous prévient quand un changement nécessite un restart.
+
+## Modifier via slash command custom
+
+Vous pouvez créer une slash command pour basculer rapidement entre profils. Exemple, `.claude/commands/cfg/opus.md` :
+
+```md
+---
+description: "Bascule sur Opus pour la suite de la session"
+allowed-tools: [Edit]
+---
+
+Édite `~/.claude/settings.json` pour mettre `"model": "claude-opus-4-7"`.
+Affiche un message de confirmation.
+```
+
+Et `.claude/commands/cfg/haiku.md` pour la version rapide :
+
+```md
+---
+description: "Bascule sur Haiku pour les tâches simples"
+allowed-tools: [Edit]
+---
+
+Édite `~/.claude/settings.json` pour mettre `"model": "claude-haiku-4-5"`.
+```
+
+Usage :
+
+```bash
+> /cfg:opus
+Switched model to claude-opus-4-7
+> /cfg:haiku
+Switched model to claude-haiku-4-5
+```
+
+## Édition manuelle vs /config
+
+Trois façons de modifier la config, à choisir selon le contexte :
+
+1. **`/config`** : changement ponctuel, vous voulez voir l'effet immédiatement, vous ne savez pas par cœur le nom du champ.
+2. **Édition directe du JSON** : changement structuré (plusieurs champs à la fois), vous voulez commit la modif via git.
+3. **Slash command custom** : bascule fréquente entre N profils, vous voulez un raccourci.
+
+## Précédence des fichiers
+
+Quand plusieurs `settings.json` définissent la même clé, l'ordre de précédence est généralement :
+
+1. `.claude/settings.local.json` (override local, non versionné) — le plus fort
+2. `.claude/settings.json` (config projet versionnée)
+3. `~/.claude/settings.json` (config utilisateur globale) — le plus faible
+
+Si vous modifiez via `/config` dans un projet, la valeur va par défaut dans le settings local — c'est l'option safe (n'impacte pas vos collègues). Pour un changement d'équipe, éditez `.claude/settings.json` à la main et commitez.
+
+## Validation et erreurs
+
+`/config` valide le JSON avant écriture : si vous tentez d'enregistrer un schéma invalide, la commande refuse et explique pourquoi. Si vous éditez le fichier à la main et cassez le JSON, la session affiche un warning au démarrage et fallback sur les valeurs par défaut.
+
+```bash
+$ claude
+Warning: ~/.claude/settings.json contains invalid JSON at line 12.
+Falling back to defaults. Run /config to fix.
+```
+
+## Cas d'usage : changer de modèle selon la phase
+
+```bash
+# Phase exploration : Sonnet (équilibre coût/qualité)
+> ... travail de découverte ...
+
+# Phase implémentation complexe : Opus
+> /config
+... bascule sur claude-opus-4-7 ...
+
+# Phase formatage / petits ajustements : Haiku
+> /config
+... bascule sur claude-haiku-4-5 ...
+```
+
+Sur une session de 2h, ce yo-yo bien dosé peut diviser la facture par 2 sans perdre en qualité sur les moments qui comptent.
+
+## Pour aller plus loin
+
+- Doc officielle : https://docs.claude.com/en/docs/claude-code/settings
+- Skill `update-config` pour générer des configs complexes (hooks, permissions, MCP)
+- Versionner `.claude/settings.json` pour standardiser une stack d'équipe

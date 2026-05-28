@@ -1,0 +1,180 @@
+---
+title: "settings.json en profondeur"
+description: "Toutes les options de configuration disponibles dans settings.json pour personnaliser Claude Code."
+updatedAt: "2026-05-19"
+readingMinutes: 8
+---
+
+Le fichier `settings.json` est le centre de contrôle de Claude Code. Il gouverne les permissions, les hooks, le modèle utilisé, les variables d'environnement injectées, les MCP servers et bien plus. Mal configuré, il génère trop de prompts. Bien configuré, il transforme Claude Code en outil sur mesure. Cet article fait le tour complet des clés disponibles et propose des exemples concrets.
+
+## Ordre de chargement
+
+Trois fichiers sont fusionnés à chaque démarrage, du moins prioritaire au plus prioritaire :
+
+1. `~/.claude/settings.json` — préférences utilisateur globales
+2. `<repo>/.claude/settings.json` — config partagée (à commiter)
+3. `<repo>/.claude/settings.local.json` — overrides locaux (à ignorer dans `.gitignore`)
+
+La fusion est **profonde** pour les objets et **remplaçante** pour les tableaux. Si vous définissez `permissions.allow` dans deux fichiers, le second remplace le premier — pensez à dédupliquer.
+
+## Permissions
+
+C'est la section la plus utilisée. Elle contrôle ce que Claude peut faire sans demander :
+
+```json
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run *)",
+      "Bash(git status)",
+      "Bash(git diff:*)",
+      "Read(//Users/me/projects/**)",
+      "Edit(src/**)"
+    ],
+    "deny": [
+      "Bash(rm -rf *)",
+      "Bash(sudo *)"
+    ],
+    "ask": [
+      "Bash(git push:*)"
+    ]
+  }
+}
+```
+
+Les patterns suivent la syntaxe **glob** pour les chemins et un format `Tool(argument)` pour les commandes. Le suffixe `:*` autorise toutes les sous-commandes. `deny` l'emporte toujours sur `allow`.
+
+## Modèle et comportement
+
+```json
+{
+  "model": "claude-sonnet-4-6",
+  "smallFastModel": "claude-haiku-4-5",
+  "outputStyle": "default",
+  "theme": "dark",
+  "autoCompactThreshold": 0.85
+}
+```
+
+| Clé | Effet |
+|-----|-------|
+| `model` | Modèle principal pour les réponses |
+| `smallFastModel` | Modèle utilisé pour les tâches utilitaires (summarisation, status line) |
+| `outputStyle` | `default`, `concise`, `explanatory` |
+| `theme` | `dark`, `light`, `daltonized` |
+| `autoCompactThreshold` | Ratio de remplissage déclenchant la compaction auto [à vérifier] |
+
+## Variables d'environnement
+
+Vous pouvez injecter des env vars uniquement pour Claude Code :
+
+```json
+{
+  "env": {
+    "NODE_ENV": "development",
+    "DEBUG": "1",
+    "DISABLE_TELEMETRY": "1"
+  }
+}
+```
+
+Ces variables sont héritées par tous les sous-processus (`Bash`, hooks, MCP servers).
+
+## Hooks
+
+Les hooks exécutent des scripts à des moments clés du cycle de vie :
+
+```json
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          { "type": "command", "command": "./.claude/hooks/log-bash.sh" }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          { "type": "command", "command": "afplay /System/Library/Sounds/Glass.aiff" }
+        ]
+      }
+    ]
+  }
+}
+```
+
+Les events disponibles incluent `PreToolUse`, `PostToolUse`, `UserPromptSubmit`, `Stop`, `Notification`, `SubagentStop`, `SessionStart`, `SessionEnd`. Chaque hook reçoit un JSON sur stdin et peut bloquer l'action (exit code ≠ 0) ou injecter du contexte.
+
+## MCP servers
+
+```json
+{
+  "mcpServers": {
+    "supabase": {
+      "command": "npx",
+      "args": ["-y", "@supabase/mcp-server-supabase"],
+      "env": { "SUPABASE_ACCESS_TOKEN": "sbp_..." }
+    }
+  }
+}
+```
+
+Chaque entrée déclare un serveur MCP démarré en parallèle du CLI. Les outils exposés sont préfixés `mcp__<server>__<tool>`.
+
+## Status line, plugins, skills
+
+```json
+{
+  "statusLine": {
+    "type": "command",
+    "command": "~/.claude/statusline.sh"
+  },
+  "enabledPlugins": ["claude-mem", "vercel"],
+  "skills": {
+    "autoLoad": true
+  }
+}
+```
+
+Voir l'article dédié à la **status line custom** pour les détails.
+
+## Exemple complet et minimaliste
+
+```json
+{
+  "model": "claude-sonnet-4-6",
+  "theme": "dark",
+  "permissions": {
+    "allow": [
+      "Bash(npm:*)",
+      "Bash(git status)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Read(./**)",
+      "Edit(./**)"
+    ],
+    "deny": ["Bash(rm -rf /)"]
+  },
+  "env": {
+    "DISABLE_TELEMETRY": "1"
+  }
+}
+```
+
+Avec cette config, Claude peut lire et éditer librement votre projet, lancer `npm`/`git` en lecture seule, mais demandera pour tout le reste.
+
+## Bonnes pratiques
+
+- **Versionnez `.claude/settings.json`** dans Git pour partager la config d'équipe.
+- **Ne commitez jamais `settings.local.json`** : il contient vos approbations personnelles et potentiellement des secrets dans `env`.
+- Préférez des **patterns granulaires** (`Bash(git status)`) plutôt qu'autoriser tout `Bash(*)`.
+- Utilisez le skill `fewer-permission-prompts` pour générer automatiquement une allowlist pertinente à partir de vos transcripts.
+
+## Pour aller plus loin
+
+- Article **Modes de permissions** : détails sur `ask`/`allow`/`deny`.
+- Article **Variables d'environnement** : la liste exhaustive des env vars reconnues.
+- Doc officielle : [docs.claude.com/claude-code/settings](https://docs.claude.com/en/docs/claude-code).

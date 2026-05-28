@@ -1,0 +1,176 @@
+---
+title: "Partager et centraliser les slash commands en équipe"
+description: "Versionner les commandes Claude Code dans un repo d'entreprise pour les partager efficacement."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+Une slash command vraiment utile, c'est une slash command que toute l'équipe utilise. Versionner `.claude/commands/` dans git transforme les bonnes pratiques d'un développeur en standard partagé : pas de doc à jour à maintenir, pas de Notion à lire, juste un `git pull` et la commande apparaît. Pour les grosses orgs, on peut même centraliser un catalogue commun à plusieurs repos.
+
+## Le principe : .claude/commands/ versionné
+
+Le dossier `.claude/commands/` à la racine de votre projet est destiné à être commité. C'est la première règle :
+
+```bash
+$ git add .claude/commands/
+$ git commit -m "chore: add /pr:review and /db:migrate commands"
+$ git push
+```
+
+À partir du moment où votre collègue pull, il a accès aux commandes. Pas d'installation, pas de plugin, pas de version à synchroniser.
+
+Ce qui doit **ne pas** être versionné :
+
+- `.claude/settings.local.json` (préférences personnelles, ajouter au `.gitignore`)
+- `.claude/sessions/` (historiques de sessions, sensibles)
+- Tout fichier temporaire généré par hooks (`.claude/last-audit.md`, etc.)
+
+`.gitignore` recommandé :
+
+```
+.claude/settings.local.json
+.claude/sessions/
+.claude/cache/
+.claude/*.log
+```
+
+## Structure recommandée pour un repo
+
+Pour un projet avec 5–20 commandes :
+
+```
+.claude/
+  commands/
+    db/
+      migrate.md
+      rollback.md
+      seed.md
+    pr/
+      review.md
+      summary.md
+    test/
+      unit.md
+      e2e.md
+    release.md
+    deploy.md
+  settings.json           # config partagée (permissions, MCPs, hooks)
+  README.md               # doc des conventions et commandes
+```
+
+Le namespacing par dossier (`/db:migrate`, `/pr:review`) garde `/help` lisible.
+
+## Centraliser à l'échelle entreprise
+
+Pour partager des commandes entre **plusieurs repos** d'une même organisation, trois approches :
+
+### 1. Submodule git
+
+```bash
+$ cd .claude/
+$ git submodule add git@github.com:macorp/claude-commands.git commands-shared
+```
+
+Vous montez le repo central comme submodule dans chaque projet. Les commandes communes vivent dans `commands-shared/` (préfixées `/shared:` via le namespacing), les commandes spécifiques au projet restent dans `commands/`.
+
+Pour : versionning fin, mise à jour explicite.
+Contre : les submodules sont notoirement pénibles.
+
+### 2. Symlink ou script de sync
+
+Maintenir un repo `claude-commands-internal` côté entreprise et un script qui copie/link les commandes dans chaque projet :
+
+```bash
+# scripts/sync-claude.sh
+#!/bin/bash
+git clone --depth 1 git@github.com:macorp/claude-commands.git /tmp/cc
+mkdir -p .claude/commands/shared
+cp -r /tmp/cc/commands/* .claude/commands/shared/
+echo "Synced shared Claude commands."
+```
+
+À lancer après chaque clone du repo, ou via un hook git `post-checkout`.
+
+### 3. Commandes utilisateur globales
+
+Pour les commandes vraiment universelles (review, audit sécu, helpers de productivité), installez-les dans `~/.claude/commands/` une fois pour toutes :
+
+```bash
+$ git clone git@github.com:macorp/claude-commands.git ~/.claude/commands-corp
+# puis sym-link les .md voulus dans ~/.claude/commands/
+```
+
+Avantage : disponibles dans tous les projets sans config.
+Limite : chaque dev doit le faire à l'embauche (à automatiser dans le script d'onboarding).
+
+## Documenter le catalogue
+
+Un `.claude/README.md` à la racine du dossier décrit les commandes disponibles. Exemple :
+
+```md
+# Claude Commands — projet MyApp
+
+## Database
+- `/db:migrate <nom>`    Crée une migration Supabase
+- `/db:rollback`         Rollback la dernière migration
+- `/db:seed`             Lance les seeds dev
+
+## Pull Requests
+- `/pr:review [n°]`      Review une PR (défaut: branche courante)
+- `/pr:summary [n°]`     Génère un résumé pour le team channel
+
+## Release
+- `/release <patch|minor|major>`  Bump version + changelog + tag
+
+## Convention
+- Toute commande qui modifie du code doit avoir un mode `--dry-run`
+- Toute commande destructive doit demander confirmation
+```
+
+Bonus : un lien vers ce README dans le `CLAUDE.md` principal :
+
+```md
+## Slash commands custom
+Voir `.claude/README.md` pour la liste complète.
+```
+
+## Convention de nommage
+
+Mettez-vous d'accord en équipe sur la convention. Exemples qui marchent :
+
+- **Namespace = domaine** : `/db:*`, `/pr:*`, `/test:*`, `/deploy:*`
+- **Verbe en premier** : `/create-component`, `/run-tests`, `/audit-perf`
+- **Action-objet** : `/component-create`, `/test-run`. Plus régulier mais moins naturel.
+
+L'important : ne pas mélanger. Un repo où on a `/db:migrate` et `/migrate-db` côte à côte rend `/help` confus.
+
+## Tests et qualité des commandes partagées
+
+Une commande partagée mérite le même niveau de soin qu'une lib interne :
+
+- **Description claire** dans le frontmatter
+- **`argument-hint`** systématique
+- **`allowed-tools`** précis (pas de `Bash(*)`)
+- **Mode dry-run** pour les commandes destructives
+- **Confirmation** explicite avant action irréversible
+- **Tests manuels** documentés dans le README : "Pour tester `/release`, lancer `/release patch --dry-run` sur la branche main."
+
+## Lifecycle : créer, faire vivre, retirer
+
+```
+1. Un dev identifie une procédure répétitive
+2. Il crée la commande dans .claude/commands/, branch dédiée
+3. PR avec :
+   - Le .md de la commande
+   - Mise à jour de .claude/README.md
+   - Un exemple d'utilisation dans la description de la PR
+4. Review d'équipe : utilité, sécurité, naming
+5. Merge → tout le monde a la commande au prochain pull
+6. Si une commande tombe en désuétude : suppression + entrée dans le CHANGELOG
+```
+
+## Pour aller plus loin
+
+- Doc officielle : https://docs.claude.com/en/docs/claude-code/slash-commands
+- Guide "Markdown frontmatter" pour produire des commandes lisibles
+- Guide "Arguments et namespacing" pour structurer un gros catalogue
+- Étudier le repo public anthropics/claude-code pour des exemples d'organisation

@@ -1,0 +1,128 @@
+---
+title: "Génération auto de doc de skills"
+description: "Générer automatiquement le SKILL.md d'un Skill Claude Code à partir des commentaires TSDoc/JSDoc, avec outils de scaffolding et CI."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+Maintenir à la main la documentation de dizaines de Skills devient vite ingérable : description désynchronisée du code, exemples obsolètes, frontmatter cassé. La solution : générer le `SKILL.md` automatiquement depuis les commentaires TSDoc/JSDoc du code source, comme on le fait pour Typedoc ou Storybook. Ce guide montre comment mettre en place un pipeline simple, du scaffolding initial à la régénération en CI.
+
+## Pourquoi générer plutôt qu'écrire
+
+Trois douleurs récurrentes que la génération résout :
+
+- **Drift** : un Skill évolue (ajout d'arguments, nouvelle option), mais le `SKILL.md` reste figé. Les utilisateurs lisent une doc fausse.
+- **Verbosité** : décrire en prose ce qui est déjà décrit en types TypeScript est doublon. Le compilateur connaît déjà les arguments.
+- **Cohérence** : 30 Skills écrits par 10 devs = 10 styles différents. Un générateur applique un template unique.
+
+Le frontmatter, lui, reste souvent semi-manuel : seul un humain peut écrire un `description` pertinent pour l'activation auto.
+
+## Scaffolding initial : `claude skill init`
+
+Pour démarrer un Skill, le CLI fournit (ou peut être étendu pour fournir) un générateur qui crée la structure minimale.
+
+```bash
+npx claude-skill-init my-skill --lang ts
+```
+
+Génère :
+
+```
+my-skill/
+  SKILL.md          # Frontmatter pré-rempli, sections vides
+  src/
+    index.ts        # Entry point avec TSDoc déjà annoté
+  scripts/
+    run.sh          # Wrapper Bash
+  .skillrc.json     # Config du générateur (template, sections)
+```
+
+Le `SKILL.md` initial contient :
+
+```md
+---
+title: "<TODO>"
+description: "<TODO — write WHEN to use and WHEN NOT to>"
+---
+
+<!-- AUTO-GENERATED — do not edit below this line -->
+```
+
+Tout ce qui suit le marqueur est régénéré à chaque build.
+
+## Extraire la doc depuis TSDoc/JSDoc
+
+Le générateur lit les types et les commentaires TSDoc du code. Exemple d'entrée :
+
+```ts
+/**
+ * Envoie un message Slack sur le canal configuré.
+ * @param message - Texte à envoyer (markdown Slack supporté)
+ * @param channel - ID du canal, défaut: env SLACK_CHANNEL_ID
+ * @example
+ *   notify("Deploy terminé", "C01234")
+ */
+export async function notify(message: string, channel?: string) { ... }
+```
+
+Le générateur produit dans le `SKILL.md` :
+
+```md
+## API
+
+### `notify(message, channel?)`
+
+Envoie un message Slack sur le canal configuré.
+
+**Paramètres**
+- `message` (string) — Texte à envoyer (markdown Slack supporté)
+- `channel` (string, optionnel) — ID du canal, défaut: env `SLACK_CHANNEL_ID`
+
+**Exemple**
+
+​```ts
+notify("Deploy terminé", "C01234")
+​```
+```
+
+Outils disponibles pour cette extraction : **TypeDoc** (le plus mûr, plugin markdown), **api-extractor** de Microsoft, **tsdoc-markdown**, ou un parseur custom basé sur le compiler TypeScript.
+
+## Régénération en CI
+
+L'idéal est de bloquer les PR qui modifient un Skill sans régénérer la doc. Workflow GitHub Actions minimal :
+
+```yaml
+- run: npm run skills:gen
+- run: git diff --exit-code SKILL.md || (echo "Doc obsolète, run npm run skills:gen" && exit 1)
+```
+
+Couplé à un hook `pre-commit` (via Husky ou lefthook) qui régénère automatiquement, le drift devient impossible.
+
+## Templates et sections personnalisées
+
+Un bon générateur permet de définir des **slots** dans le template :
+
+- `{{frontmatter}}` — toujours manuel
+- `{{description-long}}` — manuel, prose
+- `{{api}}` — auto depuis TSDoc
+- `{{examples}}` — auto depuis tests (`*.test.ts`) ou `@example`
+- `{{cleanup}}` — manuel
+
+Stocker le template dans `.skillrc.json` permet à toute l'équipe de partager le même format sans copier-coller.
+
+## Validation du frontmatter
+
+Au-delà de la génération, ajouter une étape de **validation** :
+
+- Le `description` fait-il au moins 40 caractères ?
+- Inclut-il un "use when" et un "skip when" ?
+- Le `name` est-il en kebab-case ?
+
+Un script Zod (ou Valibot) qui parse le frontmatter et fail si invalide évite 90% des Skills cassés en production.
+
+## Pour aller plus loin
+
+- TypeDoc avec plugin markdown : `typedoc-plugin-markdown`
+- Voir **Cycle de vie d'un Skill** pour comprendre l'impact du `description` sur l'activation
+- Inspiration : le système de docs de tRPC, généré depuis les types
+- Outils complémentaires : `syncpack` pour aligner les versions de dépendances entre Skills, `changesets` pour versionner chaque Skill indépendamment

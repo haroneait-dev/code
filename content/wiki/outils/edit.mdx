@@ -1,0 +1,138 @@
+---
+title: "L'outil Edit"
+description: "Modifier un fichier existant via remplacement exact — syntaxe, replace_all, et pièges d'unicité."
+updatedAt: "2026-05-19"
+readingMinutes: 7
+---
+
+`Edit` est probablement l'outil le plus utilisé de Claude Code après `Read`. Il effectue un remplacement exact de chaîne dans un fichier existant : `old_string` → `new_string`. Sa philosophie est radicalement simple — pas de diff fuzzy, pas de patch context, pas de heuristique. Si la chaîne d'origine n'est pas trouvée exactement, l'édition échoue. Cette rigueur est ce qui rend Edit fiable.
+
+## À quoi sert Edit
+
+Edit sert à modifier précisément une portion d'un fichier déjà existant. C'est l'outil par défaut pour :
+
+- corriger un bug sur une ligne ;
+- ajouter un import, un export, une prop ;
+- renommer une variable (via `replace_all`) ;
+- mettre à jour une valeur de configuration ;
+- refactorer une fonction sans toucher au reste du fichier.
+
+Pour créer un fichier ou tout réécrire, utilisez `Write`. Pour un notebook Jupyter, utilisez `NotebookEdit`.
+
+## Syntaxe et paramètres
+
+| Paramètre | Type | Obligatoire | Description |
+|-----------|------|-------------|-------------|
+| `file_path` | string | oui | Chemin absolu du fichier à modifier |
+| `old_string` | string | oui | Texte à remplacer (doit exister tel quel) |
+| `new_string` | string | oui | Texte de remplacement (doit différer de `old_string`) |
+| `replace_all` | boolean | non | Remplace toutes les occurrences (défaut: `false`) |
+
+Trois règles cruciales :
+
+1. **Le fichier doit avoir été lu** au préalable avec `Read` dans la conversation.
+2. **`old_string` doit être unique** dans le fichier — sinon erreur. Pour gérer plusieurs occurrences, soit ajouter du contexte (lignes voisines), soit utiliser `replace_all`.
+3. **`new_string` doit être différent** de `old_string`.
+
+## Exemples concrets
+
+### Corriger une typo
+
+```ts
+Edit(
+  file_path="/Users/harone/projet/lib/format.ts",
+  old_string="export function formatDte(d: Date) {",
+  new_string="export function formatDate(d: Date) {"
+)
+```
+
+### Renommer une variable partout
+
+```ts
+Edit(
+  file_path="/Users/harone/projet/components/Hero.tsx",
+  old_string="userName",
+  new_string="displayName",
+  replace_all=true
+)
+```
+
+`replace_all` est parfait pour les renommages — un seul appel, toutes les occurrences mises à jour.
+
+### Ajouter un import en haut d'un fichier
+
+```ts
+Edit(
+  file_path="/Users/harone/projet/app/page.tsx",
+  old_string="import { useState } from 'react';",
+  new_string="import { useState, useEffect } from 'react';"
+)
+```
+
+Quand la cible est suffisamment unique (une ligne d'import existante), on peut s'appuyer dessus comme ancre.
+
+### Désambiguïser avec du contexte
+
+Si vous voulez remplacer `return null;` dans une fonction parmi cinq qui contiennent la même ligne, ajoutez les lignes voisines :
+
+```ts
+Edit(
+  file_path="/Users/harone/projet/app/page.tsx",
+  old_string=`function LoadingState() {
+  return null;
+}`,
+  new_string=`function LoadingState() {
+  return <div>Chargement...</div>;
+}`
+)
+```
+
+L'unicité est garantie par la signature de la fonction englobante.
+
+## Pièges courants
+
+**Indentation et numéros de ligne.** Quand vous lisez un fichier avec `Read`, chaque ligne est préfixée par `<numéro>\t`. Ne copiez **jamais** le numéro dans `old_string` — seul le contenu après la tabulation compte. L'indentation (espaces ou tabs) doit être préservée exactement.
+
+**Chaînes non uniques.** L'erreur la plus fréquente. Symptôme : "old_string not unique". Solution : élargir `old_string` pour inclure le contexte ou utiliser `replace_all`.
+
+**Fichier non lu.** Edit refuse de modifier un fichier dont il n'a pas vu le contenu actuel. Faites un `Read` d'abord, même si vous croyez le connaître — le disque peut avoir changé.
+
+**Caractères invisibles.** Espaces en fin de ligne, tabulations vs espaces, CRLF vs LF — un seul caractère différent fait échouer le match. En cas de doute, copiez-collez depuis le retour de `Read`.
+
+**`new_string == old_string`.** Erreur évidente mais courante quand on duplique mentalement. Vérifiez qu'il y a bien une différence.
+
+**Caractères spéciaux dans les regex.** Edit n'est **pas** une regex. `[`, `(`, `.`, `$` sont littéraux. Pas de groupes de capture, pas de backreferences. C'est volontaire : zéro magie, zéro surprise.
+
+## replace_all vs édition multiple
+
+Pour renommer `oldName` en `newName` dans un fichier avec 12 occurrences :
+
+- ✅ `Edit(... old_string="oldName", new_string="newName", replace_all=true)` — un appel, rapide.
+- ❌ 12 appels Edit successifs — lent, sujet aux erreurs d'unicité.
+
+Mais attention : `replace_all=true` ne distingue pas le contexte. Si `oldName` apparaît aussi dans un commentaire ou une string que vous ne voulez **pas** changer, faites du cas par cas.
+
+## Combiner Edit avec Grep
+
+Workflow classique pour un renommage cross-fichiers :
+
+```bash
+# 1. Trouver les fichiers concernés
+Grep(pattern="oldName", output_mode="files_with_matches")
+
+# 2. Pour chaque fichier
+Read(file_path="...")
+Edit(file_path="...", old_string="oldName", new_string="newName", replace_all=true)
+```
+
+Pour un renommage global multi-fichiers, certains préfèrent un `sed -i` via Bash, mais Edit reste plus sûr car il garantit que chaque fichier a été lu et le diff est explicite.
+
+## Performance
+
+Edit n'envoie que le diff au modèle — pas le fichier entier. C'est beaucoup plus économe en tokens que Write. Sur un fichier de 2000 lignes, modifier 3 lignes coûte ~50 tokens via Edit vs 25k tokens via Write.
+
+## Pour aller plus loin
+
+- [Documentation Claude Code](https://docs.claude.com/en/docs/claude-code)
+- Voir aussi : `Write` pour réécriture totale, `NotebookEdit` pour `.ipynb`, `Grep` pour repérer les cibles.
+- Astuce : pour un refactoring où vous hésitez sur la stratégie, demandez à Claude de planifier avec `ExitPlanMode` avant d'enchaîner les Edit.

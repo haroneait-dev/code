@@ -1,0 +1,95 @@
+---
+title: "Hooks et performance : garder Claude Code rapide"
+description: "Un hook lent ralentit chaque appel d'outil. Apprenez à profiler vos hooks, fixer des timeouts et adopter des patterns asynchrones."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+Les hooks s'exécutent de façon synchrone dans la boucle d'événements de Claude Code. Concrètement : si votre `PostToolUse` met 4 secondes à formater un fichier, chaque écriture coûte 4 secondes de plus. Multiplié par 50 outils dans une session, c'est 3 minutes perdues. Cet article explique comment mesurer, optimiser, et déléguer les travaux longs.
+
+## Mesurer avant d'optimiser
+
+Premier réflexe : instrumenter. Avant de réécrire un hook, on veut savoir combien il coûte. Un wrapper minimal fait l'affaire :
+
+```bash
+#!/usr/bin/env bash
+START=$(date +%s%N)
+INPUT="$(cat)"
+echo "$INPUT" | /usr/local/bin/mon-hook-reel.sh
+EXIT=$?
+END=$(date +%s%N)
+ELAPSED=$(( (END - START) / 1000000 ))
+echo "{\"hook\":\"format\",\"ms\":$ELAPSED,\"exit\":$EXIT}" \
+  >> "$CLAUDE_PROJECT_DIR/.claude/hook-metrics.jsonl"
+exit $EXIT
+```
+
+Au bout de quelques sessions, un `jq -s 'group_by(.hook) | map({hook: .[0].hook, p95: (map(.ms) | sort | .[(length * 0.95 | floor)])})' .claude/hook-metrics.jsonl` vous donne la latence p95 par hook. Vous saurez immédiatement qui ralentit la session.
+
+## Fixer un timeout explicite
+
+Claude Code permet de définir un `timeout` (en secondes) par hook. C'est la première ligne de défense contre un script qui pend indéfiniment.
+
+```json
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "prettier --write \"$(jq -r '.tool_input.file_path')\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+Au-delà de 5 secondes, le hook est tué et la session continue. C'est mieux qu'un blocage silencieux. Choisissez un timeout serré : si votre `prettier` met plus de 2 secondes sur un fichier moyen, c'est qu'il y a un souci de configuration.
+
+## Délégation asynchrone : fire-and-forget
+
+Pour les tâches qui n'ont pas besoin de bloquer (analytics, indexation, push de logs), détachez-les complètement. Le hook se termine en quelques millisecondes, le travail réel tourne en arrière-plan.
+
+```bash
+#!/usr/bin/env bash
+INPUT="$(cat)"
+# On détache : pas de wait, redirection complète
+( echo "$INPUT" | /usr/local/bin/lourd-indexer.sh \
+    > /tmp/indexer.log 2>&1 ) &
+disown
+exit 0
+```
+
+Attention : un `PreToolUse` async ne peut **pas** bloquer un appel d'outil. Cette technique est réservée à `PostToolUse`, `Stop`, `SessionEnd`, où le résultat n'est pas attendu.
+
+## Éviter les coûts cachés
+
+Quelques pièges classiques :
+
+- **Cold start Node/Python** : lancer `node script.js` coûte ~150 ms juste pour démarrer le runtime. Pour un hook appelé sur chaque édition, préférez du shell pur ou un daemon long-vivant via socket Unix.
+- **Glob trop large** : `prettier --write "**/*.ts"` au lieu du fichier modifié re-formate tout le projet. Toujours cibler avec `jq -r '.tool_input.file_path'`.
+- **Réseau synchrone** : un appel `curl` vers une API externe dans un hook ajoute la latence réseau à chaque outil. À éviter ou à mettre en async strict.
+- **Hooks empilés sur le même `matcher`** : ils s'exécutent en série. Regroupez-les dans un script unique si possible.
+
+## Profiler plus finement avec `time`
+
+Pour creuser un hook spécifique, exécutez-le manuellement avec un payload représentatif :
+
+```bash
+echo '{"tool_name":"Edit","tool_input":{"file_path":"src/big.ts"}}' \
+  | time /usr/local/bin/mon-hook.sh
+```
+
+Le `user` vs `sys` vs `real` vous dit si vous êtes CPU-bound, I/O-bound, ou en attente réseau. À partir de là, l'optimisation devient ciblée.
+
+## Pour aller plus loin
+
+- Mettre en place une alerte locale (notification système) si un hook dépasse son budget — ça évite la dégradation invisible.
+- Pour les formatters lourds (eslint, biome), utiliser leur mode daemon ou serveur.
+- Penser à `SessionEnd` plutôt que `PostToolUse` pour les tâches batch qui peuvent attendre la fin de session.
+- Comparer périodiquement les métriques p95 entre versions de Claude Code : un changement de comportement du harnais peut faire dériver vos hooks.

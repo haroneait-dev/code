@@ -1,0 +1,51 @@
+---
+title: "Création et optimisation de Projects"
+description: "Bien construire un Project Claude.ai : bases de connaissances, instructions personnalisées, fichiers attachés."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+Un Project sur Claude.ai est un espace de conversation persistant équipé de trois leviers : une **base de connaissances**, des **instructions personnalisées**, et un **historique de threads** regroupés. Bien configuré, il transforme Claude en assistant spécialisé qui n'a plus besoin de réexpliquer le contexte à chaque message. Mal configuré, il sature inutilement la fenêtre de contexte et dégrade les réponses. Voici la méthode.
+
+## Créer un Project utile dès le départ
+
+Depuis la sidebar gauche, "Projects" → "Create project". Donnez un nom clair (le modèle ne le lit pas, mais vous le réutilisez souvent) et une description courte. Le vrai travail commence avec deux blocs :
+
+1. **Custom instructions** : un prompt système qui s'applique à tous les threads du Project
+2. **Project knowledge** : les fichiers et textes que Claude consultera en permanence
+
+Avant de remplir, posez-vous la question : ce Project sert-il à **une tâche répétée** (rédaction de specs, revue de code, support client) ou à **un domaine** (un produit, un client, un dépôt) ? Un Project = une mission précise donne toujours de meilleurs résultats qu'un Project fourre-tout.
+
+## Instructions personnalisées : le prompt système
+
+Les custom instructions tiennent dans une zone de texte longue. Structurez-les en sections explicites :
+
+- **Rôle** : "Tu es l'assistant éditorial de la newsletter X."
+- **Audience** : qui lit, quel niveau, quelle langue
+- **Ton et style** : formel, vouvoiement, formules à bannir
+- **Format de sortie attendu** par défaut (Markdown, longueur, structure)
+- **Comportements interdits** : pas d'emojis, pas de listes à puces si on demande de la prose, etc.
+
+Évitez les instructions vagues ("sois utile"). Privilégiez des règles vérifiables. Une bonne pratique : terminer par "Avant de répondre, vérifie que ta réponse respecte chacune des règles ci-dessus."
+
+## Project knowledge : ce qu'on attache et ce qu'on évite
+
+La base de connaissances accepte des PDF, .docx, .txt, .md, du code, et des extraits collés directement. Trois principes :
+
+1. **Pertinence avant volume.** Mieux vaut 50 pages utiles que 500 pages dont 10 % servent. Tout fichier consomme du contexte à chaque requête.
+2. **Pré-digérer les sources.** Un PDF de 200 pages bruyant gagne à être résumé d'abord, ou découpé en sections taggées (Markdown avec headings clairs).
+3. **Mettre à jour.** La base ne se synchronise pas automatiquement avec une source externe : il faut remplacer les fichiers à la main quand la doc évolue.
+
+Pour les dépôts de code, plutôt que d'attacher tous les fichiers, fournissez une carte d'architecture (arborescence + résumé par module) et seulement les fichiers réellement utiles à la mission.
+
+## Connecteurs et fichiers vivants
+
+Claude.ai propose des connecteurs Google Drive et GitHub. Ils donnent à Claude la possibilité d'aller chercher un fichier à la demande, plutôt que de le charger en permanence. C'est souvent préférable pour les sources volumineuses : on libère du contexte et on garantit que la version lue est la plus récente.
+
+## Itérer et mesurer
+
+Après quelques threads, relisez les réponses : si Claude répète une erreur, ajoutez une règle aux instructions. S'il invente sur un sujet précis, c'est que la connaissance manque — enrichissez la base. Versionnez vos instructions dans un fichier externe (Notion, Git) pour ne pas perdre l'historique.
+
+## Pour aller plus loin
+
+Pour un Project Team partagé, désignez un "owner" qui maintient les instructions et la base — sans propriétaire clair, les Projects collaboratifs dérivent vite. Et si votre Project dépasse 80 % de remplissage de la base, c'est le signal qu'il faut soit le scinder en deux, soit migrer vers une architecture RAG via l'API, plus scalable que la mémoire intégrée de Claude.ai.

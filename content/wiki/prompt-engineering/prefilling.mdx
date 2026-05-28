@@ -1,0 +1,74 @@
+---
+title: "Prefilling (pré-remplissage de la réponse)"
+description: "Technique avancée pour dicter les premiers mots de la réponse de Claude et forcer un format strict comme JSON ou XML."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+Le **prefilling** consiste à fournir à Claude le tout début de sa propre réponse via le rôle `assistant`. Au lieu de laisser Claude choisir comment commencer, vous lui imposez les premiers caractères. Le modèle continue alors la génération à partir de ce point — ce qui est l'une des techniques les plus puissantes (et sous-estimées) de l'API Anthropic pour garantir un format de sortie.
+
+C'est particulièrement utile quand vous avez besoin d'une sortie machine-readable, quand Claude a tendance à ajouter du texte conversationnel ("Bien sûr ! Voici…"), ou quand vous voulez verrouiller un ton et une persona.
+
+## Le principe en deux messages
+
+Un appel API classique contient un message `user`. Pour faire du prefilling, vous ajoutez un message `assistant` immédiatement après, partiellement rempli :
+
+```ts
+const response = await anthropic.messages.create({
+  model: "claude-sonnet-4-6",
+  max_tokens: 1024,
+  messages: [
+    { role: "user", content: "Donne-moi 3 ingrédients pour une pizza." },
+    { role: "assistant", content: "{" }
+  ]
+});
+```
+
+Claude reprend exactement après `{` et produira directement le contenu d'un objet JSON. Pas de préambule, pas de markdown, pas d'explication.
+
+## Forcer un JSON parfait
+
+Le cas d'usage numéro 1 du prefilling, c'est la sortie structurée. Sans prefill, Claude entoure souvent son JSON de \`\`\`json … \`\`\`, ajoute un commentaire, ou commence par "Voici le JSON demandé :". Avec un prefill `{`, vous éliminez tout ça :
+
+```ts
+messages: [
+  { role: "user", content: "Extrait nom, email, téléphone de ce texte: ..." },
+  { role: "assistant", content: "{" }
+]
+```
+
+Vous récupérez ensuite la réponse en re-préfixant manuellement le `{` côté client avant `JSON.parse()`. C'est plus fiable que n'importe quel "réponds uniquement en JSON" dans le system prompt.
+
+## Forcer un format XML ou un tableau
+
+Le même principe marche pour les listes (`[`), les balises XML (`<analysis>`), les blocs de code (\`\`\`python), ou même un mot précis pour démarrer une réponse :
+
+```ts
+{ role: "assistant", content: "<thinking>" }
+```
+
+Claude poursuivra dans cette balise jusqu'à fermer correctement. Très utile pour les pipelines de parsing XML.
+
+## Verrouiller une persona ou un refus
+
+Le prefilling sert aussi à orienter le ton. Pour une persona "Sherlock Holmes" :
+
+```ts
+{ role: "assistant", content: "*ajuste sa pipe* Élémentaire," }
+```
+
+Claude continuera dans ce registre. Inversement, pour empêcher un refus ou une digression sur un sujet sensible (dans un cadre légitime), un prefill comme `"Voici la réponse : "` force le modèle à entrer directement dans le vif du sujet.
+
+## Limites à connaître
+
+Le prefill ne fait **pas** partie de la réponse retournée par l'API : Claude renvoie uniquement ce qu'il génère après. Pensez donc à re-concaténer le prefill côté client si vous en avez besoin.
+
+Évitez aussi les prefills trop longs ou trop directifs : si vous écrivez la moitié de la réponse vous-même, vous perdez la valeur du modèle. Le sweet spot, c'est 1 à 10 caractères qui verrouillent le format sans contraindre le fond.
+
+Enfin, le prefill ne peut pas se terminer par un espace en fin de chaîne (l'API renvoie une erreur). Utilisez `{`, `[`, `<balise>` ou une lettre — pas `"Voici : "`.
+
+## Pour aller plus loin
+
+- Documentation officielle Anthropic : "Prefill Claude's response"
+- Combiner prefill + tool use pour des sorties ultra-déterministes
+- Voir aussi l'article Meta-Prompting pour générer le prefill optimal automatiquement

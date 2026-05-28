@@ -1,0 +1,83 @@
+---
+title: "Serveurs populaires (Supabase, Vercel, Linear)"
+description: "Serveurs tiers à connaître pour intégrer Claude à votre stack."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+L'écosystème MCP (Model Context Protocol) explose depuis 2025. Des dizaines de serveurs officiels permettent désormais à Claude d'interagir avec vos outils favoris : bases de données, plateformes de déploiement, gestion de projet, design. Plutôt que de coder vous-même chaque intégration, brancher un serveur tiers prend quelques minutes et débloque immédiatement des dizaines de tools.
+
+Voici une sélection des serveurs MCP les plus utiles à connaître en 2026, et comment les configurer dans Claude Code.
+
+## Supabase MCP
+
+Le serveur Supabase officiel donne à Claude un contrôle complet sur votre projet : lister les tables, exécuter du SQL, appliquer des migrations, déployer des Edge Functions, consulter les logs et les conseils de sécurité (advisors).
+
+```json
+{
+  "mcpServers": {
+    "supabase": {
+      "command": "npx",
+      "args": ["-y", "@supabase/mcp-server-supabase@latest"],
+      "env": {
+        "SUPABASE_ACCESS_TOKEN": "sbp_xxxxxxxxxxxx"
+      }
+    }
+  }
+}
+```
+
+Cas d'usage typique : « Liste mes tables, ajoute une colonne `archived_at` à `posts` via une migration, puis régénère les types TypeScript ». Claude enchaîne `list_tables`, `apply_migration`, `generate_typescript_types` sans intervention.
+
+## Vercel MCP
+
+Le serveur Vercel expose le déploiement, les logs runtime, la gestion des projets et des domaines. Indispensable pour débugger un déploiement en production sans quitter Claude Code.
+
+```bash
+claude mcp add vercel -- npx -y @vercel/mcp-server
+```
+
+Vous pouvez ensuite demander : « Pourquoi mon dernier deploy a échoué ? » et Claude appellera `list_deployments` puis `get_deployment_build_logs` pour vous donner la réponse, souvent avec un correctif prêt à appliquer.
+
+## Linear MCP
+
+Linear fournit un serveur MCP qui transforme Claude en assistant de gestion de tickets. Création d'issues depuis un message d'erreur, mise à jour de statut après un commit, génération de specs depuis un thread Slack.
+
+```bash
+claude mcp add linear --transport sse https://mcp.linear.app/sse
+```
+
+L'authentification se fait via OAuth dans le navigateur au premier appel. Une fois connecté, Claude peut lire vos cycles, créer des issues taggées, et même fermer un ticket automatiquement quand le PR associé est mergé.
+
+## Autres serveurs à connaître
+
+Quelques serveurs qui méritent une place dans votre `~/.claude/mcp.json` :
+
+- **GitHub** : PRs, issues, reviews, actions
+- **Stripe** : créer un produit, inspecter un paiement, refunds
+- **Sentry** : récupérer une erreur et son stack trace
+- **Notion** : lire et écrire dans vos bases
+- **Playwright** : automatisation navigateur pour tester un site
+- **Filesystem** : accès sandboxé à un dossier hors du repo
+
+```ts
+// Pattern courant : combiner plusieurs serveurs dans un workflow
+// 1. Sentry → identifie l'erreur
+// 2. Linear → crée l'issue
+// 3. GitHub → ouvre la PR avec le fix
+// 4. Vercel → vérifie le deploy preview
+```
+
+## Sécurité et permissions
+
+Chaque serveur MCP hérite des droits du token que vous lui donnez. Trois règles d'or :
+
+1. Créer des **tokens scopés** (ex : Supabase read-only en dev, write en prod uniquement)
+2. Stocker les tokens dans des **secrets managers** (1Password CLI, `op read`)
+3. Utiliser les **hooks** Claude Code pour bloquer les tools sensibles (`apply_migration` en prod, `deploy_to_vercel` sans confirmation)
+
+## Pour aller plus loin
+
+- Registre officiel : modelcontextprotocol.io/servers
+- Tutoriel : créer son propre serveur en TypeScript ou Python (voir articles dédiés)
+- Inspecteur MCP : `npx @modelcontextprotocol/inspector` pour tester un serveur localement avant de le brancher

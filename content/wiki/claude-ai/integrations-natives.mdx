@@ -1,0 +1,57 @@
+---
+title: "Intégrations natives Claude.ai"
+description: "GitHub, Google Drive, Notion connectés directement à Claude.ai sans passer par le CLI."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+Claude.ai propose un catalogue d'intégrations natives qui permettent de connecter vos outils du quotidien à l'assistant sans installer le moindre paquet npm ni configurer un serveur MCP localement. En quelques clics depuis les paramètres, Claude peut lire vos fichiers Google Drive, parcourir vos dépôts GitHub ou interroger vos pages Notion pour répondre dans le contexte de votre travail réel.
+
+## À quoi servent les intégrations natives
+
+Une intégration native, c'est une connexion OAuth gérée côté Anthropic entre votre compte Claude et un service tiers. Une fois autorisée, vos conversations peuvent inclure des "outils" automatiquement disponibles pour le modèle : lire un fichier, lister un dossier, faire une recherche full-text, ouvrir une issue. Vous gardez la main : Claude ne déclenche un outil que si la requête le justifie et chaque appel reste visible dans la conversation.
+
+L'avantage principal par rapport au CLI : aucun setup. Pas de `claude mcp add`, pas de tokens à coller dans un fichier de config, pas de gestion de scopes manuelle. Tout passe par l'écran de connexion du service et reste révocable depuis vos paramètres Claude.ai.
+
+## GitHub : lecture de code et pull requests
+
+L'intégration GitHub permet à Claude d'accéder à vos dépôts publics et privés (selon les permissions accordées). Cas d'usage typiques :
+
+- Lui demander d'expliquer une fonction dans un fichier précis sans copier-coller.
+- Récupérer la liste des PR ouvertes sur un repo pour préparer une revue groupée.
+- Lire les issues d'un projet pour rédiger un changelog ou un rapport hebdomadaire.
+
+Vous pouvez restreindre l'accès à des organisations ou à des dépôts spécifiques au moment de l'installation. Pour les opérations d'écriture (commits, merge), l'intégration native reste volontairement limitée — c'est le rôle de Claude Code en local.
+
+## Google Drive : documents et tableurs
+
+Une fois Google Drive connecté, Claude peut chercher dans vos fichiers via une recherche sémantique, ouvrir un Doc, lire un Sheet ou extraire le texte d'un PDF. C'est particulièrement puissant pour :
+
+- Synthétiser plusieurs comptes-rendus de réunion dispersés dans un dossier.
+- Comparer deux versions d'un même document de spec.
+- Générer un récap basé sur un tableur de suivi de tickets.
+
+L'autorisation se fait au niveau de votre compte Google et vous pouvez la révoquer à tout moment depuis [myaccount.google.com](https://myaccount.google.com). Claude ne stocke pas les contenus lus : ils sont injectés dans le contexte de la conversation puis oubliés.
+
+## Notion : bases de connaissances et wikis
+
+L'intégration Notion donne à Claude un accès en lecture (et parfois en écriture, selon la config) aux pages que vous lui partagez explicitement via le sélecteur d'intégration Notion. Pratique pour :
+
+- Interroger un wiki interne sans changer d'onglet.
+- Générer un brouillon de page à partir d'une discussion.
+- Croiser une roadmap Notion avec des issues GitHub dans une même conversation.
+
+Le contrôle de permissions est plus granulaire que pour Drive : vous décidez page par page (ou espace par espace) ce que l'intégration peut voir.
+
+## Bonnes pratiques
+
+- N'activez que les intégrations dont vous avez réellement besoin pour limiter la surface d'exposition.
+- Vérifiez régulièrement la liste des services connectés dans **Settings > Integrations**.
+- Pour des données ultra-sensibles, préférez le CLI avec un serveur MCP local que vous maîtrisez de bout en bout.
+- Combinez les intégrations : une même conversation peut piocher dans Drive et GitHub, ce qui ouvre des workflows transverses impossibles autrement.
+
+## Pour aller plus loin
+
+- Explorez le catalogue complet sur [claude.ai/settings/integrations](https://claude.ai/settings/integrations).
+- Pour aller au-delà des intégrations officielles, regardez le protocole **MCP** qui permet de brancher n'importe quel service custom.
+- Combinez Claude Code (en local) et les intégrations Claude.ai (en web) pour couvrir à la fois le développement et la consultation rapide depuis n'importe quel navigateur.

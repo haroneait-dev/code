@@ -1,0 +1,101 @@
+---
+title: "Routing et agrégation de serveurs MCP"
+description: "Utiliser un proxy MCP pour exposer plusieurs serveurs via un endpoint unique et simplifier la configuration client."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+À mesure que les serveurs MCP se multiplient — filesystem, git, github, postgres, memory, puppeteer, plus vos serveurs internes — la configuration client devient ingérable. Chaque utilisateur installe la même liste, met à jour à la main, debug ses propres pannes. La solution : un **proxy MCP** qui agrège plusieurs serveurs derrière un endpoint unique.
+
+## Le problème
+
+Le `claude_desktop_config.json` typique d'un développeur ressemble à ça :
+
+```json
+{
+  "mcpServers": {
+    "filesystem": { ... },
+    "git": { ... },
+    "github": { ... },
+    "postgres": { ... },
+    "memory": { ... },
+    "linear": { ... },
+    "slack": { ... }
+  }
+}
+```
+
+Sept processus locaux à maintenir, sept binaires à installer, sept jeux de credentials. Multipliez par 50 développeurs : enfer opérationnel.
+
+## L'idée du proxy MCP
+
+Un proxy MCP est un serveur qui :
+1. Se présente au client comme **un seul serveur MCP**
+2. Maintient en interne des **connexions vers plusieurs serveurs MCP en amont**
+3. **Agrège** leurs tools, resources et prompts dans un namespace unifié
+4. **Route** chaque appel vers le bon backend
+
+Côté client, on configure une seule entrée. Côté ops, on gère une configuration centralisée.
+
+## Schémas de namespace
+
+L'agrégation pose un problème : deux serveurs peuvent exposer un tool de même nom (`list_files` côté filesystem et côté github). Les proxys résolvent ça par :
+
+- **Préfixage** : `filesystem.list_files`, `github.list_files`
+- **Routing explicite** : un tool `route(server, tool, args)` unique
+- **Sélection contextuelle** : activer un sous-ensemble selon le projet
+
+Le préfixage est le plus courant et le plus prévisible pour le modèle.
+
+## Implémentations existantes
+
+Plusieurs projets open source matures :
+
+- **mcp-proxy** (sparfenyuk) : pont Stdio ↔ SSE, utile pour exposer un serveur local sur HTTP
+- **mcp-hub** / **mcp-router** : agrégateurs multi-serveurs avec UI de gestion
+- **Smithery** : registre + gateway hébergé qui agrège les serveurs publics
+- **Toolhive** : orchestrateur conteneurisé pour serveurs MCP en équipe
+
+Côté entreprise, certains éditeurs proposent des **gateways MCP managés** avec auth SSO, audit logs, rate limiting et politiques par utilisateur.
+
+## Architecture type pour une équipe
+
+```
+Claude clients (50 devs)
+        │
+        ▼
+   MCP Gateway (HTTP/SSE, auth SSO)
+        │
+   ┌────┼─────┬─────────┬──────────┐
+   ▼    ▼     ▼         ▼          ▼
+ GitHub Linear Postgres Filesystem Internal
+                                   tools
+```
+
+Le gateway :
+- Authentifie chaque dev (token SSO)
+- Injecte les credentials backend (le dev ne voit jamais le token GitHub d'équipe)
+- Filtre les tools selon le rôle
+- Log toutes les invocations pour audit
+
+## Quand ne pas le faire
+
+Le proxy ajoute une couche, donc :
+
+- **Latence** supplémentaire (réseau + sérialisation)
+- **Point unique de défaillance** si pas redondé
+- **Complexité de debug** : une erreur peut venir du proxy ou du serveur en amont
+- **Surface d'attaque** : un proxy mal configuré expose tous les backends
+
+Pour un usage individuel ou une petite équipe (< 5 personnes), garder les serveurs locaux reste plus simple.
+
+## Pattern hybride : proxy partiel
+
+Une approche pragmatique : garder en local les serveurs qui ont besoin du contexte utilisateur (filesystem, git) et passer par un proxy pour les services partagés (GitHub d'équipe, base de données, outils internes). Le `mcp.json` reste raisonnable et les responsabilités sont claires.
+
+## Pour aller plus loin
+
+- Étudier les implémentations open source citées sur GitHub
+- Lire la spec MCP sur la composition de serveurs (en cours d'évolution)
+- Évaluer Smithery ou un gateway hébergé pour un POC rapide
+- Concevoir une politique de naming des tools avant d'agréger pour éviter les collisions

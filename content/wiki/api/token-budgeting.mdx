@@ -1,0 +1,105 @@
+---
+title: "Token budgeting et dépassement de contexte"
+description: "Sliding window, résumé dynamique et stratégies de token budgeting pour agents long-running."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+Un agent qui tourne longtemps finit toujours par heurter la limite de contexte du modèle (200 K tokens pour Claude Sonnet 4.6). Sans stratégie de gestion, votre agent crashera avec une erreur `context_length_exceeded` au pire moment — typiquement après plusieurs heures d'exécution et de nombreux tool calls. Le **token budgeting** consiste à anticiper et contrôler activement la croissance du contexte.
+
+## Comprendre la croissance du contexte
+
+Chaque tour d'un agent ajoute :
+
+- Le message utilisateur (ou le résultat de l'outil précédent)
+- Le `thinking` du modèle s'il est activé
+- Le texte de réponse
+- Les tool calls et leurs résultats (souvent volumineux : 1 000 à 10 000 tokens chacun)
+
+Sur un agent qui exécute 50 tool calls retournant chacun 5 K tokens, vous accumulez 250 K tokens — au-delà de la fenêtre. La courbe est exponentielle dans les workflows d'exploration (recherche web, scraping, parsing de documents).
+
+## Stratégie 1 : Sliding window
+
+La plus simple : ne garder que les N derniers tours. On préserve toujours le system prompt et le message initial de l'utilisateur, puis on tronque le milieu.
+
+```ts
+function slidingWindow(messages: Message[], maxTurns = 20): Message[] {
+  if (messages.length <= maxTurns) return messages;
+  const initial = messages.slice(0, 2); // system + premier user
+  const recent = messages.slice(-(maxTurns - 2));
+  return [...initial, ...recent];
+}
+```
+
+Avantages : trivial à implémenter, aucun coût additionnel. Inconvénient : l'agent perd la mémoire des tours anciens — problématique si une décision actuelle dépend d'un fait évoqué 30 tours plus tôt.
+
+## Stratégie 2 : Résumé dynamique
+
+Quand le contexte approche un seuil (ex : 70 % de la fenêtre), on demande à Claude de résumer les N premiers tours en quelques centaines de tokens, puis on remplace ces tours par le résumé.
+
+```ts
+async function compactIfNeeded(messages: Message[], threshold = 140_000) {
+  const tokens = estimateTokens(messages);
+  if (tokens < threshold) return messages;
+
+  const oldTurns = messages.slice(2, -10);
+  const summary = await anthropic.messages.create({
+    model: "claude-haiku-4-5",
+    max_tokens: 1500,
+    messages: [{
+      role: "user",
+      content: `Résume ces échanges en préservant faits, décisions et données clés:\n\n${JSON.stringify(oldTurns)}`
+    }]
+  });
+
+  return [
+    messages[0],
+    messages[1],
+    { role: "assistant", content: `[Résumé contexte précédent]\n${summary.content[0].text}` },
+    ...messages.slice(-10)
+  ];
+}
+```
+
+Pattern hybride efficace : sliding window sur les 10 derniers tours + résumé compacté de tout le reste. La mémoire à long terme est préservée, le coût reste maîtrisé.
+
+## Stratégie 3 : Mémoire externe
+
+Pour les agents très long-running (jours, semaines), externalisez l'historique dans une base vectorielle ou un store clé-valeur :
+
+- Chaque tour est embeddé et stocké
+- À chaque nouveau tour, on retrouve les K passages les plus pertinents (RAG sur la propre conversation)
+- Seuls ces passages sont réinjectés, pas tout l'historique
+
+C'est le pattern utilisé par les agents de longue durée comme Claude Code en mode session étendue.
+
+## Budgeter les tool results
+
+Les résultats de tools sont la première cause de débordement. Imposez un budget par tool :
+
+```ts
+function truncateToolResult(result: string, maxTokens = 2000): string {
+  const approxChars = maxTokens * 4;
+  if (result.length <= approxChars) return result;
+  return result.slice(0, approxChars) + `\n\n[...tronqué, ${result.length - approxChars} caractères omis]`;
+}
+```
+
+Pour un fichier de 50 K lignes, retournez les 100 premières + un résumé statistique. Pour une page web scrapée, extrayez le contenu principal avec `readability` au lieu du HTML brut.
+
+## Monitoring du budget
+
+Chaque réponse API renvoie `usage.input_tokens` et `usage.output_tokens`. Loggez la trajectoire :
+
+```ts
+metrics.gauge("agent_context_tokens", response.usage.input_tokens, { agent_id, turn });
+```
+
+Alertez à 80 % de la fenêtre. Déclenchez la compaction à 70 %. Vous ne devriez jamais voir une erreur `context_length_exceeded` en production.
+
+## Pour aller plus loin
+
+- Anthropic propose désormais une **API de compaction native** dans certains SDK — vérifiez `messages.compact()` dans la dernière version.
+- Combinez budget + prompt caching : le résumé compacté devient un préfixe stable cachable.
+- Pour les agents multi-utilisateurs, isolez le budget par `metadata.user_id` afin qu'un utilisateur ne consomme pas tout le quota.
+- Lisez le papier d'Anthropic sur les **long-running agents** et la stratégie de "memory chunking".

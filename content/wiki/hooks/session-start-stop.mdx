@@ -1,0 +1,180 @@
+---
+title: "SessionStart, Stop et SessionEnd"
+description: "Les hooks de cycle de vie d'une session Claude Code et leurs usages clés."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+Au-delà des hooks d'outils, Claude Code expose des **hooks de cycle de vie** qui se déclenchent à l'ouverture, à la pause et à la fermeture d'une session. Ils sont parfaits pour préparer l'environnement, injecter du contexte ou notifier la fin d'une tâche longue.
+
+## Les trois hooks de session
+
+- `SessionStart` — au démarrage d'une nouvelle session (ou reprise via `--resume`/`--continue`).
+- `Stop` — quand l'agent finit de répondre et rend la main à l'utilisateur.
+- `SessionEnd` — quand la session est fermée (sortie, `/exit`, fermeture du terminal).
+
+À ne pas confondre : `Stop` se déclenche **à chaque tour**, alors que `SessionEnd` ne se déclenche qu'une fois.
+
+## SessionStart : préparer le terrain
+
+Le payload de `SessionStart` inclut un champ `source` qui indique si c'est un démarrage frais, un `--continue`, un `--resume`, ou une compaction. Cela permet d'adapter le comportement.
+
+Cas d'usage typiques :
+- Charger des informations dynamiques (version du projet, état du build, branche git).
+- Rappeler à Claude des règles spécifiques au repo.
+- Démarrer un service local (base de données, serveur de dev).
+
+```json
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/session-start.sh"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+```bash
+#!/usr/bin/env bash
+# Injecte du contexte dynamique dans la session
+branch=$(git -C "$CLAUDE_PROJECT_DIR" branch --show-current 2>/dev/null)
+last_commit=$(git -C "$CLAUDE_PROJECT_DIR" log -1 --oneline 2>/dev/null)
+
+cat <<EOF
+Contexte projet :
+- Branche courante : $branch
+- Dernier commit : $last_commit
+- Date : $(date +%Y-%m-%d)
+EOF
+exit 0
+```
+
+Le `stdout` peut être **injecté dans le contexte** de la session — vérifiez le format JSON attendu dans la doc officielle [à vérifier].
+
+## Stop : notifier la fin d'un tour
+
+`Stop` est le hook qui change la vie de quiconque lance des tâches longues. Plus besoin de rester collé au terminal : Claude vous notifie quand il a fini.
+
+```json
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "osascript -e 'display notification \"Claude a terminé\" with title \"Claude Code\" sound name \"Glass\"'"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+Sur Linux :
+
+```bash
+notify-send "Claude Code" "Tâche terminée"
+```
+
+Sur n'importe quel OS via Slack :
+
+```bash
+curl -X POST "$SLACK_WEBHOOK_URL" \
+  -H "Content-Type: application/json" \
+  -d '{"text":"Claude a terminé son tour"}' >/dev/null 2>&1
+```
+
+> ⚠️ Attention : `Stop` se déclenche à chaque tour, même très court. Évitez les sons agressifs ou les notifications spam — préférez un signal discret.
+
+## Stop avancé : forcer Claude à continuer
+
+`Stop` peut renvoyer un JSON pour **empêcher** la fin du tour :
+
+```bash
+#!/usr/bin/env bash
+input=$(cat)
+# Si le projet a des tests qui échouent, on demande à Claude de continuer
+if ! npm test --silent 2>/dev/null; then
+  jq -n '{
+    decision: "block",
+    reason: "Des tests échouent. Corrige-les avant de t'arrêter."
+  }'
+  exit 0
+fi
+```
+
+Utile pour des workflows agentiques où Claude doit boucler jusqu'à atteindre un état stable.
+
+## SessionEnd : nettoyer derrière soi
+
+`SessionEnd` est le bon endroit pour :
+- Arrêter un service lancé au `SessionStart`.
+- Sauvegarder un résumé de session.
+- Envoyer un rapport d'utilisation.
+
+```json
+{
+  "hooks": {
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/cleanup.sh"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+```bash
+#!/usr/bin/env bash
+input=$(cat)
+session_id=$(echo "$input" | jq -r '.session_id')
+transcript=$(echo "$input" | jq -r '.transcript_path')
+
+# Archive le transcript
+mkdir -p "$HOME/.claude-archive"
+cp "$transcript" "$HOME/.claude-archive/$session_id.jsonl"
+exit 0
+```
+
+## SubagentStop : pour les sous-agents
+
+Quand Claude lance un sous-agent (via la `Task` tool ou un mécanisme équivalent), `SubagentStop` se déclenche quand celui-ci termine. Utile pour suivre des workflows multi-agents.
+
+## Combiner les hooks de cycle de vie
+
+Un workflow complet pour un projet sérieux :
+
+```json
+{
+  "hooks": {
+    "SessionStart": [{ "hooks": [{ "type": "command", "command": ".claude/hooks/start.sh" }] }],
+    "Stop":         [{ "hooks": [{ "type": "command", "command": ".claude/hooks/notify.sh" }] }],
+    "SessionEnd":   [{ "hooks": [{ "type": "command", "command": ".claude/hooks/end.sh" }] }]
+  }
+}
+```
+
+- `start.sh` charge la branche, lance le dev server, injecte le contexte.
+- `notify.sh` envoie un ping à chaque fin de tour.
+- `end.sh` archive le transcript et stoppe les services.
+
+## Pour aller plus loin
+
+- [Documentation officielle des hooks](https://docs.claude.com/en/docs/claude-code/hooks)
+- Article wiki : « Notification hook »
+- Article wiki : « Hooks et environnement »
+- Article wiki : « Hook lifecycle »

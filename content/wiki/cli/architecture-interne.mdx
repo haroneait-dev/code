@@ -1,0 +1,104 @@
+---
+title: "Architecture interne du CLI"
+description: "Comprendre comment Claude Code fonctionne sous le capot : boucle agentique, outils, contexte et processus."
+updatedAt: "2026-05-19"
+readingMinutes: 7
+---
+
+Claude Code n'est pas un simple wrapper autour de l'API Anthropic. C'est un **agent autonome** capable de lire, écrire, exécuter et raisonner sur votre code via une boucle agentique. Comprendre son architecture interne permet d'écrire de meilleurs prompts, de diagnostiquer les comportements inattendus et d'exploiter pleinement ses capacités. Cet article décortique les briques essentielles : la boucle principale, le système d'outils, la gestion du contexte et l'orchestration des sous-processus.
+
+## La boucle agentique
+
+Au cœur du CLI tourne une **boucle agent-tool-result** classique. À chaque tour :
+
+1. Claude reçoit l'historique des messages + la liste des outils disponibles.
+2. Il génère une réponse qui peut contenir du texte et/ou des `tool_use`.
+3. Le harness (l'enveloppe du CLI) exécute les outils localement.
+4. Les résultats (`tool_result`) sont injectés dans la conversation.
+5. La boucle continue jusqu'à ce que Claude renvoie une réponse sans `tool_use`.
+
+C'est ce mécanisme qui permet à Claude de chaîner `Read`, `Edit`, `Bash`, etc. sans intervention humaine. Le harness applique aussi des **politiques de permissions** entre l'étape 2 et 3 (cf. article sur les modes de permissions).
+
+## Le système d'outils intégrés
+
+Le CLI expose une liste figée d'outils built-in. Voici les principaux :
+
+| Outil | Rôle |
+|-------|------|
+| `Read` | Lire un fichier (texte, image, PDF) |
+| `Edit` | Remplacer une chaîne dans un fichier |
+| `Write` | Écrire un fichier complet |
+| `Bash` | Exécuter une commande shell |
+| `Glob` / `Grep` | Recherche de fichiers et contenu |
+| `WebFetch` / `WebSearch` | Accès web |
+| `Task` | Déléguer à un sous-agent |
+
+Les outils sont implémentés côté harness (TypeScript/Node), pas côté modèle. Vous pouvez en ajouter via **MCP** (Model Context Protocol) ou via des **hooks** qui interceptent leur exécution.
+
+## Le contexte et son budget
+
+Chaque session dispose d'une fenêtre de contexte limitée (200k tokens pour Sonnet 4.6, davantage pour les modèles récents [à vérifier]). Le CLI gère plusieurs zones :
+
+- **System prompt** : instructions de base + description des outils
+- **CLAUDE.md** : injecté automatiquement au début
+- **Messages utilisateur/assistant** : historique chronologique
+- **Tool results** : peuvent être volumineux (fichiers, sorties de commandes)
+
+Quand le budget se remplit, le CLI déclenche une **compaction automatique** : un résumé est généré à la volée pour libérer de l'espace. La commande `/compact` force ce comportement, `/clear` vide tout.
+
+```bash
+# Inspecter l'usage actuel
+/cost
+
+# Forcer la compaction
+/compact
+
+# Repartir de zéro
+/clear
+```
+
+## Le processus et son environnement
+
+Quand vous lancez `claude`, voici ce qui se passe :
+
+```bash
+claude              # démarre une session interactive
+claude -p "..."     # mode headless (one-shot)
+claude --continue   # reprend la dernière session
+```
+
+Le binaire principal est un script Node qui :
+
+1. Charge la config depuis `~/.claude/settings.json` puis `<repo>/.claude/settings.json` puis `<repo>/.claude/settings.local.json` (ordre de précédence croissant).
+2. Découvre les **plugins**, **skills**, **hooks** et **MCP servers** déclarés.
+3. Établit la connexion à l'API Anthropic (clé via `ANTHROPIC_API_KEY` ou via Claude Pro/Max OAuth).
+4. Lance la TUI (terminal UI) ou bascule en mode `-p` selon les flags.
+
+Chaque exécution d'outil `Bash` se fait dans un **sous-shell** (zsh/bash selon l'OS) avec le `cwd` du projet. Les variables d'environnement de votre shell sont héritées, plus celles injectées par le CLI comme `CLAUDE_PROJECT_DIR`.
+
+## Stockage et état persistant
+
+Claude Code stocke ses données dans `~/.claude/` :
+
+- `~/.claude/settings.json` : config utilisateur
+- `~/.claude/projects/<hash>/` : historique des sessions par projet
+- `~/.claude/todos/` : todo lists actives
+- `~/.claude/plugins/` : plugins installés
+
+Les **sessions** sont sérialisées sous forme de JSONL (un message par ligne) ce qui permet la reprise via `--continue` ou `--resume`. Le hash du projet est dérivé du `cwd` absolu : changer de dossier crée une nouvelle "racine" de sessions.
+
+## Sécurité et sandbox
+
+Par défaut, **chaque commande Bash et chaque édition de fichier déclenche une demande de permission**. Vous pouvez :
+
+- Approuver une fois (`y`)
+- Approuver toujours pour ce pattern (`a`)
+- Refuser (`n`)
+
+Les patterns approuvés sont sauvegardés dans `settings.local.json` (non commité par défaut). En mode `--dangerously-skip-permissions`, le CLI exécute tout sans demander — réservé aux environnements CI ou aux conteneurs isolés.
+
+## Pour aller plus loin
+
+- Lisez la doc officielle sur [docs.claude.com/claude-code](https://docs.claude.com/en/docs/claude-code) pour suivre les évolutions de l'architecture.
+- Explorez le code source open-source des outils MCP pour comprendre comment ajouter vos propres outils.
+- Consultez les articles **settings.json en profondeur** et **Modes de permissions** dans ce wiki pour pousser la configuration plus loin.

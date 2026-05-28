@@ -1,0 +1,71 @@
+---
+title: "Créer un subagent custom"
+description: "Définir un subagent réutilisable via un fichier Markdown dans .claude/agents/ avec frontmatter et prompt système."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+Les subagents custom permettent d'encapsuler une expertise précise (revue de code, migration de schéma, audit sécurité) dans un fichier versionné. Une fois défini, le subagent devient appelable comme un outil de premier ordre par l'agent principal, avec son propre contexte isolé, sa propre allowlist d'outils et son propre modèle. C'est le mécanisme de référence pour industrialiser des workflows répétitifs sans polluer le prompt principal.
+
+## Anatomie d'un fichier agent
+
+Un subagent est un simple fichier `.md` placé dans `.claude/agents/` à la racine du projet (ou `~/.claude/agents/` pour le rendre disponible sur toutes les sessions). Le nom du fichier sert d'identifiant.
+
+```md
+---
+name: code-reviewer
+description: Relit les diffs Git et signale bugs, régressions et code smells. À utiliser après chaque commit non trivial.
+tools: Read, Grep, Glob, Bash
+model: sonnet
+---
+
+Tu es un relecteur de code senior. Quand on t'invoque :
+
+1. Lance `git diff HEAD~1` pour voir les changements récents.
+2. Lis les fichiers modifiés en entier pour le contexte.
+3. Cherche : bugs logiques, fuites de ressources, problèmes de sécurité,
+   gestion d'erreurs manquante, tests absents.
+4. Réponds avec un rapport structuré : Bloquants / À discuter / Nits.
+
+Ne reformate jamais le code. Ne modifie aucun fichier.
+```
+
+Le frontmatter est obligatoire. Le corps qui suit constitue le prompt système du subagent : c'est tout son monde, il n'hérite pas du `CLAUDE.md` du projet de manière implicite.
+
+## Choisir un bon `description`
+
+Le champ `description` est lu par l'agent principal pour décider *quand* déléguer. Il doit être impératif et concret. Préférez « À utiliser après chaque modification SQL pour vérifier les migrations » à « Aide pour les bases de données ». Les formulations qui marchent le mieux contiennent un déclencheur (« après un commit », « quand le build casse ») et un livrable (« retourne un rapport », « propose un patch »).
+
+## Restreindre les outils avec `tools`
+
+Par défaut, un subagent hérite de tous les outils disponibles. En production on restreint quasi systématiquement :
+
+- Un reviewer n'a besoin que de lecture : `Read, Grep, Glob, Bash`.
+- Un agent de migration a besoin de `Edit, Write, Bash` mais pas de `WebFetch`.
+- Un agent de recherche externe a besoin de `WebSearch, WebFetch` mais surtout pas de `Edit`.
+
+Cette allowlist sert deux objectifs : sécurité (limiter les dégâts possibles) et focus (le subagent ne se laisse pas distraire par des outils hors scope).
+
+## Invoquer le subagent
+
+Une fois le fichier sauvegardé, redémarrez la session puis appelez-le explicitement ou laissez l'agent principal le déléguer automatiquement.
+
+```bash
+# Invocation explicite depuis le chat
+> utilise le subagent code-reviewer sur le dernier commit
+
+# Listage des subagents disponibles
+/agents
+```
+
+La commande `/agents` ouvre un menu interactif pour créer, éditer et inspecter les agents. C'est aussi le chemin recommandé pour générer un premier squelette : Claude propose une description et un prompt initial à partir d'une intention en langage naturel.
+
+## Versionner et partager
+
+Les fichiers dans `.claude/agents/` doivent être commités dans Git. C'est le moyen le plus simple de partager un workflow avec l'équipe : un `git pull` suffit à ce que tous les collaborateurs disposent du même reviewer, du même migrateur, du même auditeur. Évitez `~/.claude/agents/` pour les agents spécifiques à un projet, sinon les nouveaux arrivants devront tout recréer à la main.
+
+## Pour aller plus loin
+
+- Lisez la page « Frontmatter agent » pour le détail de chaque champ YAML.
+- Consultez « Code-reviewer & isolation » pour un exemple complet avec gestion de contexte.
+- Pour orchestrer plusieurs subagents en parallèle, voyez « Parallélisation ».

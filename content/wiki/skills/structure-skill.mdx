@@ -1,0 +1,143 @@
+---
+title: "Structure d'un Skill : anatomie d'un dossier"
+description: "Décortiquer un Skill : SKILL.md, scripts, ressources, dépendances et conventions de nommage."
+updatedAt: "2026-05-19"
+readingMinutes: 7
+---
+
+Un Skill Claude Code est avant tout un **dossier sur disque**, lisible par n'importe quel humain et versionnable avec Git. Cette simplicité est volontaire : pas de runtime caché, pas de manifeste binaire. Voyons ce qu'on y trouve, fichier par fichier.
+
+## Arborescence type
+
+```
+my-skill/
+├── SKILL.md              # Manifeste + instructions (obligatoire)
+├── README.md             # Doc utilisateur (optionnel)
+├── package.json          # Si publié sur npm
+├── scripts/
+│   ├── setup.sh
+│   └── validate.py
+├── templates/
+│   └── component.tsx.hbs
+├── references/
+│   └── api-spec.md
+└── tests/
+    └── skill.test.ts
+```
+
+Seul `SKILL.md` est strictement obligatoire. Tout le reste s'organise selon le besoin du skill.
+
+## Le fichier SKILL.md
+
+C'est le **cœur** du skill. Il contient un frontmatter YAML suivi de Markdown libre. Claude lit le frontmatter pour décider quand activer le skill, et le corps une fois activé.
+
+```md
+---
+name: api-route-tester
+description: Génère et exécute des tests pour les routes Next.js avec Vitest
+allowed-tools:
+  - Bash
+  - Read
+  - Write
+  - Edit
+version: 1.2.0
+---
+
+# API Route Tester
+
+## Quand l'utiliser
+Active-toi automatiquement quand l'utilisateur ajoute ou modifie un fichier
+sous `app/api/**/route.ts`.
+
+## Procédure
+1. Lis la route concernée
+2. Identifie les handlers exportés (GET, POST, etc.)
+3. Crée un fichier de test parallèle dans `__tests__/`
+4. Lance `npm run test -- --run` pour valider
+```
+
+## Le dossier `scripts/`
+
+Stocke ici les scripts que le skill exécutera via Bash. Convention : un script = une étape claire et testable. Préférez des scripts **idempotents** qui peuvent être relancés sans dégât.
+
+```bash
+#!/usr/bin/env bash
+# scripts/setup.sh
+set -euo pipefail
+mkdir -p .my-skill/cache
+echo "Skill initialisé : $(date)" >> .my-skill/log
+```
+
+Le skill peut les invoquer ainsi :
+
+```bash
+bash "$CLAUDE_SKILL_DIR/scripts/setup.sh"
+```
+
+La variable `$CLAUDE_SKILL_DIR` est exposée par Claude Code au moment de l'exécution.
+
+## Le dossier `templates/`
+
+Pour les skills qui scaffoldent du code (composants, migrations, tests), un dossier `templates/` avec des fichiers Handlebars, EJS ou de simples placeholders `{{name}}` est la norme. Le skill lit le template, substitue les variables et écrit le résultat.
+
+## Le dossier `references/`
+
+Documentation interne que Claude pourra consulter dynamiquement : specs OpenAPI, schémas SQL, extraits de doc API tierce. Plutôt que d'embarquer toute la doc dans `SKILL.md` (et de consommer du contexte à chaque session), on la décharge ici et le skill instruit Claude à la lire **à la demande**.
+
+```md
+Si l'utilisateur demande un endpoint Stripe inconnu, lis d'abord
+`references/stripe-api.md` avant de répondre.
+```
+
+## Dépendances et `package.json`
+
+Si votre skill embarque du code Node ou Python exécutable, déclarez ses dépendances clairement.
+
+```json
+{
+  "name": "@acme/skill-pdf-tools",
+  "version": "0.3.1",
+  "type": "module",
+  "dependencies": {
+    "pdf-lib": "^1.17.1"
+  },
+  "files": ["SKILL.md", "scripts/", "templates/"]
+}
+```
+
+Le champ `files` est important : il évite de publier `node_modules` ou les tests sur npm.
+
+## Conventions de nommage
+
+- **Nom du skill** (champ `name`) : kebab-case, court, descriptif (`pdf-form-filler`, pas `pdf`).
+- **Dossier** : identique au `name` pour faciliter le grep.
+- **Scripts** : verbe + objet (`setup.sh`, `validate.py`, `cleanup.sh`).
+- **Templates** : suffixe `.hbs`, `.tpl` ou extension cible + `.template`.
+
+## Découverte automatique
+
+Claude Code scanne plusieurs emplacements :
+
+```
+~/.claude/skills/                  # Skills utilisateur (globaux)
+<projet>/.claude/skills/           # Skills projet (partagés via Git)
+<projet>/node_modules/*/skill.json # Skills npm
+```
+
+Un skill installé via `npx claude-mem add` est généralement placé dans `~/.claude/skills/`.
+
+## Vérifier la structure
+
+Une commande utile pour vérifier la santé d'un skill avant publication :
+
+```bash
+npx claude-skill-lint ./my-skill
+```
+
+Cela valide le frontmatter, vérifie que les `allowed-tools` existent et signale les références cassées vers `scripts/` ou `templates/`.
+
+## Pour aller plus loin
+
+- Article wiki « SKILL.md frontmatter » pour la liste exhaustive des champs.
+- Dépôt `anthropics/skills` : https://github.com/anthropics/skills
+- Documentation officielle : https://docs.claude.com/en/docs/claude-code/skills

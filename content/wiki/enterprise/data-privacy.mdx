@@ -1,0 +1,77 @@
+---
+title: "Politique de confidentialité des données"
+description: "Comprendre la non-utilisation des données API et Enterprise pour l'entraînement des modèles Anthropic."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+La confidentialité des données est un critère décisif pour toute adoption en entreprise. Anthropic applique une politique stricte : aucune donnée transitant par l'API commerciale ou les offres Enterprise n'est utilisée pour entraîner ses modèles, sauf consentement explicite. Cet article détaille les garanties contractuelles, techniques et opérationnelles.
+
+## Principes fondamentaux
+
+Anthropic distingue clairement deux flux de données :
+
+- **Consumer (Claude.ai gratuit/Pro)** : possibilité d'opt-in pour contribuer à l'amélioration des modèles.
+- **API, Bedrock, Vertex, Enterprise** : exclusion par défaut. Les prompts et complétions ne sont jamais utilisés pour l'entraînement.
+
+Cette séparation est inscrite dans les **Commercial Terms of Service** et dans le **Data Processing Addendum (DPA)** signé avec chaque client Enterprise.
+
+## Rétention et journalisation
+
+Par défaut, les données API sont conservées 30 jours pour des raisons de sécurité (détection d'abus). Les clients Enterprise peuvent négocier une rétention **zero retention** (ZDR) qui supprime tout stockage côté Anthropic.
+
+```bash
+# Vérifier les politiques activées sur un workspace
+curl https://api.anthropic.com/v1/organizations/me \
+  -H "x-api-key: $ANTHROPIC_API_KEY" \
+  -H "anthropic-version: 2023-06-01"
+```
+
+Le mode ZDR exige une demande commerciale et un avenant au contrat. Une fois activé, aucun log applicatif ne persiste les contenus utilisateurs au-delà du temps de traitement.
+
+## Chiffrement et isolation
+
+L'ensemble des échanges est protégé en transit (TLS 1.3) et au repos (AES-256). Les clés sont gérées via KMS interne. Pour les déploiements sur AWS Bedrock ou GCP Vertex AI, le chiffrement reste sous contrôle du client (CMEK/BYOK).
+
+```yaml
+data_protection:
+  encryption_in_transit: TLS 1.3
+  encryption_at_rest: AES-256-GCM
+  key_management: AWS KMS | GCP Cloud KMS | Anthropic-managed
+  zero_data_retention: optional (Enterprise)
+  training_opt_out: default (API)
+```
+
+## Conformité et certifications
+
+Anthropic maintient un référentiel de conformité aligné sur les standards entreprise :
+
+- **SOC 2 Type II** (audit annuel)
+- **ISO 27001** et **ISO 42001** (management de l'IA)
+- **HIPAA BAA** disponible pour les clients santé US
+- **RGPD** : Anthropic agit comme sous-traitant, le DPA inclut les Clauses Contractuelles Types
+
+Le rapport SOC 2 est accessible sur demande via le portail Trust Center.
+
+## Contrôles côté client
+
+Même avec une politique stricte d'Anthropic, le client reste responsable de la donnée qu'il envoie. Bonnes pratiques :
+
+```json
+{
+  "policies": {
+    "pii_redaction": "before_send",
+    "prompt_logging": "hashed_only",
+    "audit_trail": "siem_export",
+    "data_classification": ["public", "internal", "confidential"]
+  }
+}
+```
+
+Mettre en place un **proxy de redaction** (Presidio, Nightfall) en amont des appels API permet d'éliminer noms, emails, numéros de carte avant transmission.
+
+## Pour aller plus loin
+
+- Trust Center Anthropic : [trust.anthropic.com](https://trust.anthropic.com)
+- Documentation officielle : *Usage Policies* et *Privacy Policy*
+- Articles connexes du wiki : `sovereign-hosting`, `aws-bedrock`, `gcp-vertex`

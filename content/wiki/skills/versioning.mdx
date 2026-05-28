@@ -1,0 +1,73 @@
+---
+title: "Versioning des skills"
+description: "Appliquer le SemVer aux skills Claude Code : gérer les breaking changes, émettre des avertissements de dépréciation et bâtir un plan de migration sain."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+Un skill installé chez un utilisateur est une dépendance comme une autre : il évolue, il se déprécie, parfois il casse. Adopter une discipline de versioning évite que vos améliorations transforment l'expérience d'autrui en cauchemar silencieux. Cette page applique les conventions SemVer au monde des skills Claude Code et décrit un plan de migration que vous pouvez réutiliser tel quel.
+
+## Choisir un schéma SemVer
+
+Chaque skill expose un champ `version` dans son frontmatter, suivant le format `MAJOR.MINOR.PATCH` :
+
+- **PATCH** (`1.2.3` → `1.2.4`) : reformulation, correction de typo, amélioration de prompt sans changement de comportement observable.
+- **MINOR** (`1.2.4` → `1.3.0`) : nouveau trigger, nouvelle référence à un fichier, capacité supplémentaire compatible avec l'usage existant.
+- **MAJOR** (`1.3.0` → `2.0.0`) : changement de nom de skill, suppression d'un trigger, modification du contrat avec un script externe, renommage d'un fichier de référence.
+
+La règle d'or : si un utilisateur peut être surpris après une mise à jour, c'est un MAJOR.
+
+## Détecter les breaking changes
+
+Voici la check-list à parcourir avant chaque release :
+
+- Le nom du skill (clé d'invocation) a-t-il changé ?
+- Un `trigger` a-t-il été supprimé ou rendu plus strict ?
+- Un script appelé par le skill change-t-il sa signature CLI ?
+- Une variable d'environnement requise a-t-elle été ajoutée ?
+- Le `SKILL.md` référence-t-il maintenant un fichier qui n'existait pas dans la version précédente ?
+
+Si vous répondez oui à une seule de ces questions, bumpez MAJOR. Documentez le changement dans un `CHANGELOG.md` à la racine du skill, organisé par version avec une section "Breaking changes" en tête de chaque entrée majeure.
+
+## Avertissements de dépréciation
+
+Avant de supprimer un trigger ou de renommer un skill, marquez l'ancien comme déprécié pendant au moins une version mineure. Le frontmatter accepte un champ `deprecated` :
+
+```yaml
+---
+name: mon-skill
+version: 1.4.0
+deprecated:
+  - trigger: "ancien-mot-cle"
+    replacement: "nouveau-mot-cle"
+    removeIn: "2.0.0"
+---
+```
+
+Quand l'utilisateur déclenche un alias déprécié, Claude Code affiche un avertissement en début de réponse. Cela laisse le temps aux utilisateurs de migrer sans surprise. La fenêtre habituelle est de deux releases mineures avant le retrait définitif.
+
+## Plan de migration type
+
+Pour une release majeure bien préparée, suivez ce plan en cinq étapes :
+
+1. **Annonce** dans la version `N.M.0` avec un `CHANGELOG.md` listant les changements prévus pour `N+1.0.0`.
+2. **Dépréciation** des anciens triggers dès `N.M+1.0`, avec messages d'avertissement actifs.
+3. **Compatibilité descendante** maintenue jusqu'à `N.M+2.0` au minimum.
+4. **Release majeure** `N+1.0.0` qui retire les éléments dépréciés, accompagnée d'un guide de migration sous `MIGRATION.md`.
+5. **Patch correctif** `N+1.0.1` rapidement après la sortie pour traiter les bugs remontés par les early adopters.
+
+## Communiquer les changements
+
+Un skill se diffuse souvent par bouche-à-oreille ou via un registre communautaire. Trois canaux à maintenir à jour :
+
+- Le `CHANGELOG.md` (source de vérité technique).
+- La page wiki ou README du skill (vue d'ensemble pour les nouveaux utilisateurs).
+- Une note dans le `description` du frontmatter quand un changement majeur récent risque de surprendre.
+
+Pour les skills installés via un registre, ajoutez un champ `compatibility` indiquant la version minimum de Claude Code requise. Cela évite qu'un utilisateur sur une version ancienne installe un skill qui exploite des features récentes.
+
+## Pour aller plus loin
+
+- La page **tester un skill localement** explique comment automatiser des snapshot tests qui détectent les breaking changes avant publication.
+- Voir **composer plusieurs skills** pour comprendre les conflits de version entre skills qui dépendent l'un de l'autre.
+- La spécification SemVer officielle (semver.org) reste la référence ultime — un investissement de lecture rentable.

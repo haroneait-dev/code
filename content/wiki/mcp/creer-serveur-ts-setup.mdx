@@ -1,0 +1,153 @@
+---
+title: "Créer un serveur MCP TypeScript : setup & primitives"
+description: "@modelcontextprotocol/sdk, exposer tools/resources/prompts."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+Créer un serveur MCP en TypeScript prend une dizaine de minutes avec le SDK officiel `@modelcontextprotocol/sdk`. Vous exposez trois primitives à Claude : des **tools** (fonctions appelables), des **resources** (données lisibles) et des **prompts** (templates réutilisables). Ce guide montre la mise en place complète d'un serveur minimal mais production-ready.
+
+## Initialisation du projet
+
+Démarrez avec un projet Node.js classique, en TypeScript strict et ESM.
+
+```bash
+mkdir mcp-mon-serveur && cd mcp-mon-serveur
+npm init -y
+npm install @modelcontextprotocol/sdk zod
+npm install -D typescript @types/node tsx
+npx tsc --init
+```
+
+Dans `package.json`, ajoutez `"type": "module"` et un script de démarrage :
+
+```json
+{
+  "type": "module",
+  "bin": { "mcp-mon-serveur": "./dist/index.js" },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/index.ts",
+    "inspect": "npx @modelcontextprotocol/inspector tsx src/index.ts"
+  }
+}
+```
+
+## Squelette du serveur
+
+Le SDK fournit `McpServer`, une abstraction haut niveau qui gère le protocole JSON-RPC sur stdio.
+
+```ts
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { z } from "zod";
+
+const server = new McpServer({
+  name: "mon-serveur",
+  version: "0.1.0",
+});
+
+// ... tools, resources, prompts ici
+
+const transport = new StdioServerTransport();
+await server.connect(transport);
+```
+
+## Exposer un tool
+
+Un tool est une fonction typée que Claude peut appeler. La validation des arguments se fait via Zod, ce qui produit automatiquement le JSON Schema attendu par le protocole.
+
+```ts
+server.registerTool(
+  "convertir_devise",
+  {
+    title: "Conversion de devise",
+    description: "Convertit un montant d'une devise vers une autre",
+    inputSchema: {
+      montant: z.number().positive(),
+      from: z.string().length(3),
+      to: z.string().length(3),
+    },
+  },
+  async ({ montant, from, to }) => {
+    const taux = await fetchTaux(from, to);
+    return {
+      content: [
+        { type: "text", text: `${montant} ${from} = ${montant * taux} ${to}` },
+      ],
+    };
+  }
+);
+```
+
+Bonnes pratiques : descriptions claires (Claude s'en sert pour choisir le tool), erreurs renvoyées comme `content` plutôt qu'en throw, et idempotence quand c'est possible.
+
+## Exposer une resource
+
+Les resources sont des données identifiées par URI que Claude peut lire à la demande. Idéales pour documents, fichiers de config, snapshots de données.
+
+```ts
+server.registerResource(
+  "config",
+  "config://app",
+  { title: "Configuration", mimeType: "application/json" },
+  async (uri) => ({
+    contents: [
+      {
+        uri: uri.href,
+        text: JSON.stringify({ version: "0.1.0", env: process.env.NODE_ENV }),
+      },
+    ],
+  })
+);
+```
+
+Pour des resources dynamiques, utilisez un template d'URI :
+
+```ts
+server.registerResource(
+  "user",
+  new ResourceTemplate("user://{id}", { list: undefined }),
+  { title: "Profil utilisateur" },
+  async (uri, { id }) => ({
+    contents: [{ uri: uri.href, text: await getUser(id as string) }],
+  })
+);
+```
+
+## Exposer un prompt
+
+Les prompts sont des templates que l'utilisateur peut invoquer dans le client (ex : slash command dans Claude Code).
+
+```ts
+server.registerPrompt(
+  "revue_pr",
+  {
+    title: "Revue de PR",
+    description: "Analyse une PR GitHub et propose des commentaires",
+    argsSchema: { url: z.string().url() },
+  },
+  ({ url }) => ({
+    messages: [
+      {
+        role: "user",
+        content: { type: "text", text: `Revois la PR suivante : ${url}` },
+      },
+    ],
+  })
+);
+```
+
+## Tester avec l'inspecteur
+
+Avant de brancher votre serveur à Claude, validez-le avec l'inspecteur MCP. Il fournit une UI web qui liste les tools, resources et prompts, et permet de les appeler manuellement.
+
+```bash
+npx @modelcontextprotocol/inspector tsx src/index.ts
+```
+
+## Pour aller plus loin
+
+- Documentation SDK : github.com/modelcontextprotocol/typescript-sdk
+- Logs : utilisez `server.server.sendLoggingMessage` pour envoyer des logs au client
+- Article suivant : déploiement (NPM, Docker, distribution)

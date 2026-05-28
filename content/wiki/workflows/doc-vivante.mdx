@@ -1,0 +1,49 @@
+---
+title: "Documentation technique vivante"
+description: "Boucler code et documentation avec MkDocs et diagrammes Mermaid régénérés à chaque commit via hook Claude."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+La documentation technique vieillit dès qu'on cesse de l'écrire. Le seul moyen fiable de la maintenir à jour est de la coupler au cycle de vie du code lui-même. Avec Claude Code, un hook `PostToolUse` ou un hook Git côté CI peut régénérer les pages MkDocs et les diagrammes Mermaid affectés à chaque commit, sans intervention humaine.
+
+## Le principe de la doc vivante
+
+Une documentation vivante repose sur trois propriétés. Elle est versionnée dans le même dépôt que le code. Elle est partiellement générée à partir de signatures, commentaires ou conventions du code. Elle est régénérée automatiquement quand le code change. Claude n'écrit pas toute la doc : il met à jour les sections impactées par un diff et signale celles qui méritent une relecture humaine.
+
+## Stack MkDocs minimale
+
+MkDocs Material est un excellent point de départ. Structurez `docs/` avec un dossier par domaine fonctionnel et une page par module ou service. Activez les plugins `mkdocs-mermaid2` pour les diagrammes, `mkdocstrings` pour les signatures Python ou TypeScript extraites du code, et `mkdocs-include-markdown-plugin` pour réutiliser des fragments. Le build se lance avec `mkdocs build --strict` pour échouer dès qu'un lien casse.
+
+## Hook de régénération
+
+Configurez un hook qui se déclenche après chaque commit local ou en pré-merge sur la CI. Le script appelle Claude avec le diff Git et une consigne précise : "identifie les fichiers de doc à mettre à jour à partir de ce diff, modifie-les pour refléter les changements de comportement, n'invente rien". Claude répond avec une liste de patchs MkDocs et, si nécessaire, des diagrammes Mermaid mis à jour. Le hook applique les patchs et relance `mkdocs build`.
+
+```yaml
+# .github/workflows/docs.yml
+on: [push]
+jobs:
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 2 }
+      - run: npx @anthropic-ai/claude-code update-docs --diff HEAD~1
+      - run: mkdocs build --strict
+      - uses: peaceiris/actions-gh-pages@v3
+```
+
+## Diagrammes Mermaid synchronisés
+
+Les diagrammes d'architecture sont les premières victimes de l'obsolescence. Stockez-les en Mermaid directement dans les pages MkDocs. Lorsque Claude détecte un changement structurel (nouveau service, route renommée, dépendance ajoutée), il met à jour le bloc ` ```mermaid ` correspondant. Pour les diagrammes de séquence, il peut les régénérer à partir des traces OpenTelemetry exportées par votre environnement de staging.
+
+## Garde-fous éditoriaux
+
+Tout n'est pas automatisable. Les guides conceptuels, tutoriels et décisions d'architecture (ADR) doivent rester écrits par des humains. Marquez ces pages avec un front-matter `auto_update: false` que le hook respecte. À l'inverse, les pages de référence (API, schéma DB, variables d'env) peuvent porter `auto_update: true` et être réécrites intégralement. Un check CI échoue si une PR modifie du code sans toucher la doc associée.
+
+## Pour aller plus loin
+
+- Documentation officielle de MkDocs Material et de ses plugins phares.
+- Spécification Mermaid pour les diagrammes de séquence, de classes et C4.
+- Pattern Architecture Decision Records (ADR) de Michael Nygard pour les décisions structurantes.
+- Intégration Backstage ou Docusaurus si vous avez besoin d'un portail multi-dépôts.

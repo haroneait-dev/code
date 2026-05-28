@@ -1,0 +1,57 @@
+---
+title: "Pourquoi des subagents ?"
+description: "Comprendre l'intérêt des subagents dans Claude Code : préservation du contexte, parallélisation et isolation des tâches."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+Les subagents sont l'une des fonctionnalités les plus puissantes de Claude Code. Plutôt que de tout faire dans la même session, vous déléguez certaines tâches à des agents secondaires qui possèdent leur propre fenêtre de contexte. Le résultat : un agent principal plus concentré, des recherches parallèles et une meilleure qualité de réponse sur des projets complexes.
+
+## Préserver le contexte principal
+
+Le contexte de l'agent principal est précieux. Chaque fichier lu, chaque commande exécutée et chaque message consomme des tokens qui finissent par diluer la qualité du raisonnement. Quand vous demandez à Claude « explore tout le dossier `app/` pour trouver où sont gérées les routes API », vous polluez la conversation avec des dizaines de milliers de tokens dont seul le résumé final vous intéresse.
+
+Un subagent règle ce problème : il fait le travail dans sa propre bulle, puis renvoie un seul message synthétique. Votre agent principal reçoit la conclusion sans subir le bruit intermédiaire.
+
+## Paralléliser les tâches indépendantes
+
+Claude Code peut lancer plusieurs subagents simultanément. C'est idéal pour les opérations indépendantes :
+
+- Recherche dans le frontend pendant qu'un autre agent fouille le backend
+- Analyse de trois bibliothèques candidates en parallèle
+- Génération de tests pour plusieurs modules en même temps
+
+```bash
+# Exemple : demander à Claude d'analyser 3 zones du repo en parallèle
+> Lance 3 subagents Explore en parallèle : un sur app/api, un sur lib/, un sur content/
+```
+
+Le gain de temps est réel sur les gros codebases, et chaque subagent reste focalisé sur sa zone.
+
+## Isoler les tâches risquées ou bruyantes
+
+Certaines tâches sont par nature bruyantes ou risquées : refactor exploratoire, debug d'un test qui plante, recherche large avec beaucoup de faux positifs. Les confier à un subagent isole le « désordre » du contexte principal. Si le subagent échoue ou prend une mauvaise direction, vous n'avez perdu que sa fenêtre — votre conversation principale reste propre.
+
+C'est aussi utile pour les revues de code : un `code-reviewer` peut critiquer librement sans influencer le ton de l'agent qui écrit la suite.
+
+## Cas d'usage typiques
+
+Quelques scénarios où un subagent est presque toujours la bonne réponse :
+
+- **Onboarding sur un repo inconnu** : déléguer à un agent Explore la cartographie du projet
+- **Recherche multi-fichiers** : « trouve tous les endroits où on appelle `supabase.auth` » via Explore
+- **Architecture d'une nouvelle feature** : un agent Plan produit un plan détaillé avant écriture
+- **Audit de sécurité** : un agent dédié relit les diffs d'une PR
+- **Migration** : un agent par module à migrer, exécutés en parallèle
+
+À l'inverse, pour une petite édition ciblée (corriger une typo, modifier une ligne), le surcoût d'un subagent ne se justifie pas.
+
+## Limites à connaître
+
+Un subagent ne voit pas la conversation principale. Il faut lui donner un brief complet et autonome — pas de « tu sais, le fichier dont on parlait tout à l'heure ». Il ne renvoie qu'un seul message final, donc impossible de dialoguer en cours de route. Enfin, ses outils sont limités à ce que vous lui autorisez (voir l'article sur le frontmatter).
+
+## Pour aller plus loin
+
+- Consultez l'article sur les types de subagents fournis pour savoir lequel utiliser.
+- Apprenez à créer un subagent custom adapté à vos workflows récurrents.
+- Combinez subagents et hooks pour automatiser des revues à chaque commit.

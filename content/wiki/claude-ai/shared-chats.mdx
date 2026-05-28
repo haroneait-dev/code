@@ -1,0 +1,61 @@
+---
+title: "Partage de conversations Claude"
+description: "Snapshots, ce qui est inclus ou masqué dans un lien public de conversation Claude.ai."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+Claude.ai permet de partager n'importe quelle conversation via une URL publique. C'est pratique pour transmettre un raisonnement complet à un collègue, illustrer un cas d'usage dans un article, ou demander de l'aide sur un thread complexe. Mais derrière le bouton "Share", il y a quelques règles à connaître pour ne pas exposer plus qu'il ne faut.
+
+## Comment fonctionne un lien partagé
+
+Quand vous cliquez sur **Share** en haut d'une conversation, Claude génère un **snapshot** : une copie figée de l'état du chat au moment du partage. Le lien produit ressemble à `claude.ai/share/<id>` et reste accessible à toute personne disposant de l'URL — il n'y a pas d'authentification requise pour le consulter.
+
+Ce snapshot vit indépendamment de votre conversation originale. Si vous continuez à discuter avec Claude après avoir partagé, les nouveaux messages **n'apparaissent pas** dans le lien public. Pour répercuter les ajouts, il faut explicitement cliquer à nouveau sur "Update share" (ou recréer un lien).
+
+## Ce qui est inclus dans un snapshot
+
+Par défaut, un lien partagé contient :
+
+- Tous les messages utilisateur et assistant échangés jusqu'au moment du partage.
+- Les **artifacts** générés (code, diagrammes, documents) avec leur contenu complet.
+- Les images et fichiers que vous avez uploadés dans la conversation.
+- Les références aux outils utilisés par Claude (web search, calculatrice, etc.) avec leurs résultats.
+- Le nom du modèle utilisé (Sonnet, Opus, Haiku) et la date de la conversation.
+
+Le destinataire peut **cloner** la conversation dans son propre compte Claude pour la continuer. À partir de ce moment, votre version et la sienne divergent — il n'y a pas de synchronisation bidirectionnelle.
+
+## Ce qui est masqué ou retiré
+
+Quelques éléments **ne sont jamais** exposés dans un lien partagé :
+
+- Votre nom, votre email et votre photo de profil.
+- Les autres conversations de votre historique.
+- Les instructions de votre **Project** (system prompt custom) si la conversation appartient à un projet — seul le contenu visible du chat est inclus.
+- Les **connexions privées** comme les fichiers Google Drive ouverts via intégration : le destinataire verra que Claude a lu un fichier, mais ne pourra pas y accéder lui-même.
+- Les contenus de votre **memory** Claude (préférences enregistrées).
+
+En revanche — et c'est important — **tout ce que vous avez collé en clair** dans la conversation reste visible. Si vous avez tapé un token API, un mot de passe ou une donnée client dans un message, il sera lisible par toute personne avec le lien.
+
+## Gérer et révoquer un partage
+
+Tous vos liens actifs sont listés dans **Settings > Privacy > Shared chats**. Pour chaque lien, vous pouvez :
+
+- Voir la date de création et la dernière mise à jour.
+- Copier à nouveau l'URL.
+- **Supprimer** le partage, ce qui rend le lien définitivement inaccessible (HTTP 404).
+
+Attention : si quelqu'un a déjà cloné votre conversation dans son compte, la suppression du lien public **ne supprime pas** sa copie. Considérez tout partage comme potentiellement permanent.
+
+## Bonnes pratiques avant de partager
+
+- Relisez la conversation entière à la recherche de secrets, noms propres, ou contexte confidentiel.
+- Si la conversation appartient à un Project avec des instructions sensibles, vérifiez qu'aucun écho de ces instructions n'apparaît dans les réponses.
+- Pour partager seulement une portion d'un long thread, créez une nouvelle conversation et copiez-y uniquement les messages pertinents.
+- Préférez un export local (markdown, PDF) pour des destinataires hors ligne ou dans un cadre professionnel strict.
+
+## Pour aller plus loin
+
+- Consultez la page officielle [Privacy & Sharing](https://support.anthropic.com) pour le détail des politiques de rétention.
+- Pour des partages contrôlés en équipe, regardez les **Projects** de Claude Teams qui gèrent les permissions par utilisateur.
+- Combinez snapshots et export Markdown pour archiver les conversations clés de manière pérenne, indépendamment de la plateforme.

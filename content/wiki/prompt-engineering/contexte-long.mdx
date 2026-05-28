@@ -1,0 +1,135 @@
+---
+title: "Gérer le contexte long : stratégies pour 100K+ tokens"
+description: "Structurer un prompt massif avec balises XML, position critique en fin, citations forcées et prompt caching pour exploiter pleinement la fenêtre de 200K."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+Claude Sonnet 4 et Opus 4 acceptent jusqu'à **200 000 tokens** en entrée, soit environ 500 pages. Mais "accepter" ne veut pas dire "exploiter pleinement". Sans structuration, le modèle perd en précision sur les détails enfouis au milieu du contexte (effet *"lost in the middle"*). Voici les patterns qui tiennent en production sur des prompts de 100K+ tokens.
+
+## Le problème : lost in the middle
+
+Tous les LLM, y compris Claude, accordent plus d'attention au **début** et à la **fin** du contexte qu'au milieu. Sur un prompt de 100K tokens, un détail crucial placé au token 50 000 peut être manqué dans 20 à 30 % des cas. La conséquence : il faut **architecturer** la position de l'information.
+
+## Règle 1 : information critique en fin
+
+Placez la **question** et les **instructions clés** juste avant la zone de génération, après tous les documents.
+
+```xml
+<documents>
+  <document index="1" title="Contrat_2024.pdf">
+    {contenu document 1, 30K tokens}
+  </document>
+  <document index="2" title="Avenant_2025.pdf">
+    {contenu document 2, 25K tokens}
+  </document>
+</documents>
+
+<instructions>
+Identifie les clauses qui ont changé entre le contrat 2024 et
+l'avenant 2025. Pour chaque changement, cite la phrase exacte des
+deux versions.
+</instructions>
+```
+
+Les instructions sont en **dernière position** : c'est la zone où Claude est le plus attentif au moment de générer.
+
+## Règle 2 : balises XML pour la structure
+
+Claude est entraîné à reconnaître les balises XML comme délimiteurs sémantiques. Utilisez-les pour :
+
+- Isoler chaque document (`<document>`)
+- Délimiter les instructions (`<instructions>`)
+- Marquer les exemples (`<example>`)
+- Réserver l'espace de raisonnement (`<thinking>`)
+
+```xml
+<context>
+  <user_profile>...</user_profile>
+  <conversation_history>...</conversation_history>
+  <retrieved_docs>...</retrieved_docs>
+</context>
+
+<task>...</task>
+```
+
+Cette structure est **drastiquement** plus efficace qu'un mur de texte. Sur 100K tokens, la différence de précision peut atteindre 15 %.
+
+## Règle 3 : citations forcées (grounding)
+
+Sur du Q&A documentaire, exigez que Claude **cite** ses sources textuelles. Cela réduit les hallucinations et permet de vérifier les réponses.
+
+```text
+Avant de répondre, extrais dans <quotes> les 1 à 5 citations
+EXACTES (mot pour mot) des documents qui supportent ta réponse.
+Numérote-les. Réponds ensuite dans <answer> en référençant les
+numéros : [1], [2], etc.
+
+Si aucune citation ne supporte une réponse, dis-le explicitement.
+```
+
+Sortie type :
+
+```xml
+<quotes>
+[1] "Le préavis est de trois mois à compter de la notification."
+[2] "Toute modification doit être notifiée par écrit."
+</quotes>
+
+<answer>
+Oui, le préavis est de 3 mois [1] et nécessite une notification
+écrite [2].
+</answer>
+```
+
+## Règle 4 : prompt caching pour économiser
+
+Sur un contexte de 100K tokens réutilisé sur plusieurs questions, le **prompt caching** divise le coût par 10 et la latence par 2.
+
+```json
+{
+  "model": "claude-sonnet-4-6",
+  "system": [
+    {
+      "type": "text",
+      "text": "Tu es un analyste contractuel..."
+    },
+    {
+      "type": "text",
+      "text": "{100K tokens de documents}",
+      "cache_control": { "type": "ephemeral" }
+    }
+  ],
+  "messages": [
+    { "role": "user", "content": "Question 1 : ..." }
+  ]
+}
+```
+
+Le cache vit 5 minutes par défaut (ou 1 heure avec le tier `ephemeral_1h`). Idéal pour les sessions interactives sur un corpus stable.
+
+## Règle 5 : index et table des matières
+
+Pour les très longs contextes, fournissez en **tête** un index des sections avec leurs titres. Claude l'utilisera pour naviguer plus efficacement.
+
+```text
+<index>
+- Section 1 (lignes 1-500) : Conditions générales
+- Section 2 (lignes 501-1200) : Annexes techniques
+- Section 3 (lignes 1201-1800) : Tarifs
+</index>
+```
+
+## Anti-patterns courants
+
+- **Concaténer 50 PDFs sans balises** : Claude ne sait plus où commence/finit chaque document.
+- **Mettre la question en tête, documents en queue** : exactement l'inverse de ce qu'il faut.
+- **Ne pas réutiliser le cache** : payer plein tarif sur des contextes identiques.
+- **Charger 200K tokens "au cas où"** : la latence explose. Préférez un RAG ciblé sur 20-30K tokens pertinents.
+
+## Pour aller plus loin
+
+- Mesurer l'effet "lost in the middle" sur votre cas en injectant un fait connu à 3 positions (début/milieu/fin) et observer le taux de récupération.
+- Activer le **prompt caching** sur tout système prompt > 1024 tokens — ROI quasi immédiat.
+- Tester le **contextual retrieval** (Anthropic, 2024) qui ajoute un mini-contexte à chaque chunk pour améliorer le rappel RAG de 35 à 50 %.
+- Pour les corpus > 200K, basculer vers un pipeline RAG + reranking plutôt que tout charger dans le contexte.

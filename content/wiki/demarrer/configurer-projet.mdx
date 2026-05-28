@@ -1,0 +1,212 @@
+---
+title: "Configurer un projet pour Claude Code"
+description: "Préparer un repo pour tirer le meilleur de Claude Code dès la première session."
+updatedAt: "2026-05-19"
+readingMinutes: 7
+---
+
+Claude Code fonctionne dès que vous lancez `claude` dans un dossier — mais il devient drastiquement plus pertinent quand le repo est correctement configuré. Ce guide détaille les fichiers, conventions et configurations qui transforment Claude en véritable membre de l'équipe.
+
+## Les fichiers qui comptent
+
+Trois fichiers à la racine du projet ont un impact direct sur la qualité des réponses :
+
+| Fichier | Rôle | Priorité |
+|---|---|---|
+| `CLAUDE.md` | Instructions et contexte permanent pour Claude | Critique |
+| `.claude/settings.json` | Permissions, hooks, MCP servers du projet | Important |
+| `README.md` | Documentation humaine que Claude lit aussi | Recommandé |
+
+## Créer un `CLAUDE.md` efficace
+
+Le fichier `CLAUDE.md` est lu automatiquement à chaque session. Il doit contenir tout ce que vous **répéteriez sinon à chaque prompt**. Structure minimale :
+
+```markdown
+# Mon Projet
+
+## Stack
+- Next.js 16 App Router + TypeScript
+- Supabase (auth + Postgres)
+- Tailwind CSS
+
+## Conventions
+- Composants en PascalCase, hooks en camelCase
+- Pas de `any` en TypeScript
+- Tests Vitest dans `__tests__/`
+
+## Commandes
+- `npm run dev` — démarrer le dev server
+- `npm run test` — lancer les tests
+- `npm run lint` — vérifier le code
+
+## À éviter
+- Ne pas modifier `lib/legacy/` (en cours de dépréciation)
+- Ne pas committer dans `main` directement
+```
+
+Détails complets dans [Le fichier CLAUDE.md](/wiki/demarrer/claude-md).
+
+## Configurer les permissions du projet
+
+Le fichier `.claude/settings.json` permet de pré-autoriser des commandes courantes et d'éviter les demandes répétitives :
+
+```json
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run *)",
+      "Bash(git status)",
+      "Bash(git diff:*)",
+      "Read(./**)",
+      "Edit(./src/**)"
+    ],
+    "deny": [
+      "Bash(rm -rf *)",
+      "Edit(.env*)",
+      "Edit(./node_modules/**)"
+    ]
+  }
+}
+```
+
+> Committez `.claude/settings.json` (partage équipe) mais ajoutez `.claude/settings.local.json` dans `.gitignore` pour les overrides personnels.
+
+## Structurer son `.gitignore`
+
+Ajoutez les chemins suivants pour éviter de polluer les diffs et de fuiter des secrets :
+
+```gitignore
+# Claude Code
+.claude/settings.local.json
+.claude/cache/
+.claude/sessions/
+
+# Secrets
+.env
+.env.local
+.env.*.local
+
+# Build
+node_modules/
+.next/
+dist/
+```
+
+## Optimiser la structure des dossiers
+
+Claude se repère mieux dans un repo **prévisible**. Quelques règles qui simplifient son travail :
+
+- **Un dossier = une responsabilité** (`api/`, `components/`, `lib/`, `hooks/`)
+- **Pas plus de 2-3 niveaux d'imbrication**
+- **Nommage explicite** : `user-profile.tsx` plutôt que `up.tsx`
+- **Index files** : un `index.ts` qui exporte le public d'un dossier
+
+Exemple de structure lisible :
+
+```text
+mon-app/
+├── CLAUDE.md
+├── README.md
+├── .claude/
+│   └── settings.json
+├── app/
+│   ├── api/
+│   ├── (auth)/
+│   └── layout.tsx
+├── components/
+├── lib/
+│   ├── supabase.ts
+│   └── utils.ts
+└── tests/
+```
+
+## Documenter les commandes essentielles
+
+Listez explicitement dans `CLAUDE.md` les commandes que Claude doit privilégier :
+
+```markdown
+## Commandes
+| Commande | Quand l'utiliser |
+|---|---|
+| `npm run dev` | Démarrer le serveur local |
+| `npm run build` | Vérifier que la prod build |
+| `npm test -- --run` | Tests en mode CI (pas watch) |
+| `npm run lint:fix` | Auto-fix ESLint avant commit |
+```
+
+Cela évite que Claude tente `yarn dev` ou `pnpm test` au hasard.
+
+## Ajouter des MCP servers utiles
+
+Les serveurs **Model Context Protocol** étendent les capacités de Claude (DB, GitHub, Slack, Notion...). Déclarez-les dans `.claude/mcp.json` ou `.claude/settings.json` :
+
+```json
+{
+  "mcpServers": {
+    "github": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"],
+      "env": {
+        "GITHUB_TOKEN": "${env:GITHUB_TOKEN}"
+      }
+    }
+  }
+}
+```
+
+Une fois ajouté, Claude peut lire les PRs, ouvrir des issues, etc. directement depuis le terminal.
+
+## Hooks pour automatiser
+
+Les **hooks** déclenchent des commandes shell avant/après certaines actions :
+
+```json
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          { "type": "command", "command": "npm run lint:fix --silent" }
+        ]
+      }
+    ]
+  }
+}
+```
+
+Ici, ESLint tourne automatiquement après chaque édition. Pratique pour garder le code propre sans le demander.
+
+## Préparer un script d'onboarding
+
+Pour les nouveaux contributeurs, créez un `scripts/setup-claude.sh` qui :
+
+```bash
+#!/bin/bash
+# Vérifie les prérequis
+node --version || { echo "Installez Node 20+"; exit 1; }
+# Installe Claude si absent
+command -v claude || npm install -g @anthropic-ai/claude-code
+# Crée la config locale
+cp .claude/settings.example.json .claude/settings.local.json
+echo "Tout est prêt. Lance: claude"
+```
+
+## Tester la configuration
+
+Une fois tout en place, lancez :
+
+```bash
+claude
+> /status
+> /memory  # affiche le CLAUDE.md chargé
+```
+
+Vérifiez que Claude voit bien votre `CLAUDE.md`, vos permissions, et vos MCP servers.
+
+## Pour aller plus loin
+
+- [Le fichier CLAUDE.md](/wiki/demarrer/claude-md) — anatomie détaillée
+- [Permissions et sandbox](/wiki/demarrer/permissions-sandbox) — sécurité
+- [Le fichier de config globale](/wiki/demarrer/config-globale) — config utilisateur
+- [Documentation projet](https://docs.claude.com/claude-code/configuration) — référence officielle

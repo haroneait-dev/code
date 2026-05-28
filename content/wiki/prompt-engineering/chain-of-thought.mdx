@@ -1,0 +1,91 @@
+---
+title: "Chain of Thought : forcer Claude à raisonner étape par étape"
+description: "Guider Claude vers un raisonnement explicite avec les balises <thinking>, le prompt 'réfléchis avant' et le extended thinking."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+Le **Chain of Thought** (CoT) est la technique de prompting la plus rentable pour augmenter la qualité des réponses de Claude sur les tâches complexes. L'idée est simple : au lieu de demander une réponse directe, on demande au modèle d'expliciter son raisonnement avant de conclure. Pour les calculs, la logique, l'analyse de code ou les décisions multi-critères, le gain peut atteindre +30 % de précision.
+
+## Pourquoi ça marche
+
+Un LLM génère token par token. Sans CoT, il doit "deviner" la bonne réponse en un seul jet. Avec CoT, il dispose d'un espace de travail textuel pour décomposer le problème, vérifier ses hypothèses et corriger ses erreurs en cours de route. Ce que vous achetez, c'est du **compute supplémentaire** dépensé sur les tokens intermédiaires.
+
+```text
+Sans CoT  : Question → Réponse
+Avec CoT  : Question → Raisonnement → Réponse
+```
+
+## La balise `<thinking>` : pattern standard
+
+Claude est spécifiquement entraîné à reconnaître les balises XML comme zones de réflexion. Le pattern le plus efficace consiste à isoler la pensée dans un bloc dédié, puis la réponse finale dans un autre.
+
+```xml
+<instructions>
+Tu es un analyste financier. Avant de répondre, raisonne étape par étape
+dans une balise <thinking>. Donne ensuite ta réponse finale dans <answer>.
+</instructions>
+
+<question>
+Une entreprise a un CA de 2M€, une marge brute de 60 %, des OPEX de 800k€.
+Quel est l'EBITDA et la marge EBITDA ?
+</question>
+```
+
+Claude répondra structurellement :
+
+```xml
+<thinking>
+- Marge brute = 2 000 000 * 0,60 = 1 200 000
+- EBITDA = Marge brute - OPEX = 1 200 000 - 800 000 = 400 000
+- Marge EBITDA = 400 000 / 2 000 000 = 20 %
+</thinking>
+<answer>
+EBITDA : 400 000 €. Marge EBITDA : 20 %.
+</answer>
+```
+
+## Formulations qui déclenchent le CoT
+
+Quelques tournures qui activent fiablement le raisonnement étape par étape :
+
+- *"Réfléchis avant de répondre."*
+- *"Décompose le problème en sous-étapes."*
+- *"Avant de conclure, liste les hypothèses puis vérifie-les."*
+- *"Raisonne à voix haute dans `<thinking>`, puis donne ta réponse dans `<answer>`."*
+
+Évitez les formulations vagues type *"sois rigoureux"* : Claude n'a pas de signal opérationnel sur quoi faire. Soyez prescriptif sur le **format** du raisonnement.
+
+## Extended Thinking (Sonnet 4 et +)
+
+Depuis Claude Sonnet 4, l'API expose un mode `thinking` natif. Le modèle produit un bloc de pensée caché du client final, facturé séparément, et utilisé en interne pour les décisions complexes.
+
+```json
+{
+  "model": "claude-sonnet-4-6",
+  "max_tokens": 16000,
+  "thinking": { "type": "enabled", "budget_tokens": 8000 },
+  "messages": [
+    { "role": "user", "content": "Démontre que √2 est irrationnel." }
+  ]
+}
+```
+
+Le `budget_tokens` plafonne le coût du raisonnement. Pour la plupart des tâches métier, 2 000 à 4 000 tokens suffisent. Au-delà de 10 000, vous payez pour du bruit.
+
+## Quand ne PAS utiliser le CoT
+
+Le CoT a un coût : tokens supplémentaires, latence accrue. Évitez-le pour :
+
+- Les tâches **mécaniques** (extraction, reformatage, traduction simple)
+- Les **classifications binaires** avec critères évidents
+- Les réponses à très **faible enjeu** où la rapidité prime
+
+Règle de pouce : si vous, humain, sauriez répondre en moins de 5 secondes, Claude n'a pas besoin de CoT.
+
+## Pour aller plus loin
+
+- Tester le mode `extended thinking` avec `budget_tokens: 4000` sur vos prompts métier les plus complexes.
+- Comparer les sorties avec et sans `<thinking>` sur un échantillon de 20 cas pour mesurer le ROI réel.
+- Combiner CoT avec **role prompting** (voir article dédié) pour cumuler les gains de qualité.
+- Lire le cookbook Anthropic sur le CoT structuré et les patterns `<scratchpad>` pour les agents multi-étapes.

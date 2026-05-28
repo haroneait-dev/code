@@ -1,0 +1,57 @@
+---
+title: "Contexte 200K tokens"
+description: "Comment exploiter au mieux la fenêtre de contexte 200K de Claude : structure de prompt, lost in the middle, stratégies de chunking."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+Toute la famille Claude 4.x (Opus 4.7, Sonnet 4.6, Haiku 4.5) propose une fenêtre de contexte de 200 000 tokens — soit environ 500 pages de texte ou un repo de taille moyenne. C'est l'un des plus larges du marché, mais le simple fait d'avoir la place ne garantit pas que le modèle s'en serve bien. Voici les bonnes pratiques pour tirer parti d'un contexte long sans tomber dans les pièges classiques.
+
+## Ce que 200K tokens représente vraiment
+
+Un token correspond grosso modo à 4 caractères ou ~0,75 mot en anglais (un peu plus en français à cause des accents et de la morphologie). 200K tokens, c'est donc :
+
+- **~150 000 mots** de texte courant
+- **~500 pages** de roman
+- **~20 000 lignes** de code TypeScript
+- **~50 PDF** d'une dizaine de pages
+
+Concrètement, vous pouvez injecter une base de connaissances complète, le code source d'un module entier, ou plusieurs heures de transcription audio. Le coût grimpe vite cependant : un appel à pleine charge sur Sonnet 4.6 coûte environ 0,60 $ en input seul.
+
+## Le phénomène lost in the middle
+
+C'est le piège n°1 des contextes longs. Les LLM, Claude inclus, accordent plus d'attention au début et à la fin du contexte qu'au milieu. Une information cruciale placée au token 100 000 sur 200 000 risque d'être ignorée ou mal pondérée.
+
+Claude 4.x est nettement plus résistant à ce phénomène que les générations précédentes (les benchmarks "needle in a haystack" montrent une précision >95% jusqu'à 180K tokens), mais ce n'est pas magique. Les éléments les plus importants doivent rester aux extrémités du prompt — typiquement : instructions au début, question à la fin.
+
+## Structure de prompt recommandée
+
+Pour un long contexte, structurez votre prompt en 5 blocs explicites, dans cet ordre :
+
+1. **System prompt** : rôle, ton, contraintes générales
+2. **Instructions** : tâche précise à accomplir
+3. **Documents / contexte** : encadrés par des balises XML (`<document>`, `<code>`, `<transcript>`)
+4. **Exemples few-shot** (si applicable)
+5. **Question finale** : la requête utilisateur, répétée si nécessaire
+
+Les balises XML aident énormément Claude à délimiter les zones. Donnez aussi un identifiant à chaque document (`<document id="rapport-2025">`) pour que le modèle puisse citer ses sources.
+
+## Stratégies de chunking et de compression
+
+Plutôt que de tout envoyer, demandez-vous toujours : qu'est-ce qui est strictement nécessaire ? Trois approches utiles :
+
+- **Retrieval (RAG)** : utilisez un index vectoriel pour ne charger que les passages pertinents. Combiné à Claude, c'est souvent plus précis ET moins cher qu'un context dump complet.
+- **Résumé hiérarchique** : compressez d'abord chaque document en résumé structuré, puis travaillez sur les résumés.
+- **Pagination dynamique** : pour les conversations longues, gardez les N derniers tours en entier et résumez le reste.
+
+Claude 4.x dispose aussi d'un mécanisme de **prompt caching** : si vous renvoyez le même contexte sur plusieurs appels (par exemple 100K tokens de doc + une question variable), activez le cache et payez ces tokens 10× moins cher après le premier appel.
+
+## Test : le rappel en bout de contexte
+
+Avant de mettre un workflow long-contexte en production, testez-le. Insérez délibérément 3-4 "needles" (faits uniques, faciles à vérifier) à différentes profondeurs du prompt — 25%, 50%, 75%, 95% — et posez des questions ciblées. Si Claude rate la needle à 50%, votre structure est mauvaise : remontez l'info vers les extrémités ou switchez vers du RAG.
+
+## Pour aller plus loin
+
+- Documentation officielle : [docs.anthropic.com/en/docs/build-with-claude/prompt-caching](https://docs.anthropic.com/en/docs/build-with-claude/prompt-caching)
+- Article wiki [Pricing et tokens](/wiki/modeles/pricing-tokens) pour calculer le coût d'un contexte long
+- Étude originale Liu et al. (2024) sur le "Lost in the Middle"

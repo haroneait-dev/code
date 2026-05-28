@@ -1,0 +1,68 @@
+---
+title: "Types de subagents fournis"
+description: "Inventaire des subagents disponibles par défaut dans Claude Code : Explore, Plan, general-purpose et code-reviewer."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+Claude Code embarque plusieurs subagents prêts à l'emploi. Chacun a un rôle précis, un prompt système optimisé et un jeu d'outils adapté. Bien les distinguer évite de réinventer la roue et garantit que vous déléguez la bonne tâche au bon agent.
+
+## Explore — la recherche dans le code
+
+L'agent **Explore** est conçu pour fouiller un codebase. Il sait lire, grepper, lister, suivre des imports et reconstruire mentalement l'architecture d'un module sans rien modifier. Il est idéal quand vous posez des questions du type :
+
+- « Où est définie la fonction `authenticateUser` ? »
+- « Liste tous les endroits où on lit la variable `ANTHROPIC_API_KEY`. »
+- « Comment circule la donnée entre `app/api/chat` et le client ? »
+
+```bash
+> Utilise un subagent Explore pour cartographier toutes les routes API du dossier app/api
+```
+
+Explore renvoie un résumé structuré : fichiers pertinents, extraits clés, dépendances. Il ne touche jamais au disque, ce qui en fait un agent sûr et rapide.
+
+## Plan — l'architecture avant l'implémentation
+
+L'agent **Plan** est spécialisé dans la conception. Vous lui décrivez un objectif (« ajouter un système de favoris aux leçons ») et il produit un plan détaillé : fichiers à créer, fonctions à modifier, schéma de base à étendre, points de vigilance. Il peut lire le code pour s'inspirer du style existant, mais il ne modifie rien.
+
+Plan est particulièrement précieux avant un gros changement : vous validez le plan, vous l'ajustez, puis vous demandez à l'agent principal (ou à un autre subagent) de l'exécuter. Cela évite de partir bille en tête dans une mauvaise direction.
+
+## general-purpose — le couteau suisse
+
+Le subagent **general-purpose** n'a pas de spécialité forte : il dispose de la palette complète d'outils et peut aussi bien lire que écrire, exécuter des commandes, modifier des fichiers. Vous l'utilisez pour les tâches composites qui ne rentrent dans aucune autre case :
+
+- « Génère un script de migration, exécute-le sur la base locale et vérifie le résultat. »
+- « Crée un nouveau composant React, ajoute-le à la page, lance le build. »
+
+C'est aussi le bon choix quand vous voulez déléguer une tâche complète bout-en-bout, et pas seulement une exploration ou un plan.
+
+## code-reviewer — la relecture critique
+
+Le subagent **code-reviewer** est calibré pour relire du code avec un œil critique : bugs potentiels, problèmes de sécurité, anti-patterns, lisibilité, tests manquants. On l'invoque typiquement après une modification ou avant d'ouvrir une PR.
+
+```bash
+> Lance un code-reviewer sur les changements du dernier commit
+```
+
+Il renvoie un rapport structuré avec une sévérité par remarque. Couplé à un hook `PostToolUse` sur `Edit` ou à un slash command, il devient un compagnon de revue continu.
+
+## Comment choisir ?
+
+Quelques règles simples :
+
+- **Lecture seule, recherche large** → Explore
+- **Conception, pas d'écriture** → Plan
+- **Exécution complète d'une tâche** → general-purpose
+- **Audit de diff** → code-reviewer
+
+Si vous hésitez, Explore est souvent un bon premier réflexe : il prépare le terrain pour un agent plus actif ensuite.
+
+## Et les agents customs ?
+
+Les quatre subagents ci-dessus couvrent l'essentiel, mais vos workflows répétitifs méritent souvent un agent dédié : un `db-migrator`, un `i18n-checker`, un `pr-summarizer`. C'est l'objet de l'article suivant.
+
+## Pour aller plus loin
+
+- Apprenez à créer un subagent custom pour vos besoins spécifiques.
+- Consultez le détail des champs du frontmatter agent.
+- Combinez plusieurs subagents en parallèle pour accélérer vos sessions.

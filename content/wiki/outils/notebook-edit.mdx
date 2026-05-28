@@ -1,0 +1,143 @@
+---
+title: "NotebookEdit en profondeur"
+description: "Manipuler des notebooks Jupyter (.ipynb) avec Claude Code — différences avec Edit, cellules, modes."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+Les notebooks Jupyter ne sont pas des fichiers texte ordinaires : ce sont des JSON structurés contenant des cellules de code, de markdown, des outputs et des métadonnées. Utiliser `Edit` dessus est risqué — un changement de virgule peut corrompre le fichier. C'est pourquoi Claude Code expose un outil dédié, `NotebookEdit`, qui opère au niveau de la cellule plutôt qu'au niveau du caractère.
+
+## À quoi sert NotebookEdit
+
+NotebookEdit permet de :
+
+- **remplacer** le contenu d'une cellule existante ;
+- **insérer** une nouvelle cellule à une position donnée ;
+- **supprimer** une cellule ;
+- gérer les cellules de **code** comme de **markdown**.
+
+C'est l'outil à privilégier dès qu'un fichier `.ipynb` est concerné. Il préserve les IDs de cellules, les métadonnées Jupyter et la structure JSON.
+
+## Différences clés avec Edit
+
+| Aspect | `Edit` | `NotebookEdit` |
+|--------|--------|----------------|
+| Cible | Chaîne de caractères | Cellule entière |
+| Identifiant | `old_string` (texte) | `cell_id` ou index |
+| Format | Texte brut | JSON Jupyter |
+| Risques | Corruption JSON | Aucun si bien utilisé |
+| Modes | Remplacement | Replace / Insert / Delete |
+
+**Règle d'or :** ne touchez **jamais** à un `.ipynb` avec `Edit` ou `Write` directement. Toujours passer par `NotebookEdit`.
+
+## Paramètres
+
+| Paramètre | Type | Obligatoire | Description |
+|-----------|------|-------------|-------------|
+| `notebook_path` | string | oui | Chemin absolu du `.ipynb` |
+| `new_source` | string | oui (sauf delete) | Nouveau contenu de la cellule |
+| `cell_id` | string | non | ID de la cellule cible |
+| `cell_type` | string | non | `"code"` ou `"markdown"` |
+| `edit_mode` | string | non | `"replace"` (défaut), `"insert"`, `"delete"` |
+
+Pour `insert`, `cell_id` désigne la cellule **après** laquelle insérer (ou début du notebook si vide).
+
+## Exemples concrets
+
+### Remplacer le contenu d'une cellule de code
+
+```python
+NotebookEdit(
+  notebook_path="/Users/harone/analyse/data.ipynb",
+  cell_id="abc123",
+  new_source="import pandas as pd\ndf = pd.read_csv('data.csv')\ndf.head()"
+)
+```
+
+### Insérer une nouvelle cellule markdown après une cellule existante
+
+```python
+NotebookEdit(
+  notebook_path="/Users/harone/analyse/data.ipynb",
+  cell_id="abc123",
+  cell_type="markdown",
+  edit_mode="insert",
+  new_source="## Exploration des données\nVoici un aperçu du dataset."
+)
+```
+
+### Supprimer une cellule
+
+```python
+NotebookEdit(
+  notebook_path="/Users/harone/analyse/data.ipynb",
+  cell_id="xyz789",
+  edit_mode="delete"
+)
+```
+
+## Lire un notebook avant d'éditer
+
+Comme pour Edit, vous devez avoir lu le notebook avec `Read` au préalable. La lecture d'un `.ipynb` retourne :
+
+- toutes les cellules avec leur `cell_id` ;
+- leur type (`code` / `markdown`) ;
+- leur source ;
+- leurs outputs (résultats d'exécution, plots, erreurs).
+
+Cela vous donne le `cell_id` à passer à NotebookEdit.
+
+```bash
+Read(file_path="/Users/harone/analyse/data.ipynb")
+```
+
+## Pièges courants
+
+**Confondre cell_id et index.** Les `cell_id` sont des chaînes opaques (UUID courts), pas des numéros. Récupérez-les depuis la sortie de `Read`.
+
+**Édition mode "replace" sans cell_id.** Replace nécessite un `cell_id` valide. Sans lui, l'édition est ambiguë.
+
+**Insertion sans `cell_type`.** Lors d'un `insert`, précisez toujours `cell_type` ("code" ou "markdown") — la valeur par défaut peut surprendre selon les versions.
+
+**Outputs effacés.** Modifier le `new_source` d'une cellule code remet ses outputs à zéro (logique : le code a changé). Réexécutez le notebook pour les régénérer.
+
+**Notebook corrompu suite à un Edit/Write.** Si quelqu'un (ou un autre outil) a touché au JSON directement, le fichier peut être invalide. Ouvrez-le dans Jupyter pour vérifier, ou utilisez `nbformat` en Python pour le valider.
+
+## Workflow recommandé pour un audit
+
+```bash
+# 1. Lire le notebook
+Read(file_path="/Users/harone/analyse/data.ipynb")
+
+# 2. Identifier les cellules à corriger (ex. import obsolète)
+
+# 3. Remplacer les cellules concernées
+NotebookEdit(
+  notebook_path=".../data.ipynb",
+  cell_id="cell-import-1",
+  new_source="import polars as pl  # migré depuis pandas"
+)
+
+# 4. Ajouter une cellule markdown de note
+NotebookEdit(
+  notebook_path=".../data.ipynb",
+  cell_id="cell-import-1",
+  cell_type="markdown",
+  edit_mode="insert",
+  new_source="> Migration pandas → polars effectuée le 2026-05-19."
+)
+```
+
+## Cas particuliers
+
+**Notebooks Colab / Kaggle.** Le format est compatible standard `.ipynb`. NotebookEdit fonctionne dessus à condition que vous l'ayez téléchargé localement.
+
+**Notebooks avec widgets interactifs.** Les métadonnées de widget (ipywidgets) sont préservées par NotebookEdit, mais vous ne pouvez pas éditer l'état d'un widget — uniquement le code qui le crée.
+
+**Notebooks .py percent format (Jupytext).** Si le notebook est sérialisé en `.py` avec markers `# %%`, utilisez `Edit` classique : ce n'est pas du JSON Jupyter.
+
+## Pour aller plus loin
+
+- [Documentation officielle Jupyter — nbformat](https://nbformat.readthedocs.io/) [à vérifier pour version exacte]
+- Voir aussi : `Read` (qui rend nativement les notebooks), `Edit` (à ne **pas** utiliser sur les `.ipynb`).
+- Bonne pratique : commitez vos notebooks "vidés" (outputs effacés) avec `nbstripout` pour des diffs Git lisibles.

@@ -1,0 +1,108 @@
+---
+title: "Mode non-interactif et CI/CD"
+description: "Automatiser des refactors et des revues de code avec Claude Code en pipeline grâce au flag -p et aux workflows GitHub Actions / GitLab CI."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+Claude Code n'est pas qu'un REPL : avec le flag `-p` (print mode), le CLI devient un binaire scriptable que vous pouvez brancher dans n'importe quel pipeline. Cette page montre comment automatiser des refactors, des audits de sécurité ou des génération de changelog directement depuis vos workflows CI.
+
+## Le flag `-p` en pratique
+
+Le mode non-interactif renvoie la réponse de Claude sur `stdout` puis quitte avec un code de sortie standard. Aucun TTY, aucune session persistante.
+
+```bash
+# Refactor déterministe d'un fichier
+claude -p "Refactor src/auth.ts pour extraire la logique JWT dans un module séparé" \
+  --output-format json \
+  --max-turns 8 \
+  > refactor.json
+
+# Avec restriction d'outils
+claude -p "Liste les TODO du repo" \
+  --allowedTools "Read,Grep,Glob" \
+  --permission-mode plan
+```
+
+Les flags clés à connaître :
+
+- `--output-format json|stream-json|text` : pour piper la sortie vers `jq` ou un parseur.
+- `--max-turns` : limite stricte pour éviter une boucle infinie qui ferait exploser votre facture.
+- `--allowedTools` / `--disallowedTools` : whitelist explicite des outils que Claude peut utiliser.
+- `--permission-mode acceptEdits` : Claude écrit les fichiers sans demander confirmation.
+
+## GitHub Actions : refactor automatique
+
+Voici un workflow qui lance Claude sur chaque PR pour proposer des améliorations de typage TypeScript.
+
+```yaml
+name: Claude Refactor
+on:
+  pull_request:
+    paths:
+      - "src/**/*.ts"
+
+jobs:
+  refactor:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Install Claude Code
+        run: npm install -g @anthropic-ai/claude-code
+      - name: Run Claude
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          claude -p "Améliore le typage strict des fichiers modifiés dans cette PR. \
+            Utilise git diff origin/main pour identifier les fichiers." \
+            --allowedTools "Read,Edit,Bash(git diff:*)" \
+            --permission-mode acceptEdits \
+            --max-turns 12
+      - name: Commit
+        run: |
+          git config user.name "claude-bot"
+          git config user.email "bot@example.com"
+          git add -A && git diff --cached --quiet || git commit -m "chore: claude refactor"
+          git push
+```
+
+## GitLab CI : audit de sécurité nocturne
+
+Sur GitLab, le pattern est identique. On déclenche le job via `schedules` et on stocke le rapport en artefact.
+
+```yaml
+claude_audit:
+  image: node:22
+  variables:
+    ANTHROPIC_API_KEY: $ANTHROPIC_API_KEY
+  before_script:
+    - npm install -g @anthropic-ai/claude-code
+  script:
+    - claude -p "Audit de sécurité du dossier api/. Liste les vulnérabilités OWASP Top 10 en JSON." --output-format json --allowedTools "Read,Grep,Glob" > audit.json
+  artifacts:
+    paths:
+      - audit.json
+    expire_in: 30 days
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+```
+
+## Bonnes pratiques pour la prod
+
+- **Toujours fixer `--max-turns`**. Un agent libre en CI peut vite consommer 20 $ pour rien.
+- **Whitelist d'outils stricte**. En CI, jamais de `Bash(*)`. Listez les commandes exactes : `Bash(npm test:*)`, `Bash(git diff:*)`.
+- **Secret rotation**. Stockez `ANTHROPIC_API_KEY` dans le coffre de votre CI (GitHub Secrets, GitLab Variables masquées) et faites-le tourner trimestriellement.
+- **Sortie JSON pour les parseurs**. `--output-format stream-json` permet de suivre la progression en temps réel et de logger chaque étape.
+- **Sandbox réseau**. Sur GitHub Actions, utilisez `runs-on: ubuntu-latest` avec un firewall sortant pour éviter qu'un prompt malveillant exfiltre vos sources.
+
+## Pour aller plus loin
+
+- La doc officielle des [headless flags](https://docs.claude.com/claude-code) liste tous les paramètres de `-p`.
+- L'action `anthropics/claude-code-action` (marketplace GitHub) encapsule le pattern ci-dessus et gère les commentaires de PR automatiquement.
+- Pour orchestrer plusieurs agents en parallèle (un par sous-dossier), couplez `-p` à `xargs -P` ou à `GNU parallel`.
+- Surveillez vos coûts via le header `anthropic-ratelimit-tokens-remaining` exposé par l'API.

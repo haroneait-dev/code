@@ -1,0 +1,127 @@
+---
+title: "L'outil WebFetch"
+description: "Récupérer le contenu d'une URL depuis Claude Code — rendu JS, cache, contournement anti-bots."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+`WebFetch` permet à Claude Code de récupérer une URL et d'en extraire le contenu pertinent en utilisant un modèle léger pour le résumer ou le requêter via un prompt. C'est l'outil de prédilection pour lire une page de documentation, un article de blog, une issue GitHub ou un changelog sans quitter votre session.
+
+## À quoi sert WebFetch
+
+- Lire une page de documentation officielle (Next.js, React, Anthropic) ;
+- Extraire des informations d'une issue ou d'un PR GitHub ;
+- Vérifier un changelog ou une note de version ;
+- Récupérer un fichier brut (`raw.githubusercontent.com`) ;
+- Suivre un lien donné par l'utilisateur pour en extraire les points clés.
+
+WebFetch n'est **pas** un crawler. Une URL = un appel. Pour de la recherche large, utilisez `WebSearch`.
+
+## Paramètres
+
+| Paramètre | Type | Obligatoire | Description |
+|-----------|------|-------------|-------------|
+| `url` | string | oui | URL complète (https préféré) |
+| `prompt` | string | oui | Question / instruction pour extraire le contenu |
+
+Le `prompt` est crucial : il dit au modèle quoi chercher dans la page. Évite de retourner toute la page (souvent inutile et coûteux).
+
+## Exemples concrets
+
+### Lire une page de doc et en extraire l'essentiel
+
+```ts
+WebFetch(
+  url="https://docs.claude.com/en/docs/claude-code",
+  prompt="Liste les outils disponibles et leur description courte."
+)
+```
+
+### Récupérer le changelog d'une lib
+
+```ts
+WebFetch(
+  url="https://github.com/vercel/next.js/releases/tag/v16.0.0",
+  prompt="Quelles sont les breaking changes et les nouvelles features ?"
+)
+```
+
+### Lire un raw markdown
+
+```ts
+WebFetch(
+  url="https://raw.githubusercontent.com/user/repo/main/CHANGELOG.md",
+  prompt="Quels changements ont eu lieu dans la version 2.0 ?"
+)
+```
+
+## Cache et HTTPS
+
+- **Cache** : WebFetch met en cache les réponses pendant ~15 minutes (selon l'implémentation [à vérifier]) pour éviter les appels redondants.
+- **HTTPS upgrade** : si vous passez une URL `http://`, elle peut être automatiquement promue en `https://` quand le serveur le supporte.
+- **Redirections** : si l'URL redirige vers un autre **host**, Claude vous le signale plutôt que de suivre aveuglément — vous décidez de refaire l'appel sur la nouvelle URL.
+
+## Limites
+
+**Pas de rendu JavaScript.** WebFetch récupère le HTML brut. Les SPA (React, Vue) qui hydratent côté client peuvent retourner une page quasi vide. Pour ces cas, recherchez la doc équivalente côté serveur (`/api/`, fichiers MDX), ou utilisez `WebSearch` pour viser une page statique.
+
+**Sites anti-bots.** Cloudflare, Akamai et autres WAF peuvent bloquer ou challenger les requêtes automatisées. Symptôme : page "Just a moment..." ou 403. Workaround :
+
+- chercher une version archivée (`web.archive.org/web/*/<url>`) ;
+- viser une URL `raw.githubusercontent.com` plutôt que `github.com` ;
+- utiliser `WebSearch` qui passe par une infrastructure différente.
+
+**Authentification.** WebFetch ne gère pas l'authentification (cookies, OAuth). Pour des ressources privées, utilisez `Bash` avec `curl` + token.
+
+**Taille de page.** Très longues pages → tronquées. Posez un prompt précis pour aider le modèle à cibler.
+
+## Pièges courants
+
+**Prompt trop vague.** "Résume cette page" → réponse plate. Préférez : "Liste les paramètres acceptés par la fonction X avec leur type et description."
+
+**URL avec espaces.** Encodez-les en `%20` ou utilisez des URLs propres.
+
+**Confondre WebFetch et WebSearch.** WebFetch = URL connue. WebSearch = je cherche, je ne sais pas où c'est.
+
+**Oublier le préfixe `https://`.** Sans schéma, l'appel échoue. Toujours commencer par `https://`.
+
+## Combinaisons typiques
+
+### Documentation → implémentation
+
+```bash
+# 1. Lire la doc
+WebFetch(url="https://docs.anthropic.com/...", prompt="Comment faire un streaming ?")
+
+# 2. Implémenter
+Edit(file_path="/.../api/chat/route.ts", old_string="...", new_string="...")
+```
+
+### Issue GitHub → diagnostic
+
+```bash
+# 1. Récupérer l'issue
+WebFetch(
+  url="https://github.com/vercel/next.js/issues/12345",
+  prompt="Quel est le bug, le workaround, et la version corrigée ?"
+)
+
+# 2. Vérifier votre code
+Grep(pattern="...", path="...")
+```
+
+## Bonnes pratiques
+
+**Une URL par appel.** WebFetch n'a pas de mode batch. Pour plusieurs URLs, faites plusieurs appels en parallèle (multiple tool calls dans un message).
+
+**Réutilisez le cache.** Si vous re-demandez la même URL dans la même session, c'est gratuit pendant ~15 min.
+
+**Préférez les sources canoniques.** `docs.claude.com` plutôt qu'un blog non officiel. `developer.mozilla.org` plutôt que w3schools.
+
+**Vérifiez la date.** Les pages web évoluent. Si vous lisez de la doc, vérifiez qu'elle correspond à votre version de lib.
+
+## Pour aller plus loin
+
+- [Documentation Claude Code](https://docs.claude.com/en/docs/claude-code)
+- Voir aussi : `WebSearch` pour découvrir, `Bash(curl ...)` pour les requêtes authentifiées.
+- Astuce : pour fact-checker pendant une rédaction de doc, faites plusieurs WebFetch en parallèle sur les pages canoniques — bien plus rapide que séquentiel.

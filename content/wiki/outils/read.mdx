@@ -1,0 +1,93 @@
+---
+title: "L'outil Read"
+description: "Lire des fichiers texte, images, PDF et notebooks Jupyter avec Claude Code — toutes les options et bonnes pratiques."
+updatedAt: "2026-05-19"
+readingMinutes: 7
+---
+
+L'outil `Read` est le point d'entrée le plus fondamental de Claude Code pour explorer un projet. Il permet à Claude de lire n'importe quel fichier du système de fichiers local — qu'il s'agisse de code source, d'une image, d'un PDF ou d'un notebook Jupyter — afin de comprendre votre contexte avant d'agir. Contrairement à `cat` dans un terminal, `Read` est multimodal, paginable et conçu pour s'intégrer aux autres outils (Edit, Write, Grep) de manière cohérente.
+
+## À quoi sert Read
+
+Read sert à charger le contenu d'un fichier dans le contexte du modèle. Claude l'utilise constamment :
+
+- avant un `Edit`, pour connaître l'état exact du fichier (obligatoire) ;
+- pour explorer un fichier de configuration, un schéma de base de données ou un composant React ;
+- pour analyser une image (capture d'écran, mockup, diagramme) ;
+- pour parcourir un PDF (documentation, papier de recherche) ;
+- pour comprendre un notebook `.ipynb` avec ses cellules et leurs outputs.
+
+C'est l'outil à privilégier dès que vous connaissez le chemin du fichier. Si vous ne le connaissez pas, utilisez `Glob` ou `Grep` d'abord, puis enchaînez avec `Read`.
+
+## Syntaxe et paramètres
+
+Read prend toujours un chemin **absolu**. Les chemins relatifs sont refusés.
+
+| Paramètre | Type | Obligatoire | Description |
+|-----------|------|-------------|-------------|
+| `file_path` | string | oui | Chemin absolu du fichier à lire |
+| `offset` | integer | non | Numéro de ligne de départ (1-indexé) |
+| `limit` | integer | non | Nombre de lignes à lire |
+| `pages` | string | non | Plage de pages pour les PDF (ex. `"1-5"`) |
+
+Par défaut, Read lit jusqu'à 2000 lignes depuis le début du fichier. Au-delà, il faut paginer avec `offset` + `limit`. Pour les PDF de plus de 10 pages, `pages` devient obligatoire (20 pages maximum par appel).
+
+## Exemples concrets
+
+### Lire un fichier source en entier
+
+```bash
+Read(file_path="/Users/harone/projet/app/page.tsx")
+```
+
+Le retour est formaté en `cat -n` : chaque ligne est préfixée par son numéro, ce qui permet à Claude d'exécuter ensuite un `Edit` précis sans ambiguïté.
+
+### Paginer un gros fichier de logs
+
+```bash
+Read(file_path="/var/log/app.log", offset=5000, limit=500)
+```
+
+Utile lorsque le fichier dépasse 2000 lignes. Astuce : combiner avec `Grep -n motif` pour repérer la zone intéressante avant de la lire.
+
+### Lire un PDF par pages
+
+```bash
+Read(file_path="/Users/harone/docs/paper.pdf", pages="3-7")
+```
+
+Pour un PDF de 50 pages, ne lisez jamais tout d'un coup : ciblez les sections via la table des matières, puis paginez.
+
+### Inspecter une capture d'écran
+
+```bash
+Read(file_path="/Users/harone/Desktop/bug.png")
+```
+
+Claude visualise l'image et peut décrire un bug d'UI, lire un message d'erreur, ou comparer un mockup à votre implémentation.
+
+## Pièges courants
+
+**Lire avant d'éditer, toujours.** L'outil `Edit` refuse de modifier un fichier qui n'a pas été lu dans la conversation courante. C'est une garantie de cohérence : Claude ne peut pas remplacer une chaîne qu'il n'a pas vue.
+
+**Chemin relatif refusé.** `./app/page.tsx` échoue. Utilisez `/Users/.../app/page.tsx`. Si vous travaillez avec une variable de cwd, préfixez-la explicitement.
+
+**Fichier vide.** Read ne retourne pas une erreur sur un fichier vide — il retourne un rappel système indiquant que le fichier existe mais est vide. Ne confondez pas avec un fichier inexistant.
+
+**Ne pas lire tout un PDF d'un coup.** Au-delà de 10 pages, l'appel échoue sans `pages`. Sur un papier scientifique de 30 pages, faites trois appels (`1-10`, `11-20`, `21-30`).
+
+**Ne pas utiliser Read sur un répertoire.** Pour lister un répertoire, passez par `Bash` (`ls -la`) ou par `Glob`. Read est strictement pour les fichiers.
+
+**Préférer Read à `cat`, `head`, `tail`.** Si vous demandez à Claude d'inspecter un fichier, il doit utiliser `Read`, jamais `cat` via Bash : Read est plus rapide, retourne des numéros de ligne et alimente correctement le contexte du modèle.
+
+## Performance et contexte
+
+Chaque ligne lue consomme des tokens. Sur un fichier de 1500 lignes TypeScript, comptez environ 15–25k tokens. Sur des projets monorepo, lire trois gros fichiers d'affilée peut consommer plus de 80k tokens — d'où l'intérêt de cibler avec `Grep` ou `Glob` plutôt que de lire en aveugle.
+
+Pour un audit complet, préférez plusieurs `Read` ciblés (offset/limit) plutôt qu'un seul `Read` géant. Vous gardez ainsi de la marge dans la fenêtre de contexte pour les Edit et les réponses.
+
+## Pour aller plus loin
+
+- [Documentation Claude Code — Tools](https://docs.claude.com/en/docs/claude-code)
+- Voir aussi : `Glob` pour trouver des fichiers, `Grep` pour chercher dedans, `Edit` pour les modifier.
+- Astuce workflow : pour explorer un nouveau dépôt, commencez par `Read` du `README.md`, puis du `package.json`, puis du fichier d'entrée principal (`app/page.tsx`, `src/main.ts`, etc.). Trois lectures suffisent souvent à comprendre la stack.

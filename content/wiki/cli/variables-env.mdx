@@ -1,0 +1,130 @@
+---
+title: "Variables d'environnement"
+description: "Toutes les variables d'environnement reconnues par Claude Code et comment les utiliser."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+Claude Code lit et expose un certain nombre de variables d'environnement, à la fois pour se configurer lui-même et pour transmettre du contexte aux hooks, MCP servers et commandes Bash qu'il lance. Cet article recense les plus utiles, explique l'ordre de précédence avec `settings.json` et donne des exemples concrets d'usage.
+
+## Variables d'authentification
+
+| Variable | Rôle |
+|----------|------|
+| `ANTHROPIC_API_KEY` | Clé API si vous n'utilisez pas l'auth Claude Pro/Max |
+| `ANTHROPIC_AUTH_TOKEN` | Token OAuth (rempli automatiquement après `claude login`) |
+| `ANTHROPIC_BASE_URL` | URL d'API alternative (proxies, gateways) |
+| `ANTHROPIC_MODEL` | Modèle par défaut (équivaut à `--model`) |
+
+Exemple pour pointer vers un proxy interne :
+
+```bash
+export ANTHROPIC_BASE_URL="https://anthropic-proxy.entreprise.fr"
+export ANTHROPIC_API_KEY="sk-ant-..."
+claude
+```
+
+## Variables injectées dans les sous-processus
+
+Quand Claude Code exécute un outil `Bash`, un hook ou un MCP server, il **injecte** des variables qui décrivent l'état courant :
+
+| Variable | Contenu |
+|----------|---------|
+| `CLAUDE_PROJECT_DIR` | Chemin absolu du projet (cwd au démarrage) |
+| `CLAUDE_SESSION_ID` | UUID de la session active [à vérifier] |
+| `CLAUDE_MODEL` | Modèle actuellement utilisé |
+| `CLAUDE_CWD` | Répertoire courant du sous-processus |
+
+Cas typique : un hook qui veut écrire un log à la racine du projet, peu importe d'où la commande est lancée :
+
+```bash
+#!/usr/bin/env bash
+echo "$(date) — $1" >> "$CLAUDE_PROJECT_DIR/.claude/hooks.log"
+```
+
+## Variables de contrôle du CLI
+
+| Variable | Effet |
+|----------|-------|
+| `DISABLE_TELEMETRY=1` | Désactive l'envoi de télémétrie anonyme |
+| `DISABLE_AUTOUPDATER=1` | Bloque les mises à jour auto |
+| `DISABLE_ERROR_REPORTING=1` | Pas de remontée d'erreurs |
+| `CLAUDE_CODE_USE_BEDROCK=1` | Utilise Amazon Bedrock comme backend [à vérifier] |
+| `CLAUDE_CODE_USE_VERTEX=1` | Utilise Google Vertex AI comme backend [à vérifier] |
+| `BASH_DEFAULT_TIMEOUT_MS` | Timeout par défaut pour `Bash` |
+| `BASH_MAX_TIMEOUT_MS` | Timeout maximal autorisé |
+| `MAX_THINKING_TOKENS` | Plafond pour le thinking étendu |
+
+## Précédence avec settings.json
+
+`settings.json` peut définir des env vars via la clé `env` :
+
+```json
+{
+  "env": {
+    "DEBUG": "1",
+    "NODE_ENV": "development"
+  }
+}
+```
+
+L'ordre de précédence final (du moins prioritaire au plus prioritaire) :
+
+1. Variables du shell parent
+2. `env` de `~/.claude/settings.json`
+3. `env` de `<repo>/.claude/settings.json`
+4. `env` de `<repo>/.claude/settings.local.json`
+5. Variables injectées par Claude Code (`CLAUDE_*`)
+
+## Exemple : configurer une équipe
+
+Dans `<repo>/.claude/settings.json` commité :
+
+```json
+{
+  "env": {
+    "NODE_ENV": "development",
+    "DISABLE_TELEMETRY": "1",
+    "BASH_DEFAULT_TIMEOUT_MS": "60000"
+  }
+}
+```
+
+Chaque développeur ajoute ses secrets dans `settings.local.json` non commité :
+
+```json
+{
+  "env": {
+    "GITHUB_TOKEN": "ghp_xxx",
+    "OPENAI_API_KEY": "sk-xxx"
+  }
+}
+```
+
+## Inspecter les env vars actives
+
+Demandez à Claude :
+
+```
+Liste les variables CLAUDE_* visibles dans ton environnement
+```
+
+Il exécutera quelque chose comme :
+
+```bash
+env | grep ^CLAUDE_
+```
+
+C'est un bon moyen de déboguer ce qu'un hook ou MCP server reçoit réellement.
+
+## Pièges classiques
+
+- Les variables définies dans `~/.zshrc` ou `~/.bashrc` ne sont visibles que si vous lancez `claude` depuis un terminal interactif. En CI, exportez-les explicitement.
+- `ANTHROPIC_API_KEY` **écrase** l'auth OAuth : si vous êtes connecté en Claude Max et qu'une vieille variable traîne, vous serez facturé sur la clé API.
+- Les flags CLI (`--model`, `--api-key`) ont la priorité sur les env vars correspondantes.
+
+## Pour aller plus loin
+
+- Article **settings.json en profondeur** pour la config statique.
+- Article **Mode headless** pour l'utilisation en CI où les env vars sont reines.
+- Doc officielle : [docs.claude.com/claude-code](https://docs.claude.com/en/docs/claude-code).

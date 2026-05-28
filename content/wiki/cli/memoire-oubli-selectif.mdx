@@ -1,0 +1,105 @@
+---
+title: "Gestion fine de la mémoire"
+description: "Forcer Claude Code à oublier des fichiers ou sections de contexte via /clear, /compact et les hooks."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+La fenêtre de contexte de Claude est large, mais pas infinie. Plus elle se remplit, plus le modèle ralentit, plus il coûte cher et plus il perd en précision. Apprendre à faire oublier sélectivement à Claude est aussi important que savoir lui faire mémoriser. Ce guide passe en revue les outils intégrés au CLI.
+
+## /clear : repartir de zéro
+
+La commande la plus radicale. Elle vide intégralement le contexte de la session courante : historique de conversation, fichiers lus, résultats d'outils.
+
+```bash
+> /clear
+```
+
+À utiliser entre deux tâches sans rapport. Exemple typique : vous venez de finir un refactor sur le module auth, vous enchaînez sur du design CSS. `/clear` évite que Claude continue à raisonner avec en tête le code de l'auth.
+
+Attention : `/clear` ne supprime pas votre `CLAUDE.md` ni vos memories projet, qui sont rechargés à chaque démarrage de session. Il purge uniquement le contexte volatil.
+
+## /compact : résumer pour libérer de l'espace
+
+Plus subtil que `/clear`. La commande `/compact` demande à Claude de résumer la conversation passée en un message court, puis remplace tout l'historique par ce résumé.
+
+```bash
+> /compact
+```
+
+On peut guider la compaction avec une instruction :
+
+```bash
+> /compact Garde uniquement les décisions d'architecture et oublie les détails d'implémentation
+```
+
+Idéal sur les sessions longues où vous voulez conserver les conclusions importantes sans traîner tout le détail des allers-retours. Le compactage automatique se déclenche aussi quand on approche de la limite de contexte.
+
+## Oublier un fichier précis
+
+Claude n'a pas de commande native `/forget fichier.ts`. La méthode pragmatique consiste à :
+
+1. Faire un `/compact` avec une instruction qui exclut le fichier.
+2. Ou recharger une session propre avec `/clear` puis ne lire que ce qui est utile.
+
+```bash
+> /compact Garde le contexte sauf le contenu de app/page.tsx que tu peux relire si besoin
+```
+
+Cette approche fonctionne mieux que d'espérer que Claude ignore un fichier déjà chargé : tant que le texte est dans la fenêtre, il influence les réponses.
+
+## Hooks pour contrôler ce qui entre
+
+Pour empêcher Claude de lire certains fichiers dès le départ, on utilise un hook `PreToolUse`. Configuration dans `.claude/settings.json` :
+
+```json
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Read",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/scripts/block-secrets.js"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+Le script reçoit le `tool_input` sur `stdin` et peut renvoyer `exit 2` pour bloquer la lecture. Exemple minimal :
+
+```bash
+#!/usr/bin/env node
+let data = "";
+process.stdin.on("data", c => data += c);
+process.stdin.on("end", () => {
+  const { tool_input } = JSON.parse(data);
+  if (tool_input.file_path?.includes(".env")) {
+    console.error("Lecture .env bloquée");
+    process.exit(2);
+  }
+});
+```
+
+Résultat : Claude ne pourra jamais charger ces fichiers dans son contexte, donc jamais les retenir.
+
+## Memories projet et utilisateur
+
+Les fichiers `CLAUDE.md` (projet) et `~/.claude/CLAUDE.md` (utilisateur) sont rechargés à chaque session. Pour faire oublier durablement une convention, il faut la retirer de ces fichiers.
+
+```bash
+> /memory
+```
+
+La commande `/memory` ouvre l'éditeur sur les memories actifs. C'est le seul oubli vraiment permanent : ce qui n'est pas dans `CLAUDE.md` ne sera pas réinjecté la prochaine fois.
+
+## Pour aller plus loin
+
+- Utiliser `/cost` régulièrement pour repérer quand le contexte coûte trop cher et déclencher `/compact`.
+- Créer un hook `SessionStart` qui rappelle à Claude les fichiers à ne pas charger spontanément.
+- Découper les longues sessions en sous-sessions thématiques avec `claude --resume` plutôt que tout faire dans un seul fil.
+- Documenter dans `CLAUDE.md` les patterns de mémoire de votre projet pour que toute l'équipe ait les mêmes réflexes.

@@ -1,0 +1,52 @@
+---
+title: "Audit trail"
+description: "Tracer toutes les actions de Claude pour la compliance via hooks JSONL et export vers un SIEM."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+En contexte régulé (banque, santé, défense), chaque action automatisée doit être traçable. Quand Claude Code écrit du code, exécute des commandes ou appelle des outils, il faut conserver un journal infalsifiable de ces événements. Les hooks Claude Code offrent un point d'extension natif pour produire ce journal, le stocker au format JSONL puis l'expédier vers un SIEM (Splunk, Elastic, Datadog, Sentinel).
+
+## Pourquoi un audit trail dédié
+
+Les logs standards (terminal, historique shell) ne suffisent pas. Un auditeur attend une chaîne de preuve continue : qui a lancé Claude, quel prompt a été envoyé, quels fichiers ont été modifiés, quelles commandes ont été exécutées, à quel horodatage. Sans cela, impossible de répondre à un contrôle PCI-DSS, HDS ou SOC 2. Le hook `PostToolUse` capture exactement le bon niveau de granularité : un événement par appel d'outil, avec contexte structuré.
+
+## Logger JSONL minimal
+
+Configurez un hook dans `.claude/settings.json` qui pipe chaque événement vers un fichier append-only :
+
+```json
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          { "type": "command", "command": "/usr/local/bin/claude-audit.sh" }
+        ]
+      }
+    ]
+  }
+}
+```
+
+Le script `claude-audit.sh` lit l'événement sur stdin, l'enrichit (utilisateur OS, hostname, hash du repo Git, session ID) et l'écrit dans `/var/log/claude/audit-$(date +%F).jsonl`. Une ligne par événement, format JSON strict, jamais de mutation a posteriori. Le fichier doit être en append-only (`chattr +a` sous Linux) pour résister à un attaquant qui voudrait effacer ses traces.
+
+## Champs à journaliser
+
+Au minimum : `timestamp` ISO 8601 UTC, `session_id`, `user`, `tool_name`, `tool_input` (tronqué si > 8 ko), `tool_output_summary`, `cwd`, `git_commit`, `exit_code`. Pour les commandes Bash, conservez la commande exacte. Pour Edit/Write, conservez le chemin et un hash SHA-256 du contenu avant/après. Évitez de logger les secrets : filtrez les variables d'environnement sensibles (`AWS_SECRET_*`, `*_TOKEN`, `*_KEY`) avant écriture.
+
+## Expédition vers le SIEM
+
+Deux options. Soit l'agent local (Splunk Universal Forwarder, Filebeat, Datadog Agent) lit le fichier JSONL et l'expédie en continu. Soit le hook lui-même envoie via HTTPS vers un endpoint HEC. La première approche est plus robuste : si le réseau tombe, l'agent réessaye et Claude n'est jamais bloqué. Côté SIEM, créez un index dédié `claude_code` avec une rétention conforme à votre politique (souvent 13 mois glissants).
+
+## Alertes et tableaux de bord
+
+Une fois les événements indexés, créez des règles de détection : commande `rm -rf` sur un chemin sensible, modification d'un fichier `.env` en production, appel d'un outil MCP non autorisé, volume anormal d'écritures sur une courte fenêtre. Un dashboard "activité Claude par utilisateur" rassure les RSSI et facilite les revues trimestrielles. Pour la conformité, exportez mensuellement un rapport signé numériquement qui agrège ces métriques.
+
+## Pour aller plus loin
+
+- Documentation officielle des hooks Claude Code et de leurs payloads JSON.
+- Spécifications HEC (HTTP Event Collector) de Splunk et équivalents Elastic/Datadog.
+- Guides ANSSI sur la journalisation et la traçabilité dans les SI sensibles.
+- Mettre en place une rotation et un archivage chiffré (GPG + S3 Object Lock) pour répondre aux exigences WORM.

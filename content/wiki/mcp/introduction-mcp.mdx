@@ -1,0 +1,59 @@
+---
+title: "Qu'est-ce que MCP ?"
+description: "Définition, philosophie et problème résolu par le Model Context Protocol d'Anthropic."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+Le **Model Context Protocol** (MCP) est un standard ouvert publié par Anthropic à la fin de 2024. Son objectif : offrir un moyen universel de connecter un modèle de langage (comme Claude) à des sources de données, des outils et des systèmes externes. En d'autres termes, MCP est au LLM ce que l'**USB-C** est aux périphériques : un connecteur unique, normalisé, qui remplace une myriade d'intégrations propriétaires.
+
+## Le problème que MCP résout
+
+Avant MCP, chaque application LLM devait réimplémenter sa propre couche d'intégration. Vous vouliez que Claude lise vos fichiers ? Il fallait coder un wrapper. L'interroger sur votre base Postgres ? Un autre wrapper. Y connecter Slack, Linear ou Notion ? Encore d'autres wrappers, tous incompatibles entre eux. Cette fragmentation produisait le fameux problème **M × N** : M modèles à connecter à N outils, soit M×N intégrations à maintenir.
+
+MCP transforme l'équation en **M + N** : chaque modèle parle MCP, chaque outil expose un serveur MCP, et tout le monde se comprend.
+
+## La philosophie : ouvert, local-first, composable
+
+Trois principes guident la conception du protocole :
+
+- **Ouvert** : la spécification est publique, sous licence permissive, et n'importe qui peut écrire un client ou un serveur.
+- **Local-first** : par défaut, un serveur MCP tourne sur la machine de l'utilisateur. Vos données ne transitent pas par un tiers.
+- **Composable** : on peut brancher plusieurs serveurs à un même client, et un même serveur à plusieurs clients (Claude Desktop, Claude Code, Cursor, Zed, etc.).
+
+## Comparaison avec les "plugins LLM" classiques
+
+Les plugins ChatGPT (2023) ou les "GPTs" reposaient sur des APIs HTTP hébergées, propriétaires, validées par un app store. MCP prend le contre-pied :
+
+| Aspect | Plugins LLM classiques | MCP |
+|---|---|---|
+| Transport | HTTP distant | stdio local ou SSE |
+| Gouvernance | App store fermé | Open source |
+| Hébergement | Cloud du fournisseur | Machine de l'utilisateur |
+| Auth | OAuth obligatoire | Optionnel, contextuel |
+| Découverte | Marketplace | Fichier de config local |
+
+Résultat : MCP donne à l'utilisateur le contrôle total sur les données partagées et les outils exposés au modèle.
+
+## Un exemple concret
+
+Imaginons que vous demandiez à Claude : "Résume les tickets Linear ouverts cette semaine et crée un brouillon de release notes dans Notion." Sans MCP, ce workflow nécessite un agent custom branché manuellement aux deux APIs. Avec MCP, il suffit que Claude Code voie deux serveurs déclarés — `linear` et `notion` — et il peut appeler leurs outils via un format JSON-RPC standardisé.
+
+```json
+{
+  "mcpServers": {
+    "linear": { "command": "npx", "args": ["-y", "@linear/mcp-server"] },
+    "notion": { "command": "npx", "args": ["-y", "@notion/mcp-server"] }
+  }
+}
+```
+
+## Pourquoi cela change la donne
+
+MCP repositionne le LLM comme un **orchestrateur** plutôt qu'un silo. Le modèle ne contient plus la logique métier : il la **délègue** à des serveurs spécialisés qui savent parler à un système particulier. On peut auditer chaque serveur séparément, le versionner, le remplacer. C'est l'esprit Unix appliqué à l'IA : faire une chose, bien la faire, et composer.
+
+## Pour aller plus loin
+
+- Spécification officielle : [modelcontextprotocol.io](https://modelcontextprotocol.io)
+- Annonce d'Anthropic (nov. 2024) : "Introducing the Model Context Protocol"
+- Article suivant : **Architecture client/serveur** pour comprendre comment Claude dialogue concrètement avec un serveur MCP

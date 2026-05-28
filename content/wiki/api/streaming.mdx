@@ -1,0 +1,155 @@
+---
+title: "Streaming"
+description: "Recevoir une réponse Claude token par token via le streaming SSE et gérer les events."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+Quand vous construisez une interface conversationnelle, attendre la réponse complète avant de l'afficher donne une impression de lenteur. Le **streaming** permet à Claude d'envoyer sa réponse au fur et à mesure qu'il la génère — exactement comme dans claude.ai. Voici comment l'utiliser.
+
+## Pourquoi streamer
+
+Le streaming repose sur le protocole **Server-Sent Events (SSE)**. Au lieu d'une seule réponse JSON, l'API envoie une suite d'événements typés que vous traitez à la volée. Les bénéfices :
+
+- **UX réactive** : le texte apparaît dès les premiers tokens (TTFT très court).
+- **Réponses longues** : pas de timeout HTTP sur des générations de plusieurs minutes.
+- **Annulation** : on peut fermer la connexion si l'utilisateur change d'avis.
+
+## Activer le streaming en curl
+
+Ajoutez simplement `"stream": true` au body :
+
+```bash
+curl https://api.anthropic.com/v1/messages \
+  -H "x-api-key: $ANTHROPIC_API_KEY" \
+  -H "anthropic-version: 2023-06-01" \
+  -H "content-type: application/json" \
+  -d '{
+    "model": "claude-sonnet-4-6",
+    "max_tokens": 1024,
+    "stream": true,
+    "messages": [
+      {"role": "user", "content": "Raconte une courte histoire."}
+    ]
+  }'
+```
+
+Vous verrez défiler des lignes du type `event: content_block_delta` suivies de `data: {...}`.
+
+## Les types d'événements
+
+Une réponse en streaming suit toujours la même séquence :
+
+1. `message_start` — métadonnées initiales (id, modèle, usage partiel).
+2. `content_block_start` — début d'un bloc (texte, tool_use, thinking...).
+3. `content_block_delta` — fragments successifs (le vrai contenu).
+4. `content_block_stop` — fin du bloc en cours.
+5. `message_delta` — mise à jour finale (stop_reason, output_tokens).
+6. `message_stop` — événement terminal.
+7. `ping` — keep-alive envoyé périodiquement, à ignorer.
+
+Le champ `delta.text` dans chaque `content_block_delta` contient le morceau de texte à concaténer.
+
+## Streaming en Python
+
+Le SDK propose deux APIs : `stream()` (contextuelle, recommandée) et `create(stream=True)` (itérable bas niveau).
+
+```python
+from anthropic import Anthropic
+
+client = Anthropic()
+
+with client.messages.stream(
+    model="claude-sonnet-4-6",
+    max_tokens=1024,
+    messages=[
+        {"role": "user", "content": "Écris un poème sur Paris."}
+    ],
+) as stream:
+    for text in stream.text_stream:
+        print(text, end="", flush=True)
+
+    # Récupérer le message complet une fois terminé
+    final = stream.get_final_message()
+    print(f"\nTotal : {final.usage.output_tokens} tokens")
+```
+
+L'itérateur `text_stream` ne yield que les fragments de texte — pratique pour les cas simples. Pour gérer les tool_use ou le thinking, utilisez `stream` (sans `.text_stream`) qui yield tous les événements.
+
+## Streaming en TypeScript
+
+```ts
+import Anthropic from "@anthropic-ai/sdk";
+
+const client = new Anthropic();
+
+const stream = client.messages.stream({
+  model: "claude-sonnet-4-6",
+  max_tokens: 1024,
+  messages: [
+    { role: "user", content: "Écris un poème sur Paris." },
+  ],
+});
+
+for await (const event of stream) {
+  if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
+    process.stdout.write(event.delta.text);
+  }
+}
+
+const final = await stream.finalMessage();
+console.log(`\nTokens : ${final.usage.output_tokens}`);
+```
+
+Le SDK expose aussi des helpers événementiels :
+
+```ts
+stream
+  .on("text", (text) => process.stdout.write(text))
+  .on("finalMessage", (msg) => console.log("Terminé :", msg.usage));
+
+await stream.finalMessage();
+```
+
+## Streamer vers le navigateur (Next.js)
+
+Pour propager le stream à votre frontend, renvoyez un `ReadableStream` depuis une route handler :
+
+```ts
+// app/api/chat/route.ts
+import Anthropic from "@anthropic-ai/sdk";
+
+const client = new Anthropic();
+
+export async function POST(req: Request) {
+  const { prompt } = await req.json();
+
+  const encoder = new TextEncoder();
+  const readable = new ReadableStream({
+    async start(controller) {
+      const stream = client.messages.stream({
+        model: "claude-sonnet-4-6",
+        max_tokens: 1024,
+        messages: [{ role: "user", content: prompt }],
+      });
+
+      for await (const event of stream) {
+        if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
+          controller.enqueue(encoder.encode(event.delta.text));
+        }
+      }
+      controller.close();
+    },
+  });
+
+  return new Response(readable, {
+    headers: { "Content-Type": "text/plain; charset=utf-8" },
+  });
+}
+```
+
+Côté client, lisez le stream avec `response.body.getReader()` et un `TextDecoder`, puis mettez à jour votre état React au fur et à mesure.
+
+## Pour aller plus loin
+
+Le streaming peut transporter bien plus que du texte : **tool calls partiels** (les arguments arrivent en delta JSON), blocs de **thinking étendu** (extended thinking), citations en temps réel... Consultez la [documentation officielle du streaming](https://docs.anthropic.com/en/api/messages-streaming) ainsi que le [AI SDK de Vercel](https://ai-sdk.dev) qui fournit des helpers React (`useChat`, `useCompletion`) compatibles avec le format Anthropic.

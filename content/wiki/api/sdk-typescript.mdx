@@ -1,0 +1,163 @@
+---
+title: "SDK TypeScript"
+description: "Installer et utiliser @anthropic-ai/sdk en Node.js : client, messages.create et types."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+Le SDK TypeScript officiel d'Anthropic, `@anthropic-ai/sdk`, est entièrement typé et fonctionne dans Node.js, Deno, Bun, Cloudflare Workers et même les navigateurs modernes (avec l'option appropriée). Voici comment l'utiliser au quotidien.
+
+## Installation
+
+Avec npm, pnpm ou yarn :
+
+```bash
+npm install @anthropic-ai/sdk
+# ou
+pnpm add @anthropic-ai/sdk
+# ou
+bun add @anthropic-ai/sdk
+```
+
+Aucune dépendance lourde, et les types TypeScript sont inclus directement dans le package — pas besoin d'installer un `@types/...` séparé.
+
+## Initialiser le client
+
+Comme en Python, la classe `Anthropic` lit automatiquement `process.env.ANTHROPIC_API_KEY`.
+
+```ts
+import Anthropic from "@anthropic-ai/sdk";
+
+const client = new Anthropic();
+
+// Ou avec une clé explicite
+const client = new Anthropic({
+  apiKey: process.env.ANTHROPIC_API_KEY,
+});
+```
+
+Dans un projet Next.js, créez le client uniquement côté serveur (route handler, server action, server component) — n'exposez jamais votre clé API au client.
+
+## Envoyer un message
+
+La méthode `client.messages.create()` retourne une `Promise<Message>` :
+
+```ts
+import Anthropic from "@anthropic-ai/sdk";
+
+const client = new Anthropic();
+
+const message = await client.messages.create({
+  model: "claude-sonnet-4-6",
+  max_tokens: 1024,
+  messages: [
+    { role: "user", content: "Explique le principe SOLID en 3 phrases." },
+  ],
+});
+
+// content est une union de blocs typés
+const firstBlock = message.content[0];
+if (firstBlock.type === "text") {
+  console.log(firstBlock.text);
+}
+
+console.log(`Tokens : ${message.usage.input_tokens} in / ${message.usage.output_tokens} out`);
+```
+
+Le narrowing TypeScript sur `block.type === "text"` est important : un bloc peut aussi être de type `tool_use`, `thinking`, etc.
+
+## Types essentiels
+
+Tous les types sont accessibles via l'import principal :
+
+```ts
+import type {
+  Message,
+  MessageParam,
+  ContentBlock,
+  TextBlock,
+  Usage,
+  Model,
+} from "@anthropic-ai/sdk/resources/messages";
+
+const history: MessageParam[] = [
+  { role: "user", content: "Salut" },
+  { role: "assistant", content: "Bonjour !" },
+  { role: "user", content: "Comment vas-tu ?" },
+];
+```
+
+Cela vous permet de typer proprement votre historique, vos handlers, et de bénéficier de l'autocomplétion sur tous les paramètres.
+
+## Options avancées
+
+```ts
+const message = await client.messages.create({
+  model: "claude-sonnet-4-6",
+  max_tokens: 2048,
+  system: "Tu es un expert TypeScript. Réponds toujours en français.",
+  temperature: 0.5,
+  top_p: 0.95,
+  stop_sequences: ["</fin>"],
+  messages: [
+    { role: "user", content: "Comment fonctionnent les types conditionnels ?" },
+  ],
+});
+```
+
+Le paramètre `system` peut aussi être un tableau de blocs si vous souhaitez activer le **prompt caching** sur certaines portions :
+
+```ts
+system: [
+  {
+    type: "text",
+    text: "Documentation longue...",
+    cache_control: { type: "ephemeral" },
+  },
+],
+```
+
+## Gestion des erreurs
+
+Le SDK exporte des classes d'erreurs spécifiques :
+
+```ts
+import Anthropic, { APIError, RateLimitError } from "@anthropic-ai/sdk";
+
+try {
+  const message = await client.messages.create({ /* ... */ });
+} catch (err) {
+  if (err instanceof RateLimitError) {
+    console.warn("Trop de requêtes, on patiente.");
+  } else if (err instanceof APIError) {
+    console.error(`Erreur ${err.status}: ${err.message}`);
+  } else {
+    throw err;
+  }
+}
+```
+
+Le SDK gère également les retries automatiques sur les erreurs réseau et 5xx (configurable via l'option `maxRetries` du constructeur).
+
+## Exemple Next.js Route Handler
+
+```ts
+// app/api/chat/route.ts
+import Anthropic from "@anthropic-ai/sdk";
+
+const client = new Anthropic();
+
+export async function POST(req: Request) {
+  const { prompt } = await req.json();
+  const message = await client.messages.create({
+    model: "claude-sonnet-4-6",
+    max_tokens: 1024,
+    messages: [{ role: "user", content: prompt }],
+  });
+  return Response.json({ text: (message.content[0] as { text: string }).text });
+}
+```
+
+## Pour aller plus loin
+
+Le SDK supporte également le **streaming** via `client.messages.stream()` (avec une API d'événements très ergonomique), les **tool calls** typés, la **vision**, le **batch API** pour traiter des milliers de messages en différé à moitié prix, et le **prompt caching**. Voir le [repo GitHub anthropic-sdk-typescript](https://github.com/anthropics/anthropic-sdk-typescript) pour la référence complète.

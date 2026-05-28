@@ -1,0 +1,97 @@
+---
+title: "Le serveur MCP Memory (Knowledge Graph)"
+description: "Construire un graphe de connaissances persistant pour donner à Claude une mémoire structurée entre sessions."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+Par défaut, Claude oublie tout entre deux conversations. Le serveur **MCP Memory** officiel résout ce problème en exposant un **graphe de connaissances** persistant : entités, relations, observations. Claude peut y lire et écrire, transformant ses échanges en mémoire long terme exploitable.
+
+## Le modèle de données : entités, relations, observations
+
+Memory ne stocke pas du texte libre mais une structure typée :
+
+- **Entité** : un nœud nommé avec un type (`person`, `project`, `concept`)
+- **Relation** : un lien orienté entre deux entités (`works_on`, `lives_in`, `depends_on`)
+- **Observation** : un fait textuel attaché à une entité
+
+Exemple :
+
+```
+Entity: Alice (person)
+  Observations:
+    - "Préfère TypeScript à JavaScript"
+    - "Lead du projet Pegasus"
+Entity: Pegasus (project)
+  Observations:
+    - "Migration vers Next.js 16 prévue Q3"
+Relation: Alice --works_on--> Pegasus
+```
+
+Cette structure est volontairement minimaliste — c'est ce qui la rend universelle et facile à raisonner pour le LLM.
+
+## Installation
+
+Le serveur Memory est distribué via npm et tourne en Stdio :
+
+```json
+{
+  "mcpServers": {
+    "memory": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-memory"],
+      "env": {
+        "MEMORY_FILE_PATH": "/Users/me/.claude/memory.json"
+      }
+    }
+  }
+}
+```
+
+Les données sont sérialisées dans un fichier JSON local — pratique pour versionner, sauvegarder, ou inspecter manuellement.
+
+## Les tools exposés
+
+Memory fournit une dizaine de tools que Claude apprend à utiliser :
+
+- `create_entities`, `create_relations`, `add_observations`
+- `delete_entities`, `delete_relations`, `delete_observations`
+- `read_graph` (tout le graphe)
+- `search_nodes` (par requête textuelle)
+- `open_nodes` (détail d'entités précises)
+
+Claude appelle ces tools spontanément si on lui demande de "se souvenir" ou de "retrouver ce qu'on a dit sur X".
+
+## Workflow recommandé
+
+Le piège classique : laisser Claude tout écrire sans discipline. Le graphe devient vite un fouillis. Quelques règles aident :
+
+1. **Définir des types d'entités** dans le prompt système (`person`, `project`, `decision`, `bug`)
+2. **Inciter à la déduplication** : avant de créer une entité, chercher si elle existe
+3. **Préférer les observations atomiques** plutôt que des paragraphes
+4. **Revoir le graphe régulièrement** (`read_graph` + nettoyage)
+
+## Cas d'usage concrets
+
+- **Coach personnel** : Claude se souvient de vos objectifs, vos préférences, vos contraintes
+- **Assistant projet** : il maintient un graphe des features, bugs, décisions techniques
+- **CRM léger** : entités `contact` avec leurs interactions
+- **Apprentissage** : il note ce que vous maîtrisez, ce qui reste flou
+
+## Limites
+
+Memory est un excellent point de départ mais reste rudimentaire :
+
+- Pas de recherche sémantique vectorielle native
+- Pas de versionning ni d'historique
+- Stockage fichier non concurrent — un seul client à la fois
+- Pas de mécanisme d'oubli ou de TTL
+
+Pour des besoins plus avancés, on peut combiner Memory avec un serveur MCP vectoriel (Qdrant, pgvector) ou écrire un serveur custom qui implémente la même interface au-dessus d'un graphe Neo4j.
+
+## Pour aller plus loin
+
+- Code source : [github.com/modelcontextprotocol/servers](https://github.com/modelcontextprotocol/servers)
+- Lire le fichier JSON généré pour comprendre la structure
+- Comparer avec les approches "memory" d'autres frameworks (LangGraph, Letta)
+- Écrire un prompt système qui force Claude à consulter Memory en début de chaque session

@@ -1,0 +1,88 @@
+---
+title: "Modes de permissions : default, acceptEdits, bypassPermissions, plan"
+description: "Configurer finement les autorisations de Claude Code avec les quatre modes de permissions disponibles."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+Claude Code peut modifier vos fichiers, exécuter des commandes shell et appeler des outils MCP. Pour garder la main, l'agent demande votre validation à chaque action sensible. Mais selon le contexte (prototypage rapide, refonte planifiée, environnement isolé), vous voudrez ajuster ce comportement. Les **permission modes** vous donnent quatre presets prêts à l'emploi.
+
+## Le mode par défaut : `default`
+
+C'est le mode actif quand vous lancez `claude` sans option particulière. Pour chaque action qui sort du périmètre autorisé (édition de fichier, commande Bash, outil MCP), Claude vous demande une confirmation explicite.
+
+```bash
+claude
+```
+
+Vous pouvez répondre :
+- **Yes** : autoriser cette action uniquement
+- **Yes, and don't ask again** : ajouter automatiquement la règle à `.claude/settings.json`
+- **No, and explain** : refuser et expliquer pourquoi
+
+Ce mode est recommandé sur les projets de production ou quand vous découvrez un nouveau codebase. Il est verbeux mais il évite les mauvaises surprises (suppression de fichier, push intempestif).
+
+## `acceptEdits` : approuver automatiquement les modifications de fichiers
+
+Quand vous travaillez sur une grosse refonte et que Claude va éditer 20 fichiers d'affilée, le mode `default` devient pénible. `acceptEdits` accepte automatiquement toutes les éditions (Edit, Write, NotebookEdit) tout en continuant à demander confirmation pour Bash et MCP.
+
+```bash
+claude --permission-mode acceptEdits
+```
+
+Vous pouvez aussi basculer en cours de session en appuyant sur `Shift+Tab` pour cycler entre les modes. C'est le mode idéal pour :
+
+- des refactors massifs où vous avez relu le plan au préalable
+- du scaffolding (Claude génère 30 fichiers, vous vérifierez après)
+- du travail itératif avec des tests qui valident automatiquement
+
+## `plan` : raisonner sans rien modifier
+
+Le **plan mode** désactive complètement les outils d'écriture. Claude ne peut que lire le code, faire des recherches, et produire un plan détaillé. Aucun fichier n'est modifié, aucune commande n'est exécutée tant que vous n'avez pas validé.
+
+```bash
+claude --permission-mode plan
+```
+
+C'est le mode à utiliser systématiquement avant une tâche ambitieuse : "Refonte du système d'authentification", "Migration de Webpack vers Turbopack". Claude explore, comprend, propose une stratégie, et c'est seulement quand vous validez le plan qu'il bascule en mode exécution.
+
+## `bypassPermissions` : tout autoriser (à vos risques)
+
+Mode le plus permissif : aucune confirmation, Claude exécute tout ce qu'il juge nécessaire. À ne **jamais** utiliser sur votre machine de travail.
+
+```bash
+claude --permission-mode bypassPermissions
+```
+
+Réservez-le strictement aux environnements isolés : conteneurs Docker éphémères, sandboxes Vercel, VMs jetables. C'est le mode utilisé pour les workflows d'agents autonomes 24/7 (par exemple via `claude --print` dans une CI).
+
+## Configurer les permissions dans settings.json
+
+Plutôt que de tout autoriser ou tout refuser, vous pouvez whitelister précisément ce que Claude peut faire :
+
+```json
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run *)",
+      "Bash(git status)",
+      "Bash(git diff:*)",
+      "Read",
+      "Edit"
+    ],
+    "deny": [
+      "Bash(rm -rf *)",
+      "Bash(git push --force*)"
+    ]
+  }
+}
+```
+
+Les patterns supportent les wildcards. Combiner une allowlist précise avec le mode `default` donne le meilleur compromis sécurité/productivité.
+
+## Pour aller plus loin
+
+- Skill `fewer-permission-prompts` : analyse vos transcripts et propose une allowlist optimisée
+- Pattern matching avancé pour les commandes Bash : `Bash(npm run test:*)` autorise `test:unit` mais pas `test`
+- Combinez `plan` + `acceptEdits` : planifier puis exécuter sans interruption
+- Configurer `defaultMode` dans `~/.claude/settings.json` pour fixer un mode global

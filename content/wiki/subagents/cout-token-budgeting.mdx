@@ -1,0 +1,42 @@
+---
+title: "Coût et token budgeting des subagents"
+description: "Comprendre ce que coûte vraiment un subagent en tokens input et output, comment estimer le budget et l'optimiser."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+Un subagent n'est pas gratuit. Il consomme des tokens en entrée (prompt système, prompt utilisateur, fichiers lus, résultats d'outils) et en sortie (raisonnement, appels d'outils, résumé final). Comprendre cette structure permet de décider en connaissance de cause et d'éviter les mauvaises surprises sur la facture.
+
+## Anatomie du coût d'un subagent
+
+Quatre postes composent le coût d'un subagent. D'abord le prompt système : c'est une base incompressible, généralement de l'ordre de quelques milliers de tokens, qui décrit les outils disponibles et le comportement attendu. Ensuite le prompt utilisateur que vous lui envoyez, typiquement quelques centaines de tokens. Puis le contenu des fichiers et résultats d'outils qu'il lit pendant l'exécution, qui peut exploser : un fichier de 500 lignes pèse facilement 5000 tokens. Enfin la sortie : raisonnement intermédiaire, appels d'outils, et résumé final renvoyé à la conversation principale.
+
+L'input est généralement 5 à 10 fois plus volumineux que l'output, mais l'output est facturé 5 fois plus cher. Les deux postes finissent souvent au même ordre de grandeur sur la facture.
+
+## Estimer avant de lancer
+
+Pour estimer rapidement, posez-vous trois questions. Combien de fichiers le subagent va-t-il devoir lire ? À 5000 tokens par fichier en moyenne, dix fichiers = 50k tokens d'input. Combien d'appels d'outils ? Chaque appel ajoute son résultat au contexte du subagent pour le tour suivant, donc les tokens s'accumulent. Combien de lignes attendez-vous en sortie ? Un résumé de 30 lignes = environ 600 tokens, un rapport détaillé peut monter à 3000.
+
+Ordre de grandeur typique pour une tâche d'exploration moyenne : 30k à 80k tokens d'input, 1k à 5k tokens d'output. Pour un audit large multi-fichiers, comptez 100k à 300k tokens d'input.
+
+## Comparer avec faire la tâche soi-même
+
+Le subagent est rentable quand le ratio `tokens_lus / tokens_renvoyés` est élevé. Si le subagent lit 50k tokens et vous renvoie 500 tokens de synthèse, vous économisez 49.5k tokens dans votre contexte principal. Si à l'inverse il lit 5k tokens et vous renvoie 4k tokens, l'isolation ne vaut pas grand-chose et vous auriez aussi bien fait de lire vous-même.
+
+Règle empirique : déléguez quand le ratio dépasse 10x. En dessous, lisez directement.
+
+## Optimisations concrètes
+
+Plusieurs leviers réduisent significativement le coût. Cadrez le périmètre dans le prompt : « ne lis que les fichiers `.ts` dans `app/api/` » évite l'exploration sauvage. Demandez explicitement un format de sortie compact : « réponds en 10 lignes maximum, format liste ». Évitez de faire faire au subagent ce que `grep` ou `ls` font instantanément : un outil shell coûte 100 fois moins cher qu'une lecture LLM.
+
+Activez le prompt caching côté Anthropic si vous lancez plusieurs subagents similaires d'affilée : la partie système est mise en cache et les appels suivants coûtent 10 % du prix normal sur cette portion.
+
+## Surveiller la dérive
+
+Sur une session longue, les coûts de subagents s'accumulent silencieusement. Si vous lancez 20 subagents à 50k tokens d'input chacun, vous êtes à 1M de tokens d'input juste en délégations. Pensez à regrouper les tâches similaires dans un seul subagent plutôt que d'en lancer dix petits, et préférez deux vagues séquentielles à dix parallèles si la latence n'est pas critique.
+
+## Pour aller plus loin
+
+- Article voisin : `quand-deleguer` pour décider quand l'investissement en tokens vaut le coup.
+- Article voisin : `parallelisation` pour comprendre l'effet multiplicateur sur la facture.
+- Article voisin : `erreurs-courantes` pour éviter les subagents qui consomment sans rien renvoyer d'utile.

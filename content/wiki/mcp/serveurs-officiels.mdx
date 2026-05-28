@@ -1,0 +1,98 @@
+---
+title: "Serveurs MCP officiels (Filesystem, Git, Postgres…)"
+description: "Tour d'horizon des serveurs MCP maintenus par Anthropic et la communauté MCP."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+L'écosystème MCP a explosé en 2025. On compte aujourd'hui plus de **400 serveurs publics** sur le registre officiel, dont une dizaine sont maintenus directement par Anthropic. Voici les plus utiles à connaître pour démarrer, organisés par cas d'usage.
+
+## Filesystem — lire et écrire des fichiers
+
+Le serveur **`@modelcontextprotocol/server-filesystem`** donne à Claude un accès contrôlé à un (ou plusieurs) répertoire(s) précis. C'est probablement le serveur le plus installé au monde.
+
+```bash
+claude mcp add fs npx -y @modelcontextprotocol/server-filesystem ~/projets
+```
+
+Il expose des outils `read_file`, `write_file`, `list_directory`, `search_files`, `move_file`. Le serveur **refuse** tout chemin en dehors des racines autorisées : c'est une garantie de sandboxing essentielle.
+
+## Git — interagir avec un dépôt
+
+**`mcp-server-git`** (Python, lancé via `uvx`) permet à Claude de lire l'historique, diff, blame, status et même de créer des commits.
+
+```bash
+claude mcp add git uvx mcp-server-git --repository .
+```
+
+Combiné à Filesystem, il devient un assistant de revue de code redoutable : "analyse les changements depuis la dernière release et résume-les en changelog".
+
+## Postgres — interroger une base de données
+
+**`@modelcontextprotocol/server-postgres`** expose une base Postgres en **lecture seule**. Claude peut lister les schémas, décrire des tables et exécuter des `SELECT`.
+
+```json
+{
+  "mcpServers": {
+    "db": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-postgres"],
+      "env": { "DATABASE_URL": "postgresql://user:pass@localhost/app" }
+    }
+  }
+}
+```
+
+Le mode lecture seule est volontaire : on ne veut pas qu'un agent autonome puisse `DROP TABLE`. Pour de l'écriture, on préfèrera un serveur métier qui validera chaque action.
+
+## Sqlite — la version légère
+
+**`mcp-server-sqlite`** offre la même expérience mais sur un fichier `.db` local. Parfait pour des prototypes ou pour analyser un dump.
+
+## GitHub — issues, PRs, recherche de code
+
+Maintenu officiellement par GitHub, **`@modelcontextprotocol/server-github`** ouvre l'API GitHub à Claude : créer une issue, commenter une PR, chercher du code à travers une organisation entière.
+
+```bash
+claude mcp add github -e GITHUB_TOKEN=$GITHUB_PAT -- npx -y @modelcontextprotocol/server-github
+```
+
+## Brave Search / Fetch — accéder au web
+
+- **`@modelcontextprotocol/server-brave-search`** : recherche web via l'API Brave (clé gratuite jusqu'à 2 000 requêtes/mois).
+- **`@modelcontextprotocol/server-fetch`** : récupère et convertit n'importe quelle URL en markdown pour que Claude puisse la lire.
+
+## Puppeteer / Playwright — automatiser un navigateur
+
+**`@modelcontextprotocol/server-puppeteer`** permet à Claude de piloter un Chrome headless : naviguer, cliquer, screenshoter, extraire du DOM. Indispensable pour scraper des sites JavaScript ou tester un parcours utilisateur.
+
+## Memory — mémoire persistante entre sessions
+
+**`@modelcontextprotocol/server-memory`** stocke un graphe de connaissances (entités + relations) que Claude peut interroger d'une session à l'autre. Une forme de mémoire long terme externe au modèle.
+
+## Slack, Notion, Linear, Sentry…
+
+La majorité des SaaS modernes propose désormais son propre serveur MCP officiel, souvent distant (HTTPS + OAuth) :
+
+- **Slack** — lire des channels, poster des messages.
+- **Notion** — naviguer dans un workspace, créer des pages.
+- **Linear** — gérer des tickets et cycles.
+- **Sentry** — analyser des erreurs en production.
+
+```bash
+claude mcp add --transport http linear https://mcp.linear.app/sse
+```
+
+## Où trouver le catalogue complet
+
+Le registre officiel se trouve sur **`github.com/modelcontextprotocol/servers`**, qui regroupe les serveurs de référence, et **`mcpservers.org`** qui agrège les serveurs communautaires avec ratings et descriptions.
+
+## Construire le sien
+
+Si aucun serveur n'existe pour votre cas d'usage, écrire le vôtre prend une après-midi avec le SDK TypeScript ou Python. Un serveur MCP utile peut parfois tenir en moins de 100 lignes de code — c'est tout l'intérêt du protocole.
+
+## Pour aller plus loin
+
+- Registre officiel : [github.com/modelcontextprotocol/servers](https://github.com/modelcontextprotocol/servers)
+- Annuaire communautaire : [mcpservers.org](https://mcpservers.org)
+- Tutoriel "Build your own MCP server" sur [modelcontextprotocol.io](https://modelcontextprotocol.io)

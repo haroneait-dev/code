@@ -1,0 +1,43 @@
+---
+title: "Faux positifs en audit de sécurité"
+description: "Calibrer la commande /security-review de Claude pour réduire le bruit grâce au whitelisting contextuel."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+Un audit de sécurité automatisé qui crie au loup à chaque revue finit ignoré. La commande `/security-review` de Claude Code, comme tout SAST, produit son lot de faux positifs : findings théoriquement valides mais sans impact réel dans le contexte du projet. Apprendre à les calibrer est ce qui sépare un outil utile d'un générateur de tickets fantômes.
+
+## Comprendre pourquoi un faux positif apparaît
+
+Trois causes dominent. Le contexte manquant : Claude ne sait pas qu'une URL est purement interne, qu'une fonction n'est jamais appelée avec une entrée utilisateur, ou qu'un secret apparent est une fixture de test. La signature trop large : un pattern `eval(` déclenche une alerte même quand l'argument est une constante littérale. Et l'ignorance des contrôles compensatoires : un middleware d'authentification global rend obsolète la plupart des alertes "endpoint non protégé" sur les routes downstream.
+
+## Documenter le périmètre dans CLAUDE.md
+
+La première étape consiste à enrichir `CLAUDE.md` avec une section "Sécurité et hypothèses". Listez les contrôles transverses (auth gateway, rate limiting, WAF), les zones publiques versus internes, les conventions de nommage des fixtures (`*_test.py`, `fixtures/**`, `__mocks__/**`). Claude lit ce fichier avant chaque revue et adapte sa sensibilité. Une seule ligne "tous les endpoints sous `/api/internal/` sont protégés par mTLS au niveau de l'ingress" élimine des dizaines de faux positifs.
+
+## Whitelisting structuré
+
+Maintenez un fichier `.claude/security-allowlist.yml` versionné. Chaque entrée comporte un chemin (ou glob), une règle ignorée, un motif justifiant l'exception, et une date d'expiration. L'expiration force une relecture périodique : aucune exception n'est éternelle. Claude doit refuser d'ignorer une alerte si l'entrée d'allowlist n'a pas de justification écrite.
+
+```yaml
+- path: "scripts/seed.ts"
+  rule: "hardcoded-credentials"
+  reason: "Credentials de seed pour env local uniquement, jamais déployés."
+  expires: "2026-12-31"
+  owner: "team-platform"
+```
+
+## Affiner le prompt de /security-review
+
+Personnalisez la slash-command dans `.claude/commands/security-review.md`. Précisez le modèle de menace (qui est l'attaquant, qu'est-ce qui est exposé), demandez à Claude de classer chaque finding selon DREAD ou CVSS, et exigez un champ "exploitabilité concrète dans ce repo" qui force le raisonnement contextuel. Une alerte sans scénario d'exploitation crédible est automatiquement marquée comme informative plutôt que bloquante.
+
+## Boucler avec les vrais incidents
+
+Le meilleur calibrage vient de la réalité. À chaque incident de sécurité ou audit externe, mettez à jour la base de connaissance : ajoutez un exemple de vrai positif manqué, ou au contraire un faux positif récurrent. Une revue mensuelle des findings produit deux livrables : la liste des règles à durcir (trop permissives) et celles à assouplir (trop bruyantes). Sur trois à six mois, le ratio signal/bruit devient exploitable et les équipes commencent à lire les rapports.
+
+## Pour aller plus loin
+
+- OWASP Top 10 et CWE Top 25 pour aligner la taxonomie des findings.
+- Article "How to triage SAST findings" de Semgrep, transposable à `/security-review`.
+- Méthodologie STRIDE pour formaliser un modèle de menace réutilisable par Claude.
+- Intégration avec Defect Dojo ou GitHub Advanced Security pour centraliser le suivi.

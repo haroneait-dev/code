@@ -1,0 +1,34 @@
+---
+title: "Quand déléguer à un subagent ?"
+description: "Heuristiques concrètes pour décider quand lancer un subagent : tâche bornée, recherche large, économie de tokens et parallélisation."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+Déléguer une tâche à un subagent n'est pas toujours la bonne décision. Un subagent a un coût fixe (initialisation, contexte, prompt système) et introduit une couche d'indirection : vous ne voyez pas ce qu'il fait pas à pas, vous recevez seulement son résumé final. La question à se poser n'est donc jamais « est-ce que je peux déléguer ? » mais « est-ce que la délégation me fait gagner quelque chose ? ».
+
+## Critère 1 : la tâche est bornée et a un livrable clair
+
+Un bon candidat pour un subagent est une tâche qui peut être décrite en deux ou trois phrases et dont on peut décrire le résultat attendu sans ambiguïté. « Trouve toutes les routes API qui n'ont pas de vérification d'authentification et donne-moi la liste des fichiers » est borné. « Améliore le code » ne l'est pas. Si vous n'arrivez pas à écrire le prompt du subagent en une seule passe, c'est généralement le signe qu'il faut d'abord clarifier la tâche dans la conversation principale.
+
+## Critère 2 : la recherche est large et exploratoire
+
+Les subagents brillent quand il faut ouvrir et lire beaucoup de fichiers pour extraire une petite information. Au lieu de charger 40 fichiers dans votre contexte principal, vous lancez un subagent qui fait le travail de lecture et vous renvoie quelques lignes de synthèse. Exemples typiques : auditer une convention de nommage, retrouver tous les usages d'une API dépréciée, lister les composants qui utilisent un certain hook.
+
+## Critère 3 : économie de tokens dans le contexte principal
+
+Chaque token chargé dans la conversation principale reste là jusqu'à la fin de la session et coûte à chaque appel suivant. Un subagent isole ce coût : son contexte est jeté à la fin, seul son résumé revient. Si une tâche nécessite de lire des milliers de lignes pour produire 20 lignes de conclusion, c'est un gain net. À l'inverse, si vous savez déjà que vous allez devoir éditer les fichiers ensuite, lire dans le contexte principal est plus économique : vous évitez de payer la lecture deux fois.
+
+## Critère 4 : parallélisation possible
+
+Si vous avez trois recherches indépendantes à faire, vous pouvez lancer trois subagents en parallèle dans un seul message. Le temps total devient celui du subagent le plus lent, pas la somme des trois. C'est particulièrement rentable pour des audits multi-fichiers, des comparaisons de plusieurs implémentations, ou des vérifications croisées entre frontend, backend et tests.
+
+## Critère 5 : isolation d'un sujet sensible
+
+Parfois on veut isoler un raisonnement pour ne pas « polluer » la conversation principale avec des allers-retours, des fausses pistes ou un long debug. Le subagent renvoie une conclusion propre, et la conversation principale garde un fil lisible. Utile pour les investigations de bugs profonds, les recherches dans la documentation externe, ou les diagnostics d'erreurs Vercel.
+
+## Pour aller plus loin
+
+- Article voisin : `parallelisation` pour orchestrer plusieurs subagents en simultané.
+- Article voisin : `cout-token-budgeting` pour chiffrer le coût réel d'une délégation.
+- Article voisin : `erreurs-courantes` pour éviter les délégations qui ne renvoient rien d'exploitable.

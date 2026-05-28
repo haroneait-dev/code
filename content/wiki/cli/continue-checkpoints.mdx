@@ -1,0 +1,120 @@
+---
+title: "--continue et checkpoints"
+description: "Reprendre une session interrompue avec --continue et restaurer un état antérieur via les checkpoints."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+`--continue` est probablement le flag le plus utile de Claude Code au quotidien. Il évite de recharger manuellement le contexte d'une tâche en cours. Combiné avec les **checkpoints** — un système plus récent qui permet de "rewind" l'état des fichiers et de la conversation — il offre un filet de sécurité précieux pour expérimenter sans crainte. Cet article explique le fonctionnement des deux mécanismes et comment les utiliser ensemble.
+
+## --continue : reprendre la dernière session
+
+```bash
+claude --continue
+# ou en raccourci
+claude -c
+```
+
+Cette commande recharge automatiquement la session la plus récente associée au `cwd` courant. Tout l'historique (messages, tool results, todos) revient en mémoire, et vous repartez avec le contexte intact. C'est l'équivalent d'un "résumer où j'en étais" instantané.
+
+Quelques précisions :
+
+- La session reprise est celle dont le **timestamp de dernière modification** est le plus récent dans `~/.claude/projects/<projet>/`.
+- Si vous lancez `claude --continue` depuis un dossier où vous n'avez jamais utilisé Claude Code, une nouvelle session est créée.
+- Le contexte est rechargé tel quel, sans compaction additionnelle — si la session était déjà près de la limite, vous risquez un `/compact` immédiat.
+
+## --resume : choisir une session précise
+
+```bash
+claude --resume
+# affiche une liste interactive : timestamp, premier prompt, nombre de tours
+```
+
+Vous pouvez aussi passer un UUID :
+
+```bash
+claude --resume 2c8f9e1a-d3b4-4f8c-9e2a-1b3d4f5e6a7b
+```
+
+C'est utile pour basculer entre plusieurs pistes parallèles, ou pour relancer une session datant de plusieurs jours qui ne serait plus la "plus récente".
+
+## Les checkpoints
+
+Les checkpoints sont une fonctionnalité plus récente du CLI [à vérifier sa disponibilité selon votre version]. À intervalles réguliers (typiquement avant chaque modification de fichier risquée), Claude Code enregistre un **snapshot** :
+
+- Du contenu des fichiers touchés
+- De l'état de la conversation
+- Du todo list
+
+Vous pouvez ensuite **rewind** à n'importe quel checkpoint. C'est précieux quand un refactoring tourne mal ou qu'une suggestion de Claude casse plus de choses qu'elle n'en répare.
+
+## Commandes liées aux checkpoints
+
+```bash
+/rewind            # affiche la liste des checkpoints récents
+/rewind 3          # revient 3 checkpoints en arrière
+/checkpoint        # force la création d'un checkpoint nommé
+```
+
+L'effet d'un rewind :
+
+| Type de rewind | Fichiers | Conversation |
+|----------------|----------|--------------|
+| Files only | restaurés | conservée |
+| Conversation only | inchangés | tronquée |
+| Both | restaurés | tronquée |
+
+Selon le contexte, vous pouvez vouloir garder la conversation tout en restaurant les fichiers (pour réessayer une approche différente) ou l'inverse.
+
+## Combiner --continue et checkpoints
+
+Le workflow idéal :
+
+```bash
+# Reprise du matin
+claude --continue
+
+# Tentative de refactor
+> refactor src/auth.ts pour utiliser PKCE
+
+# Catastrophe, on revient en arrière
+> /rewind
+
+# On reformule
+> refactor src/auth.ts pour utiliser PKCE, en gardant la signature publique de login()
+```
+
+## Workflow expérimental sécurisé
+
+Pour explorer plusieurs implémentations sans Git :
+
+```bash
+> /checkpoint base
+> implémente l'option A
+> # test...
+> /rewind base
+> implémente l'option B
+> # test...
+```
+
+Vous comparez sans polluer l'historique Git, ce qui est plus léger qu'un branch.
+
+## Limites et pièges
+
+- Les checkpoints **n'incluent pas** les changements faits via `Bash` (ex. `npm install`, créations de fichiers par un build). Ce qui n'est pas tracé par les outils `Edit`/`Write` n'est pas restauré.
+- Le stockage des checkpoints grossit vite : pensez à les purger sur les très longues sessions.
+- `--continue` reprend la session mais **ne ré-exécute pas** les commandes : si l'environnement a changé entre temps (services arrêtés, branches Git modifiées), Claude opère sur un état périmé.
+- En cas de doute, faites un `git status` au tout début de votre reprise.
+
+## Bonnes pratiques
+
+- Aliasez `claude --continue` (par exemple `cc`) pour aller plus vite.
+- Créez un checkpoint nommé avant chaque tentative risquée (`/checkpoint avant-migration-db`).
+- Combinez avec Git : commitez avant les grandes étapes, utilisez les checkpoints pour les itérations rapides à l'intérieur d'une étape.
+- Documentez les sessions importantes en ajoutant un message final résumant ce qui a été fait — ça facilite les reprises ultérieures.
+
+## Pour aller plus loin
+
+- Article **Sessions et reprise** : pour comprendre où sont stockées les sessions.
+- Article **/clear, /resume, /cost** : pour les commandes slash complémentaires.
+- Article **Gestion fine de la mémoire** : pour gérer le contexte long terme.

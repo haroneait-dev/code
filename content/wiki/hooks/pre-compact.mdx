@@ -1,0 +1,123 @@
+---
+title: "PreCompact"
+description: "Sauvegarder le transcript complet avant que Claude Code ne compacte le contexte pour récupérer des tokens."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+Quand une session Claude Code dépasse le seuil de contexte, le harness lance une **compaction** : il résume les messages anciens pour libérer des tokens. C'est efficace, mais tu perds les détails fins (commandes shell exactes, sorties d'outils volumineuses, raisonnements intermédiaires). Le hook `PreCompact` te permet d'archiver l'état complet juste avant la compression.
+
+## Anatomie de l'évènement
+
+Le hook reçoit sur stdin un JSON :
+
+```json
+{
+  "session_id": "01HX...",
+  "transcript_path": "/Users/me/.claude/projects/-Users-me-app/01HX....jsonl",
+  "trigger": "auto",
+  "custom_instructions": null
+}
+```
+
+`trigger` vaut `"auto"` (déclenché par le seuil de tokens) ou `"manual"` (utilisateur a tapé `/compact`). `transcript_path` est le fichier JSONL qui contient l'intégralité de la conversation — c'est ce que tu vas vouloir archiver.
+
+## Archivage simple du transcript
+
+Une stratégie low-tech mais efficace : copier le JSONL dans un dossier daté.
+
+```json
+{
+  "hooks": {
+    "PreCompact": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/snapshot.sh"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+
+INPUT=$(cat)
+TRANSCRIPT=$(echo "$INPUT" | jq -r '.transcript_path')
+SESSION=$(echo "$INPUT" | jq -r '.session_id')
+TRIGGER=$(echo "$INPUT" | jq -r '.trigger')
+
+ARCHIVE_DIR="$HOME/.claude/archives/$(date +%Y-%m-%d)"
+mkdir -p "$ARCHIVE_DIR"
+
+TS=$(date +%H%M%S)
+cp "$TRANSCRIPT" "$ARCHIVE_DIR/${SESSION:0:8}-${TRIGGER}-${TS}.jsonl"
+
+echo "Snapshot sauvegardé dans $ARCHIVE_DIR" >&2
+```
+
+Tout ce que tu écris sur `stderr` apparaît dans le terminal de Claude — pratique pour confirmer que ça a tourné.
+
+## Extraire un résumé Markdown lisible
+
+Le JSONL brut est verbeux. Tu peux convertir à la volée en Markdown :
+
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+
+INPUT=$(cat)
+TRANSCRIPT=$(echo "$INPUT" | jq -r '.transcript_path')
+OUT="$HOME/.claude/archives/$(date +%Y-%m-%d-%H%M%S).md"
+
+mkdir -p "$(dirname "$OUT")"
+
+{
+  echo "# Session $(date)"
+  echo
+  jq -r 'select(.type=="message") | "## \(.role)\n\n\(.content | if type==\"array\" then map(select(.type==\"text\").text) | join(\"\\n\") else . end)\n"' "$TRANSCRIPT"
+} > "$OUT"
+```
+
+Tu obtiens un fichier `.md` que tu peux relire dans n'importe quel éditeur, indexer dans Obsidian, ou commit dans un dossier `journal/`.
+
+## Bloquer une compaction non désirée
+
+`PreCompact` peut renvoyer un code de sortie `2` pour **annuler** la compaction (uniquement pour le trigger `manual`). Utile si tu veux te protéger d'un `/compact` accidentel en pleine session critique :
+
+```bash
+#!/usr/bin/env bash
+INPUT=$(cat)
+TRIGGER=$(echo "$INPUT" | jq -r '.trigger')
+
+if [ "$TRIGGER" = "manual" ] && [ -f .claude/no-compact ]; then
+  echo "Compaction bloquée : retire .claude/no-compact pour autoriser" >&2
+  exit 2
+fi
+exit 0
+```
+
+La compaction automatique (`auto`) ne peut pas être bloquée — sinon tu casserais la session quand le contexte est plein.
+
+## Envoyer vers un stockage distant
+
+Pour ne pas saturer le disque local, push vers S3, R2 ou un Git privé :
+
+```bash
+aws s3 cp "$TRANSCRIPT" "s3://my-claude-archives/${SESSION}.jsonl" --quiet
+```
+
+Combine avec un cron qui purge les snapshots locaux de plus de 7 jours.
+
+## Pour aller plus loin
+
+- Pair `PreCompact` avec `SessionEnd` pour une double sauvegarde (snapshot avant compaction + final à la fermeture).
+- Indexe les transcripts archivés avec `ripgrep` : `rg "ma fonction" ~/.claude/archives/` retrouve une discussion d'il y a 3 semaines.
+- Le champ `custom_instructions` contient les directives passées via `/compact <instructions>` — log-les pour comprendre tes patterns de compaction.
+- Pour un workflow équipe, push le résumé Markdown dans un canal Slack avec le webhook approprié.

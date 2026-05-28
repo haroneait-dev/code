@@ -1,0 +1,144 @@
+---
+title: "Installation de Claude Code"
+description: "Installer le CLI Claude Code sur macOS, Linux et Windows en quelques minutes."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+Claude Code est le CLI officiel d'Anthropic pour intégrer Claude directement dans votre terminal et votre flux de développement. Ce guide couvre l'installation sur les trois plateformes principales, les prérequis indispensables et les vérifications post-installation pour valider que tout fonctionne correctement.
+
+## Prérequis
+
+Avant d'installer Claude Code, assurez-vous d'avoir :
+
+- **Node.js 20.x ou supérieur** (LTS recommandée)
+- **npm 10+** ou un gestionnaire compatible (`pnpm`, `yarn`, `bun`)
+- Un **compte Anthropic** actif (Console ou Claude.ai avec abonnement Pro/Max/Team)
+- Un terminal moderne : Terminal/iTerm2 (macOS), GNOME Terminal/Konsole (Linux), Windows Terminal (Windows)
+
+Vérifiez votre version de Node :
+
+```bash
+node --version   # doit afficher v20.x ou plus
+npm --version    # doit afficher 10.x ou plus
+```
+
+> Si votre Node est plus ancien, installez **nvm** (`nvm install --lts`) ou **fnm** pour gérer plusieurs versions sans casser votre système.
+
+## Installation sur macOS
+
+La méthode officielle passe par npm en global :
+
+```bash
+npm install -g @anthropic-ai/claude-code
+```
+
+Si vous obtenez une erreur de permission `EACCES`, **n'utilisez jamais `sudo`** avec npm global. Configurez plutôt un préfixe utilisateur :
+
+```bash
+mkdir -p ~/.npm-global
+npm config set prefix ~/.npm-global
+echo 'export PATH=~/.npm-global/bin:$PATH' >> ~/.zshrc
+source ~/.zshrc
+npm install -g @anthropic-ai/claude-code
+```
+
+Pour les utilisateurs Homebrew, vous pouvez aussi installer Node via `brew install node@20` avant la commande npm.
+
+## Installation sur Linux
+
+Sur Ubuntu/Debian, installez Node depuis NodeSource pour garantir une version récente :
+
+```bash
+curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+sudo apt-get install -y nodejs
+npm install -g @anthropic-ai/claude-code
+```
+
+Sur Fedora/RHEL :
+
+```bash
+sudo dnf install -y nodejs npm
+npm install -g @anthropic-ai/claude-code
+```
+
+Sur Arch :
+
+```bash
+sudo pacman -S nodejs npm
+npm install -g @anthropic-ai/claude-code
+```
+
+## Installation sur Windows
+
+Claude Code fonctionne nativement sur Windows 10/11, mais l'expérience optimale reste **WSL2** (Ubuntu) pour la compatibilité POSIX.
+
+**Option 1 — WSL2 (recommandée) :**
+
+```bash
+wsl --install -d Ubuntu
+# puis dans Ubuntu :
+sudo apt update && sudo apt install -y nodejs npm
+npm install -g @anthropic-ai/claude-code
+```
+
+**Option 2 — PowerShell natif :**
+
+```powershell
+winget install OpenJS.NodeJS.LTS
+npm install -g @anthropic-ai/claude-code
+```
+
+> Sur Windows natif, certaines commandes shell (`grep`, `find`) peuvent manquer. Claude Code utilise ses propres outils internes, mais l'expérience reste meilleure sous WSL.
+
+## Vérifier l'installation
+
+Une fois installé, lancez :
+
+```bash
+claude --version
+```
+
+Puis démarrez le CLI depuis n'importe quel dossier de projet :
+
+```bash
+cd ~/mon-projet
+claude
+```
+
+À la première exécution, Claude Code vous guide pour vous authentifier (OAuth via votre compte Claude ou clé API Anthropic). Voir [Authentification et clés API](/wiki/demarrer/authentification).
+
+## Comparaison des méthodes d'installation
+
+| Plateforme | Méthode recommandée | Alternative |
+|---|---|---|
+| macOS | `npm install -g` | Homebrew + npm |
+| Linux Ubuntu/Debian | NodeSource + npm | `nvm` |
+| Linux Arch | `pacman` + npm | AUR |
+| Windows | WSL2 + npm | `winget` natif |
+
+## Mettre à jour Claude Code
+
+Le CLI sort des mises à jour régulières. Pour passer à la dernière version :
+
+```bash
+npm update -g @anthropic-ai/claude-code
+```
+
+Claude Code vérifie aussi automatiquement les mises à jour au démarrage et vous avertit si une nouvelle version est disponible.
+
+## Désinstallation
+
+Si vous devez désinstaller pour résoudre un conflit :
+
+```bash
+npm uninstall -g @anthropic-ai/claude-code
+rm -rf ~/.claude            # supprime config + caches
+```
+
+## Pour aller plus loin
+
+- [Votre premier prompt](/wiki/demarrer/premier-prompt) — lancer Claude Code et écrire sa première requête
+- [Résolution des conflits d'installation](/wiki/demarrer/troubleshooting-installation) — erreurs Node/npm courantes
+- [Documentation officielle](https://docs.claude.com/claude-code) — référence complète Anthropic
+- [Dépôt GitHub](https://github.com/anthropics/claude-code) — issues et releases

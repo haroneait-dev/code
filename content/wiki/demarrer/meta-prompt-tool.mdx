@@ -1,0 +1,88 @@
+---
+title: "Le Meta-Prompt Tool d'Anthropic"
+description: "Outil officiel Anthropic pour générer des prompts parfaits à partir d'une description de tâche."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+Écrire un bon prompt est l'une des compétences les plus rentables quand on travaille avec Claude — et l'une des plus difficiles à acquérir intuitivement. Pour combler ce gap, Anthropic propose le **Meta-Prompt Tool**, un générateur officiel qui transforme une description en langage naturel de votre tâche en un prompt structuré, prêt à l'emploi, conforme aux best practices internes d'Anthropic (rôle, instructions, exemples XML, contraintes).
+
+## Pourquoi un meta-prompt
+
+Un meta-prompt, c'est un « prompt qui écrit des prompts ». Anthropic a entraîné un workflow spécifique qui :
+
+- structure votre intention en sections claires (`<role>`, `<instructions>`, `<examples>`, `<output_format>`)
+- ajoute les balises XML que Claude affectionne particulièrement
+- insère des exemples few-shot quand le pattern le justifie
+- explicite les contraintes que vous auriez oubliées (longueur, format, ton)
+
+Le résultat se rapproche de ce qu'un prompt engineer Anthropic produirait en quelques heures de travail.
+
+## Où l'utiliser
+
+Le Meta-Prompt Tool est disponible à deux endroits :
+
+- Directement dans **Anthropic Console** (`console.anthropic.com`) sous l'onglet **Generate a prompt**.
+- Sous forme de **notebook Python** dans le cookbook officiel pour ceux qui veulent l'industrialiser.
+
+Côté Console, le flow est trivial : vous décrivez votre tâche en une ou deux phrases, vous cliquez sur **Generate**, et vous récupérez le system prompt complet. Vous pouvez ensuite l'essayer immédiatement dans le Playground avec différents inputs.
+
+## Exemple concret
+
+Description en entrée :
+
+> « Je veux un assistant qui reformule des emails professionnels en français pour les rendre plus concis et plus chaleureux. »
+
+Le Meta-Prompt Tool retourne un system prompt structuré dans ce style :
+
+```text
+Tu es un assistant spécialisé dans la reformulation d'emails professionnels en français.
+
+<instructions>
+- Lis l'email original entre les balises <email>
+- Conserve l'information factuelle à 100%
+- Réduis la longueur de 30% minimum
+- Adopte un ton chaleureux et direct, sans formules trop guindées
+- Retourne uniquement l'email reformulé, sans préambule
+</instructions>
+
+<output_format>
+Objet : <objet reformulé>
+Corps : <corps reformulé>
+</output_format>
+```
+
+C'est déjà bien meilleur que ce qu'un développeur écrirait spontanément en 30 secondes.
+
+## L'appeler par API
+
+Le pattern est trivial à reproduire dans votre code : un appel `messages.create` avec un system prompt « génère-moi un prompt pour... ». Mais Anthropic expose aussi un endpoint dédié dans la Console qui retourne directement le prompt formaté :
+
+```bash
+curl https://api.anthropic.com/v1/experimental/generate_prompt \
+  -H "x-api-key: $ANTHROPIC_API_KEY" \
+  -H "anthropic-version: 2023-06-01" \
+  -H "content-type: application/json" \
+  -d '{
+    "task": "Résume un article scientifique en 5 bullet points compréhensibles par un lycéen.",
+    "target_model": "claude-sonnet-4-6"
+  }'
+```
+
+Vous pouvez wrapper cet appel dans un script `npm run generate-prompt` pour standardiser la création de tous vos system prompts dans un repo.
+
+## Limites et bonnes pratiques
+
+Le Meta-Prompt Tool est un excellent point de départ, mais ce n'est pas une baguette magique :
+
+- **Itérez** : le premier jet est rarement final. Lancez 10 inputs représentatifs, regardez les ratés, raffinez le prompt à la main.
+- **Versionnez** : stockez vos prompts dans `prompts/*.txt` versionnés en Git, pas en dur dans le code.
+- **Mesurez** : utilisez l'évaluation intégrée à la Console pour comparer deux versions sur un dataset.
+- **Adaptez au modèle** : un prompt généré pour Sonnet n'est pas forcément optimal pour Haiku — précisez le `target_model`.
+
+## Pour aller plus loin
+
+- Console Anthropic : `console.anthropic.com`
+- Documentation « Prompt generator » : `docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/prompt-generator`
+- Notebook cookbook : `github.com/anthropics/anthropic-cookbook` → `misc/prompt_engineering`
+- Guide « Prompt engineering » officiel pour comprendre les patterns générés

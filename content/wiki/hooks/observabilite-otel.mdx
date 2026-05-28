@@ -1,0 +1,67 @@
+---
+title: "Hooks pour l'observabilité"
+description: "Envoyer les traces de hooks vers OpenTelemetry, Langfuse ou Phoenix pour monitorer vos agents."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+Dès qu'un agent Claude Code tourne en continu — en CI, dans un cron, ou pour plusieurs développeurs — il devient indispensable de mesurer ce qu'il fait : combien d'outils par session, quels fichiers édités, combien de tokens consommés, quels prompts utilisateurs déclenchent quelles actions. Les hooks sont le point d'instrumentation idéal car ils s'exécutent à chaque event clé du cycle de vie.
+
+## Modèle mental : un span par event
+
+L'idée centrale est d'associer chaque event Claude Code (`UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `Stop`) à un span OpenTelemetry. La session devient le trace parent, chaque outil un span enfant. On obtient alors un graphe complet de l'exécution, comparable à celui d'une requête HTTP distribuée.
+
+| Event Claude        | Span OTel suggéré           | Attributs utiles                       |
+|---------------------|-----------------------------|----------------------------------------|
+| `SessionStart`      | trace root                  | `session.id`, `user.email`, `git.sha`  |
+| `UserPromptSubmit`  | span `user.prompt`          | `prompt.length`, `cwd`                 |
+| `PreToolUse`        | début span `tool.<name>`    | `tool.name`, `tool.input`              |
+| `PostToolUse`       | fin span `tool.<name>`      | `tool.exit_code`, `tool.duration_ms`   |
+| `Stop`              | clôture du trace            | `tokens.input`, `tokens.output`        |
+
+## Hook d'export minimal
+
+Pour ne pas alourdir chaque session, le hook écrit un événement JSON ligne par ligne dans un fichier ; un démon (otelcol, vector, fluent-bit) le lit et l'envoie au collecteur.
+
+```bash
+#!/usr/bin/env bash
+# ~/.claude/hooks/otel-emit.sh
+input=$(cat)
+event=$(echo "$input" | jq -c \
+  --arg ts "$(date -u +%FT%T.%3NZ)" \
+  --arg host "$(hostname)" \
+  '. + {ts: $ts, host: $host}')
+echo "$event" >> /var/log/claude/events.jsonl
+exit 0
+```
+
+Configurez-le sur tous les events que vous souhaitez tracer :
+
+```json
+{
+  "hooks": {
+    "PreToolUse":  [{ "hooks": [{ "type": "command", "command": "/usr/local/bin/otel-emit.sh" }] }],
+    "PostToolUse": [{ "hooks": [{ "type": "command", "command": "/usr/local/bin/otel-emit.sh" }] }],
+    "Stop":        [{ "hooks": [{ "type": "command", "command": "/usr/local/bin/otel-emit.sh" }] }]
+  }
+}
+```
+
+## Intégration Langfuse
+
+Langfuse est particulièrement adapté aux agents LLM : il sait représenter prompts, completions et outils dans une vue « trace ». Un petit script Node ou Python lit le `jsonl` et appelle l'API Langfuse, en regroupant les events par `session_id`. Le `transcript_path` fourni dans le payload permet en plus de remonter le prompt complet et les messages assistant pour les attacher au span.
+
+## Intégration Phoenix (Arize)
+
+Phoenix offre une UI locale (open source) très pratique en développement. Le SDK Python `arize-phoenix-otel` accepte directement des spans OTel standards : il suffit de pointer le collecteur OpenTelemetry vers `http://localhost:6006/v1/traces`. Vous bénéficiez alors des vues « LLM tracing » sans aucun couplage propriétaire.
+
+## Bonnes pratiques
+
+- **Asynchrone** : ne jamais appeler l'API d'observabilité directement depuis le hook. Écrire dans un buffer local et exporter via un agent dédié évite de ralentir Claude Code.
+- **Redaction** : avant export, supprimez les secrets potentiels (`.env`, tokens) avec `jq` ou un script de redaction.
+- **Cardinalité** : n'attribuez pas le contenu complet des prompts en label OTel — préférez un hash et stockez le contenu dans le span body.
+- **Sampling** : pour les sessions très longues, échantillonnez les `PreToolUse` afin de limiter le volume.
+
+## Pour aller plus loin
+
+Une fois l'export en place, construisez quelques dashboards de base : durée moyenne par outil, taux d'exit code non nuls, top 10 des commandes Bash exécutées. Ces métriques révèlent rapidement les frictions (outils lents, prompts qui boucle, fichiers édités trop souvent) et donnent une vraie boucle d'amélioration continue à vos workflows d'agents.

@@ -1,0 +1,64 @@
+---
+title: "Pricing et tokens"
+description: "Comprendre la facturation Anthropic, calculer le coût d'un appel Claude et optimiser ses dépenses avec le prompt caching et le batching."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+L'API Anthropic facture à l'usage, en tokens, avec des tarifs différenciés selon le modèle et selon le sens (input vs output). Comprendre ce modèle est essentiel pour bâtir un produit rentable — un appel mal cadré peut coûter 100× plus cher que sa version optimisée. Voici comment décortiquer la facture.
+
+## Qu'est-ce qu'un token ?
+
+Un token n'est pas un mot. C'est une unité sub-lexicale produite par le tokeniseur du modèle. En anglais, **1 token ≈ 0,75 mot** ou **4 caractères**. En français, c'est un peu moins favorable (~0,6 mot par token) à cause des accents et de la morphologie plus riche. Pour estimer rapidement : divisez le nombre de caractères par 4.
+
+Tout est compté en tokens : votre system prompt, l'historique de conversation, les documents joints, les images (~1600 tokens pour une image 1000×1000), et bien sûr la réponse générée.
+
+## Les tarifs Claude 4.x (par million de tokens)
+
+| Modèle | Input | Output | Cache write | Cache read |
+|---|---|---|---|---|
+| **Opus 4.7** | 15 $ | 75 $ | 18,75 $ | 1,50 $ |
+| **Sonnet 4.6** | 3 $ | 15 $ | 3,75 $ | 0,30 $ |
+| **Haiku 4.5** | 1 $ | 5 $ | 1,25 $ | 0,10 $ |
+
+Deux choses sautent aux yeux : **l'output coûte 5× l'input** (toujours), et **Opus est 15× plus cher que Haiku**. Choisir le bon modèle est donc le premier levier d'optimisation.
+
+## Calculer le coût d'un appel
+
+Prenons un exemple concret avec Sonnet 4.6 :
+
+- System prompt : 500 tokens
+- Document joint : 20 000 tokens
+- Question utilisateur : 100 tokens
+- Réponse générée : 800 tokens
+
+→ Input : 20 600 tokens × 3 $/M = **0,062 $**
+→ Output : 800 tokens × 15 $/M = **0,012 $**
+→ **Total : 0,074 $** par appel
+
+Sur 10 000 requêtes/jour, cela représente ~22 000 $/mois. Le même volume en Haiku 4.5 : ~7 500 $. En Opus 4.7 : ~111 000 $. D'où l'importance du choix.
+
+## Le prompt caching : le levier n°1
+
+Si vous renvoyez le même contexte (system prompt, documentation, exemples few-shot) à chaque appel, activez le cache. Anthropic stocke ces tokens pendant 5 minutes (ou 1 heure avec l'extended cache) et facture les **lectures à seulement 10% du prix input**.
+
+Reprenons l'exemple : si les 20 000 tokens de doc sont mis en cache, ils passent de 0,060 $ à 0,006 $. Sur 10 000 appels/jour, ce seul changement économise ~16 000 $/mois.
+
+Conditions : le préfixe mis en cache doit faire au moins 1024 tokens (Sonnet/Opus) ou 2048 tokens (Haiku), et être strictement identique d'un appel à l'autre.
+
+## Batch API : -50% sur les workloads asynchrones
+
+Pour les tâches qui ne nécessitent pas une réponse immédiate (analyse en bulk, génération de contenu en masse, évaluations), la **Message Batches API** offre une réduction de 50% sur input ET output, avec un SLA de 24h. Idéal pour les pipelines de nuit ou les jobs ETL.
+
+## Autres optimisations
+
+- **Réduire l'output** : demandez explicitement des réponses courtes, structurées en JSON quand possible. L'output coûte 5× l'input.
+- **Compresser le contexte** : faites un premier appel Haiku pour résumer un long document, puis envoyez le résumé à Sonnet/Opus.
+- **Streaming** : ne réduit pas le coût mais améliore la latence perçue, donc l'UX à coût égal.
+- **Monitoring** : utilisez les headers de réponse (`x-ratelimit-*` et le bloc `usage`) pour tracker token par token.
+
+## Pour aller plus loin
+
+- Tarifs officiels : [anthropic.com/pricing](https://anthropic.com/pricing)
+- Documentation prompt caching : [docs.anthropic.com/en/docs/build-with-claude/prompt-caching](https://docs.anthropic.com/en/docs/build-with-claude/prompt-caching)
+- Article wiki [Choisir le bon modèle](/wiki/modeles/choisir-bon-modele) pour optimiser le rapport qualité/coût

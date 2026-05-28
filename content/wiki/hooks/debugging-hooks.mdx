@@ -1,0 +1,80 @@
+---
+title: "Debugging hooks"
+description: "Diagnostiquer un hook qui ne se déclenche pas : matcher, JSON stdin, exit codes, logs."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+Un hook qui ne s'exécute pas est l'un des bugs les plus frustrants de Claude Code : aucune erreur visible, aucune trace dans l'UI, et pourtant le script reste muet. Heureusement, la chaîne d'exécution des hooks est entièrement déterministe. En remontant méthodiquement les couches (matcher → JSON stdin → exit code → logs), on identifie presque toujours la cause en quelques minutes.
+
+## Vérifier que le matcher déclenche bien
+
+Avant tout, isolez la question : « est-ce que mon hook est seulement appelé ? ». La cause numéro un d'un hook silencieux est un `matcher` trop restrictif ou mal orthographié. Les matchers acceptent des expressions régulières et sont sensibles à la casse.
+
+```json
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [{ "type": "command", "command": "/tmp/log-bash.sh" }]
+      }
+    ]
+  }
+}
+```
+
+Pour valider qu'un matcher est bien évalué, remplacez-le temporairement par `".*"` : si le hook se déclenche alors, le problème vient bien du pattern initial.
+
+## Inspecter le JSON envoyé sur stdin
+
+Claude Code envoie un objet JSON sur l'entrée standard du script (event, tool_name, tool_input, session_id, transcript_path…). Un script qui n'attend rien sur stdin peut sembler ne « rien faire » alors qu'il s'exécute correctement.
+
+```bash
+#!/usr/bin/env bash
+# /tmp/log-bash.sh
+input=$(cat)
+echo "$(date -u +%FT%TZ) $input" >> /tmp/hook-trace.log
+```
+
+Lire le payload dans un fichier de log donne immédiatement la structure réelle de l'événement. C'est aussi le meilleur moyen de découvrir les champs disponibles sans deviner.
+
+## Comprendre les exit codes
+
+Les exit codes pilotent le comportement de Claude Code :
+
+- `0` : succès, l'exécution continue normalement.
+- `2` : décision « bloquante » — la sortie sur stderr est renvoyée au modèle et l'action peut être annulée selon l'event (`PreToolUse`, `UserPromptSubmit`).
+- Autre code non nul : erreur non bloquante, affichée à l'utilisateur mais sans interrompre l'agent.
+
+Un hook qui retourne `1` n'aura donc pas l'effet d'un blocage. Pour refuser une action, il faut explicitement `exit 2` et écrire le motif sur stderr.
+
+```bash
+if [[ "$input" == *"rm -rf /"* ]]; then
+  echo "Commande destructrice interdite" >&2
+  exit 2
+fi
+exit 0
+```
+
+## Activer les logs détaillés
+
+Lancez Claude en mode debug pour voir le cycle de vie complet :
+
+```bash
+claude --debug
+```
+
+Le flux verbose imprime les hooks détectés, l'ordre de matching, le timeout configuré et le résultat de chaque exécution. Couplez cela à un `tail -f /tmp/hook-trace.log` dans un second terminal et vous obtenez une observabilité complète.
+
+## Pièges classiques à éliminer
+
+- **Permissions** : le script doit être exécutable (`chmod +x`).
+- **Shebang manquant** : sans `#!/usr/bin/env bash` (ou équivalent), le script peut échouer silencieusement.
+- **Chemin relatif** : utilisez toujours des chemins absolus, ou `$CLAUDE_PROJECT_DIR` pour les commandes situées dans le repo.
+- **JSON invalide** dans `settings.json` : Claude Code ignore alors tout le bloc `hooks`. Validez avec `jq . settings.json`.
+- **Timeout** : par défaut 60 s. Un script lent peut être tué sans message clair.
+
+## Pour aller plus loin
+
+Une fois le hook fiable, automatisez sa vérification : ajoutez un test qui pipe un faux JSON dans le script (`echo '{"tool_name":"Bash"}' | ./mon-hook.sh`) et vérifie l'exit code attendu. Cette approche transforme les hooks en composants testables au même titre que le reste du code. Pour aller plus loin encore, étudiez le chaînage de hooks et l'envoi de traces vers OpenTelemetry, abordés dans d'autres articles de ce wiki.

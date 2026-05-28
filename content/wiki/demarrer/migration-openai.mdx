@@ -1,0 +1,123 @@
+---
+title: "Migrer de GPT-4o à Claude Sonnet"
+description: "Correspondance des concepts (messages, system prompt, tools, temperature) pour passer d'OpenAI à Anthropic."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+Migrer un projet de l'API OpenAI vers l'API Anthropic est rarement un drop-in remplacement, mais c'est bien plus simple qu'il n'y paraît. Les deux SDK partagent les mêmes concepts de base — messages, rôles, tools, streaming — mais les nomment et les structurent différemment. Ce guide récapitule les correspondances exactes pour migrer un endpoint `chat.completions` vers `messages.create` sans surprise.
+
+## Les différences de surface
+
+Trois choses changent dès la première ligne de code :
+
+- Le **system prompt** n'est plus un message avec `role: "system"`, mais un paramètre dédié `system` au niveau de la requête.
+- `max_tokens` est **obligatoire** chez Anthropic, alors qu'il est optionnel chez OpenAI.
+- Les réponses arrivent dans `content[]` (un tableau de blocs typés) plutôt que dans `choices[0].message.content` (une string).
+
+Côté authentification, on passe de `OPENAI_API_KEY` à `ANTHROPIC_API_KEY` et du header `Authorization: Bearer` à `x-api-key`.
+
+## Côte à côte : un appel simple
+
+OpenAI :
+
+```ts
+import OpenAI from "openai";
+const openai = new OpenAI();
+
+const res = await openai.chat.completions.create({
+  model: "gpt-4o",
+  messages: [
+    { role: "system", content: "Tu es concis." },
+    { role: "user", content: "Capitale de la France ?" },
+  ],
+  temperature: 0.7,
+});
+console.log(res.choices[0].message.content);
+```
+
+Anthropic :
+
+```ts
+import Anthropic from "@anthropic-ai/sdk";
+const anthropic = new Anthropic();
+
+const res = await anthropic.messages.create({
+  model: "claude-sonnet-4-6",
+  max_tokens: 1024,
+  system: "Tu es concis.",
+  messages: [{ role: "user", content: "Capitale de la France ?" }],
+  temperature: 0.7,
+});
+console.log(res.content[0].type === "text" ? res.content[0].text : "");
+```
+
+## Tools / function calling
+
+Le concept est le même, le format change. OpenAI imbrique sous `tools[].function`, Anthropic met tout à plat dans `tools[]`. Le schéma JSON Schema reste rigoureusement identique.
+
+```json
+{
+  "name": "get_weather",
+  "description": "Retourne la météo d'une ville",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "city": { "type": "string" }
+    },
+    "required": ["city"]
+  }
+}
+```
+
+Autres différences à connaître :
+
+- Anthropic renvoie un bloc `tool_use` dans `content[]` avec `id`, `name`, `input`.
+- Vous devez répondre avec un message `role: "user"` contenant un bloc `tool_result` qui référence l'`id` précédent — il n'existe pas de `role: "tool"` comme chez OpenAI.
+- `tool_choice` accepte `auto`, `any`, `tool` (par nom) ou `none`.
+
+## Paramètres équivalents
+
+Tableau de correspondance des paramètres les plus courants :
+
+- `temperature` → identique (0 à 1 chez Anthropic, 0 à 2 chez OpenAI ; restez sous 1)
+- `top_p` → identique
+- `max_tokens` → identique mais **obligatoire** chez Anthropic
+- `stop` → `stop_sequences` (toujours un tableau)
+- `stream: true` → identique, mais le format des events SSE diffère (`message_start`, `content_block_delta`, `message_stop`)
+- `response_format: { type: "json_object" }` → pas d'équivalent direct ; utilisez un `tool` avec un schéma JSON, ou demandez le JSON dans le system prompt
+- `seed` → pas d'équivalent (Claude n'expose pas de seed déterministe)
+- `logprobs` → non disponible
+
+## Streaming
+
+Le streaming est conceptuellement similaire mais le parsing change. Le SDK officiel masque la complexité :
+
+```ts
+const stream = anthropic.messages.stream({
+  model: "claude-sonnet-4-6",
+  max_tokens: 1024,
+  messages: [{ role: "user", content: "Raconte une histoire" }],
+});
+
+for await (const event of stream) {
+  if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
+    process.stdout.write(event.delta.text);
+  }
+}
+```
+
+## Pièges classiques à éviter
+
+- Oublier `max_tokens` → erreur 400 immédiate.
+- Laisser un `role: "system"` dans `messages[]` → erreur de validation.
+- Concaténer naïvement `content` en string : c'est un tableau de blocs (`text`, `tool_use`, `image`).
+- Vouloir activer `response_format: json_object` : préférez le tool calling pour garantir une sortie structurée.
+- Comparer les coûts à l'aveugle : activez le **prompt caching** d'Anthropic, qui peut réduire de 90% le coût des system prompts répétés.
+
+## Pour aller plus loin
+
+- Documentation officielle de migration : `docs.anthropic.com/en/docs/about-claude/models/migrating`
+- Guide « Tool use » d'Anthropic
+- Cookbook « migration from OpenAI » dans `anthropic-cookbook`
+- SDK : `@anthropic-ai/sdk` (Node/TS) et `anthropic` (Python)

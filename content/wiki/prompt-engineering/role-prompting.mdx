@@ -1,0 +1,108 @@
+---
+title: "Role prompting : donner un rôle à Claude pour orienter ton et profondeur"
+description: "Configurer la persona du modèle (architecte senior, juriste, copywriter) pour ajuster vocabulaire, niveau de détail et angle d'analyse."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+Le **role prompting** consiste à assigner explicitement un rôle à Claude au début du prompt système. C'est l'un des leviers les plus simples et les plus puissants : un même prompt utilisateur peut produire des réponses radicalement différentes selon que vous demandez à Claude d'être *"un développeur junior"* ou *"un architecte logiciel senior avec 15 ans d'expérience en systèmes distribués"*.
+
+## Pourquoi ça change tout
+
+Le rôle agit comme un **filtre de distribution**. Il oriente :
+
+- Le **vocabulaire** (technique vs vulgarisé)
+- La **profondeur** d'analyse (surface vs causes racines)
+- Les **angles morts** anticipés (un juriste pensera RGPD ; un growth hacker pensera funnel)
+- Le **ton** (formel, didactique, direct)
+
+Sans rôle, Claude répond avec un style "assistant générique poli" qui est rarement optimal pour un contexte professionnel précis.
+
+## Anatomie d'un bon rôle
+
+Un rôle efficace est **spécifique** et **opérationnel**. Comparez :
+
+```text
+Mauvais : "Tu es un expert."
+Moyen   : "Tu es un développeur senior."
+Bon     : "Tu es un architecte logiciel senior spécialisé en
+          systèmes distribués haute disponibilité, avec une
+          expérience forte sur Kafka, Postgres et Kubernetes."
+```
+
+Le bon rôle injecte du **contexte sémantique** que Claude utilisera pour calibrer ses réponses : références techniques pertinentes, trade-offs implicites, vocabulaire idiomatique.
+
+## Template prêt à l'emploi
+
+```xml
+<role>
+Tu es {TITRE PRÉCIS} avec {N ANNÉES} d'expérience.
+Tu as travaillé chez {TYPE D'ENTREPRISE} sur {DOMAINE}.
+Tes spécialités : {3 SPÉCIALITÉS CONCRÈTES}.
+</role>
+
+<style>
+- Réponses {DIRECTES / NUANCÉES / PÉDAGOGIQUES}
+- Cite tes trade-offs et tes hypothèses
+- Si une question est ambiguë, demande une clarification
+</style>
+
+<task>
+{INSTRUCTION UTILISATEUR}
+</task>
+```
+
+## Exemples par cas d'usage
+
+### Code review
+
+```text
+Tu es un staff engineer chez une scale-up B2B SaaS. Tu fais 50 reviews
+de PR par mois. Tu privilégies la lisibilité, la testabilité et la
+robustesse aux erreurs. Tu détestes le code "clever" et tu repères
+les fuites de mémoire, les race conditions et les SQL injections.
+```
+
+### Conseil juridique tech
+
+```text
+Tu es un avocat français spécialisé en droit du numérique, RGPD,
+contrats SaaS B2B et propriété intellectuelle logicielle. Tu cites
+les articles de loi pertinents et tu signales toujours quand un point
+nécessite l'avis d'un confrère sur une juridiction étrangère.
+```
+
+### Copywriting
+
+```text
+Tu es une copywriter avec 10 ans d'expérience en direct response.
+Tu écris pour des fondateurs B2B. Style : phrases courtes, verbes
+forts, zéro jargon corporate, une idée par paragraphe.
+```
+
+## Pièges à éviter
+
+- **Rôle contradictoire avec la tâche** : demander à *"un poète"* d'écrire de la doc API technique produit un résultat médiocre. Le rôle doit servir la tâche.
+- **Rôle trop pompeux** : *"Tu es le plus grand expert mondial de…"*. Aucun gain de qualité, parfois génère du ton condescendant.
+- **Rôle vs prompt système** : placez le rôle dans le `system`, pas dans le `user`. Cela libère les tours utilisateur pour les données réelles et améliore la cohérence sur les conversations longues.
+
+```json
+{
+  "model": "claude-sonnet-4-6",
+  "system": "Tu es un architecte logiciel senior spécialisé en...",
+  "messages": [
+    { "role": "user", "content": "Review ce schéma Postgres : ..." }
+  ]
+}
+```
+
+## Combiner avec d'autres techniques
+
+Le role prompting se combine avec tout : Chain of Thought, output format, few-shot. Un rôle bien défini **amplifie** les autres techniques car le modèle a un point d'ancrage stable pour interpréter vos instructions.
+
+## Pour aller plus loin
+
+- Construire une bibliothèque interne de 5 à 10 rôles réutilisables pour vos cas métier récurrents.
+- A/B tester deux variantes de rôle sur 30 prompts et mesurer la qualité perçue.
+- Lire le guide *"System Prompts"* de la doc Anthropic pour les patterns avancés (multi-rôles, garde-fous).
+- Coupler rôle + ton avec un **few-shot** de 2-3 exemples pour verrouiller le style.

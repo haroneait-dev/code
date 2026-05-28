@@ -1,0 +1,130 @@
+---
+title: "Claude Sonnet 4.6 — standard industrie pour le code"
+description: "Le workhorse pour le développement : équilibre vitesse/qualité."
+updatedAt: "2026-05-19"
+readingMinutes: 7
+---
+
+`claude-sonnet-4-6` est devenu, en moins d'un an, le **modèle par défaut** pour les outils d'ingénierie logicielle. Claude Code, Cursor, Cline et de nombreux IDE AI-first le sélectionnent comme modèle principal. La raison : un rapport vitesse/qualité/coût qui couvre 90 % des besoins de développement, sans la latence d'Opus ni les limites de Haiku.
+
+## Pourquoi Sonnet domine le code
+
+Sonnet 4.6 combine trois qualités rarement réunies :
+
+- **Faible latence** : génération de code rapide, idéale pour des cycles d'édition interactifs.
+- **Tool use fiable** : faible taux d'hallucination sur les noms de fonctions/paramètres.
+- **Suivi d'instructions** : respecte les conventions imposées (ESLint, style guide, structure de PR).
+
+Sur **SWE-bench Verified**, Sonnet 4.6 atteint des scores compétitifs avec Opus, à une fraction du coût [à vérifier].
+
+## Tableau récapitulatif
+
+| Caractéristique | Valeur |
+|---|---|
+| ID modèle | `claude-sonnet-4-6` |
+| Contexte d'entrée | 200K tokens |
+| Sortie max | ~64K tokens [à vérifier] |
+| Extended thinking | Supporté |
+| Vision | Oui |
+| Prompt caching | Oui |
+| Batch API | Oui |
+
+## Exemple d'appel
+
+```ts
+import Anthropic from "@anthropic-ai/sdk";
+
+const client = new Anthropic();
+
+const res = await client.messages.create({
+  model: "claude-sonnet-4-6",
+  max_tokens: 8192,
+  system: "Tu es un assistant Next.js 16 App Router.",
+  messages: [
+    { role: "user", content: "Écris un Route Handler POST /api/users." },
+  ],
+});
+```
+
+En streaming :
+
+```ts
+const stream = await client.messages.stream({
+  model: "claude-sonnet-4-6",
+  max_tokens: 4096,
+  messages: [{ role: "user", content: "Refactor ce fichier..." }],
+});
+
+for await (const chunk of stream) {
+  if (chunk.type === "content_block_delta") {
+    process.stdout.write(chunk.delta.text ?? "");
+  }
+}
+```
+
+## Cas d'usage typiques
+
+1. **Génération de code** : composants React, endpoints API, requêtes SQL
+2. **Revue de code automatisée** : PR bots, linting sémantique
+3. **Agents IDE** : Claude Code, plugins VS Code
+4. **Documentation technique** : génération de README, JSDoc, OpenAPI
+5. **Migrations de framework** : Next.js 14 → 16, Vue 2 → 3
+
+## Patterns recommandés
+
+### Prompt système concis et caché
+
+```json
+{
+  "model": "claude-sonnet-4-6",
+  "system": [
+    {
+      "type": "text",
+      "text": "<règles du projet, 5000 tokens>",
+      "cache_control": { "type": "ephemeral" }
+    }
+  ]
+}
+```
+
+### Tool use bien typé
+
+```ts
+const tools = [
+  {
+    name: "read_file",
+    description: "Lit un fichier du repo",
+    input_schema: {
+      type: "object",
+      properties: { path: { type: "string" } },
+      required: ["path"],
+    },
+  },
+];
+```
+
+> Astuce : sur Sonnet, **moins de tools = meilleur taux de succès**. Si tu as 30 outils, regroupe-les ou utilise un router en amont.
+
+## Sonnet vs Opus en pratique
+
+| Scénario | Modèle conseillé |
+|---|---|
+| Bug fix court (< 200 lignes) | Sonnet |
+| Architecture d'un nouveau service | Opus |
+| Génération de tests unitaires | Sonnet |
+| Audit de sécurité approfondi | Opus |
+| Chatbot interne avec RAG | Sonnet |
+| Agent multi-heures avec décisions critiques | Opus |
+
+## Limites à connaître
+
+- Sur des bases de code **très spécifiques** (DSL maison, framework rare), Sonnet peut nécessiter plus d'exemples in-context.
+- L'extended thinking améliore les résultats mais **alourdit la latence** — à n'activer que si nécessaire.
+- Comme tous les LLM, Sonnet est sensible au **bruit dans le prompt** : enlève les fichiers non pertinents.
+
+## Pour aller plus loin
+
+- Documentation modèles : https://docs.anthropic.com/en/docs/about-claude/models
+- Pricing : https://www.anthropic.com/pricing
+- Article voisin : [Comparatif des modèles Claude](/wiki/modeles/comparatif-modeles)
+- Article voisin : [Choisir le bon modèle](/wiki/modeles/choisir-bon-modele)

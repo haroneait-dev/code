@@ -1,0 +1,178 @@
+---
+title: "Exemples pratiques : auto-format, anti-secrets, audit log"
+description: "Trois recettes de hooks prêtes à coller : Prettier automatique, blocage des secrets, journal d'audit JSONL."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+Assez de théorie : voici trois hooks qu'on peut copier-coller dans `settings.json` aujourd'hui et qui apportent une vraie valeur. Ils couvrent les trois besoins les plus fréquents : qualité de code, sécurité, traçabilité.
+
+## 1. Auto-format avec Prettier sur chaque Edit/Write
+
+L'idée : dès que Claude modifie un fichier source, le formater. Plus de PR avec des diffs cosmétiques, plus de "ah j'avais oublié de lancer prettier".
+
+```json
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/.claude/scripts/auto-format.sh",
+            "timeout": 8
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+Le script associé filtre les extensions concernées et utilise le `prettier` local du projet :
+
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+INPUT="$(cat)"
+FILE="$(echo "$INPUT" | jq -r '.tool_input.file_path // empty')"
+[ -z "$FILE" ] && exit 0
+[ ! -f "$FILE" ] && exit 0
+
+case "$FILE" in
+  *.ts|*.tsx|*.js|*.jsx|*.json|*.md|*.css)
+    cd "$CLAUDE_PROJECT_DIR"
+    npx --no-install prettier --write "$FILE" 2>/dev/null || true
+    ;;
+esac
+exit 0
+```
+
+Le `|| true` et le `--no-install` garantissent qu'on ne casse jamais une session si Prettier n'est pas installé ou plante.
+
+## 2. Blocage des secrets avant écriture
+
+Ce hook intercepte chaque tentative d'écriture pour vérifier qu'aucun secret ne se glisse dans un fichier. C'est un `PreToolUse` qui peut bloquer l'opération.
+
+```json
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/.claude/scripts/anti-secrets.sh",
+            "timeout": 3
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+Le script teste plusieurs patterns courants : clés AWS, tokens GitHub, OpenAI/Anthropic, JWT, clés privées.
+
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+INPUT="$(cat)"
+CONTENT="$(echo "$INPUT" | jq -r '
+  (.tool_input.content // "") + "\n" +
+  (.tool_input.new_string // "")
+')"
+
+# Patterns de secrets
+PATTERNS=(
+  'AKIA[0-9A-Z]{16}'                       # AWS Access Key
+  'ghp_[A-Za-z0-9]{36}'                    # GitHub Personal Token
+  'sk-ant-api[0-9]{2}-[A-Za-z0-9_-]{80,}'  # Anthropic
+  'sk-[A-Za-z0-9]{48}'                     # OpenAI
+  '-----BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY-----'
+  'eyJ[A-Za-z0-9_-]{20,}\.eyJ[A-Za-z0-9_-]{20,}\.' # JWT
+)
+
+for P in "${PATTERNS[@]}"; do
+  if echo "$CONTENT" | grep -qE "$P"; then
+    echo "Secret détecté (pattern: $P). Écriture bloquée." >&2
+    exit 2
+  fi
+done
+exit 0
+```
+
+Le `exit 2` est crucial : il bloque l'outil et renvoie le message au modèle, qui pourra corriger sa réponse au lieu d'écrire un secret en dur.
+
+## 3. Audit log JSONL de toute la session
+
+Pour les équipes qui doivent garder une trace de ce que fait Claude Code (conformité, debug post-mortem), un journal JSONL local est idéal : un événement par ligne, facile à requêter avec `jq`.
+
+```json
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          { "type": "command", "command": "$CLAUDE_PROJECT_DIR/.claude/scripts/audit.sh pre" }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          { "type": "command", "command": "$CLAUDE_PROJECT_DIR/.claude/scripts/audit.sh post" }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          { "type": "command", "command": "$CLAUDE_PROJECT_DIR/.claude/scripts/audit.sh prompt" }
+        ]
+      }
+    ]
+  }
+}
+```
+
+Le script `audit.sh` agrège tout dans un seul fichier, avec timestamp ISO :
+
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+PHASE="${1:-unknown}"
+INPUT="$(cat)"
+TS="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+LOG="$CLAUDE_PROJECT_DIR/.claude/audit.jsonl"
+
+jq -c --arg ts "$TS" --arg phase "$PHASE" \
+  '{ts: $ts, phase: $phase, session: .session_id,
+    tool: .tool_name, cwd: .cwd, input: .tool_input,
+    prompt: .prompt}' <<< "$INPUT" >> "$LOG"
+
+exit 0
+```
+
+Pour explorer le log ensuite :
+
+```bash
+# Tous les Bash exécutés aujourd'hui
+jq 'select(.tool == "Bash" and (.ts | startswith("2026-05-19")))' \
+  .claude/audit.jsonl
+
+# Top 10 des fichiers édités
+jq -r 'select(.tool == "Edit") | .input.file_path' .claude/audit.jsonl \
+  | sort | uniq -c | sort -rn | head
+```
+
+## Pour aller plus loin
+
+- Combiner les trois hooks ci-dessus dans un seul `settings.json` : ils ne se gênent pas.
+- Ajouter un hook `SessionEnd` qui zippe le log de la session et l'archive.
+- Pour les équipes : pousser `audit.jsonl` vers un bucket S3 via un hook `Stop` asynchrone.
+- Versionner les scripts dans `.claude/scripts/` pour que toute l'équipe en bénéficie via le repo.

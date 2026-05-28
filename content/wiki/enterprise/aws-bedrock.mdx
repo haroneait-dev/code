@@ -1,0 +1,106 @@
+---
+title: "Déployer Claude sur AWS Bedrock"
+description: "Guide pratique pour invoquer Claude via Amazon Bedrock : IAM, débit provisionné, boto3."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+Amazon Bedrock est le service managé d'AWS qui expose les modèles Claude sans quitter votre VPC. Aucun appel ne sort vers Anthropic : la facturation passe par AWS, la conformité repose sur les certifications AWS (SOC, HIPAA, FedRAMP). Voici comment l'intégrer proprement.
+
+## Activer l'accès aux modèles
+
+Avant toute chose, demander l'accès aux modèles Anthropic dans la console Bedrock (région `us-east-1` ou `eu-west-3` par exemple). L'activation est gratuite mais nécessite une validation manuelle pour certains modèles avancés.
+
+```bash
+aws bedrock list-foundation-models \
+  --by-provider anthropic \
+  --region us-east-1
+```
+
+## Politique IAM minimale
+
+Le principe de moindre privilège impose de restreindre les actions et les ARN de modèles :
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "bedrock:InvokeModel",
+        "bedrock:InvokeModelWithResponseStream"
+      ],
+      "Resource": [
+        "arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-sonnet-4-6*",
+        "arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-opus-4-7*"
+      ]
+    }
+  ]
+}
+```
+
+Attacher cette policy à un rôle IRSA (EKS) ou à un rôle EC2 plutôt qu'à un utilisateur IAM avec clés statiques.
+
+## Appel via boto3
+
+Le SDK Python `boto3` expose `bedrock-runtime`. Le payload reste compatible avec le format Messages d'Anthropic.
+
+```python
+import boto3, json
+
+client = boto3.client("bedrock-runtime", region_name="us-east-1")
+
+response = client.invoke_model(
+    modelId="anthropic.claude-sonnet-4-6-20260101-v1:0",
+    body=json.dumps({
+        "anthropic_version": "bedrock-2023-05-31",
+        "max_tokens": 1024,
+        "messages": [{"role": "user", "content": "Résume ce rapport en 3 points."}]
+    })
+)
+
+print(json.loads(response["body"].read())["content"][0]["text"])
+```
+
+Pour le streaming, utiliser `invoke_model_with_response_stream` et itérer sur les events.
+
+## Débit provisionné (Provisioned Throughput)
+
+Le mode on-demand est suffisant pour le prototypage. En production à fort volume, souscrire un **Provisioned Throughput** garantit des tokens/seconde dédiés et un coût prévisible.
+
+```bash
+aws bedrock create-provisioned-model-throughput \
+  --model-units 2 \
+  --provisioned-model-name claude-sonnet-prod \
+  --model-id anthropic.claude-sonnet-4-6-20260101-v1:0 \
+  --commitment-duration OneMonth
+```
+
+Chaque *model unit* offre un débit fixe (consulter la doc Bedrock pour les valeurs par modèle). Engagements possibles : 1 mois ou 6 mois.
+
+## Observabilité et garde-fous
+
+Activer **CloudTrail** pour les appels d'API et **CloudWatch** pour les métriques de latence/erreurs. **Bedrock Guardrails** ajoute des filtres de contenu (PII, sujets sensibles) en amont et en aval du modèle :
+
+```yaml
+guardrail:
+  name: claude-prod-guardrail
+  content_filters:
+    - hate: HIGH
+    - violence: HIGH
+    - sexual: HIGH
+  pii_entities:
+    - EMAIL
+    - PHONE
+    - CREDIT_DEBIT_CARD_NUMBER
+  blocked_topics:
+    - conseil_medical
+    - conseil_financier
+```
+
+## Pour aller plus loin
+
+- Documentation AWS : *Bedrock User Guide* (section Anthropic)
+- Article wiki : `resilience-multi-cloud` pour le fallback Bedrock ↔ Anthropic
+- Bibliothèque `anthropic[bedrock]` pour conserver l'API SDK Anthropic native

@@ -1,0 +1,154 @@
+---
+title: "Déclencher des slash commands depuis un hook"
+description: "Combiner hooks et slash commands pour automatiser les workflows Claude Code."
+updatedAt: "2026-05-19"
+readingMinutes: 5
+---
+
+Les hooks de Claude Code exécutent du code à des moments précis du cycle de vie d'une session (avant un tool, après un edit, à la fin d'une session...). Combinés aux slash commands, ils permettent d'automatiser des workflows complexes sans intervention manuelle : un audit sécurité après chaque commit, un compact automatique au bout de N minutes, un rappel des conventions à chaque démarrage.
+
+## Le pattern de base
+
+Un hook est défini dans `settings.json` (projet ou utilisateur). Pour déclencher une slash command, le hook lance un sous-process `claude` en mode non-interactif avec la commande en argument :
+
+```json
+{
+  "hooks": {
+    "Stop": [
+      {
+        "command": "claude -p '/cost' >> .claude/cost.log"
+      }
+    ]
+  }
+}
+```
+
+Ce hook logue le coût de chaque session à la fermeture. Le flag `-p` (print) exécute la commande et sort, sans ouvrir de REPL.
+
+## Hooks utiles disponibles
+
+Selon la version de Claude Code, les principaux événements hookables sont :
+
+- `SessionStart` : au démarrage d'une session
+- `Stop` : à la fin d'une session
+- `PreToolUse` / `PostToolUse` : avant/après un appel de tool
+- `UserPromptSubmit` : juste après que l'utilisateur a envoyé un message
+- `PreCompact` / `PostCompact` : autour de la compaction
+- `SubagentStop` : à la fin d'un sub-agent
+
+Chaque hook reçoit des données contextuelles (nom du tool, arguments, etc.) sur `stdin` au format JSON, et peut renvoyer une décision (autoriser, bloquer, modifier).
+
+## Exemple : audit sécurité après chaque commit
+
+```json
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "command": "if echo \"$CLAUDE_TOOL_INPUT\" | grep -q 'git commit'; then claude -p '/security-review' --output-format text; fi"
+      }
+    ]
+  }
+}
+```
+
+Dès que Claude exécute un `git commit`, le hook relance Claude en sous-session pour exécuter `/security-review`. Le résultat est imprimé dans le terminal sans bloquer la session principale.
+
+## Exemple : reprendre la session précédente automatiquement
+
+`SessionStart` peut détecter si une session récente existe et proposer un `/resume`. Plus simple : afficher un rappel des conventions à chaque démarrage :
+
+```json
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "command": "cat .claude/welcome.txt"
+      }
+    ]
+  }
+}
+```
+
+Et `.claude/welcome.txt` :
+
+```
+Bienvenue ! Rappels :
+- /clear entre chaque feature
+- /security-review avant chaque PR
+- Slash commands disponibles : /db:migrate, /pr:review, /release
+```
+
+## Exemple : déclencher une commande custom depuis un hook
+
+Vous pouvez aussi lancer vos propres slash commands. Disons que vous avez `.claude/commands/log-decision.md` :
+
+```md
+---
+description: "Loggue une décision technique dans DECISIONS.md"
+---
+
+Résume la dernière décision technique prise dans cette conversation
+et ajoute-la à `DECISIONS.md` avec date + auteur.
+```
+
+Hook qui l'appelle automatiquement à la fin de session :
+
+```json
+{
+  "hooks": {
+    "Stop": [
+      { "command": "claude -p '/log-decision'" }
+    ]
+  }
+}
+```
+
+## Subtilités à connaître
+
+1. **Coût** : chaque déclenchement de `claude -p` est une nouvelle session avec son propre contexte et donc sa propre facture. Évitez les hooks `PostToolUse` qui se déclenchent à chaque appel sans filtre.
+
+2. **Récursion** : un hook qui appelle Claude qui à son tour déclenche le même hook = boucle infinie. Toujours conditionner ou utiliser des variables d'environnement pour casser la récursion :
+
+```bash
+if [ -z "$CLAUDE_HOOK_RUNNING" ]; then
+  CLAUDE_HOOK_RUNNING=1 claude -p '/audit'
+fi
+```
+
+3. **Permissions** : la sous-session a sa propre config de permissions. Si elle a besoin de tools sensibles, pré-autorisez-les ou passez `--allow Bash(...)`.
+
+4. **Timeout** : les hooks ont une limite de temps. Pour des audits longs, utilisez une variante asynchrone : lancez la commande en background et écrivez le résultat dans un fichier que vous lirez plus tard.
+
+```bash
+nohup claude -p '/security-review' > .claude/last-audit.md 2>&1 &
+```
+
+## Pattern complet : audit auto + résumé
+
+```json
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "command": "if echo \"$CLAUDE_TOOL_INPUT\" | grep -qE 'git (commit|push)'; then (claude -p '/review' > .claude/review-$(date +%s).md &); fi"
+      }
+    ],
+    "Stop": [
+      {
+        "command": "ls .claude/review-*.md 2>/dev/null | tail -1 | xargs -I {} cat {}"
+      }
+    ]
+  }
+}
+```
+
+À la fin de la session, le dernier rapport de revue généré en arrière-plan est affiché. Vous voyez les remarques sans interrompre votre flow pendant le travail.
+
+## Pour aller plus loin
+
+- Doc officielle des hooks : https://docs.claude.com/en/docs/claude-code/hooks
+- Doc des slash commands : https://docs.claude.com/en/docs/claude-code/slash-commands
+- Skill `update-config` pour générer ces hooks sans éditer le JSON à la main

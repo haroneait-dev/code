@@ -1,0 +1,104 @@
+---
+title: "Sessions et reprise"
+description: "Comment Claude Code persiste l'état d'une conversation et permet de reprendre exactement où vous vous étiez arrêté."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+Une session Claude Code, c'est l'historique complet d'une conversation : messages, appels d'outils, résultats, todos. Le CLI persiste tout cela sur disque pour permettre la reprise après une fermeture (volontaire ou non) du terminal. Comprendre où sont stockées ces sessions et comment les manipuler ouvre des possibilités puissantes : reprendre une tâche longue, comparer deux pistes, ou simplement éviter de tout recommencer après un crash.
+
+## Où sont stockées les sessions
+
+Toutes les sessions vivent sous `~/.claude/projects/`. Chaque projet (identifié par son chemin absolu) reçoit un sous-dossier dont le nom est dérivé du `cwd` :
+
+```bash
+ls ~/.claude/projects/
+# -Users-harone-claude-code/
+# -Users-harone-sam-network-solutions/
+
+ls ~/.claude/projects/-Users-harone-claude-code/
+# 2c8f9e1a-...jsonl
+# 4d2b8c7f-...jsonl
+```
+
+Chaque fichier `.jsonl` est une session. Le format **JSON Lines** stocke un message par ligne, ce qui rend les fichiers append-only et faciles à inspecter avec `grep`/`jq`.
+
+## Démarrer, reprendre, lister
+
+Trois flags principaux gèrent les sessions :
+
+```bash
+claude                  # nouvelle session dans le projet courant
+claude --continue       # reprend la session la plus récente
+claude --resume         # affiche une liste interactive de sessions
+claude --resume <id>    # reprend une session par son UUID
+```
+
+`--continue` est idéal pour l'usage quotidien : si vous fermez et rouvrez le terminal, vous récupérez exactement la conversation précédente avec tout son contexte chargé. `--resume` est utile quand vous travaillez sur plusieurs pistes en parallèle.
+
+## Liaison projet ↔ session
+
+La clé de la persistance, c'est le `cwd`. Claude Code dérive l'identifiant projet du **chemin absolu** du dossier où vous avez lancé `claude`. Conséquences :
+
+- Si vous renommez le dossier, vous perdez l'historique (sauf à renommer aussi le dossier dans `~/.claude/projects/`).
+- Lancer `claude` depuis un sous-dossier crée potentiellement une nouvelle racine.
+- Deux projets avec le même nom dans des chemins différents sont bien séparés.
+
+## Inspecter une session
+
+Comme c'est du JSONL, vous pouvez explorer en CLI :
+
+```bash
+# Compter les messages
+wc -l ~/.claude/projects/-Users-harone-claude-code/<id>.jsonl
+
+# Voir tous les prompts utilisateur
+jq -r 'select(.role=="user") | .content' \
+   ~/.claude/projects/-Users-harone-claude-code/<id>.jsonl
+
+# Extraire les tool calls Bash
+jq 'select(.content[]?.type=="tool_use" and .content[].name=="Bash")' \
+   ~/.claude/projects/-Users-harone-claude-code/<id>.jsonl
+```
+
+C'est précieux pour faire des post-mortems ou alimenter un système de mémoire externe.
+
+## Compaction et rétention
+
+Pendant une session longue, Claude Code peut déclencher une **compaction automatique** : un résumé est généré et remplace l'historique antérieur pour libérer de la fenêtre de contexte. La session sur disque conserve toutefois la trace complète — la compaction n'affecte que ce qui est envoyé au modèle au prochain tour.
+
+```bash
+/compact           # force la compaction immédiate
+/compact <focus>   # compacte en gardant les détails liés à <focus>
+/clear             # repart de zéro (la session précédente reste sur disque)
+```
+
+## Cycle de vie typique
+
+| Phase | Commande | Effet |
+|-------|----------|-------|
+| Démarrage matinal | `claude --continue` | Reprend la session de la veille |
+| Bascule de tâche | `/clear` puis nouveau prompt | Garde la session mais vide le contexte |
+| Reprise après crash | `claude --continue` | Reload depuis le JSONL |
+| Switch entre pistes | `claude --resume` | Sélection interactive |
+| Archive | déplacer le `.jsonl` | Sortie du listing sans suppression |
+
+## Multi-machine et synchronisation
+
+Le dossier `~/.claude/projects/` n'est pas synchronisé nativement. Pour partager des sessions entre machines, vous pouvez :
+
+- Synchroniser `~/.claude/projects/<projet>/` via iCloud Drive, Dropbox ou un repo Git privé.
+- Attention aux conflits si vous travaillez en parallèle sur deux machines : le format JSONL append-only se prête mal aux merges.
+
+## Bonnes pratiques
+
+- Utilisez `--continue` par défaut, ne lancez `claude` (session neuve) que pour les tâches franchement nouvelles.
+- Préférez `/clear` à fermer/rouvrir : c'est plus rapide et ça garde la session indexée.
+- Sauvegardez périodiquement les sessions importantes (les fichiers JSONL peuvent dépasser plusieurs Mo).
+- Combinez avec un système de **mémoire long terme** (claude-mem par exemple) pour conserver les enseignements au-delà d'une session.
+
+## Pour aller plus loin
+
+- Article **--continue et checkpoints** pour la reprise fine.
+- Article **/clear, /resume, /cost** pour les commandes slash de gestion.
+- Article **Gestion fine de la mémoire** pour les techniques avancées.

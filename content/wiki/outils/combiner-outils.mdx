@@ -1,0 +1,228 @@
+---
+title: "Combiner les outils efficacement"
+description: "Workflows multi-outils dans Claude Code pour des tâches complexes — exemples concrets de combos."
+updatedAt: "2026-05-19"
+readingMinutes: 8
+---
+
+Aucun outil de Claude Code n'est puissant seul. La valeur émerge dans les **combinaisons** : Glob+Read pour explorer, Grep+Edit pour refactorer, WebFetch+Edit pour intégrer une API. Ce guide rassemble les workflows multi-outils qui reviennent le plus souvent, prêts à l'emploi.
+
+## Combo 1 : Explorer un repo inconnu
+
+**Objectif :** comprendre la stack et l'architecture en quelques minutes.
+
+```bash
+# Tour 1 : files clés en parallèle
+Read(file_path="/.../README.md")
+Read(file_path="/.../package.json")
+Read(file_path="/.../CLAUDE.md")
+Glob(pattern="*.config.{js,ts,json}")
+
+# Tour 2 : entry points
+Read(file_path="/.../app/page.tsx")  # ou src/main.ts selon stack
+Glob(pattern="app/**/page.tsx")
+Glob(pattern="app/api/**/route.ts")
+
+# Tour 3 : convention et structure
+Grep(pattern="^export", path="lib", output_mode="files_with_matches")
+```
+
+Vous avez en 3 tours : la stack, les conventions, les routes principales, les libs utilitaires.
+
+## Combo 2 : Refactoring cross-fichiers
+
+**Objectif :** renommer une fonction ou changer une signature dans tout le projet.
+
+```bash
+# 1. Cartographier
+Grep(pattern="\\boldName\\b", output_mode="files_with_matches")
+# → liste de N fichiers
+
+# 2. Pour chaque fichier (parallèle)
+Read(file_path="/.../A.ts")
+Read(file_path="/.../B.ts")
+Read(file_path="/.../C.ts")
+
+# 3. Éditer (parallèle si pas de chevauchement)
+Edit(file_path="/.../A.ts", old_string="oldName", new_string="newName", replace_all=true)
+Edit(file_path="/.../B.ts", old_string="oldName", new_string="newName", replace_all=true)
+Edit(file_path="/.../C.ts", old_string="oldName", new_string="newName", replace_all=true)
+
+# 4. Vérifier
+Bash(command="npm run build", description="Build check")
+Bash(command="npm test", description="Run tests")
+```
+
+## Combo 3 : Diagnostic d'erreur de prod
+
+**Objectif :** d'un message d'erreur, remonter à la cause.
+
+```bash
+# 1. Trouver où l'erreur est levée
+Grep(pattern="Cannot read property 'foo'", output_mode="content", "-n": true)
+
+# 2. Lire le fichier coupable
+Read(file_path="/.../erreur-zone.ts")
+
+# 3. Chercher les usages de la valeur problématique
+Grep(pattern="foo\\?\\.", output_mode="content", "-C": 2)
+
+# 4. Vérifier les types
+Read(file_path="/.../types/...")
+
+# 5. Corriger et tester
+Edit(file_path="/.../erreur-zone.ts", old_string="...", new_string="... ?? null")
+Bash(command="npm test -- erreur-zone", description="Targeted test")
+```
+
+## Combo 4 : Intégrer une nouvelle API externe
+
+**Objectif :** ajouter un appel à une API tiers.
+
+```bash
+# 1. Lire la doc
+WebSearch(query="api XYZ create resource POST endpoint")
+WebFetch(url="https://api-xyz.com/docs/...", prompt="Quelle est la signature ? Quels headers ? Quel format de réponse ?")
+
+# 2. Voir les patterns existants
+Glob(pattern="app/api/**/route.ts")
+Read(file_path="/.../app/api/<route-similaire>/route.ts")
+
+# 3. Créer la nouvelle route
+Write(
+  file_path="/.../app/api/xyz/route.ts",
+  content="..."
+)
+
+# 4. Variables d'env
+Read(file_path="/.../.env.example")
+Edit(file_path="/.../.env.example", old_string="...", new_string="...\nXYZ_API_KEY=")
+
+# 5. Tester
+Bash(command="curl -X POST http://localhost:3000/api/xyz -d '{\"test\":1}'", description="Smoke test")
+```
+
+## Combo 5 : Audit de sécurité d'un diff
+
+```bash
+# 1. Récupérer le diff
+Bash(command="git diff main...HEAD", description="Diff vs main")
+
+# 2. Lister les fichiers modifiés
+Bash(command="git diff main...HEAD --name-only", description="Files changed")
+
+# 3. Pour chaque fichier sensible (auth, DB, env)
+Read(file_path="/.../middleware.ts")
+Grep(pattern="process\\.env", output_mode="content", "-n": true)
+
+# 4. Vérifier les secrets
+Grep(pattern="(?i)(api[_-]?key|secret|token)\\s*=", output_mode="content", "-n": true)
+
+# 5. Déléguer une review structurée
+Task(
+  subagent_type="security-review",
+  description="Security review of pending changes",
+  prompt="Analyse le diff actuel pour identifier des risques d'injection, fuite de secrets, RLS bypass."
+)
+```
+
+## Combo 6 : Mise à jour de dépendance majeure
+
+**Objectif :** passer une lib majeure (ex. Next 15 → 16).
+
+```bash
+# 1. Lire les release notes
+WebFetch(url="https://github.com/vercel/next.js/releases/tag/v16.0.0", prompt="Breaking changes ?")
+
+# 2. État actuel
+Read(file_path="/.../package.json")
+Bash(command="npm ls next", description="Current version tree")
+
+# 3. Plan via ExitPlanMode
+# (Claude présente un plan détaillé à l'utilisateur)
+
+# 4. Bump
+Bash(command="npm install next@16", description="Upgrade Next.js")
+
+# 5. Codemods
+Bash(command="npx @next/codemod@latest", description="Run Next.js codemods")
+
+# 6. Build + test + fix loop
+Bash(command="npm run build", description="Build")
+# si erreurs → Read fichiers fautifs → Edit → re-build
+```
+
+## Combo 7 : Génération de tests pour un module
+
+```bash
+# 1. Lire le module
+Read(file_path="/.../lib/format.ts")
+
+# 2. Lire un test existant pour calquer le style
+Glob(pattern="**/*.test.ts")
+Read(file_path="/.../lib/parse.test.ts")
+
+# 3. Créer le test
+Write(
+  file_path="/.../lib/format.test.ts",
+  content="..."
+)
+
+# 4. Lancer pour valider
+Bash(command="npm test -- format.test", description="Run new test")
+```
+
+## Combo 8 : Documenter un endpoint
+
+```bash
+# 1. Lire la route
+Read(file_path="/.../app/api/users/route.ts")
+
+# 2. Lire un schema/types associé
+Grep(pattern="export.*User", output_mode="content")
+
+# 3. Écrire la doc
+Write(
+  file_path="/.../docs/api/users.md",
+  content="# /api/users\n\n## GET\n..."
+)
+```
+
+(Mais attention : ne créez pas de docs spontanément ; demandé ici à titre d'exemple.)
+
+## Combo 9 : Migration de fichier de config
+
+```bash
+# 1. Backup
+Bash(command="cp /.../old.config.js /.../old.config.js.bak", description="Backup")
+
+# 2. Lire
+Read(file_path="/.../old.config.js")
+
+# 3. Réécrire au nouveau format
+Write(file_path="/.../new.config.ts", content="...")
+
+# 4. Supprimer l'ancien
+Bash(command="rm /.../old.config.js", description="Remove old config")
+
+# 5. Vérifier la build
+Bash(command="npm run build", description="Build with new config")
+```
+
+## Principes transversaux
+
+**Lire avant d'écrire.** Toujours. Pas d'exception.
+
+**Paralléliser les lectures.** Read/Glob/Grep indépendants → un seul message tool calls.
+
+**Chaîner avec validation.** Après chaque Edit critique, un Bash(build) ou Bash(test) ferme la boucle.
+
+**Déléguer aux subagents les explorations larges.** Un Task qui retourne un résumé vaut mieux que 50 Read qui saturent le contexte parent.
+
+**Conclure par un commit (si demandé).** `git status` + `git diff` + Write commit message via HEREDOC.
+
+## Pour aller plus loin
+
+- [Documentation Claude Code](https://docs.claude.com/en/docs/claude-code)
+- Voir aussi : `Tool use patterns` (parallélisation/chaînage), `Task` pour déléguer, `TodoWrite` pour suivre.
+- Astuce : créez un skill pour chacun de vos combos récurrents (audit-security, migrate-lib, scaffold-route). Vous économisez de la cognition à chaque session.

@@ -1,0 +1,121 @@
+---
+title: "Génération de tests"
+description: "Faire écrire des tests à Claude — unitaires, intégration, end-to-end — avec couverture sérieuse."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+Écrire les tests est la corvée que tout le monde repousse — et c'est précisément la tâche que Claude exécute le mieux. À condition de cadrer : sans contexte, il génère des tests tautologiques qui ne prouvent rien. Voici comment obtenir une suite qui détecte vraiment les régressions.
+
+## Trois niveaux, trois objectifs
+
+Avant de demander un test, clarifier le niveau visé.
+
+- **Unitaire** — une fonction pure, sans I/O. Rapide, exécuté à chaque sauvegarde.
+- **Intégration** — plusieurs modules ensemble, avec DB en mémoire ou mockée.
+- **End-to-end** — l'app complète, pilotée via Playwright ou Cypress.
+
+Chaque niveau a son prompt, son outillage, son ratio coût/valeur. Confondre les niveaux est la cause numéro un de suites lentes et fragiles.
+
+## Tests unitaires : viser les branches
+
+Un bon test unitaire couvre les branches conditionnelles, les cas limites et les erreurs — pas le chemin heureux unique.
+
+```text
+Voici la fonction `parseInvoiceAmount(input: string): number`.
+Écris une suite Vitest qui couvre :
+1. Cas nominal (montant valide).
+2. Montant avec virgule décimale française.
+3. Montant négatif (doit throw InvalidAmountError).
+4. Chaîne vide (doit throw).
+5. NaN, Infinity, undefined.
+Utilise `describe` + `it` + `expect`. Une assertion par test.
+```
+
+Lancer ensuite :
+
+```bash
+npx vitest run --coverage
+```
+
+Le rapport de couverture par branches doit dépasser 90 % sur les modules critiques. En-dessous, Claude a oublié un cas.
+
+## Tests d'intégration : faux mocks, vrais bugs
+
+Le piège des tests d'intégration : tout mocker pour aller vite. Résultat, le test passe alors que la vraie intégration est cassée. La règle :
+
+- Mock uniquement les frontières (HTTP externe, paiement, mail).
+- Utiliser une DB Postgres en mémoire (`pg-mem`) ou une instance Supabase locale.
+- Tester les chemins d'erreur autant que les chemins heureux.
+
+```text
+Écris un test d'intégration pour la route POST /api/wiki :
+1. Crée un user authentifié via Supabase test client.
+2. POST avec un body valide → status 201, ligne en DB.
+3. POST sans Authorization → status 401.
+4. POST avec body invalide → status 400, message d'erreur explicite.
+5. Vérifie qu'aucune ligne n'a été créée dans les cas 3 et 4.
+```
+
+## Tests end-to-end : peu, mais critiques
+
+Les E2E sont chers (lents, fragiles). Ils ne doivent couvrir que les parcours business critiques : signup, paiement, action principale du produit.
+
+```text
+Écris un test Playwright pour le parcours signup :
+1. Visite /auth.
+2. Clique "Continuer avec Google" (mocke la réponse OAuth).
+3. Vérifie la redirection vers /dashboard.
+4. Vérifie la présence du nom de l'utilisateur dans la nav.
+Utilise `data-testid` pour les sélecteurs, jamais de classes CSS.
+```
+
+Commande type :
+
+```bash
+npx playwright test --reporter=html
+npx playwright show-report
+```
+
+## Vérifier la qualité, pas la quantité
+
+100 % de couverture ne veut rien dire si les tests sont vides. Quatre signaux d'alerte :
+
+- Tests sans `expect` (juste un appel de fonction).
+- Tests qui mockent la fonction testée elle-même.
+- Tests qui passent même quand on commente le corps de la fonction.
+- Tests qui dépendent de l'ordre d'exécution.
+
+Demandez à Claude de s'auto-auditer :
+
+```text
+Relis la suite que tu viens d'écrire.
+Pour chaque test :
+1. Quelle régression réelle empêcherait-il ?
+2. Le test passerait-il encore si je supprimais la logique métier ?
+Si la réponse à 2 est OUI, réécris le test.
+```
+
+## Intégrer dans le workflow quotidien
+
+Le test ne vaut que s'il tourne. Trois automatisations utiles :
+
+```bash
+# Pre-commit : tests rapides sur les fichiers touchés
+npx vitest related --run
+
+# Pre-push : suite complète
+npm run test
+
+# CI : couverture + E2E
+npm run test:coverage && npm run test:e2e
+```
+
+Configurer un seuil de couverture qui bloque le merge sous 80 % oblige l'équipe à entretenir la suite plutôt qu'à la laisser pourrir.
+
+## Pour aller plus loin
+
+- Utiliser `vitest --ui` pour visualiser les tests qui échouent en local.
+- Combiner avec mutation testing (`stryker`) pour mesurer la vraie efficacité de la suite.
+- Demander à Claude de générer des fixtures réalistes via faker plutôt que des données bidon.
+- Lire l'article "Why Most Unit Tests Are Waste" de James Coplien pour challenger la doctrine du 100 % couverture.

@@ -1,0 +1,77 @@
+---
+title: "Composer plusieurs skills"
+description: "Faire collaborer plusieurs skills Claude Code sans accroc : ordre d'activation, conflits de noms, mécanismes d'override et patterns d'orchestration."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+Un skill isolé est utile. Plusieurs skills bien composés transforment Claude Code en assistant spécialisé sur votre stack. Mais dès que deux skills se chevauchent — mots-clés communs, scripts partagés, fichiers de référence concurrents — il faut comprendre comment Claude arbitre. Cette page décrit l'ordre d'activation, les conflits typiques et les patterns d'override que vous pouvez réutiliser.
+
+## Ordre d'activation
+
+Quand une requête arrive, Claude Code parcourt les skills disponibles dans un ordre précis :
+
+1. **Skills du projet** (`.claude/skills/` à la racine du repo)
+2. **Skills locaux** (`~/.claude/skills/`)
+3. **Skills globaux** installés via plugin
+4. **Skills built-in** fournis avec le CLI
+
+Le premier match gagne. Cela signifie qu'un skill local override toujours un skill global de même nom — pratique pour patcher un comportement sans forker le plugin. Si plusieurs skills correspondent à la même requête, Claude utilise un score de pertinence basé sur la `description` et les `triggers` pour choisir.
+
+## Conflits de noms
+
+Deux skills nommés `git-helper` dans des scopes différents : pas de problème, le scope le plus proche gagne. Deux skills nommés `git-helper` dans le même scope : Claude Code affiche une erreur au démarrage et n'active aucun des deux. La règle est simple, le débogage l'est moins quand un utilisateur installe sans le savoir un skill qui collisionne avec le vôtre.
+
+Bonnes pratiques pour éviter les collisions :
+
+- **Préfixer** les skills par votre namespace : `acme/git-helper` plutôt que `git-helper`.
+- **Documenter** le nom complet dans le README pour que les utilisateurs sachent comment l'invoquer explicitement.
+- **Vérifier** au démarrage avec `/skills list --conflicts` qui affiche les doublons potentiels.
+
+## Override partiel
+
+Un pattern puissant : créer un skill local qui hérite d'un skill global et override uniquement quelques champs. Le frontmatter accepte un champ `extends` :
+
+```yaml
+---
+name: acme/deploy
+extends: vercel/deploy
+version: 1.0.0
+overrides:
+  description: "Deploy spécifique à Acme avec checks SOC2"
+  triggers:
+    - "déployer staging acme"
+---
+```
+
+Les éléments non listés dans `overrides` sont hérités tels quels. C'est l'équivalent d'une classe enfant en POO : vous gardez 90 % du comportement et changez ce qui vous est propre.
+
+## Faire collaborer deux skills
+
+Claude n'active généralement qu'un seul skill par tour, mais il peut chaîner plusieurs skills sur une conversation. Pour orchestrer une collaboration :
+
+- **Skill orchestrateur** : un skill de haut niveau qui détecte l'intention globale et délègue. Son `SKILL.md` mentionne explicitement les autres skills disponibles, ce qui guide Claude vers le bon enchaînement.
+- **Skill atomique** : chaque skill spécialisé fait une seule chose. Plus c'est petit, plus c'est composable.
+- **Référence croisée** : dans `SKILL.md`, ajoutez une section "Skills connexes" listant les noms exacts à invoquer pour la suite. Claude lit cette section et la suit naturellement.
+
+Exemple : un skill `release-prep` peut citer dans ses instructions "Une fois la version bumpée, invoquer le skill `changelog-write` pour générer les notes de release".
+
+## Détecter et résoudre les conflits
+
+Symptômes typiques d'un conflit :
+
+- Un skill cesse de se déclencher après installation d'un autre.
+- Claude hésite ou répond de façon hybride entre deux comportements.
+- Les triggers se chevauchent sur les mêmes mots-clés.
+
+La commande `/skills doctor` parcourt les manifestes et signale les triggers en conflit. Pour résoudre :
+
+1. Restreindre les triggers du skill le plus générique.
+2. Renommer pour clarifier la frontière de responsabilité.
+3. Utiliser `extends` pour fusionner deux skills proches en un seul avec des modes.
+
+## Pour aller plus loin
+
+- La page **versioning des skills** explique comment gérer les dépendances entre skills qui s'overridenent mutuellement.
+- Voir **tester un skill localement** pour mettre en place des snapshot tests qui couvrent les scénarios multi-skills.
+- Le dépôt `anthropics/claude-code-skills` propose un exemple `skills/orchestrator/` montrant un skill de haut niveau qui en chaîne quatre autres — une référence à étudier avant de bâtir votre propre orchestration.

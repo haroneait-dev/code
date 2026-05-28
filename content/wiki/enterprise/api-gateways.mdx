@@ -1,0 +1,69 @@
+---
+title: "Gestion des clés API et API Gateways"
+description: "Proxys Kong, Cloudflare Workers, LiteLLM : rotation des clés, cache de réponses et rate-limiting pour industrialiser l'usage de Claude."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+Dans une organisation qui dépasse quelques utilisateurs, exposer la clé API Anthropic à chaque service est une pratique à risque : pas de rotation centralisée, pas d'observabilité, pas de contrôle de coût. L'introduction d'une API Gateway entre vos applications et l'API Anthropic règle ces problèmes et ouvre la porte à des optimisations majeures (cache, fallback, multi-tenant).
+
+## Pourquoi une Gateway devant Anthropic
+
+Une Gateway dédiée aux LLM apporte cinq bénéfices clairs :
+
+- **Centralisation des secrets** : une seule clé Anthropic, lue côté gateway, jamais distribuée.
+- **Quota et rate-limit par équipe** ou par projet, indépendamment des limites Anthropic.
+- **Observabilité unifiée** : logs, traces, métriques (tokens in/out, coût par appel) au même endroit.
+- **Cache sémantique** des réponses pour les requêtes répétitives.
+- **Multi-provider routing** : basculer vers Bedrock ou Vertex AI en cas d'incident.
+
+## LiteLLM : le proxy LLM-native
+
+LiteLLM s'est imposé comme la référence open source pour ce cas d'usage. Il expose un endpoint unique compatible OpenAI, route vers Anthropic en interne et gère nativement les `cache_control` blocks de Claude. Il offre :
+
+- Une UI de gestion des "virtual keys" : vous distribuez à chaque équipe une clé LiteLLM, révocable instantanément.
+- Des budgets mensuels par clé avec alertes.
+- Un cache Redis avec fingerprint sémantique optionnel.
+- Le fallback automatique entre providers (Anthropic API → Bedrock → Vertex).
+- Des hooks de logging vers Langfuse, Helicone, Datadog.
+
+Déploiement typique : un container LiteLLM derrière un load balancer interne, avec PostgreSQL pour les clés et Redis pour le cache.
+
+## Kong et l'approche API Management classique
+
+Si votre organisation utilise déjà Kong (ou Apigee, Tyk), les plugins AI Gateway de Kong permettent de réutiliser l'infra existante. Kong AI Proxy supporte Anthropic nativement, applique vos politiques d'authentification (OAuth, mTLS, JWT) et s'intègre à votre stack observability. Avantage : pas de nouveau composant à exploiter. Inconvénient : moins de features LLM-spécifiques que LiteLLM (cache sémantique limité, pas de gestion fine des cache_control).
+
+## Cloudflare Workers et l'edge proxying
+
+Pour les applications grand public ou multi-régions, un Worker Cloudflare en frontal réduit la latence et masque la clé Anthropic. Vous bénéficiez :
+
+- Du KV/Durable Objects pour le cache.
+- Des AI Gateway Cloudflare (analytics + cache + retry intégrés).
+- D'une isolation par token utilisateur via Workers Auth.
+
+C'est l'approche la plus économique pour des SaaS avec trafic mondial, et la latence ajoutée reste sous 30 ms grâce au réseau edge.
+
+## Rotation des clés et gestion des secrets
+
+Quelle que soit la gateway, appliquez ces règles :
+
+- **Stockage** dans un vault (HashiCorp Vault, AWS Secrets Manager, Doppler) — jamais en variable d'environnement statique ni dans Git.
+- **Rotation programmée** trimestrielle, ou immédiate après tout départ d'un ingénieur ayant eu accès.
+- **Clés distinctes** par environnement (dev, staging, prod) et par criticité (clé "interactive" vs clé "batch").
+- **Monitoring d'anomalies** : pic soudain de tokens, géolocalisation inhabituelle, ratio cache miss anormal.
+
+## Cache stratégique : prompt caching natif + cache sémantique
+
+Distinguez deux caches complémentaires :
+
+- Le **prompt caching natif Anthropic** (`cache_control`) qui réduit le coût des préfixes longs côté Anthropic.
+- Le **cache applicatif** côté gateway qui évite l'appel quand la même question revient.
+
+Le second est particulièrement rentable pour les FAQ, les classifications et les requêtes batch idempotentes. Attention à l'invalidation : versionnez la clé de cache avec le hash du system prompt et de la version du modèle.
+
+## Pour aller plus loin
+
+- Documentation LiteLLM Proxy et "Virtual Keys".
+- Kong AI Gateway plugins (ai-proxy, ai-prompt-guard).
+- Cloudflare AI Gateway et Workers AI.
+- Anthropic prompt caching, guide officiel.

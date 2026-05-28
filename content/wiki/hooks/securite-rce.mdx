@@ -1,0 +1,106 @@
+---
+title: "Sécurité : éviter le RCE dans les hooks"
+description: "Les hooks Claude Code exécutent du shell sur votre machine. Voici comment éviter les injections de commandes et écrire des hooks défensifs."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+Un hook Claude Code, c'est du code shell exécuté par le harnais avec vos droits utilisateur. Concrètement : un `PreToolUse` mal écrit qui interpole un champ JSON contrôlé par le modèle dans une commande bash, c'est une porte ouverte à l'exécution de code arbitraire (RCE) sur votre poste. Le modèle peut être manipulé via une page web, un fichier README, ou même un commit malicieux. Cet article passe en revue les patterns dangereux et les bonnes pratiques.
+
+## Comprendre la surface d'attaque
+
+Chaque hook reçoit, sur `stdin`, un objet JSON contenant le contexte de l'événement : nom de l'outil, arguments, chemin du projet, etc. Le danger arrive quand on extrait un champ via `jq -r` puis qu'on le passe directement à une commande shell sans validation.
+
+Exemple typique de hook vulnérable :
+
+```json
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "CMD=$(jq -r '.tool_input.command'); echo \"Exécution: $CMD\" >> /tmp/log"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+Si le modèle propose une commande contenant des backticks ou `$(...)`, le `echo` va l'évaluer. Catastrophe.
+
+## Patterns sûrs : quoting et JSON pur
+
+La règle d'or : **ne jamais interpoler du contenu non fiable dans une commande shell**. Travaillez avec `jq` jusqu'au bout, ou utilisez un script dédié qui lit le JSON via `stdin`.
+
+```json
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "jq -r '.tool_input.command' | /usr/local/bin/audit-bash.sh"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+Et dans `audit-bash.sh`, on lit `stdin` proprement, on stocke dans une variable, et on n'évalue jamais :
+
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+CMD="$(cat)"
+# Comparaison de chaînes, pas d'exécution
+case "$CMD" in
+  *"rm -rf /"*|*"curl "*"| sh"*|*":(){:|:&};:"*)
+    echo "Commande bloquée par politique locale" >&2
+    exit 2
+    ;;
+esac
+```
+
+## Construire une denylist (et pas une allowlist naïve)
+
+Une denylist arrête les attaques connues sans gêner l'usage quotidien. Quelques patterns à inclure : `rm -rf` sur des chemins absolus, `chmod 777`, `curl ... | sh`, `wget ... | bash`, écritures dans `~/.ssh`, `~/.aws/credentials`, `/etc/`. Et des bloqueurs comme `eval`, `source` sur des fichiers tmp, ou des redirections sortantes vers `/dev/tcp`.
+
+```bash
+#!/usr/bin/env bash
+INPUT="$(cat)"
+TOOL="$(echo "$INPUT" | jq -r '.tool_name')"
+PATH_ARG="$(echo "$INPUT" | jq -r '.tool_input.file_path // empty')"
+
+case "$PATH_ARG" in
+  *"/.ssh/"*|*"/.aws/"*|*"/.env"|*"/.env."*)
+    echo "Écriture interdite dans un fichier sensible: $PATH_ARG" >&2
+    exit 2
+    ;;
+esac
+```
+
+Un `exit 2` depuis un `PreToolUse` bloque l'appel d'outil et retourne le message au modèle, qui peut ajuster sa stratégie.
+
+## Principe de moindre privilège
+
+Vos hooks tournent avec votre UID. Si vous travaillez sur du code non audité (PR externes, dépendances fraîches), faites tourner Claude Code dans un conteneur ou une VM. Désactivez les hooks qui touchent au réseau (`curl`, `git push`) en environnement à risque. Et surtout : **ne committez jamais de secrets dans `settings.json`** — préférez des variables d'environnement lues au runtime.
+
+## Auditer ce qui s'exécute
+
+Loggez chaque appel de hook dans un fichier JSONL local, avec timestamp et payload complet. En cas d'incident, vous saurez ce qui a été tenté. Pensez aussi à `chmod 700` sur vos scripts de hook pour éviter qu'un autre processus ne les modifie.
+
+## Pour aller plus loin
+
+- Tester chaque nouveau hook dans un dossier jetable avant de l'activer globalement.
+- Lire les changelogs de Claude Code : la doc précise quels champs JSON sont garantis et lesquels peuvent être manipulés.
+- Croiser avec `git diff` les modifications apportées par les hooks pour repérer une exfiltration silencieuse.
+- Garder une commande de panique : `claude --no-hooks` ou supprimer `settings.json` si quelque chose tourne mal.

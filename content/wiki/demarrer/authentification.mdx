@@ -1,0 +1,156 @@
+---
+title: "Authentification et clés API"
+description: "Configurer son compte Claude Code et gérer les clés API Anthropic en toute sécurité."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+Claude Code supporte plusieurs méthodes d'authentification : OAuth via votre compte Claude (Pro/Max/Team), clé API Anthropic Console, ou intégration cloud (AWS Bedrock, Google Vertex AI). Ce guide explique comment choisir et configurer chaque option en respectant les bonnes pratiques de sécurité.
+
+## Les méthodes d'authentification
+
+| Méthode | Pour qui ? | Facturation |
+|---|---|---|
+| **OAuth Claude.ai** | Particuliers Pro/Max | Incluse dans l'abonnement |
+| **OAuth Team/Enterprise** | Équipes | Plan Team/Enterprise |
+| **API Key Console** | Développeurs/startups | Pay-as-you-go (tokens) |
+| **AWS Bedrock** | Entreprises AWS | Facturation AWS |
+| **Google Vertex AI** | Entreprises GCP | Facturation GCP |
+
+## Première connexion — OAuth (recommandée)
+
+Au premier lancement, Claude Code propose l'authentification OAuth :
+
+```bash
+claude
+# → "Welcome to Claude Code. Press Enter to log in..."
+```
+
+Un navigateur s'ouvre, vous vous connectez à votre compte Claude, autorisez l'accès, et le CLI capture le token automatiquement. Aucune clé à copier-coller.
+
+> Les tokens OAuth sont stockés dans `~/.claude/` avec des permissions restrictives (`chmod 600`). Ne committez jamais ce dossier.
+
+## Utiliser une clé API Anthropic
+
+Si vous préférez la facturation à l'usage (sans abonnement Claude.ai), générez une clé sur [console.anthropic.com](https://console.anthropic.com) :
+
+1. Connectez-vous à la Console
+2. Allez dans **Settings → API Keys**
+3. Cliquez **Create Key**
+4. Copiez la clé (commence par `sk-ant-api03-...`)
+
+Configurez-la via variable d'environnement :
+
+```bash
+export ANTHROPIC_API_KEY="sk-ant-api03-XXXXXX"
+claude
+```
+
+Pour la rendre permanente, ajoutez la ligne dans `~/.zshrc` ou `~/.bashrc` :
+
+```bash
+echo 'export ANTHROPIC_API_KEY="sk-ant-api03-XXXXXX"' >> ~/.zshrc
+source ~/.zshrc
+```
+
+> Ne committez **jamais** une clé API dans un repo. Utilisez `.env` (ignoré par git) ou un gestionnaire de secrets comme 1Password CLI, doppler, ou Vault.
+
+## Vérifier le statut d'authentification
+
+Dans le REPL, tapez :
+
+```text
+/status
+```
+
+Vous voyez le compte connecté, le mode (OAuth/API key), le modèle actif, et le solde si applicable. Pour basculer entre méthodes :
+
+```text
+/login    # nouvelle session OAuth
+/logout   # supprime le token local
+```
+
+## Authentification via AWS Bedrock
+
+Pour les organisations qui exécutent Claude sur AWS Bedrock :
+
+```bash
+export CLAUDE_CODE_USE_BEDROCK=1
+export AWS_REGION=us-west-2
+export AWS_PROFILE=mon-profil
+claude
+```
+
+Claude Code utilise vos credentials AWS standards (IAM role, profile, ou variables `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY`). Vérifiez que votre rôle a la permission `bedrock:InvokeModel` sur les modèles Claude activés dans votre région.
+
+## Authentification via Google Vertex AI
+
+Sur GCP avec Vertex AI :
+
+```bash
+export CLAUDE_CODE_USE_VERTEX=1
+export CLOUD_ML_REGION=us-east5
+export ANTHROPIC_VERTEX_PROJECT_ID=mon-projet-gcp
+gcloud auth application-default login
+claude
+```
+
+Vous devez avoir activé les modèles Anthropic dans Vertex Model Garden et disposer du rôle `roles/aiplatform.user`.
+
+## Gérer plusieurs comptes/projets
+
+Pour basculer entre clés selon le projet, utilisez un outil comme `direnv` :
+
+```bash
+# .envrc à la racine du projet
+export ANTHROPIC_API_KEY="sk-ant-api03-clé-spécifique-projet"
+```
+
+Puis :
+
+```bash
+direnv allow
+claude
+```
+
+Chaque fois que vous entrez dans le dossier, la bonne clé est chargée automatiquement.
+
+## Bonnes pratiques de sécurité
+
+| Pratique | Pourquoi |
+|---|---|
+| Ne jamais committer `.env` ou clés en clair | Une clé fuite = facturation tierce |
+| Utiliser une clé par environnement (dev/staging/prod) | Limite le rayon d'impact en cas de fuite |
+| Activer un **spending limit** sur la Console | Plafond de dépenses mensuel |
+| Régénérer les clés tous les 90 jours | Hygiène standard |
+| Auditer les clés via la Console | Detect usage anormal |
+
+## Que faire si une clé fuite ?
+
+1. Allez immédiatement sur [console.anthropic.com → API Keys](https://console.anthropic.com/settings/keys)
+2. Cliquez sur la clé compromise → **Revoke**
+3. Générez une nouvelle clé
+4. Mettez à jour vos environnements (`.env`, secrets manager, CI)
+5. Vérifiez les logs d'usage pour repérer un abus
+
+## Authentification en CI/CD
+
+En GitHub Actions, stockez la clé en secret puis :
+
+```yaml
+- name: Run Claude Code
+  env:
+    ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+  run: |
+    npm install -g @anthropic-ai/claude-code
+    claude -p "Revue de code du PR" --permission-mode plan
+```
+
+En GitLab CI, utilisez les variables protégées. En Vercel, ajoutez `ANTHROPIC_API_KEY` dans Project Settings → Environment Variables.
+
+## Pour aller plus loin
+
+- [Console Anthropic](https://console.anthropic.com) — gestion des clés et facturation
+- [Installation de Claude Code](/wiki/demarrer/installation) — prérequis
+- [Configurer un projet](/wiki/demarrer/configurer-projet) — bonnes pratiques par repo
+- [Documentation auth officielle](https://docs.claude.com/claude-code/auth) — référence complète

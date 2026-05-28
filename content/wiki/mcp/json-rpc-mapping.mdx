@@ -1,0 +1,90 @@
+---
+title: "JSON-RPC 2.0 sous le capot de MCP"
+description: "Spécifications réseau de MCP : requêtes, réponses, notifications, lifecycle et messages clés."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+MCP n'invente pas une couche réseau : il s'appuie entièrement sur **JSON-RPC 2.0**, un standard simple et éprouvé. Comprendre ce mapping aide à déboguer, à écrire des clients custom, et à saisir pourquoi certaines limites du protocole existent.
+
+## Rappel JSON-RPC 2.0
+
+JSON-RPC définit trois types de messages :
+
+- **Request** : `{"jsonrpc":"2.0","id":1,"method":"foo","params":{...}}` — attend une réponse.
+- **Response** : `{"jsonrpc":"2.0","id":1,"result":{...}}` ou `{"jsonrpc":"2.0","id":1,"error":{"code":-32601,"message":"Method not found"}}`.
+- **Notification** : comme une requête mais **sans `id`** — pas de réponse attendue.
+
+L'`id` corrèle requête et réponse. Les codes d'erreur suivent les conventions JSON-RPC (-32700 parse error, -32601 method not found, etc.) plus quelques codes MCP custom.
+
+## Le lifecycle d'une session MCP
+
+Une connexion MCP suit toujours la même chorégraphie :
+
+1. **`initialize`** (client → serveur) : version du protocole, capacités client.
+2. **Réponse `initialize`** (serveur → client) : capacités serveur, infos d'identification.
+3. **`notifications/initialized`** (client → serveur, notification) : signal que le client est prêt.
+4. Échanges normaux : `tools/list`, `tools/call`, `resources/read`, etc.
+5. **Shutdown** : fermeture du transport (stdio close ou HTTP disconnect).
+
+Si vous voyez dans une trace une requête `tools/call` avant la fin de l'initialisation, c'est un bug client garanti.
+
+## Les méthodes clés
+
+Côté client → serveur, on retrouve principalement :
+
+- `tools/list` → liste des outils avec leur JSON Schema d'entrée.
+- `tools/call` → invoque un outil avec `name` et `arguments`.
+- `resources/list`, `resources/read` → ressources lisibles (fichiers, données).
+- `resources/templates/list` → templates d'URI paramétrables.
+- `prompts/list`, `prompts/get` → prompts pré-fabriqués exposés par le serveur.
+- `completion/complete` → autocomplétion d'arguments.
+
+Côté serveur → client (plus rare) :
+
+- `sampling/createMessage` → le serveur demande au client de faire un appel LLM (puissant, peu implémenté).
+- `roots/list` → le serveur demande les "racines" (dossiers de travail) au client.
+
+## Les notifications
+
+Les notifications sont fire-and-forget. Les principales :
+
+- `notifications/initialized` (client → serveur).
+- `notifications/tools/list_changed`, `notifications/resources/list_changed`, `notifications/prompts/list_changed` (serveur → client) : indiquent au client de rafraîchir sa liste.
+- `notifications/resources/updated` : une ressource précise a changé.
+- `notifications/progress` : avancement d'une opération longue (encore peu utilisé en pratique).
+- `notifications/cancelled` : annulation d'une requête en cours par son `id`.
+
+## Les transports
+
+MCP définit deux transports officiels qui véhiculent ces messages JSON-RPC :
+
+- **stdio** : un message JSON par ligne sur stdin/stdout. Idéal pour les serveurs locaux lancés par le client. Stderr reste libre pour les logs.
+- **Streamable HTTP** (anciennement HTTP+SSE) : POST pour envoyer les requêtes, SSE pour recevoir notifications et réponses asynchrones. Idéal pour les serveurs distants, avec OAuth en option.
+
+Sur stdio, le framing est trivial (newline-delimited JSON). Sur HTTP, il y a un peu plus de cérémonie : sessions, IDs de session via header `Mcp-Session-Id`, et reprise possible après déconnexion.
+
+## Exemple d'échange minimal
+
+```json
+// → initialize
+{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"my-client","version":"1.0"}}}
+
+// ← reponse
+{"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"2025-06-18","capabilities":{"tools":{}},"serverInfo":{"name":"my-server","version":"0.1"}}}
+
+// → initialized (notification)
+{"jsonrpc":"2.0","method":"notifications/initialized"}
+
+// → tools/call
+{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"add","arguments":{"a":2,"b":3}}}
+
+// ← resultat
+{"jsonrpc":"2.0","id":2,"result":{"content":[{"type":"text","text":"5"}]}}
+```
+
+## Pour aller plus loin
+
+- La spec complète vit dans `modelcontextprotocol/specification` (TypeScript + Markdown).
+- Pour écrire un client custom, le SDK officiel encapsule tout ce framing — mais lire les schémas une fois aide à comprendre les erreurs.
+- Wireshark / `tee` sur stdio + `jq` est une combo redoutable pour analyser une session en direct.

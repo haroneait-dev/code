@@ -1,0 +1,192 @@
+---
+title: "SKILL.md frontmatter : tous les champs"
+description: "Référence complète du frontmatter YAML d'un Skill : name, description, allowed-tools, version et plus."
+updatedAt: "2026-05-19"
+readingMinutes: 8
+---
+
+Le frontmatter du fichier `SKILL.md` est lu par Claude Code à chaque démarrage de session. C'est lui qui décide **quand** votre skill s'activera et **avec quels droits**. Une description mal rédigée et le skill ne se déclenche jamais ; un `allowed-tools` trop large et vous ouvrez la porte à des effets indésirables.
+
+## Anatomie complète
+
+```md
+---
+name: stripe-webhook-tester
+description: Génère et exécute des cURL pour tester les webhooks Stripe en local
+allowed-tools:
+  - Bash
+  - Read
+  - Write
+  - WebFetch
+version: 2.1.0
+author: "Acme Engineering"
+license: MIT
+tags:
+  - stripe
+  - webhooks
+  - testing
+trigger:
+  files:
+    - "app/api/webhooks/stripe/route.ts"
+  patterns:
+    - "stripe webhook"
+    - "test signature"
+env:
+  - STRIPE_SECRET_KEY
+  - STRIPE_WEBHOOK_SECRET
+---
+```
+
+## Les champs obligatoires
+
+### `name`
+
+Identifiant unique en kebab-case. Doit être stable dans le temps : c'est ce qu'on retrouve dans les logs, les `import` et les commandes `/skill <name>`.
+
+### `description`
+
+Phrase d'**activation** : Claude la lit pour décider si le skill est pertinent pour la requête en cours. Règles d'or :
+
+- Une phrase, ~120 caractères.
+- Verbe d'action au présent : « Génère », « Vérifie », « Convertit »...
+- Mentionner les mots-clés qui doivent déclencher le skill.
+
+Mauvais : *« Un outil pour les développeurs. »*  
+Bon : *« Génère des migrations Drizzle ORM à partir d'un schéma SQL existant. »*
+
+## Les champs de sécurité
+
+### `allowed-tools`
+
+Liste blanche des outils que le skill a le droit d'invoquer. Si vous ne déclarez que `Read`, Claude refusera d'écrire un fichier même si l'utilisateur le lui demande **dans le cadre de ce skill**.
+
+```md
+allowed-tools:
+  - Read
+  - Grep
+  - Bash(npm test:*)   # Restreint à une sous-commande
+```
+
+La syntaxe `Bash(npm test:*)` autorise uniquement les commandes Bash commençant par `npm test`. Très utile pour les skills de CI.
+
+### `env`
+
+Déclare les variables d'environnement requises. Si elles manquent, Claude alerte l'utilisateur **avant** d'activer le skill — pas après un échec à mi-parcours.
+
+```md
+env:
+  - DATABASE_URL
+  - SUPABASE_SERVICE_ROLE_KEY
+```
+
+## Les champs d'activation
+
+### `trigger.files`
+
+Globs de fichiers dont l'ouverture ou la modification active automatiquement le skill.
+
+```md
+trigger:
+  files:
+    - "**/*.test.ts"
+    - "vitest.config.*"
+```
+
+### `trigger.patterns`
+
+Expressions ou mots-clés dans le message utilisateur qui suggèrent l'activation.
+
+```md
+trigger:
+  patterns:
+    - "refactor this"
+    - "extract component"
+```
+
+Attention : `trigger` est un **conseil** au modèle, pas une garantie déterministe. La description reste le levier principal.
+
+## Les champs de métadonnées
+
+### `version`
+
+Suit le **SemVer** (`MAJOR.MINOR.PATCH`). Permet aux gestionnaires de paquets de proposer des mises à jour et de signaler les *breaking changes*.
+
+### `author`, `license`, `tags`
+
+Métadonnées informationnelles, exposées dans les marketplaces et `claude skill list`.
+
+```bash
+claude skill list --tag testing
+```
+
+## Champs avancés
+
+### `subagents`
+
+Liste des subagents personnalisés que le skill embarque, pour un usage interne.
+
+```md
+subagents:
+  - researcher
+  - validator
+```
+
+### `hooks`
+
+Permet d'enregistrer des hooks `PreToolUse` / `PostToolUse` actifs uniquement quand le skill est en jeu.
+
+```md
+hooks:
+  PostToolUse:
+    - "scripts/log-action.sh"
+```
+
+### `mcp`
+
+Déclare une dépendance à un serveur MCP. Claude alerte si le MCP n'est pas configuré.
+
+```md
+mcp:
+  - linear
+  - github
+```
+
+## Validation locale
+
+Un linter dédié vérifie la conformité :
+
+```bash
+npx claude-skill-lint ./my-skill --strict
+```
+
+Codes d'erreur fréquents :
+
+- `E001` : `name` non kebab-case.
+- `E102` : `description` trop courte (< 30 caractères).
+- `W210` : `allowed-tools` contient `Bash` sans restriction (sécurité faible).
+
+## Exemple minimal mais propre
+
+```md
+---
+name: env-vars-checker
+description: Vérifie que toutes les variables d'env utilisées dans le code sont présentes dans .env.example
+allowed-tools:
+  - Read
+  - Grep
+  - Bash(grep:*)
+version: 1.0.0
+---
+
+# Env Vars Checker
+
+Quand l'utilisateur demande de valider la configuration ou prépare un déploiement,
+parcourt le code à la recherche de `process.env.X` et confirme que chaque clé
+existe bien dans `.env.example`.
+```
+
+## Pour aller plus loin
+
+- Spec officielle du frontmatter : https://docs.claude.com/en/docs/claude-code/skills
+- Article wiki « Tester un skill localement » pour valider le déclenchement.
+- Article wiki « Sécurisation des secrets dans les skills » pour le champ `env`.

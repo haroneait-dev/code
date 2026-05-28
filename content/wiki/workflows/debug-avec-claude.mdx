@@ -1,0 +1,102 @@
+---
+title: "Debug avec Claude"
+description: "Approche systématique pour débugger avec Claude : reproduire, isoler, fix, valider."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+Le debug est l'activité où Claude brille le plus, à condition de ne pas lui balancer un "ça marche pas" suivi du fichier. La méthode qui suit s'appuie sur quatre étapes — reproduire, isoler, fix, valider — et transforme Claude en partenaire de debug rigoureux plutôt qu'en générateur d'hypothèses.
+
+## Étape 1 — Reproduire avant tout
+
+Un bug non reproductible ne se fixe pas. Premier réflexe : demander à Claude d'écrire un cas reproductible minimal.
+
+```text
+Voici l'erreur observée en prod : "Cannot read property 'id' of undefined".
+Stack trace : <coller la stack>
+1. Identifie la ligne exacte qui throw.
+2. Écris un test unitaire qui reproduit le bug en local.
+3. Confirme que le test échoue avant de proposer un fix.
+```
+
+Tant que le test échoue de la même manière qu'en prod, on n'a pas le bon bug. Cette discipline évite les fixes "à l'aveugle" qui masquent un symptôme sans soigner la cause.
+
+## Étape 2 — Isoler la cause racine
+
+Une fois le bug reproductible, on cherche le coupable. Claude excelle à dérouler les hypothèses en arbre :
+
+```text
+Le test échoue avec "undefined.id". Pour chaque cause possible :
+1. La source de données retourne null
+2. Un await manquant
+3. Une condition de course
+4. Un cache invalidé
+Pour chaque hypothèse, propose UN test ou UN log à ajouter pour la confirmer ou l'écarter.
+```
+
+Ajoutez les logs proposés, relancez, partagez la sortie. Trois itérations suffisent généralement à pointer la ligne fautive.
+
+```bash
+# Activer des logs verbeux le temps du debug
+DEBUG=app:* npm run dev
+# Ou côté Next.js
+NEXT_PUBLIC_LOG_LEVEL=debug npm run dev
+```
+
+## Étape 3 — Fix minimal, pas refacto
+
+Une fois la cause identifiée, la tentation est de refacto la zone "tant qu'on y est". Mauvaise idée : on mélange fix et refacto, le diff devient illisible et la review difficile. Demandez explicitement :
+
+```text
+Propose le diff MINIMAL qui fait passer le test.
+Pas de renommage, pas de refacto annexe, pas de "tant que j'y suis".
+Si tu vois d'autres améliorations, liste-les en commentaire à part.
+```
+
+Le diff doit tenir en 10 lignes maximum dans 90 % des cas. Au-delà, soit le bug a plusieurs causes, soit le diagnostic est faux.
+
+## Étape 4 — Valider et verrouiller
+
+Un fix sans test de non-régression revient un jour ou l'autre. Avant de committer :
+
+```bash
+npm run test -- --watch=false
+npm run build
+git diff --stat
+```
+
+Le test écrit à l'étape 1 doit passer. L'ensemble de la suite ne doit pas régresser. Le diff doit rester focal.
+
+```text
+Récapitule en 3 lignes :
+1. Cause racine du bug (en français, sans jargon).
+2. Diff appliqué.
+3. Test ajouté qui empêche la régression.
+Formate pour un message de commit conventional.
+```
+
+## Anti-patterns à éviter
+
+Trois pièges classiques quand on debug avec un LLM :
+
+- **Donner trop de code d'un coup.** Claude se perd dans le contexte. Mieux vaut isoler la fonction suspecte.
+- **Accepter la première hypothèse.** Un LLM propose toujours une explication plausible — même fausse. Demandez deux ou trois hypothèses alternatives.
+- **Sauter la repro.** Sans test qui échoue, impossible de prouver que le fix marche.
+
+## Cas particulier : bugs intermittents
+
+Les bugs qui n'apparaissent qu'une fois sur dix sont les pires. Stratégie :
+
+```text
+Le bug n'apparaît pas systématiquement. Avant de fixer :
+1. Liste tout ce qui peut varier entre deux exécutions (ordre des promesses, cache, timezone, état partagé).
+2. Propose 3 hypothèses de course condition.
+3. Écris un test qui force l'ordre problématique (avec await + setTimeout si besoin).
+```
+
+## Pour aller plus loin
+
+- Combiner avec le mode "extended thinking" pour les bugs qui demandent plusieurs étapes de raisonnement.
+- Activer le débogueur Chrome avec source maps pour fournir des stack traces propres à Claude.
+- Logger systématiquement la cause racine de chaque bug dans un fichier `docs/postmortems/` que Claude pourra consulter.
+- Lire `Debugging: The 9 Indispensable Rules` de David Agans pour la culture générale du debug.

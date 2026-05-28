@@ -1,0 +1,66 @@
+---
+title: "Tester un skill localement"
+description: "Workflow de développement pour itérer rapidement sur vos skills Claude Code : symlink, rechargement à chaud, snapshot tests et débogage."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+Développer un skill sans boucle de feedback rapide, c'est marcher dans le brouillard. Cette page rassemble le workflow que les contributeurs Claude Code utilisent pour itérer en quelques secondes : lien symbolique vers le projet en cours, rechargement à chaud via `/skills reload`, tests de non-régression sous forme de snapshots, et techniques de débogage quand un skill ne se déclenche pas comme prévu.
+
+## Mettre en place un symlink vers le repo
+
+Plutôt que de copier votre dossier de skill dans `~/.claude/skills/` à chaque modification, créez un lien symbolique vers votre repo de développement :
+
+```bash
+ln -s ~/code/mon-skill ~/.claude/skills/mon-skill
+```
+
+Claude Code suit le lien à chaque démarrage de session. Toute modification de `SKILL.md`, `description.yml` ou des scripts associés est visible immédiatement, sans étape de build. Pour un monorepo qui contient plusieurs skills, faites pointer le lien vers le sous-dossier `skills/` et chaque enfant sera détecté automatiquement.
+
+## Recharger sans relancer la session
+
+La commande intégrée `/skills reload` invalide le cache de découverte et relit le manifeste de chaque skill. C'est la commande à mémoriser : elle évite de fermer/rouvrir le CLI pour tester un changement de `description`, de `triggers`, ou de fichier de référence.
+
+Workflow type :
+
+1. Éditer `SKILL.md`
+2. `/skills reload` dans la session active
+3. `/skills list` pour confirmer que le skill apparaît bien
+4. Poser une question qui devrait déclencher le skill
+5. Observer si Claude l'invoque (un badge apparaît dans la trace)
+
+Si le skill n'apparaît pas après reload, vérifiez la sortie de `/skills doctor` : elle signale les erreurs de parsing YAML, les chemins manquants ou les triggers en conflit.
+
+## Snapshot tests pour les prompts
+
+Un skill est avant tout du contenu textuel injecté dans le contexte. Pour éviter les régressions, traitez son `SKILL.md` comme un fichier de configuration testable. La convention émergente : un dossier `__snapshots__/` à côté du skill avec des prompts d'exemple et la trace attendue.
+
+```bash
+skills/mon-skill/
+  SKILL.md
+  __snapshots__/
+    case-1-trigger.md    # prompt → doit déclencher
+    case-2-skip.md       # prompt → ne doit PAS déclencher
+```
+
+Un petit script Node qui appelle l'API Anthropic avec votre prompt + le manifeste du skill permet de vérifier en CI que les déclencheurs ne dérivent pas après une refonte.
+
+## Déboguer un skill qui ne se déclenche pas
+
+Les trois causes les plus fréquentes :
+
+- **Description trop générique.** Si votre `description` dit "aide avec du code", il entre en concurrence avec tout. Soyez spécifique : "aide à migrer du code React Router v5 vers v6".
+- **Triggers manquants.** Ajoutez des mots-clés explicites dans le champ `triggers` du frontmatter. Claude compare la requête utilisateur à ces ancres avant d'invoquer le skill.
+- **Conflit avec un autre skill.** Lancez `/skills list --verbose` pour voir l'ordre de priorité. Le premier match gagne, donc un skill très large peut masquer un skill spécialisé.
+
+Pour aller plus loin dans le débogage, activez la variable `CLAUDE_DEBUG_SKILLS=1` avant de lancer la session : chaque tentative de matching apparaît dans les logs avec son score.
+
+## Boucle d'itération idéale
+
+L'objectif est une boucle inférieure à 30 secondes : éditer, recharger, tester. Gardez deux terminaux ouverts — un avec votre éditeur sur le fichier `SKILL.md`, l'autre avec la session Claude Code. Évitez d'écrire des skills de plus de 200 lignes : si vous y êtes contraint, c'est probablement deux skills déguisés en un.
+
+## Pour aller plus loin
+
+- Lisez la page wiki sur le **versioning des skills** pour gérer les évolutions de votre `SKILL.md` sans casser les utilisateurs existants.
+- Consultez **composer plusieurs skills** pour comprendre comment vos tests doivent couvrir les scénarios multi-skills.
+- Le dépôt `anthropics/claude-code-skills` contient des exemples de skills avec leurs snapshots — un excellent point de départ pour calibrer vos propres tests.

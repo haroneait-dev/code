@@ -1,0 +1,57 @@
+---
+title: "Benchmarks et évaluation de performance"
+description: "Comprendre MMLU, HumanEval et SWE-bench, lire correctement les chiffres publiés par Anthropic, et reproduire les évaluations sur vos propres cas d'usage."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+Les benchmarks publics donnent un repère utile pour comparer les modèles, mais ils ne remplacent jamais une évaluation sur vos propres données. Cet article récapitule les benchmarks que vous croiserez le plus souvent dans les communications Anthropic et propose une méthode simple pour construire votre suite d'évaluation interne.
+
+## MMLU — le test de culture générale
+
+Le **Massive Multitask Language Understanding** mesure la précision du modèle sur 57 disciplines académiques (mathématiques, droit, médecine, histoire...). Format QCM à 4 choix. Les modèles récents (Sonnet 4.6, Opus 4.7) dépassent 90 % en zero-shot, ce qui sature partiellement le benchmark. Limites : la mémorisation joue beaucoup, le format QCM ne reflète pas les usages réels, et certaines questions contiennent des erreurs.
+
+À retenir : MMLU est un proxy de connaissances générales, pas de raisonnement. Un écart de 1 à 2 points est rarement significatif.
+
+## HumanEval — la base du code
+
+Suite de 164 problèmes Python (Chen et al., 2021). Le modèle reçoit une docstring et doit produire une fonction qui passe les tests. Métrique principale : `pass@1` (probabilité de réussir au premier essai). Sonnet 4.5 atteint environ 96 %, Opus 4.7 frôle le plafond. HumanEval reste utile comme sanity check rapide, mais il est trop simple pour différencier les modèles de pointe.
+
+Variantes plus exigeantes : **HumanEval+**, **MBPP**, **APPS**, **LiveCodeBench** (problèmes Codeforces récents, moins susceptibles d'être dans les données d'entraînement).
+
+## SWE-bench — la vraie épreuve agentique
+
+**SWE-bench Verified** est devenu le benchmark de référence pour l'usage code en agent. Le modèle reçoit un repository GitHub réel (Django, scikit-learn, sympy...) et un bug report ; il doit produire un patch qui fasse passer les tests cachés. C'est multi-fichiers, multi-étapes, et nécessite des outils (lecture, édition, shell).
+
+Scores typiques (à fin 2025) :
+
+- Sonnet 4.5 : ~65 % sur SWE-bench Verified
+- Sonnet 4.6 : ~70 %
+- Opus 4.7 : ~75 %
+
+Attention : les scores varient selon le **scaffold** utilisé (Claude Code, SWE-agent, OpenHands...). Anthropic publie toujours la stack exacte ; lisez la note de bas de page.
+
+## Comment reproduire sur vos cas
+
+Le bon réflexe : construire une **eval suite maison**. Trois étapes :
+
+1. **Collecter 20 à 50 cas réels** issus de votre produit (tickets support, requêtes utilisateurs, prompts internes). Anonymiser, fixer les attendus.
+2. **Définir une métrique automatisable** : exact match, regex, score LLM-as-judge avec un modèle plus puissant, ou test fonctionnel (le code produit compile et passe les tests).
+3. **Versionner et faire tourner à chaque release** : à chaque nouveau modèle Anthropic, relancer la suite et comparer. Stocker les résultats dans un CSV ou une table Postgres pour tracer la dérive.
+
+Outils utiles : `promptfoo`, `Inspect AI` (UK AISI), `Braintrust`, ou simplement un script Node + le SDK Anthropic en parallèle (`Promise.allSettled` avec rate limit).
+
+## Lire les benchmarks Anthropic sans se faire piéger
+
+Quelques pièges récurrents :
+
+- **Best-of-N caché** : certains scores SWE-bench sont obtenus avec 5 tentatives en parallèle puis sélection.
+- **Extended thinking activé** : doublement du coût en tokens, à mentionner.
+- **Différence dataset** : SWE-bench *Verified* ≠ SWE-bench *full* (1699 cas), les scores ne sont pas comparables directement.
+- **Date de cutoff** : un benchmark sur du code GitHub récent peut avantager le modèle entraîné le plus tard.
+
+## Pour aller plus loin
+
+- Repo officiel SWE-bench : https://www.swebench.com/
+- Papers with Code pour suivre l'état de l'art en continu.
+- Lire la *model card* d'Anthropic à chaque release pour la méthodologie exacte.

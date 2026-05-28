@@ -1,0 +1,76 @@
+---
+title: "Anti-patterns prompt engineering"
+description: "Ce qu'il ne faut PAS faire : formulations vagues, négations, contradictions et autres pièges courants."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+Beaucoup de problèmes attribués au modèle viennent en réalité du prompt. Avant de blâmer Claude, vérifier qu'on n'est pas en train de demander l'impossible — ou pire, des choses contradictoires. Voici les anti-patterns les plus fréquents observés en production, et comment les corriger.
+
+## Anti-pattern 1 : la formulation vague
+
+> "Réponds bien à l'utilisateur."
+
+"Bien" ne veut rien dire pour un modèle. Que signifie une bonne réponse dans votre contexte ? Concise ? Exhaustive ? Avec sources ? En markdown ?
+
+**Correction** : être explicite, quantifié, vérifiable.
+
+> "Réponds en 3 paragraphes maximum. Cite au moins une source pour chaque affirmation factuelle. Utilise du markdown pour les listes. Refuse poliment si la question sort du domaine de la cybersécurité."
+
+Règle simple : si vous ne pouvez pas écrire un test qui valide la consigne, elle est probablement trop vague.
+
+## Anti-pattern 2 : les négations à répétition
+
+> "Ne dis pas X. Ne mentionne pas Y. Ne fais jamais Z. N'utilise pas de smileys. Ne sois pas trop long."
+
+Les LLMs gèrent mal les négations empilées : on leur active le concept "smiley" en leur disant de ne pas en faire, et parfois ils en font. Pire : une liste de 15 "ne pas" devient un bruit que le modèle apprend à ignorer.
+
+**Correction** : reformuler en positif.
+
+- "N'utilise pas de smileys" → "Garde un ton professionnel et factuel."
+- "Ne sois pas trop long" → "Réponds en moins de 200 mots."
+- "Ne mentionne pas la concurrence" → "Concentre-toi exclusivement sur nos produits Acme."
+
+## Anti-pattern 3 : les contradictions internes
+
+> "Sois exhaustif et donne tous les détails techniques. Reste concis et accessible aux débutants."
+
+Le modèle va arbitrer arbitrairement, et le résultat sera décevant des deux côtés. Les contradictions se cachent souvent entre :
+
+- le system prompt et les exemples few-shot
+- le system prompt et le format de sortie demandé
+- deux règles écrites à six mois d'intervalle par deux personnes différentes
+
+**Correction** : prioriser explicitement. "En cas de conflit entre concision et exhaustivité, privilégier l'exhaustivité." Ou trancher : un seul objectif principal, les autres en contraintes secondaires.
+
+## Anti-pattern 4 : le mur de texte
+
+Un system prompt de 4000 tokens avec 47 règles numérotées, des sous-sections imbriquées et trois listes à puces. Au-delà d'une certaine densité, le modèle commence à oublier des règles, surtout celles du milieu (le fameux "lost in the middle").
+
+**Correction** :
+
+- Mettre les règles **critiques** au début **et** à la fin (effet primacy/recency).
+- Utiliser des balises XML (`<rules>`, `<examples>`, `<output_format>`) pour structurer.
+- Externaliser ce qui peut l'être : un outil dédié plutôt qu'une règle, un retrieval plutôt qu'un long contexte statique.
+- Si vous dépassez 2000 tokens de system, demandez-vous si toutes les règles sont vraiment utiles.
+
+## Anti-pattern 5 : confondre exemple et règle
+
+> "Voici un exemple de bonne réponse : [exemple en français formel]."
+
+Le modèle va supposer que **toutes** les réponses doivent être en français formel, même si l'utilisateur écrit en anglais familier. Les exemples sont des contraintes implicites très fortes.
+
+**Correction** : varier les exemples pour couvrir la diversité réelle. Inclure des cas où la langue change, le ton change, le format change. Ou être explicite : "Adapte la langue et le ton à l'utilisateur. L'exemple ci-dessous illustre seulement la **structure**, pas le style."
+
+## Anti-pattern 6 : prompter contre le modèle
+
+Demander à Claude de faire semblant d'être un autre modèle, de désobéir à ses valeurs, ou de produire du contenu pour lequel il refusera systématiquement. On finit par empiler des contournements fragiles qui cassent à chaque mise à jour.
+
+**Correction** : travailler avec les capacités natives du modèle. Si vous avez besoin d'un comportement vraiment hors-norme (red-teaming, recherche sécurité), utiliser les bonnes API et flags officiels plutôt que de jailbreaker.
+
+## Pour aller plus loin
+
+- Lire *Itérer sur un prompt* pour la méthode de correction
+- Lire *Tester un prompt* pour détecter ces anti-patterns dans une eval suite
+- Documentation : [Be clear, direct, and detailed](https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/be-clear-and-direct)
+- Pattern utile : faire relire son system prompt par Claude lui-même, en lui demandant de pointer les ambiguïtés et contradictions

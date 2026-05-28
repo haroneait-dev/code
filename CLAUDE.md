@@ -1,5 +1,42 @@
 # CLAUDE.md — Formation Claude Code
 
+## Vision & Roadmap business
+
+Le site est une **plateforme de formation Claude Code en français**. Objectif : devenir la référence francophone pour apprendre à utiliser Claude Code.
+
+### Phases de monétisation
+1. **Phase 1 — Lancement & visibilité** (actuelle)
+   - Mise en ligne propre du site sur Vercel (domaine custom souhaité)
+   - Promotion via **TikTok** : courtes vidéos pédagogiques, démos, tips Claude Code
+   - Objectif : générer un flux constant de visiteurs, construire une audience
+   - Le site doit donc être **ultra propre visuellement** (TikTok = première impression)
+   - Onboarding rapide, mobile-first impeccable (majorité du trafic TikTok = mobile)
+
+2. **Phase 2 — Monétisation par pub**
+   - Quand le trafic est suffisant (objectif : quelques milliers de visites/mois)
+   - Intégrer des annonces (Google AdSense ou équivalent)
+   - Garder l'UX propre : pas de pub intrusive
+
+3. **Phase 3 — Freemium / Premium**
+   - Bascule vers un modèle payant :
+     - **3€/mois** (abonnement)
+     - **100€ paiement unique** (accès à vie)
+   - Contenu gratuit limité (module `intro` actuel) → reste derrière paywall
+   - Stripe pour les paiements, gestion abonnements via Supabase
+
+### Implications techniques à anticiper
+- **SEO** : titres, meta, sitemap, OG images pour le partage social
+- **Analytics** : tracker conversions visiteur → inscrit → payant (Vercel Analytics + éventuellement PostHog/Plausible)
+- **Performance** : Core Web Vitals au top — le mobile TikTok est exigeant
+- **Stripe-ready** : prévoir la table `subscriptions` dans Supabase dès maintenant, même si pas activée
+- **Auth gate actuel** = fondation du futur paywall (juste à étendre)
+- **Partage social** : OG images dynamiques par leçon → boost le partage TikTok/Twitter
+
+### Ton & positionnement
+- 100% français, ton accessible mais expert
+- Public cible : développeurs FR curieux de l'IA, freelances, étudiants
+- Différenciation : la seule formation Claude Code structurée en français
+
 ## Stack
 - **Framework** : Next.js 16 App Router (Turbopack)
 - **Language** : TypeScript

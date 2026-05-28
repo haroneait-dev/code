@@ -1,0 +1,80 @@
+---
+title: "Meta-Prompting avec Claude"
+description: "Utiliser Claude pour écrire de meilleurs prompts pour Claude — la boucle d'amélioration qui transforme votre productivité."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+Le **meta-prompting** consiste à utiliser un LLM pour écrire, critiquer et améliorer des prompts destinés au même LLM (ou à un autre). C'est l'une des techniques les plus rentables du prompt engineering moderne : au lieu de passer des heures à itérer manuellement, vous laissez Claude faire 80 % du travail.
+
+L'intuition est simple : Claude connaît mieux que vous ce qui fait un bon prompt pour Claude. Il a été entraîné sur des millions d'exemples, il sait ce qui le déstabilise, ce qui le pousse à halluciner, ce qui clarifie une consigne ambiguë.
+
+## La boucle de base
+
+La boucle de meta-prompting tient en trois étapes :
+
+1. Décrire votre objectif en langage naturel à Claude
+2. Demander à Claude de générer un prompt optimisé pour cet objectif
+3. Tester ce prompt, donner les résultats à Claude, et lui demander d'améliorer
+
+Exemple de message initial :
+
+```
+Je veux un prompt qui extrait les entités nommées (personnes, lieux, organisations)
+d'un article de presse et les retourne en JSON. Écris-moi le meilleur prompt
+possible, avec un system prompt, des exemples few-shot, et des contraintes claires.
+```
+
+Claude produira un prompt structuré, souvent avec des balises XML, du few-shot, et des règles de fallback que vous n'auriez pas pensé à inclure.
+
+## Demander une critique avant d'améliorer
+
+Encore plus puissant : avant de demander une amélioration, demandez une **critique** structurée :
+
+```
+Voici mon prompt actuel : <prompt>...</prompt>
+Voici 3 sorties qu'il a produites : <outputs>...</outputs>
+
+Identifie :
+1. Les 3 plus grosses faiblesses du prompt
+2. Les ambiguïtés qui peuvent dérouter le modèle
+3. Les exemples manquants ou contre-exemples utiles
+4. Une version améliorée du prompt
+```
+
+Cette structure force Claude à raisonner avant d'écrire — la qualité du prompt final est bien supérieure.
+
+## Le Prompt Generator d'Anthropic
+
+La console Anthropic embarque depuis 2024 un **Prompt Generator** qui applique automatiquement le meta-prompting. Vous décrivez votre tâche, et il génère un prompt complet avec system, variables, et exemples. C'est littéralement Claude qui prompte Claude, packagé en interface.
+
+Utilisez-le comme point de départ, puis itérez manuellement sur les cas edge.
+
+## Auto-évaluation par Claude
+
+Une variante avancée : utilisez Claude comme **juge** de ses propres réponses. Vous lui faites générer 5 sorties pour un prompt, puis vous lui demandez de les noter selon des critères que vous définissez :
+
+```
+Note chaque réponse de 1 à 10 sur :
+- Respect du format JSON
+- Exhaustivité de l'extraction
+- Absence d'hallucinations
+
+Puis propose 3 modifications au prompt original qui amélioreraient le score moyen.
+```
+
+Vous obtenez une boucle d'optimisation quasi-automatique. C'est le principe derrière des frameworks comme DSPy ou les évaluations LLM-as-judge.
+
+## Pièges à éviter
+
+Le meta-prompting peut produire des prompts **trop longs**. Claude a tendance à empiler les exemples et les règles "au cas où". Demandez explicitement un prompt **concis** si la latence ou le coût comptent.
+
+Méfiez-vous aussi de la sycophancie : si vous dites "ce prompt est mauvais, refais-le", Claude va le réécrire même s'il était bon. Soyez neutre dans vos demandes de critique.
+
+Enfin, gardez l'humain dans la boucle. Le meta-prompting accélère l'itération, il ne remplace pas votre jugement sur la tâche métier finale.
+
+## Pour aller plus loin
+
+- Anthropic Console → Prompt Generator
+- DSPy : framework Python pour optimiser des prompts automatiquement
+- Voir aussi l'article Prefilling pour combiner meta-prompting et sortie structurée

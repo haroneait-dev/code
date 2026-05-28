@@ -1,0 +1,210 @@
+---
+title: "Slash commands avec arguments complexes"
+description: "Parser des regex, des chemins multiples, des flags personnalisés dans une slash command."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+`$ARGUMENTS` est une simple substitution de chaîne. Pour des commandes sophistiquées — flags optionnels, chemins multiples, expressions régulières, options structurées — il faut transformer Claude en parseur d'arguments. La bonne nouvelle : le modèle est meilleur qu'un `getopt` pour ça, à condition de définir clairement la grammaire dans le prompt.
+
+## Définir une grammaire explicite
+
+La règle d'or : ne laissez pas la convention implicite. Énoncez-la dans le prompt avec des exemples. `.claude/commands/find-and-replace.md` :
+
+```md
+---
+description: "Cherche et remplace dans des fichiers"
+argument-hint: "<pattern> <remplacement> [--dry-run] [--regex] [glob...]"
+allowed-tools: [Read, Edit, Glob, Grep]
+---
+
+Parse les arguments suivants : $ARGUMENTS
+
+Grammaire attendue :
+  <pattern>        : premier argument (entre guillemets si espaces)
+  <remplacement>   : deuxième argument
+  --dry-run        : flag optionnel, n'écrit rien, affiche seulement
+  --regex          : flag optionnel, traite pattern comme une regex
+  [glob...]        : zéro ou plusieurs globs cibles (défaut: **/*.{ts,tsx})
+
+Exemples valides :
+  "oldName" "newName"
+  "oldName" "newName" --dry-run
+  "/foo.*bar/" "baz" --regex "src/**/*.ts"
+
+Refuse poliment si la grammaire n'est pas respectée.
+```
+
+Usage :
+
+```bash
+> /find-and-replace "useEffect" "useLayoutEffect" --dry-run "src/**/*.tsx"
+Parsing:
+  pattern     = useEffect
+  replacement = useLayoutEffect
+  dry-run     = true
+  globs       = ["src/**/*.tsx"]
+Scanning... 14 occurrences in 6 files.
+(Aucune modification — dry run)
+```
+
+## Parser des flags style Unix
+
+```md
+Convention des flags :
+- `--key=value` : option avec valeur
+- `--flag` : booléen
+- `-x` : raccourci équivalent à `--xxx`
+- `--` : sépare flags des arguments positionnels
+```
+
+Exemple, `.claude/commands/generate-component.md` :
+
+```md
+---
+description: "Génère un composant React"
+argument-hint: "<nom> [--type=server|client] [--style=css|tailwind] [--with-test]"
+allowed-tools: [Write, Read]
+---
+
+Parse : $ARGUMENTS
+
+Defaults :
+  type   = server
+  style  = tailwind
+  test   = false
+
+Génère :
+  app/components/<nom>.tsx (selon type)
+  app/components/<nom>.test.tsx (si --with-test)
+```
+
+Usage :
+
+```bash
+> /generate-component Header --type=client --with-test
+Creating app/components/Header.tsx (client component)
+Creating app/components/Header.test.tsx
+```
+
+## Parser une regex
+
+Les regex dans `$ARGUMENTS` sont délicates : caractères spéciaux, guillemets, backslashes. Convention recommandée : entourer la regex par `/.../ ` style sed.
+
+```md
+---
+description: "Liste les TODOs matchant une regex"
+argument-hint: "/<regex>/"
+allowed-tools: [Grep, Read]
+---
+
+L'utilisateur a passé : $ARGUMENTS
+
+Format attendu : `/<regex>/`
+Extrait la regex entre slashes. Si pas de slashes, traite tout
+$ARGUMENTS comme une chaîne littérale.
+
+Lance `grep -rE` avec la regex extraite, dans le repo.
+```
+
+Usage :
+
+```bash
+> /grep-todo "/TODO\(@\w+\):/"
+Extracted regex: TODO\(@\w+\):
+6 matches in 3 files...
+```
+
+## Parser des chemins multiples
+
+Plusieurs fichiers en argument = découper sur les espaces, mais respecter les guillemets et les globs.
+
+```md
+---
+description: "Lit plusieurs fichiers et résume chacun"
+argument-hint: "<fichier1> <fichier2> ... ou <glob>"
+allowed-tools: [Read, Glob]
+---
+
+L'utilisateur a passé : $ARGUMENTS
+
+Découpe en chemins :
+- Si tout est sur une seule ligne, split sur les espaces (en respectant les guillemets)
+- Si un argument contient `*` ou `?`, expand le glob avec le tool Glob
+- Pour chaque fichier résolu, lis et fais un résumé en 3 lignes
+```
+
+Usage :
+
+```bash
+> /summarize "app/page.tsx" "lib/curriculum.ts" "lib/exercises.ts"
+> /summarize "app/**/*.tsx"
+```
+
+## Argument JSON pour les cas vraiment complexes
+
+Quand la grammaire devient touffue, demandez un JSON. C'est moins joli mais sans ambiguïté :
+
+```md
+---
+description: "Configure et déclenche un déploiement"
+argument-hint: '{"env": "...", "skipTests": true, "tags": [...]}'
+---
+
+L'utilisateur a passé un objet JSON : $ARGUMENTS
+
+Parse-le, valide les champs :
+  env         (obligatoire, "staging"|"prod")
+  skipTests   (booléen, défaut: false)
+  tags        (array de strings, défaut: [])
+
+Si invalide, affiche un message d'erreur clair avec un exemple.
+```
+
+Usage :
+
+```bash
+> /deploy {"env": "prod", "skipTests": false, "tags": ["v1.3.0"]}
+```
+
+## Gestion des erreurs d'argument
+
+Une commande robuste explique ce qu'elle attend quand l'argument est mal formé. Pattern recommandé en fin de prompt :
+
+```md
+Si la grammaire n'est pas respectée :
+- N'exécute aucune action
+- Affiche un message du type :
+    "Format attendu : /<commande> <arg1> <arg2> [--flag]
+     Exemple : /find-and-replace 'old' 'new' --dry-run
+     Reçu : $ARGUMENTS"
+- Termine immédiatement.
+```
+
+## Validation avant exécution
+
+Pour les commandes destructrices, ajoutez une étape de confirmation :
+
+```md
+Une fois les arguments parsés, AFFICHE un récapitulatif :
+  Pattern     : ...
+  Remplacement: ...
+  Fichiers    : ...
+  Mode        : dry-run / write
+
+Demande "Confirmer ? (y/n)" avant d'écrire quoi que ce soit.
+Si l'utilisateur ne répond pas explicitement `y`, abandonne.
+```
+
+## Anti-patterns
+
+- **Parsing implicite** : "tu sauras ce que je veux dire". Non. Définissez la grammaire.
+- **Flags ambigus** : `-r` qui signifie tantôt "recursive" tantôt "regex" selon la position.
+- **Pas d'exemple** : sans exemple concret dans le prompt, Claude invente une convention différente à chaque appel.
+- **Confier la validation au shell** : Claude ne lance pas un vrai parseur. C'est lui le parseur. Donnez-lui les règles.
+
+## Pour aller plus loin
+
+- Guide "Arguments et namespacing" pour les bases
+- Guide "Bash injection sécurisée" pour les implications sécurité
+- Doc officielle : https://docs.claude.com/en/docs/claude-code/slash-commands

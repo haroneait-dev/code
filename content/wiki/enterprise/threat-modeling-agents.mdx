@@ -1,0 +1,75 @@
+---
+title: "Threat modeling pour agents autonomes"
+description: "Risques d'exécution autonome de code dans un réseau d'entreprise : surface d'attaque, scénarios STRIDE et contre-mesures pour agents Claude."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+Un agent autonome qui exécute du code, lit des fichiers, appelle des APIs internes et interagit avec des humains via Slack n'est pas un simple chatbot : c'est un nouvel acteur du système d'information, avec ses propres credentials, ses propres décisions et sa propre capacité de nuisance. Faire un threat model rigoureux avant déploiement n'est pas optionnel — c'est la base d'une mise en production responsable.
+
+## Cartographier la surface d'attaque
+
+Commencez par modéliser l'agent comme un composant standard de votre architecture, avec ses entrées, ses sorties et ses dépendances :
+
+- **Entrées non-fiables** : messages utilisateurs, contenu web fetché, documents partagés, sorties d'autres agents.
+- **Outils accessibles** : shell, navigateur, accès SQL, API métier, MCP servers, système de fichiers.
+- **Credentials détenus** : tokens API, accès base de données, clés cloud, sessions OAuth.
+- **Périmètre réseau** : VLAN d'exécution, peering vers prod, sortie internet, accès vault.
+
+Un agent dans un VLAN d'admin avec un shell et une session AWS prod est, du point de vue d'un attaquant, équivalent à un compte humain admin compromis.
+
+## Appliquer STRIDE aux agents LLM
+
+Le framework STRIDE de Microsoft reste pertinent, avec quelques adaptations :
+
+- **Spoofing** : un attaquant injecte un prompt qui fait croire à l'agent qu'il parle à un admin ou à un système de confiance.
+- **Tampering** : modification des inputs (documents empoisonnés) ou de l'état mémoire de l'agent (memory poisoning).
+- **Repudiation** : actions de l'agent non tracées, impossibilité d'attribuer une décision.
+- **Information disclosure** : l'agent exfiltre des secrets via une réponse, un log, un appel sortant.
+- **Denial of service** : prompts qui font boucler l'agent, épuisent les quotas, ou saturent un outil.
+- **Elevation of privilege** : l'agent enchaîne des appels légitimes pour atteindre une action qu'aucun appel isolé n'autoriserait (confused deputy).
+
+Chaque ligne mérite un scénario concret écrit avec votre équipe sécurité.
+
+## Scénarios d'exécution de code à risque
+
+L'exécution de code généré par le LLM est le vecteur le plus dangereux. Risques typiques :
+
+- Code qui scanne le réseau interne (`nmap`, recherches DNS) avant exfiltration.
+- Téléchargement et exécution d'un binaire depuis une URL fournie par un attaquant.
+- Lecture de `~/.aws/credentials`, `.env`, secrets de CI.
+- Persistance via cron, systemd, ou modification d'un binaire système.
+- Communication C2 via DNS tunneling ou requêtes HTTP normales.
+
+Aucun de ces comportements n'est exotique : un attaquant qui passe par prompt injection les obtient sans difficulté si l'agent dispose d'un shell non sandboxé.
+
+## Contre-mesures techniques
+
+Adoptez la défense en profondeur :
+
+- **Sandbox d'exécution** : Firecracker microVM, gVisor, Vercel Sandbox, ou conteneur sans capacité réseau par défaut.
+- **Egress filtering** : whitelist stricte des domaines sortants, blocage du DNS arbitraire.
+- **Least privilege credentials** : tokens à courte durée, scope minimal, jamais de clés long-lived dans l'environnement de l'agent.
+- **Read-only par défaut** sur les bases : opérations d'écriture nécessitent une approbation explicite.
+- **Human-in-the-loop** sur les actions classées sensibles (paiements, suppression, modifications IAM).
+- **Kill switch** déclenchable en un clic depuis un dashboard d'ops.
+
+## Détection, observabilité et incident response
+
+Un agent compromis doit être détecté en minutes, pas en jours. Mettez en place :
+
+- **Logs structurés** de chaque tool call avec input, output, durée et code de retour.
+- **Détection d'anomalies** : volume d'appels inhabituel, accès à des chemins jamais touchés, géolocalisation d'IP sortantes.
+- **Replay déterministe** d'une session pour analyse forensique.
+- **Runbook incident** spécifique aux agents : isolation, révocation des tokens, gel des conversations, notification RGPD si données touchées.
+
+## Gouvernance et revue avant déploiement
+
+Tout nouvel agent autonome doit passer une revue sécurité formelle qui couvre : périmètre, threat model, scope des credentials, plan de tests adversariaux, plan de rollback. Cette revue se documente et se rejoue à chaque montée de version majeure du modèle ou ajout d'outil.
+
+## Pour aller plus loin
+
+- Microsoft Threat Modeling Tool et méthodologie STRIDE.
+- OWASP Agentic Security Initiative et taxonomie ASI.
+- Anthropic "Computer Use" — guidance officielle sur les risques d'agent.
+- NIST AI Risk Management Framework (AI RMF) et profil generative AI.

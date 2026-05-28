@@ -1,0 +1,117 @@
+---
+title: "Claude Haiku 4.5 — vitesse et coût"
+description: "Le modèle rapide pour les tâches simples et le grand volume."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+`claude-haiku-4-5-20251001` est le modèle compact de la famille Claude 4.x. Pensé pour la **latence faible** et le **coût minimal**, Haiku 4.5 est l'option de référence pour le volume : classification, extraction structurée, modération, premiers tris, ou couche de routage devant des modèles plus chers.
+
+## Pourquoi Haiku
+
+La promesse de Haiku tient en trois mots : **rapide, pas cher, suffisant**. Un appel Haiku coûte une fraction d'un appel Sonnet pour des tâches qui ne nécessitent pas de raisonnement profond. À l'échelle (millions d'appels par jour), le coût total peut être 10 à 30 fois inférieur à Sonnet [à vérifier].
+
+| Métrique | Haiku 4.5 |
+|---|---|
+| ID modèle | `claude-haiku-4-5-20251001` |
+| Latence typique | < 1s pour réponses courtes |
+| Contexte | 200K tokens |
+| Vision | Oui |
+| Tool use | Oui |
+| Extended thinking | Supporté (avec budget réduit) |
+
+## Cas d'usage idéaux
+
+1. **Classification** : intent detection, catégorisation produit, tri de support
+2. **Extraction structurée** : entités nommées, parsing de factures, scraping
+3. **Modération de contenu** : filtres pre-LLM avant un modèle plus cher
+4. **Résumés courts** : tl;dr d'emails, synthèses de transcripts
+5. **Routage agentique** : décider quel sous-agent invoquer
+
+## Exemple : extraction JSON
+
+```ts
+import Anthropic from "@anthropic-ai/sdk";
+
+const client = new Anthropic();
+
+const res = await client.messages.create({
+  model: "claude-haiku-4-5-20251001",
+  max_tokens: 1024,
+  system: "Tu extrais des entités au format JSON strict.",
+  messages: [
+    {
+      role: "user",
+      content: "Email: Bonjour, je suis Sophie, +33612345678, sophie@acme.fr",
+    },
+  ],
+});
+```
+
+## Exemple : routeur d'intent
+
+```python
+from anthropic import Anthropic
+
+client = Anthropic()
+
+def route_intent(user_msg: str) -> str:
+    msg = client.messages.create(
+        model="claude-haiku-4-5-20251001",
+        max_tokens=20,
+        messages=[{
+            "role": "user",
+            "content": f"Catégorie unique parmi [billing, technical, sales]: {user_msg}"
+        }],
+    )
+    return msg.content[0].text.strip()
+```
+
+## Pattern : Haiku en amont, Sonnet en aval
+
+```bash
+# Pseudo-flow
+incoming_request
+  → Haiku (classify + sanity check)
+  → if "complex": Sonnet
+  → if "simple": Haiku répond directement
+```
+
+Ce pattern réduit drastiquement la facture mensuelle d'un produit IA grand public.
+
+> Astuce : Haiku répond souvent en **moins de 800 ms**. C'est suffisamment rapide pour des UX interactives type autocomplete ou ghost text.
+
+## Limites
+
+- **Raisonnement multi-étapes** : Haiku peut sauter des étapes sur les problèmes complexes. Pour de la logique non triviale, monte en Sonnet.
+- **Code long** : génération > 200 lignes — la qualité chute par rapport à Sonnet.
+- **Suivi d'instructions très subtiles** : Haiku est plus littéral et moins « créatif » dans son interprétation.
+
+## Bonnes pratiques
+
+- Donner des **exemples in-context** (few-shot) : Haiku y est très sensible.
+- Imposer un **format de sortie strict** (JSON schema, balises XML).
+- Limiter `max_tokens` au strict nécessaire — pas besoin de 8k tokens pour un label.
+- Activer le **prompt caching** sur les prompts système répétés.
+
+```ts
+const res = await client.messages.create({
+  model: "claude-haiku-4-5-20251001",
+  max_tokens: 100,
+  system: [
+    {
+      type: "text",
+      text: longSystemPrompt,
+      cache_control: { type: "ephemeral" },
+    },
+  ],
+  messages: [{ role: "user", content: userQuery }],
+});
+```
+
+## Pour aller plus loin
+
+- Pricing : https://www.anthropic.com/pricing
+- Doc modèles : https://docs.anthropic.com/en/docs/about-claude/models
+- Article voisin : [Pricing et tokens](/wiki/modeles/pricing-tokens)
+- Article voisin : [Choisir le bon modèle](/wiki/modeles/choisir-bon-modele)

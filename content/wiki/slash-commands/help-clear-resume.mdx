@@ -1,0 +1,79 @@
+---
+title: "/help, /clear, /resume : naviguer une session"
+description: "Les trois commandes de base à connaître pour démarrer, nettoyer et reprendre une session Claude Code."
+updatedAt: "2026-05-19"
+readingMinutes: 5
+---
+
+Avant même de songer aux commandes custom, trois slash commands intégrées suffisent à reprendre le contrôle d'une session Claude Code : `/help` pour explorer les capacités, `/clear` pour repartir d'un contexte propre, et `/resume` pour récupérer une conversation interrompue. Maîtriser ce trio évite 80% des frustrations des débuts : sessions qui partent en vrille, contexte saturé, ou perte d'un travail en cours après un crash de terminal.
+
+## /help — la porte d'entrée
+
+`/help` affiche la liste complète des commandes disponibles dans votre session, y compris vos commandes custom et celles fournies par des plugins. C'est aussi la commande la plus utile lorsqu'on découvre un nouveau projet : elle révèle tout ce que l'équipe a ajouté dans `.claude/commands/`.
+
+```bash
+> /help
+Available commands:
+  /clear          Clear conversation history
+  /resume         Resume a previous conversation
+  /cost           Show token usage and cost
+  /compact        Compact the conversation
+  /init           Initialize CLAUDE.md
+  /review         Review a pull request
+  ...
+```
+
+Astuce méconnue : `/help <nom>` (selon les versions) ou simplement taper le début du nom et utiliser l'auto-complétion vous donne la description issue du frontmatter de chaque commande.
+
+## /clear — repartir de zéro
+
+`/clear` efface l'historique de la conversation en cours et libère intégralement le contexte. C'est essentiel quand vous passez d'une tâche à une autre dans le même terminal : sans `/clear`, Claude conserve en mémoire les fichiers lus, les décisions prises et les erreurs rencontrées, ce qui pollue les réponses futures.
+
+```bash
+> /clear
+Conversation cleared. Context reset.
+```
+
+Règle empirique : un `/clear` entre chaque feature, chaque bug fix, chaque revue de PR. Si vous voyez Claude faire référence à un fichier qui n'a plus rien à voir avec votre demande actuelle, c'est le signal qu'un `/clear` était dû il y a 20 minutes.
+
+Attention : `/clear` est irréversible dans la session courante. Si vous pensez avoir besoin de revenir en arrière, préférez ouvrir un nouveau terminal et laisser l'ancienne session intacte — vous pourrez toujours `/resume` plus tard.
+
+## /resume — reprendre une conversation
+
+`/resume` affiche une liste des conversations passées et vous laisse en choisir une pour la reprendre exactement là où elle s'était arrêtée. Pratique après un crash de terminal, un redémarrage machine, ou simplement pour rebrancher un travail entamé la veille.
+
+```bash
+> /resume
+Select a conversation to resume:
+  1. [2026-05-18 14:32] Refactor auth module
+  2. [2026-05-18 09:15] Fix RLS policy on wiki_tips
+  3. [2026-05-17 18:04] Setup Supabase OAuth callback
+```
+
+Le contexte (fichiers lus, commandes exécutées, décisions) est restauré tel quel. C'est aussi la solution si vous voulez ouvrir deux fenêtres sur la même session sur un seul écran : lancez `claude` deux fois, faites `/resume` dans l'une et travaillez en parallèle.
+
+## Le bon réflexe : combiner les trois
+
+Une session productive ressemble souvent à ceci :
+
+```bash
+$ claude
+> /resume          # je reprends la PR d'hier
+... travail ...
+> /clear           # je passe à une autre feature
+> /help            # je vérifie qu'une commande custom existe pour cette tâche
+```
+
+C'est cette boucle qui fait la différence entre un usage occasionnel et un workflow professionnel. Les développeurs qui ne `/clear` jamais finissent toujours par voir Claude halluciner sur des fichiers fantômes ; ceux qui ne `/resume` jamais perdent du temps à réexpliquer le contexte chaque matin.
+
+## Erreurs fréquentes
+
+- **Confondre `/clear` et quitter Claude** : `/clear` vide le contexte mais reste dans la même session ; quitter (Ctrl+D) ferme tout et nécessitera un `/resume` pour retrouver l'historique.
+- **Spammer `/resume` sans filtre** : si la liste est trop longue, fermez les vieilles sessions ou notez l'identifiant qui vous intéresse.
+- **Ignorer `/help` sur un nouveau projet** : vous ratez les commandes que l'équipe a versionnées dans `.claude/commands/`.
+
+## Pour aller plus loin
+
+- Lisez la doc officielle : https://docs.claude.com/en/docs/claude-code/slash-commands
+- Combinez `/clear` avec `/cost` pour mesurer combien de tokens vous économisez en repartant à zéro
+- Configurez un hook `SessionStart` qui lance automatiquement un `/resume` si une session récente existe

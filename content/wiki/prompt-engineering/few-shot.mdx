@@ -1,0 +1,100 @@
+---
+title: "Few-shot prompting"
+description: "Fournir 2 à 5 exemples bien choisis pour guider Claude — règles d'or, anti-patterns et cas d'usage."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+Le few-shot prompting consiste à donner à Claude quelques exemples (input + output) avant la vraie demande. C'est la technique la plus efficace pour aligner le modèle sur un format précis, un style particulier, ou un raisonnement métier — souvent plus efficace que d'écrire vingt lignes d'instructions.
+
+## Pourquoi ça marche si bien
+
+Les LLM apprennent par imitation. Plutôt que de décrire en mots ce que vous voulez ("réponds de manière concise mais complète, avec un ton professionnel mais accessible..."), montrez-le. Claude infère les règles implicites — longueur, structure, vocabulaire, niveau de détail — beaucoup mieux qu'il ne suit des consignes abstraites.
+
+Le zéro-shot ("fais X") fonctionne pour les tâches générales. Le few-shot devient indispensable dès que :
+
+- La sortie doit suivre un format strict (JSON, CSV, balises spécifiques)
+- Le ton ou le style sont difficiles à décrire
+- Il existe des cas particuliers ou des conventions internes
+- Vous voulez une réponse stable d'un appel à l'autre
+
+## La règle des 2 à 5 exemples
+
+Un seul exemple peut être pris pour un cas isolé — Claude ne sait pas quelles propriétés généraliser. Deux suffisent pour les tâches simples. Trois à cinq couvrent les cas courants et les exceptions. Au-delà, vous gaspillez des tokens et risquez l'overfitting : Claude colle trop à vos exemples au lieu de généraliser.
+
+```text
+Classifie le sentiment du tweet en POSITIF, NEUTRE ou NEGATIF.
+
+Tweet : "J'adore la nouvelle interface, c'est tellement fluide !"
+Sentiment : POSITIF
+
+Tweet : "Mise à jour téléchargée, je teste."
+Sentiment : NEUTRE
+
+Tweet : "Encore un bug, c'est la troisième fois cette semaine."
+Sentiment : NEGATIF
+
+Tweet : "Bof, ça change pas grand-chose finalement."
+Sentiment :
+```
+
+## Encadrer avec des balises XML
+
+Pour éviter toute confusion entre exemples et tâche réelle, structurez avec XML :
+
+```xml
+<examples>
+  <example>
+    <input>Le client demande un remboursement après 60 jours.</input>
+    <output>
+      <action>REFUSER</action>
+      <reason>Délai légal de 30 jours dépassé</reason>
+    </output>
+  </example>
+  <example>
+    <input>Article défectueux signalé après 7 jours.</input>
+    <output>
+      <action>ACCEPTER</action>
+      <reason>Garantie légale de conformité applicable</reason>
+    </output>
+  </example>
+</examples>
+
+<request>
+  <input>Le client veut échanger un produit acheté il y a 15 jours.</input>
+</request>
+```
+
+## Choisir des exemples qui couvrent l'espace
+
+L'erreur classique : donner trois exemples qui se ressemblent tous. Vos exemples doivent couvrir la **diversité** des cas que Claude rencontrera — incluez les cas faciles, les cas limites, et au moins un cas ambigu. Si votre tâche a quatre catégories possibles, montrez les quatre.
+
+Mauvais : trois exemples qui retournent tous "POSITIF".
+Bon : un POSITIF, un NEGATIF, un NEUTRE, et un cas ironique difficile.
+
+## Anti-patterns à éviter
+
+**Incohérence de format.** Si vos exemples utilisent tantôt `Sentiment: X`, tantôt `[X]`, tantôt `<sentiment>X</sentiment>`, Claude ne saura pas lequel choisir. Verrouillez un format unique et tenez-le.
+
+**Exemples mal alignés avec la tâche réelle.** Si vos exemples sont en anglais et la requête en français, vous induisez Claude en erreur. Les exemples doivent ressembler aux inputs réels.
+
+**Raisonnement caché.** Pour les tâches qui demandent une analyse, ne donnez pas seulement input → output. Montrez le raisonnement intermédiaire (chain-of-thought few-shot) :
+
+```text
+Question : Quelle est la marge brute si CA = 100k€ et coût direct = 40k€ ?
+Raisonnement : Marge brute = CA - coût direct = 100 - 40 = 60.
+               Taux de marge brute = 60 / 100 = 60%.
+Réponse : 60% (60 000 €)
+```
+
+**Exemples qui contredisent les instructions.** Si votre system dit "réponds en français" et vos exemples sont en anglais, Claude suivra les exemples — ils sont plus contraignants. Alignez les deux.
+
+## Quand placer les exemples
+
+Dans le system prompt si les exemples sont **stables** (mêmes pour toutes les requêtes) — vous bénéficiez du cache. Dans le user prompt si les exemples sont **dynamiques** (sélectionnés par retrieval selon la requête, technique dite "dynamic few-shot").
+
+## Pour aller plus loin
+
+- Combinez le few-shot avec les balises XML pour une structure maximale.
+- Lisez l'article system vs user pour décider où placer vos exemples.
+- Explorez le chain-of-thought prompting pour les tâches de raisonnement complexe.

@@ -1,0 +1,73 @@
+---
+title: "Données sensibles"
+description: "Travailler avec des données confidentielles avec Claude : PII, secrets, conformité RGPD et HDS."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+Manipuler des données sensibles avec un assistant IA pose des questions juridiques, techniques et éthiques. PII (données personnelles identifiables), données de santé, données financières, secrets industriels : chaque catégorie a ses contraintes. La règle générale : minimiser, anonymiser, tracer.
+
+## Cartographier ce qui est sensible
+
+Avant tout, dresse la liste de ce qui circule dans ton repo et dans tes prompts :
+
+- **PII directes** : nom, email, téléphone, adresse, IP, identifiants nationaux
+- **PII indirectes** : combinaisons de champs qui ré-identifient (âge + code postal + profession)
+- **Données de catégorie spéciale RGPD** : santé, opinions politiques, orientation, biométrie
+- **Données financières** : IBAN, numéros de carte, soldes, transactions
+- **Secrets** : clés API, tokens, certificats, mots de passe (cf. l'article dédié)
+- **Propriété intellectuelle** : algorithmes brevetés, contrats, données clients sous NDA
+
+Pour chaque catégorie, définis une politique : autorisée en clair, autorisée si anonymisée, ou totalement interdite à Claude.
+
+## Anonymiser avant d'envoyer
+
+Ne colle jamais de données réelles dans un prompt. Construis un pipeline d'anonymisation systématique :
+
+- Remplace les emails par `user1@example.com`, `user2@example.com`
+- Hash les identifiants stables
+- Bucket les âges, agrège les codes postaux
+- Génère des datasets synthétiques avec Faker, Mockaroo ou Synthea pour le médical
+- Pour les logs de prod, utilise un outil comme `pii-codex` ou `Presidio` (Microsoft) pour détecter et masquer
+
+Pour le debug, demande-toi toujours : « ai-je besoin de la vraie valeur ou juste de la structure ? ». 95% du temps, la structure suffit.
+
+## Configurer Claude pour la conformité
+
+Plusieurs leviers techniques :
+
+**Hébergement** : pour de la donnée européenne, privilégie les régions UE (Anthropic via AWS Bedrock Frankfurt/Paris, ou Vertex AI europe-west). Vérifie les engagements contractuels DPA (Data Processing Agreement).
+
+**Zero data retention** : sur les comptes Enterprise, active la rétention zéro pour que tes prompts ne soient pas conservés au-delà du temps de traitement. C'est souvent une condition pour les audits.
+
+**Logging local** : garde une trace de tout ce qui est envoyé à l'API, dans ton propre stockage, avec une politique de purge alignée sur ta DPIA. Tu dois pouvoir répondre à une demande d'accès RGPD.
+
+**Permissions restrictives** : empêche Claude d'accéder aux dossiers contenant des dumps de prod, des exports clients, des sauvegardes.
+
+## Cadrer les usages par rôle
+
+Tous les développeurs n'ont pas besoin du même niveau d'accès. Mets en place une matrice :
+
+- **Devs juniors** : Claude sur du code et des fixtures synthétiques uniquement
+- **Devs seniors** : accès à des sous-ensembles anonymisés pour le debug
+- **DPO / Security** : seuls habilités à manipuler des extraits réels, dans un environnement isolé
+
+Documente ces règles dans un fichier `DATA_POLICY.md` et fais signer chaque arrivant. La conformité est autant un problème de process que de technique.
+
+## Auditer et prouver
+
+En cas de contrôle (CNIL, ISO 27001, SOC 2, HDS), tu dois prouver :
+
+- Quelles données ont été envoyées à un sous-traitant IA
+- Sur quelle base légale
+- Pendant combien de temps elles ont été conservées
+- Quelles mesures de minimisation ont été appliquées
+
+Mets en place un journal d'audit immuable (append-only, signé), avec hash des prompts. Sur des secteurs régulés (santé, banque, défense), envisage un déploiement on-premise ou via un cloud souverain avec certification adéquate (HDS pour la santé en France, SecNumCloud pour le défense).
+
+## Pour aller plus loin
+
+- Réalise une AIPD (analyse d'impact) avant d'introduire Claude sur un nouveau périmètre de données
+- Forme l'équipe avec des cas concrets : « ce ticket Jira contient-il des PII ? »
+- Mets en place une procédure de notification de violation sous 72h, conforme RGPD
+- Revois la politique tous les 6 mois : les capacités des modèles et la réglementation évoluent vite

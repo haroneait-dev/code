@@ -1,0 +1,110 @@
+---
+title: "Status line custom : afficher branche git, coût et model"
+description: "Configurer une status line personnalisée dans Claude Code via un hook pour afficher en permanence les informations clés."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+La **status line** de Claude Code est cette ligne discrète affichée en bas du terminal pendant une session. Par défaut elle reste minimaliste, mais elle est entièrement personnalisable via un hook : vous pouvez y afficher la branche git courante, le coût cumulé de la session, le modèle actif, le mode de permission, et n'importe quelle information utile. C'est une amélioration majeure du quotidien quand on passe ses journées dans Claude Code.
+
+## Comment fonctionne la status line
+
+Claude Code appelle un script externe à intervalles réguliers (et après chaque tour). Ce script reçoit en **stdin** un objet JSON contenant l'état de la session, et doit imprimer sur **stdout** une seule ligne qui sera affichée telle quelle.
+
+La configuration se fait dans `~/.claude/settings.json` :
+
+```json
+{
+  "statusLine": {
+    "type": "command",
+    "command": "~/.claude/statusline.sh"
+  }
+}
+```
+
+Le payload JSON reçu contient notamment :
+
+- `model.id` : le modèle actif (`claude-opus-4-7`, etc.)
+- `workspace.current_dir` : le répertoire courant
+- `cost.total_cost_usd` : le coût cumulé en USD
+- `cost.total_duration_ms` : durée totale de la session
+- `cost.total_lines_added` / `total_lines_removed` : stats d'édition
+
+## Un script bash de base
+
+Créez `~/.claude/statusline.sh` :
+
+```bash
+#!/usr/bin/env bash
+input=$(cat)
+
+model=$(echo "$input" | jq -r '.model.id')
+cwd=$(echo "$input" | jq -r '.workspace.current_dir')
+cost=$(echo "$input" | jq -r '.cost.total_cost_usd // 0')
+
+cd "$cwd" 2>/dev/null
+branch=$(git branch --show-current 2>/dev/null || echo "no-git")
+
+printf "[%s] %s | $%.2f" "$branch" "$model" "$cost"
+```
+
+Rendez-le exécutable :
+
+```bash
+chmod +x ~/.claude/statusline.sh
+```
+
+Relancez Claude Code : vous verrez désormais quelque chose comme `[main] claude-opus-4-7 | $0.42` en bas de l'écran, mis à jour après chaque tour.
+
+## Version enrichie : git status, dirty flag, tokens
+
+Pour les utilisateurs qui veulent tout voir d'un coup :
+
+```bash
+#!/usr/bin/env bash
+input=$(cat)
+
+model=$(echo "$input" | jq -r '.model.id' | sed 's/claude-//')
+cwd=$(echo "$input" | jq -r '.workspace.current_dir')
+cost=$(echo "$input" | jq -r '.cost.total_cost_usd // 0')
+added=$(echo "$input" | jq -r '.cost.total_lines_added // 0')
+removed=$(echo "$input" | jq -r '.cost.total_lines_removed // 0')
+
+cd "$cwd" 2>/dev/null
+branch=$(git branch --show-current 2>/dev/null)
+dirty=""
+if [ -n "$branch" ] && [ -n "$(git status --porcelain 2>/dev/null)" ]; then
+  dirty="*"
+fi
+
+printf "\033[36m%s%s\033[0m | %s | \033[32m+%s\033[0m \033[31m-%s\033[0m | \033[33m$%.3f\033[0m" \
+  "${branch:-no-git}" "$dirty" "$model" "$added" "$removed" "$cost"
+```
+
+Les codes ANSI ajoutent de la couleur (cyan pour la branche, vert/rouge pour les lignes, jaune pour le coût).
+
+## Conseils de performance
+
+Le script est exécuté souvent — il doit rester rapide (idéalement sous 100 ms). Quelques règles :
+
+- Évitez les appels réseau (pas de `curl`, pas de `gh api`)
+- Mettez en cache les valeurs lentes dans `/tmp` avec une TTL
+- Préférez `git symbolic-ref` à `git branch --show-current` (plus rapide)
+- Si le script est lent, Claude affiche temporairement l'ancienne valeur
+
+## Désactiver ou tester
+
+Pour désactiver temporairement, commentez la clé `statusLine` dans `settings.json`. Pour tester votre script sans relancer Claude :
+
+```bash
+echo '{"model":{"id":"opus-4-7"},"workspace":{"current_dir":"'$PWD'"},"cost":{"total_cost_usd":1.23}}' \
+  | ~/.claude/statusline.sh
+```
+
+## Pour aller plus loin
+
+- Affichez le mode de permission actif via `.permissionMode` du payload
+- Intégrez un compteur de PRs ouvertes sur le repo (avec cache de 5 min)
+- Utilisez Python ou Node si bash devient trop limitant — le hook accepte n'importe quel exécutable
+- Combinez avec les hooks `SessionStart` et `Stop` pour des notifications système
+- Versionnez votre `statusline.sh` dans un dotfiles repo pour le partager entre machines

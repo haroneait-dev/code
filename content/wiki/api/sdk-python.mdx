@@ -1,0 +1,127 @@
+---
+title: "SDK Python"
+description: "Installer et utiliser anthropic-sdk-python : client, messages.create et options principales."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+Le SDK Python officiel d'Anthropic simplifie énormément l'utilisation de l'API : pas besoin de gérer les headers, la sérialisation JSON ou les types de réponse à la main. Voici comment l'installer et l'utiliser efficacement.
+
+## Installation
+
+Le package s'appelle simplement `anthropic` :
+
+```bash
+pip install anthropic
+```
+
+Si vous utilisez `uv` (le gestionnaire de paquets moderne recommandé) :
+
+```bash
+uv add anthropic
+```
+
+Le SDK requiert Python 3.8+ et embarque ses propres types via `pydantic`, ce qui vous donne de l'autocomplétion dans VS Code, PyCharm ou tout éditeur compatible.
+
+## Initialiser le client
+
+Le client lit automatiquement la variable d'environnement `ANTHROPIC_API_KEY`. Vous pouvez aussi passer la clé explicitement.
+
+```python
+from anthropic import Anthropic
+
+# Lit ANTHROPIC_API_KEY automatiquement
+client = Anthropic()
+
+# Ou explicitement
+client = Anthropic(api_key="sk-ant-api03-...")
+```
+
+Le client est thread-safe et peut être réutilisé pour plusieurs requêtes — créez-le une seule fois au démarrage de votre application.
+
+## Envoyer un message
+
+La méthode principale est `client.messages.create()`. Elle prend a minima un `model`, un `max_tokens` et une liste de `messages`.
+
+```python
+from anthropic import Anthropic
+
+client = Anthropic()
+
+message = client.messages.create(
+    model="claude-sonnet-4-6",
+    max_tokens=1024,
+    messages=[
+        {"role": "user", "content": "Explique la récursion en une phrase."}
+    ],
+)
+
+print(message.content[0].text)
+print(f"Tokens utilisés : {message.usage.input_tokens} in / {message.usage.output_tokens} out")
+```
+
+L'objet retourné est typé : `message.content` est une liste de `ContentBlock`, `message.usage` expose `input_tokens` et `output_tokens`, et `message.stop_reason` indique la raison de l'arrêt.
+
+## Options principales
+
+`messages.create()` accepte de nombreux paramètres pour piloter le comportement du modèle :
+
+```python
+message = client.messages.create(
+    model="claude-sonnet-4-6",
+    max_tokens=2048,
+    system="Tu es un assistant pédagogique. Réponds toujours en français.",
+    messages=[
+        {"role": "user", "content": "Qu'est-ce qu'une API REST ?"}
+    ],
+    temperature=0.7,          # 0 = déterministe, 1 = créatif
+    top_p=0.95,               # nucleus sampling
+    stop_sequences=["\n\n"],  # arrête la génération sur ces séquences
+)
+```
+
+- **`system`** : un prompt système placé hors de la conversation, idéal pour définir le rôle, le ton ou les règles globales.
+- **`temperature`** : entre 0 et 1, contrôle l'aléatoire (utilisez 0 pour des tâches déterministes comme l'extraction de données).
+- **`max_tokens`** : limite stricte de la réponse, à ajuster selon votre cas d'usage et votre budget.
+- **`stop_sequences`** : liste de chaînes qui interrompent la génération dès qu'elles apparaissent.
+
+## Conversation multi-tours
+
+Pour maintenir un contexte, il suffit d'ajouter les messages précédents (utilisateur et assistant) à la liste :
+
+```python
+messages = [
+    {"role": "user", "content": "Quel est le plus grand océan ?"},
+    {"role": "assistant", "content": "Le Pacifique."},
+    {"role": "user", "content": "Et sa profondeur maximale ?"},
+]
+
+response = client.messages.create(
+    model="claude-sonnet-4-6",
+    max_tokens=512,
+    messages=messages,
+)
+```
+
+C'est à votre application de stocker l'historique (base de données, session, mémoire). L'API est sans état : chaque appel doit contenir tout le contexte nécessaire.
+
+## Gestion des erreurs
+
+Le SDK lève des exceptions typées qu'il faut intercepter :
+
+```python
+from anthropic import APIError, RateLimitError, APIConnectionError
+
+try:
+    message = client.messages.create(...)
+except RateLimitError:
+    print("Limite de débit atteinte, réessayez plus tard.")
+except APIConnectionError:
+    print("Problème réseau.")
+except APIError as e:
+    print(f"Erreur API : {e.status_code} — {e.message}")
+```
+
+## Pour aller plus loin
+
+Le SDK supporte aussi le **streaming** (`client.messages.stream()`), les **tool calls** pour donner à Claude la capacité d'appeler vos fonctions, la **vision** pour analyser des images, et le **prompt caching** pour réduire drastiquement vos coûts sur des prompts répétés. Consultez le [repo GitHub anthropic-sdk-python](https://github.com/anthropics/anthropic-sdk-python) et la [doc officielle](https://docs.anthropic.com/en/api/client-sdks) pour les exemples complets.

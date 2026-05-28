@@ -1,0 +1,105 @@
+---
+title: "Le fichier de config globale"
+description: "Anatomie de la config utilisateur en ~/.claude/settings.json (hors CLAUDE.md projet)."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+Le fichier `~/.claude/settings.json` est le point central de la configuration utilisateur de Claude Code. Contrairement à `CLAUDE.md`, qui décrit le contexte d'un projet, ce fichier pilote le comportement du harness lui-même : modèle par défaut, permissions globales, variables d'environnement, hooks, et intégrations MCP. Bien le configurer évite la majorité des prompts répétitifs et harmonise vos sessions entre machines.
+
+## Localisation et précédence
+
+Claude Code lit plusieurs fichiers de settings dans cet ordre, du plus général au plus spécifique :
+
+| Fichier                                    | Portée               | Versionné ? |
+|--------------------------------------------|----------------------|-------------|
+| `~/.claude/settings.json`                  | Utilisateur global   | Non         |
+| `<repo>/.claude/settings.json`             | Projet (équipe)      | Oui         |
+| `<repo>/.claude/settings.local.json`       | Projet (personnel)   | Non         |
+| Flags CLI (`--model`, `--allowed-tools`)   | Session              | —           |
+
+Les niveaux suivants surchargent les précédents clé par clé. Une permission ajoutée au niveau projet s'ajoute à la liste utilisateur, elle ne la remplace pas.
+
+## Squelette commenté
+
+```json
+{
+  "model": "claude-sonnet-4-6",
+  "theme": "dark",
+  "env": {
+    "EDITOR": "code --wait",
+    "PAGER": "less -R"
+  },
+  "permissions": {
+    "allow": [
+      "Bash(git status:*)",
+      "Bash(npm run *)",
+      "Read(//Users/harone/**)"
+    ],
+    "deny": [
+      "Bash(rm -rf *)",
+      "WebFetch(domain:internal.corp)"
+    ]
+  },
+  "hooks": {
+    "Stop": [
+      { "command": "afplay /System/Library/Sounds/Glass.aiff" }
+    ]
+  }
+}
+```
+
+## Permissions : allow / deny / ask
+
+Trois listes cohabitent. `allow` autorise sans prompt, `deny` bloque sans recours, `ask` force la demande même si l'outil serait sinon silencieux. Les motifs supportent les wildcards (`*`) et les sélecteurs spécifiques par outil :
+
+```json
+{
+  "permissions": {
+    "allow": ["Bash(gh pr view:*)", "Edit(//Users/harone/claude-code/**)"],
+    "deny":  ["Bash(curl http://*)"],
+    "ask":   ["Write(//etc/**)"]
+  }
+}
+```
+
+Astuce : la skill `fewer-permission-prompts` scanne vos transcripts pour proposer une allowlist optimale en quelques secondes.
+
+## Hooks pour automatiser
+
+Les hooks sont des commandes shell déclenchées par le harness à des évènements précis (`PreToolUse`, `PostToolUse`, `Stop`, `SubagentStop`). Ils sont indispensables dès que vous voulez un comportement systématique — les préférences en mémoire ne suffisent pas, c'est le harness qui orchestre.
+
+```json
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "command": "prettier --write $CLAUDE_FILE_PATHS"
+      }
+    ]
+  }
+}
+```
+
+## Variables d'environnement
+
+Le bloc `env` injecte des variables dans chaque session. Pratique pour pointer vers un proxy d'entreprise, fixer `ANTHROPIC_API_KEY` (déconseillé en clair, préférez le keychain), ou activer un mode debug :
+
+```bash
+# Vérifier ce qui a été chargé
+claude --print-env
+```
+
+## Bonnes pratiques
+
+- Gardez `settings.json` minimal et lisible — déplacez le bruit dans `settings.local.json`.
+- Ne committez jamais de clés API ; utilisez plutôt `op run` (1Password CLI) ou `gh auth token`.
+- Versionnez le `.claude/settings.json` du projet pour partager permissions et hooks avec l'équipe.
+- Avant de modifier à la main, utilisez la commande `/config` ou la skill `update-config` qui valide la syntaxe.
+
+## Pour aller plus loin
+
+- [Référence settings.json officielle](https://docs.claude.com/claude-code/settings)
+- [Catalogue de hooks communautaires](https://github.com/anthropics/claude-code/tree/main/examples/hooks)
+- [Article wiki — Permissions et sandbox](/wiki/demarrer/permissions-sandbox)

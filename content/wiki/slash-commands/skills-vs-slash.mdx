@@ -1,0 +1,132 @@
+---
+title: "Skills vs slash commands : lequel choisir ?"
+description: "Quand préférer un skill, quand préférer une slash command, et comment les combiner."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+Claude Code propose deux mécanismes pour encapsuler une expertise réutilisable : les **slash commands** (déclenchées manuellement avec `/`) et les **skills** (chargées automatiquement quand Claude détecte qu'elles s'appliquent). Beaucoup d'équipes mélangent les deux sans savoir lequel choisir. Règle simple : slash command si **vous** voulez décider, skill si vous voulez que **Claude** décide.
+
+## La différence fondamentale
+
+| | Slash command | Skill |
+|---|---|---|
+| Déclenchement | Manuel (`/maCommande`) | Automatique (Claude reconnaît le besoin) |
+| Découvrabilité | Visible dans `/help` | Visible dans le system prompt |
+| Idéal pour | Workflows explicites | Expertise contextuelle |
+| Argument | `$ARGUMENTS` explicite | Pas d'argument, le contexte suffit |
+| Coût | Chargé à l'invocation | Chargé en début de session ou à la demande |
+
+Une slash command est un **raccourci procédural** : "je veux faire ça, lance le script". Un skill est une **compétence latente** : "si tu vois telle situation, tu sauras quoi faire".
+
+## Exemple : déploiement Vercel
+
+**Approche slash command** — l'utilisateur déclenche explicitement :
+
+`.claude/commands/deploy.md` :
+
+```md
+---
+description: "Déploie sur Vercel (preview par défaut, prod si --prod)"
+argument-hint: "[--prod]"
+allowed-tools: [Bash(vercel:*), Bash(git status)]
+---
+
+Déploie sur Vercel :
+1. Vérifie `git status` (refuse si non-clean)
+2. Si $ARGUMENTS contient `--prod`, lance `vercel --prod`
+3. Sinon, `vercel` (preview)
+4. Affiche l'URL générée
+```
+
+Usage : `> /deploy --prod`. L'utilisateur sait qu'il déploie, c'est son intention.
+
+**Approche skill** — Claude détecte le contexte :
+
+`~/.claude/skills/vercel-deploy/SKILL.md` :
+
+```md
+---
+name: vercel-deploy
+description: "Vercel deployment expertise. TRIGGER when user says 'deploy', 'ship', 'push to prod' in a project with vercel.json or .vercel/ folder."
+---
+
+Quand l'utilisateur veut déployer un projet Vercel :
+- Toujours vérifier git status avant
+- Preview par défaut, prod uniquement sur demande explicite
+- Lire les logs de build si échec
+- Vérifier les env vars manquantes
+```
+
+Usage : l'utilisateur dit "déploie en prod" ou "ship it", Claude charge le skill et applique la procédure.
+
+## Quand choisir une slash command
+
+- **Action atomique fréquente** : `/release`, `/test`, `/migrate`. Vous savez exactement ce que vous voulez.
+- **Workflow avec arguments** : `/pr-review 1234`, `/explain <fichier>`. L'argument est central.
+- **Action sensible à déclencher consciemment** : `/security-review`, `/deploy --prod`. Vous ne voulez pas que Claude le lance "par accident".
+- **Bouton qu'on veut voir dans `/help`** : si vous voulez que les nouveaux du projet voient la liste, c'est une commande.
+
+## Quand choisir un skill
+
+- **Expertise contextuelle** : "quand on travaille avec Supabase, voici les patterns à suivre". Pas une action, une connaissance.
+- **Détection automatique souhaitée** : Claude doit reconnaître qu'il est en train de faire X et appliquer les conventions.
+- **Long contenu de référence** : un skill peut contenir des centaines de lignes de doc, exemples, conventions. Une slash command devient lourde à ce volume.
+- **Sécurité par contexte** : "ne jamais commit avec --no-verify" est un comportement à respecter en permanence, pas une commande à lancer.
+
+## Combiner les deux
+
+Le pattern le plus puissant : un skill qui expose une slash command associée.
+
+`~/.claude/skills/supabase-helper/SKILL.md` :
+
+```md
+---
+name: supabase-helper
+description: "Supabase expertise: migrations, RLS, auth. TRIGGER on files supabase/* or imports of @supabase/."
+---
+
+Quand tu manipules Supabase :
+- Toujours créer des migrations versionnées
+- Activer RLS sur chaque nouvelle table
+- Pour créer une migration, suggère à l'utilisateur la commande /db:migrate
+
+Conventions RLS du projet :
+... (200 lignes)
+```
+
+`.claude/commands/db/migrate.md` :
+
+```md
+---
+description: "Crée une migration Supabase"
+argument-hint: "<nom>"
+allowed-tools: [Bash(supabase migration:*), Write]
+---
+
+Crée une migration nommée `$ARGUMENTS`.
+Applique les conventions RLS définies dans le skill supabase-helper.
+```
+
+Le skill explique **pourquoi** et **comment** ; la commande automatise le **quoi**.
+
+## Coût et latence
+
+Les skills coûtent du contexte au démarrage (leur description est chargée pour que Claude sache qu'ils existent), mais ne consomment leur contenu complet que quand ils sont déclenchés. Les slash commands ne coûtent rien tant qu'elles ne sont pas invoquées.
+
+Si vous avez 50 commandes et 50 skills, vous voulez :
+
+- Skills : descriptions courtes, contenu lazy-loaded
+- Slash commands : `description` claire pour `/help`
+
+## Anti-patterns
+
+- **Skill qui se déclenche tout le temps** : description trop large = chargé constamment = pollue le contexte de chaque session.
+- **Slash command qui essaie de tout détecter automatiquement** : si vous écrivez "détecte le contexte et choisis quoi faire" dans un `.md`, vous voulez un skill, pas une commande.
+- **Doublon skill + commande qui font la même chose** : choisissez. Sinon, vous maintenez deux fois le même prompt.
+
+## Pour aller plus loin
+
+- Doc skills : https://docs.claude.com/en/docs/claude-code/skills
+- Doc slash commands : https://docs.claude.com/en/docs/claude-code/slash-commands
+- Examiner les skills officiels Anthropic comme inspiration

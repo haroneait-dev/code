@@ -1,0 +1,94 @@
+---
+title: "Mode headless (claude -p)"
+description: "Exécuter Claude Code sans interface interactive avec claude -p, parfait pour les scripts et la CI."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+Le mode headless de Claude Code permet d'invoquer le CLI comme n'importe quelle commande Unix : sans REPL, sans interface interactive, en lui passant directement un prompt et en récupérant sa sortie. C'est le mode privilégié pour intégrer Claude Code dans des scripts shell, des pipelines CI/CD ou des tâches cron.
+
+## Lancer Claude en mode headless
+
+La syntaxe est minimaliste : on passe le prompt avec le flag `-p` (pour `--print`).
+
+```bash
+claude -p "Résume le fichier README.md en 3 bullets"
+```
+
+Claude exécute le prompt, écrit le résultat sur `stdout`, puis termine son processus avec un code de retour standard (`0` succès, `1` erreur). Aucun affichage de progression, aucune animation : la sortie est propre, parfaite pour être capturée.
+
+```bash
+SUMMARY=$(claude -p "Génère un changelog basé sur les 10 derniers commits")
+echo "$SUMMARY" > CHANGELOG.md
+```
+
+## Choisir le format de sortie
+
+Par défaut, Claude renvoie du texte. Pour parser la réponse depuis un script, on utilise `--output-format json` qui produit un objet structuré.
+
+```bash
+claude -p "Liste les fichiers TypeScript modifiés" --output-format json
+```
+
+Exemple de réponse :
+
+```json
+{
+  "type": "result",
+  "subtype": "success",
+  "result": "src/app/page.tsx, src/lib/supabase.ts",
+  "session_id": "abc123",
+  "total_cost_usd": 0.0042,
+  "duration_ms": 3120
+}
+```
+
+Avec `--output-format stream-json`, chaque évènement (message, tool_use, tool_result) arrive ligne par ligne, ce qui permet de logger le déroulé complet d'une exécution.
+
+## Contrôler les permissions et les outils
+
+En mode headless, on n'a pas de prompt interactif pour valider les actions. Deux options :
+
+- `--allowed-tools` pour autoriser explicitement certains outils.
+- `--permission-mode acceptEdits` pour accepter automatiquement les éditions de fichiers.
+
+```bash
+claude -p "Corrige les erreurs de lint dans src/" \
+  --allowed-tools "Read,Edit,Bash(npm run lint)" \
+  --permission-mode acceptEdits
+```
+
+Ne jamais utiliser `--dangerously-skip-permissions` en production : ce flag désactive toutes les vérifications et peut entraîner des actions destructives.
+
+## Utiliser en CI
+
+Le mode headless brille dans GitHub Actions ou GitLab CI. On peut, par exemple, faire générer une revue de PR automatique.
+
+```bash
+- name: Claude review
+  env:
+    ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+  run: |
+    claude -p "Analyse les diffs de cette PR et propose des améliorations" \
+      --output-format json > review.json
+```
+
+Le code de retour permet de faire échouer le pipeline si Claude détecte un problème bloquant : il suffit que le prompt demande `exit 1` via un script Bash autorisé.
+
+## Reprendre une session
+
+Headless ne veut pas dire stateless. On peut reprendre une conversation existante avec `--resume <session_id>` ou continuer la dernière avec `--continue`.
+
+```bash
+SESSION=$(claude -p "Initialise une refacto" --output-format json | jq -r .session_id)
+claude -p "Maintenant ajoute les tests" --resume "$SESSION"
+```
+
+Pratique pour orchestrer des tâches en plusieurs étapes tout en gardant le contexte accumulé.
+
+## Pour aller plus loin
+
+- Combiner `claude -p` avec `xargs` ou `parallel` pour traiter des centaines de fichiers en lot.
+- Définir un `CLAUDE.md` projet pour donner du contexte stable à chaque invocation headless.
+- Logger systématiquement `session_id` et `total_cost_usd` pour suivre la consommation en production.
+- Encapsuler les invocations dans un wrapper shell qui injecte des garde-fous (timeout, allowlist d'outils, dry-run).

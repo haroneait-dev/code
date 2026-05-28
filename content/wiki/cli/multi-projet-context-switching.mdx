@@ -1,0 +1,104 @@
+---
+title: "Multi-projet et context switching"
+description: "Comment Claude Code isole le contexte par repo Git, gère les .claude/ locaux et permet de jongler entre plusieurs projets sans polluer la mémoire."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+Quand on travaille sur trois clients différents dans la même journée, on veut que Claude oublie le contexte du projet A en arrivant sur le projet B. Bonne nouvelle : le CLI est conçu pour ça. Tout repose sur le dossier de travail courant, les fichiers `.claude/` locaux et un système d'héritage de configuration en cascade.
+
+## Le dossier courant fait foi
+
+Claude Code détermine son contexte à partir du `cwd` au lancement. Concrètement, à chaque démarrage il :
+
+1. Remonte l'arborescence jusqu'à trouver un `.git` (la racine du repo).
+2. Charge `CLAUDE.md` à la racine s'il existe.
+3. Charge `.claude/settings.json` puis `.claude/settings.local.json`.
+4. Charge les `CLAUDE.md` imbriqués des sous-dossiers que vous ouvrez.
+
+```bash
+cd ~/projets/client-a
+claude            # contexte = client-a
+# nouvelle fenêtre terminal
+cd ~/projets/client-b
+claude            # contexte = client-b, zéro fuite
+```
+
+Aucune session n'est partagée entre les deux. Les historiques de conversations sont stockés sous `~/.claude/projects/<hash-du-path>/` ce qui garantit l'isolation.
+
+## La structure `.claude/` par projet
+
+Chaque repo peut avoir son propre dossier `.claude/` versionné (ou non). Voici une organisation typique :
+
+```
+projet-a/
+  .claude/
+    settings.json          # commit : règles d'équipe
+    settings.local.json    # gitignore : préférences perso
+    commands/
+      deploy.md            # slash command /deploy
+      review.md            # /review
+    agents/
+      security-reviewer.md # subagent spécialisé
+  CLAUDE.md                # instructions projet
+```
+
+Le `settings.json` versionné permet à toute l'équipe de partager les mêmes hooks et permissions. Le `settings.local.json` reste sur la machine du dev et override le reste.
+
+```json
+{
+  "permissions": {
+    "allow": ["Bash(npm test:*)", "Bash(git diff:*)", "Read", "Edit"],
+    "deny": ["Bash(rm -rf:*)", "Bash(curl:*)"]
+  },
+  "env": {
+    "NODE_ENV": "development"
+  }
+}
+```
+
+## Cascade des configurations
+
+L'ordre de priorité, du plus faible au plus fort :
+
+1. `~/.claude/settings.json` (global utilisateur)
+2. `.claude/settings.json` (projet, versionné)
+3. `.claude/settings.local.json` (projet, local)
+4. Variables d'environnement et flags CLI
+
+Les `CLAUDE.md` fonctionnent par concaténation : le global, puis le projet, puis ceux des sous-dossiers ouverts pendant la session.
+
+## Context switching sans douleur
+
+Trois patterns courants pour passer d'un projet à l'autre.
+
+**Pattern 1 — Plusieurs terminaux.** Une fenêtre tmux ou iTerm par projet, chaque session Claude vit dans son onglet. Simple et efficace.
+
+**Pattern 2 — Git worktrees.** Pour bosser sur deux branches du même repo en parallèle sans corrompre l'état :
+
+```bash
+git worktree add ../projet-feature-x feature-x
+cd ../projet-feature-x
+claude            # contexte isolé, même repo
+```
+
+**Pattern 3 — Reprise de session.** `claude --resume` propose la liste des dernières conversations du dossier courant. Couplé à `claude --continue` pour reprendre la dernière session immédiatement.
+
+```bash
+cd ~/projets/client-a
+claude --continue      # reprend là où vous vous étiez arrêté
+```
+
+## Pièges à éviter
+
+- **Lancer `claude` depuis `~`**. Le CLI prend votre home comme racine et tente d'indexer 200 Go de fichiers. Toujours `cd` dans le projet avant.
+- **Mettre des secrets dans `settings.json` versionné**. Utilisez `settings.local.json` ou des variables d'environnement.
+- **Oublier `.claude/` dans `.gitignore` pour les fichiers locaux**. Ajoutez au minimum `.claude/settings.local.json` et `.claude/.cache/`.
+- **Mélanger les `CLAUDE.md`**. Gardez la racine concise, déléguez aux sous-dossiers les règles spécifiques.
+
+## Pour aller plus loin
+
+- La doc [Memory & Settings](https://docs.claude.com/claude-code) détaille la hiérarchie complète.
+- Pour partager des slash commands entre projets, créez un repo de plugins et installez-le via `/plugin install`.
+- Les git worktrees combinés à Claude permettent de paralléliser plusieurs features sans changer de branche.
+- Si vous gérez beaucoup de projets, scriptez un alias `cdc` qui fait `cd` puis `claude --continue` automatiquement.

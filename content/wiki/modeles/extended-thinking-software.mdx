@@ -1,0 +1,134 @@
+---
+title: "Extended Thinking : impact sur l'ingénierie logicielle"
+description: "Pourquoi le thinking améliore la résolution de bugs complexes (SWE-bench)."
+updatedAt: "2026-05-19"
+readingMinutes: 7
+---
+
+L'extended thinking change la donne sur l'ingénierie logicielle. Les benchmarks **SWE-bench Verified**, **Terminal-Bench** et **MultiSWE-bench** montrent un écart significatif entre les modèles Claude avec et sans thinking activé. Cet article explique pourquoi, et comment exploiter cette capacité concrètement dans un workflow dev.
+
+## Pourquoi le thinking aide pour le code
+
+Le code est un domaine où les **erreurs de raisonnement intermédiaire** se propagent. Un mauvais diagnostic au début d'un debug → patch incorrect → tests qui passent par hasard → bug en production.
+
+Le thinking force le modèle à :
+
+1. **Explorer plusieurs hypothèses** avant de coder.
+2. **Vérifier la cohérence** entre les fichiers lus et le patch proposé.
+3. **Anticiper les effets de bord** (autres call sites, tests existants).
+4. **Reconsidérer** quand une preuve contredit une hypothèse.
+
+## Impact mesuré sur SWE-bench
+
+| Configuration | Score relatif |
+|---|---|
+| Sonnet 4.6 sans thinking | Baseline |
+| Sonnet 4.6 + thinking 5k | +X points [à vérifier] |
+| Opus 4.7 + thinking 10k | +Y points [à vérifier] |
+
+Les chiffres exacts évoluent à chaque release. Consulte le model card officiel.
+
+## Activation dans un agent code
+
+```ts
+import Anthropic from "@anthropic-ai/sdk";
+
+const client = new Anthropic();
+
+async function fixBug(repoContext: string, bugReport: string) {
+  return client.messages.create({
+    model: "claude-sonnet-4-6",
+    max_tokens: 16000,
+    thinking: { type: "enabled", budget_tokens: 8000 },
+    system:
+      "Tu es un agent de debug. Lis le contexte, propose un plan, applique un patch unifié.",
+    messages: [
+      { role: "user", content: `Repo:\n${repoContext}\n\nBug:\n${bugReport}` },
+    ],
+  });
+}
+```
+
+## Patterns qui marchent
+
+### 1. Thinking + tool use itératif
+
+```ts
+// Le modèle pense, appelle read_file, repense, appelle edit_file...
+const tools = [
+  { name: "read_file", input_schema: {/*...*/} },
+  { name: "edit_file", input_schema: {/*...*/} },
+  { name: "run_tests", input_schema: {/*...*/} },
+];
+
+const res = await client.messages.create({
+  model: "claude-sonnet-4-6",
+  max_tokens: 32000,
+  thinking: { type: "enabled", budget_tokens: 10000 },
+  tools,
+  messages,
+});
+```
+
+### 2. Plan-then-execute
+
+Une stratégie efficace : utiliser Opus 4.7 + thinking large pour produire un **plan détaillé**, puis Sonnet 4.6 pour exécuter chaque étape sans thinking. Coût optimal, qualité préservée.
+
+### 3. Validation post-patch
+
+Faire repasser un thinking court (3k) sur le diff généré, en demandant : « Ce patch peut-il casser autre chose ? ». Le modèle attrape des régressions évidentes avant qu'elles n'atteignent la CI.
+
+## Quand le thinking n'aide pas
+
+| Tâche | Pourquoi |
+|---|---|
+| Reformater du JSON | Tâche déterministe |
+| Renommer une variable | Pas de raisonnement requis |
+| Générer un composant à partir d'un design ultra-clair | Le modèle sait déjà quoi écrire |
+| Compléter du boilerplate (DTO, type defs) | Latence inutile |
+
+## Effet sur la latence
+
+Un budget de 10k tokens thinking sur Opus ajoute facilement **20-40 secondes** avant le premier token de la réponse finale. Inacceptable pour un IDE interactif, normal pour un job batch ou un agent autonome.
+
+| Budget thinking | Latence ajoutée (Opus) [ordre de grandeur] |
+|---|---|
+| 2 000 | +5-10s |
+| 5 000 | +10-20s |
+| 10 000 | +20-40s |
+| 20 000 | +40-80s |
+
+> Pour un agent type Claude Code en mode auto, ce temps est rentable. Pour un autocomplete, il est prohibitif.
+
+## Combiner thinking et prompt caching
+
+```ts
+const res = await client.messages.create({
+  model: "claude-sonnet-4-6",
+  max_tokens: 16000,
+  thinking: { type: "enabled", budget_tokens: 6000 },
+  system: [
+    {
+      type: "text",
+      text: PROJECT_CONVENTIONS, // 8000 tokens
+      cache_control: { type: "ephemeral" },
+    },
+  ],
+  messages,
+});
+```
+
+Le cache compense largement le surcoût des tokens de thinking quand les prompts système sont réutilisés.
+
+## Bonnes pratiques
+
+- **Logger** les blocs thinking en debug pour comprendre les décisions.
+- **Ne pas exposer** le thinking à l'utilisateur final.
+- **Budget proportionnel** à la complexité : sous-budgeter tronque la réflexion, surbudgeter gaspille.
+- **A/B tester** avec et sans thinking sur ton propre dataset.
+
+## Pour aller plus loin
+
+- Article voisin : [Extended Thinking : mécanismes et token budgeting](/wiki/modeles/extended-thinking-mecanismes)
+- Article voisin : [Claude Sonnet 4.6](/wiki/modeles/sonnet-4-6)
+- Benchmarks officiels : https://docs.anthropic.com/en/docs/about-claude/models

@@ -1,0 +1,62 @@
+---
+title: "Resources, Tools, Prompts — les primitives MCP"
+description: "Comprendre les trois primitives fondamentales du protocole MCP et savoir quand utiliser chacune."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+Le Model Context Protocol (MCP) repose sur trois primitives qui structurent la communication entre un serveur et un client LLM comme Claude : **Resources**, **Tools** et **Prompts**. Chacune répond à un besoin précis. Les confondre conduit à des serveurs MCP mal conçus, lourds à utiliser et peu fiables. Voici comment les distinguer.
+
+## Resources : du contexte en lecture seule
+
+Les **Resources** exposent des données que le modèle peut lire pour s'informer. Elles sont identifiées par une URI (`file://`, `postgres://`, `github://issue/42`) et retournent du contenu textuel ou binaire. Pensez "GET" : pas d'effet de bord, pas de mutation.
+
+Exemples typiques :
+- Le contenu d'un fichier local
+- Les lignes d'une table SQL
+- Le corps d'un ticket Jira
+- Un schéma de base de données
+
+Côté client, les Resources sont souvent **sélectionnées par l'utilisateur** (via un picker @-mention dans Claude Desktop), ou **listées dynamiquement** par le serveur. Le LLM ne les invoque pas lui-même — il les consomme.
+
+## Tools : des actions exécutables par le modèle
+
+Les **Tools** sont des fonctions que le LLM décide d'appeler. Elles ont un nom, un schéma JSON d'entrée, et produisent une sortie structurée. À la différence des Resources, elles peuvent avoir des effets de bord : envoyer un email, créer un fichier, lancer un build.
+
+C'est l'équivalent du *function calling* classique d'Anthropic, mais standardisé par MCP. Le modèle voit la liste des tools disponibles dans son contexte et les invoque quand sa logique l'exige.
+
+Bonnes pratiques :
+- Un nom verbal explicite (`create_issue`, pas `issue`)
+- Un schéma JSON strict avec descriptions claires
+- Des messages d'erreur exploitables par le LLM
+- Idempotence quand c'est possible
+
+## Prompts : des templates pilotés par l'utilisateur
+
+Les **Prompts** sont des modèles de conversation paramétrés, déclenchés explicitement par l'utilisateur (souvent via une slash command ou un menu). Le serveur renvoie une séquence de messages prête à être injectée dans la conversation.
+
+Cas d'usage typiques :
+- `/review-pr` qui prépare un prompt avec le diff, le contexte du repo et les guidelines
+- `/summarize-meeting` qui formate un transcript
+- `/debug-error` qui assemble logs + stack trace + code source
+
+Les Prompts sont la primitive la moins utilisée mais la plus puissante pour cristalliser des **workflows répétitifs** dans une équipe.
+
+## Quand choisir quoi ?
+
+| Besoin | Primitive |
+|---|---|
+| Exposer un fichier, une table, un document | Resource |
+| Permettre au modèle d'agir (écrire, créer, déployer) | Tool |
+| Offrir une commande utilisateur réutilisable | Prompt |
+
+Une erreur fréquente : exposer une "liste de fichiers" comme un Tool `list_files` au lieu d'utiliser le mécanisme natif des Resources. Résultat : le modèle perd du temps à découvrir ce qu'il aurait dû voir d'emblée.
+
+Autre piège : transformer un Prompt en Tool. Si l'utilisateur doit explicitement déclencher l'action, c'est un Prompt. Si c'est le modèle qui choisit, c'est un Tool.
+
+## Pour aller plus loin
+
+- Spécification officielle MCP : [modelcontextprotocol.io](https://modelcontextprotocol.io)
+- SDK TypeScript et Python disponibles sur GitHub
+- Inspecteur MCP (`@modelcontextprotocol/inspector`) pour tester un serveur sans Claude
+- Comparer avec le function calling natif Anthropic pour comprendre ce que MCP apporte en plus : la portabilité entre clients

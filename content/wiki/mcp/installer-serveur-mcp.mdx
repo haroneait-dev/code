@@ -1,0 +1,108 @@
+---
+title: "Installer un serveur MCP"
+description: "Ajouter un serveur MCP à Claude Code avec claude mcp add, .mcp.json et les scopes user/project/local."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+Installer un serveur MCP dans Claude Code prend moins d'une minute. Deux chemins existent : la commande CLI `claude mcp add`, ou l'édition manuelle d'un fichier `.mcp.json`. Choisir l'un ou l'autre dépend du **scope** souhaité : voulez-vous ce serveur disponible partout, uniquement dans ce projet, ou seulement pour vous sur cette machine ?
+
+## La commande `claude mcp add`
+
+C'est le moyen le plus rapide. La syntaxe générale :
+
+```bash
+claude mcp add <nom> <commande> [arguments...]
+```
+
+Par exemple, pour ajouter le serveur Filesystem officiel et lui donner accès à `~/Documents` :
+
+```bash
+claude mcp add filesystem npx -y @modelcontextprotocol/server-filesystem ~/Documents
+```
+
+Pour un serveur Python lancé via `uvx` :
+
+```bash
+claude mcp add git uvx mcp-server-git --repository /chemin/vers/repo
+```
+
+La commande accepte aussi des variables d'environnement avec `-e` :
+
+```bash
+claude mcp add github -e GITHUB_TOKEN=ghp_xxx -- npx -y @modelcontextprotocol/server-github
+```
+
+Le `--` sépare les options de `claude mcp add` de la commande qui lance le serveur.
+
+## Les trois scopes
+
+Lors de l'ajout, vous précisez un scope avec `--scope` (ou `-s`) :
+
+- **`local`** (défaut) — Stocké dans `~/.claude.json`, propre à votre machine et au répertoire courant. Idéal pour des expérimentations ou des credentials personnels.
+- **`project`** — Écrit dans `.mcp.json` à la racine du projet. **Versionné dans git**, partagé avec toute l'équipe. Parfait pour les serveurs métier du projet (base de données de staging, API interne, etc.).
+- **`user`** — Stocké dans `~/.claude.json` sous une section globale. Disponible dans **tous vos projets**. Bon pour les serveurs transverses (Linear perso, Notion perso…).
+
+```bash
+claude mcp add --scope project postgres npx -y @modelcontextprotocol/server-postgres
+```
+
+Lorsqu'un serveur figure dans `.mcp.json` (scope project), Claude Code demande votre **consentement explicite** à la première utilisation, pour éviter qu'un dépôt malveillant injecte un serveur arbitraire.
+
+## La structure du fichier `.mcp.json`
+
+Le format est volontairement simple :
+
+```json
+{
+  "mcpServers": {
+    "filesystem": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "./src"]
+    },
+    "postgres": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-postgres"],
+      "env": {
+        "DATABASE_URL": "postgresql://localhost/mydb"
+      }
+    }
+  }
+}
+```
+
+Chaque entrée décrit comment **lancer** le serveur. Claude Code spawn le processus, ouvre les pipes stdio, et la session démarre.
+
+## Vérifier que tout fonctionne
+
+Plusieurs commandes utiles :
+
+```bash
+claude mcp list              # Liste tous les serveurs configurés
+claude mcp get filesystem    # Détails d'un serveur particulier
+claude mcp remove filesystem # Supprime un serveur
+```
+
+Dans une session Claude Code, tapez `/mcp` pour voir le statut de chaque connexion (connecté, erreur, en cours d'auth) et la liste des outils exposés.
+
+## Serveurs distants (HTTP / SSE)
+
+Depuis 2025, Claude Code supporte aussi les serveurs distants via Streamable HTTP :
+
+```bash
+claude mcp add --transport http monserveur https://mcp.exemple.com/api
+```
+
+Ces serveurs peuvent nécessiter une **authentification OAuth**, gérée automatiquement par Claude Code via un flow navigateur.
+
+## Bonnes pratiques
+
+- Commitez `.mcp.json` quand le serveur est nécessaire à l'équipe (base de données, API interne).
+- Utilisez `local` pour vos credentials personnels — ne les mettez **jamais** dans `.mcp.json` versionné.
+- Préférez `npx -y` ou `uvx` plutôt que des installations globales : cela garantit que la version est figée et lisible.
+- Activez le serveur en mode debug avec `claude --mcp-debug` pour voir les échanges JSON-RPC bruts.
+
+## Pour aller plus loin
+
+- Documentation officielle : `docs.anthropic.com/claude-code/mcp`
+- Article suivant : **Serveurs officiels** — tour d'horizon des serveurs maintenus par Anthropic et la communauté

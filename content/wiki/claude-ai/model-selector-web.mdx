@@ -1,0 +1,53 @@
+---
+title: "Le sélecteur de modèles web"
+description: "Bascules automatiques en cas de quota atteint et lock manuel sur Claude.ai."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+Le sélecteur de modèles, visible en haut de chaque conversation sur Claude.ai, ne se contente pas d'afficher le modèle actif : il orchestre une logique de bascule automatique destinée à préserver la continuité de l'usage même lorsque les quotas s'épuisent. Comprendre cette logique évite les mauvaises surprises — en particulier pour les utilisateurs Pro et Max qui pensent travailler avec Opus alors qu'ils ont silencieusement basculé sur Sonnet ou Haiku.
+
+## Les modèles disponibles
+
+Au moment d'écrire ces lignes, le sélecteur web propose trois familles principales : **Opus** (le plus capable, le plus lent, le plus coûteux en quota), **Sonnet** (équilibre vitesse/qualité, c'est le défaut sur la plupart des plans), et **Haiku** (rapide et économique, idéal pour des tâches simples et conversationnelles). Chaque famille suit une numérotation de version (4.5, 4.6, 4.7...) avec parfois des variantes "extended thinking" qui activent un mode de raisonnement étendu visible dans le pli "Thinking" de la réponse.
+
+## Bascule automatique en cas de quota atteint
+
+Les plans Claude.ai (Free, Pro, Max) imposent des limites par fenêtre de 5 heures sur le nombre de messages, qui varient selon le modèle utilisé. Opus consomme typiquement 3 à 5 fois plus de quota qu'un Sonnet. Lorsque vous atteignez la limite Opus avant la fin de la fenêtre, deux comportements sont possibles :
+
+1. **Bascule silencieuse** : par défaut, Claude.ai rétrograde automatiquement vers Sonnet et continue la conversation sans interruption. Un petit bandeau jaune apparaît en haut indiquant "Vous utilisez maintenant Sonnet car la limite Opus a été atteinte".
+2. **Blocage strict** : si vous avez verrouillé le modèle (voir section suivante), aucune bascule n'a lieu et Claude affiche un message "Quota atteint, réessayez à HH:MM".
+
+Cette logique vaut aussi pour la bascule Sonnet → Haiku sur les plans qui le permettent, et pour le retour automatique vers Opus à la prochaine fenêtre de 5h.
+
+## Verrouillage manuel du modèle
+
+Pour empêcher toute bascule, vous pouvez verrouiller le modèle dans les paramètres de compte (section "Modèles et limites" → "Comportement en cas de quota"). Trois options :
+
+- **Auto-bascule** (défaut) : Claude rétrograde automatiquement
+- **Lock strict** : aucune bascule, le quota atteint bloque la conversation
+- **Demander confirmation** : Claude propose la bascule via un bouton
+
+Le lock manuel est utile pour les utilisateurs qui veulent garantir la qualité Opus dans un contexte critique (rédaction juridique, analyse complexe) et préfèrent attendre la réinitialisation du quota plutôt que de recevoir une réponse Sonnet sans le savoir.
+
+## Bascule par message vs par conversation
+
+Le sélecteur peut être changé à tout moment, même au milieu d'une conversation. Le changement s'applique au prochain message envoyé : les précédents tours restent associés au modèle qui les a produits. Cela permet une stratégie "hybride" : démarrer un brainstorming sur Sonnet (rapide, plusieurs allers-retours), puis basculer sur Opus pour la synthèse finale qui demande plus de finesse. Attention, certains modèles ne partagent pas exactement la même fenêtre de contexte — un transfert de longue conversation peut tronquer l'historique perçu par le nouveau modèle.
+
+## Cas particulier des outils
+
+Lorsque vous utilisez des outils (recherche web, exécution de code, MCP), tous les modèles ne supportent pas l'ensemble des outils. Haiku, par exemple, n'a pas accès à l'extended thinking ni à certains MCP avancés. Si vous activez un outil incompatible, le sélecteur force automatiquement la promotion vers Sonnet ou Opus, indépendamment du verrou. Un avertissement apparaît alors dans la barre.
+
+## Stratégies recommandées
+
+- Utilisez Haiku pour les questions courtes ou les conversations triviales : vous préservez vos quotas Opus
+- Activez "Demander confirmation" si vous voulez garder le contrôle sans subir de bascule silencieuse
+- Surveillez le bandeau jaune : si vous le voyez souvent, envisagez le plan Max ou l'usage de l'API pour les charges lourdes
+- Pour les Projects récurrents, configurez le modèle préféré dans les paramètres du Project
+
+## Pour aller plus loin
+
+- Tableau comparatif officiel Opus / Sonnet / Haiku
+- Comprendre les fenêtres de quota de 5h et les limites hebdomadaires
+- Quand passer de Claude.ai à l'API pour des workloads intenses
+- Différences entre extended thinking et mode standard

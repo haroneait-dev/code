@@ -1,0 +1,142 @@
+---
+title: "Markdown frontmatter dans les slash commands"
+description: "Tous les champs supportés dans le frontmatter d'une slash command et leur effet."
+updatedAt: "2026-05-19"
+readingMinutes: 5
+---
+
+Le frontmatter YAML en haut d'un fichier `.md` de slash command n'est pas décoratif : chaque champ a un effet précis sur la façon dont Claude Code exécute la commande. Description visible dans `/help`, restriction des tools, hint d'argument, choix du modèle... bien remplir le frontmatter rend vos commandes prévisibles, sûres et plus économiques.
+
+## Anatomie complète
+
+Voici une commande qui utilise tous les champs courants, `.claude/commands/pr-review.md` :
+
+```md
+---
+description: "Review approfondie d'une pull request GitHub"
+argument-hint: "<numéro de PR>"
+allowed-tools: [Read, Grep, Bash(gh pr:*), Bash(gh api:*)]
+model: claude-opus-4-7
+---
+
+Review approfondie de la PR #$ARGUMENTS.
+
+1. Récupère le diff avec `gh pr diff $ARGUMENTS`
+2. Analyse les changements selon les critères :
+   - correctness
+   - sécurité
+   - performance
+   - tests
+   - lisibilité
+3. Poste un résumé en commentaire avec `gh pr comment`
+```
+
+## `description`
+
+Apparaît dans `/help` à côté du nom de la commande. C'est la documentation à un niveau d'abstraction utile : pas le code, pas le détail d'implémentation, juste ce que la commande fait du point de vue de l'utilisateur.
+
+Bonne description : `"Review approfondie d'une pull request GitHub"`
+Mauvaise : `"Lance gh pr diff puis appelle l'API"` (trop technique, change avec l'implé).
+
+## `argument-hint`
+
+Hint affiché à côté du nom dans l'auto-complétion. Utilisez les conventions Unix : `<obligatoire>`, `[optionnel]`, `a|b|c` pour des choix.
+
+```yaml
+argument-hint: "<numéro de PR>"
+argument-hint: "[fichier]"
+argument-hint: "<patch|minor|major>"
+argument-hint: "<méthode HTTP> <chemin>"
+```
+
+Pas de hint = champ vide dans `/help`. Pour des commandes partagées en équipe, c'est presque obligatoire.
+
+## `allowed-tools`
+
+C'est le champ le plus important pour la sécurité. Il restreint les tools que Claude peut utiliser **uniquement pour cette commande**. Tout ce qui n'est pas dans la liste est interdit.
+
+```yaml
+allowed-tools: [Read, Grep, Bash(gh pr:*), Bash(gh api:*)]
+```
+
+Syntaxe :
+
+- Nom de tool seul : `Read`, `Edit`, `Write`, `Grep`, `Glob`
+- Tool avec pattern : `Bash(npm:*)`, `Bash(git status)`, `WebFetch(https://docs.claude.com/*)`
+- Wildcards `*` à la fin d'un pattern
+
+Si vous omettez `allowed-tools`, la commande hérite des permissions globales de la session. Si vous le définissez, c'est cette liste qui l'emporte — y compris contre les permissions globales plus permissives. C'est le mécanisme de "least privilege" : votre `/db:migrate` ne pourra pas appeler `rm -rf` même si vous l'avez autorisé ailleurs.
+
+## `model`
+
+Force un modèle spécifique pour l'exécution de cette commande. Utile dans deux cas :
+
+```yaml
+model: claude-opus-4-7      # tâche critique, on veut Opus
+model: claude-haiku-4-5     # tâche simple, on veut Haiku pour la latence
+```
+
+- **Tâche critique** (audit sécurité, refactor complexe) : forcez Opus même si l'utilisateur est sur Sonnet par défaut.
+- **Tâche très simple** (lint, format, résumé court) : forcez Haiku pour réduire le coût et la latence.
+
+Sans ce champ, la commande utilise le modèle courant de la session.
+
+## Autres champs (selon la version)
+
+D'autres champs peuvent apparaître selon la version de Claude Code :
+
+- `temperature` : ajuster la température pour cette commande (rare).
+- `disallowed-tools` : liste noire explicite (l'inverse d'`allowed-tools`).
+- `pre-prompt` / `post-prompt` : injecter du texte avant/après le corps du fichier.
+
+Vérifiez la doc officielle de votre version pour la liste exhaustive.
+
+## Patterns recommandés
+
+**Commande de lecture seule** :
+
+```yaml
+---
+description: "Liste les TODO du code"
+allowed-tools: [Read, Grep, Glob]
+model: claude-haiku-4-5
+---
+```
+
+Restreindre à `Read/Grep/Glob` garantit qu'aucun fichier ne sera modifié, peu importe ce que demande l'utilisateur.
+
+**Commande d'audit coûteuse** :
+
+```yaml
+---
+description: "Audit architecture complet"
+allowed-tools: [Read, Grep, Glob, Bash(git log:*)]
+model: claude-opus-4-7
+---
+```
+
+Opus + lecture seule + accès à l'historique git.
+
+**Commande sandbox-friendly** :
+
+```yaml
+---
+description: "Génère un fichier de test sans toucher au code prod"
+allowed-tools: [Read, Write(tests/**), Bash(npm test:*)]
+---
+```
+
+`Write(tests/**)` n'autorise les écritures que dans `tests/`. Combiné aux permissions globales, c'est une garantie forte.
+
+## Erreurs fréquentes
+
+- **YAML invalide** : tab au lieu d'espaces, deux-points manquant, guillemets non échappés. La commande disparaît silencieusement de `/help`.
+- **`allowed-tools` trop large** : `Bash(*)` annule l'intérêt. Préférez des préfixes.
+- **`model` sur une commande légère** : forcer Opus pour générer une liste de TODO coûte 5× plus pour rien.
+- **`description` qui ment** : si la commande fait plus que ce qu'elle dit, l'utilisateur ne peut pas s'y fier.
+
+## Pour aller plus loin
+
+- Doc officielle : https://docs.claude.com/en/docs/claude-code/slash-commands
+- Guide "Bash injection sécurisée" pour les détails sur les patterns Bash
+- Tester votre frontmatter : `/help` doit afficher la description correctement

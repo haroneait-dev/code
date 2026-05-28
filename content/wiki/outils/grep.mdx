@@ -1,0 +1,191 @@
+---
+title: "L'outil Grep"
+description: "Rechercher dans le contenu de fichiers avec Claude Code — regex, multiline, contextes et output modes."
+updatedAt: "2026-05-19"
+readingMinutes: 8
+---
+
+`Grep` est le moteur de recherche textuelle de Claude Code. Bâti sur `ripgrep` (`rg`), il est rapide, support complet des regex, et conçu pour scanner des codebases entières en quelques millisecondes. Là où `Glob` cherche des noms de fichiers, `Grep` cherche **dans** les fichiers. C'est l'outil indispensable pour comprendre où une fonction est appelée, où une variable est définie, ou où un bug pourrait se cacher.
+
+## À quoi sert Grep
+
+- Trouver les appels d'une fonction (`functionName\\(`) ;
+- Localiser une string d'erreur précise (`"Cannot read property"`) ;
+- Lister les fichiers contenant un import spécifique (`from ['"]@supabase`) ;
+- Identifier des patterns suspects (`TODO`, `FIXME`, `console.log`) ;
+- Cartographier les usages d'une API.
+
+## Paramètres principaux
+
+| Paramètre | Type | Description |
+|-----------|------|-------------|
+| `pattern` | string | Regex (style ripgrep) — **obligatoire** |
+| `path` | string | Fichier ou dossier où chercher |
+| `glob` | string | Filtre par pattern (`"*.ts"`) |
+| `type` | string | Filtre par type (`"ts"`, `"py"`, `"js"`) |
+| `output_mode` | string | `content`, `files_with_matches`, `count` |
+| `-i` | boolean | Case insensitive |
+| `-n` | boolean | Inclure numéros de ligne (si `content`) |
+| `-A` / `-B` / `-C` | integer | Lignes de contexte après / avant / des deux côtés |
+| `multiline` | boolean | Active le mode multilignes (`.` matche `\n`) |
+| `head_limit` | integer | Limiter le nombre de résultats |
+
+## Output modes
+
+**`files_with_matches`** (défaut) : ne retourne que les chemins de fichiers qui contiennent le motif. Idéal pour cartographier.
+
+**`content`** : retourne les lignes qui matchent, avec éventuellement leur contexte. Idéal pour comprendre un usage.
+
+**`count`** : retourne le nombre d'occurrences par fichier. Idéal pour prioriser.
+
+## Exemples concrets
+
+### Tous les fichiers qui importent `useState`
+
+```bash
+Grep(
+  pattern="import.*useState",
+  type="tsx",
+  output_mode="files_with_matches"
+)
+```
+
+### Lignes qui définissent une route API
+
+```bash
+Grep(
+  pattern="export async function (GET|POST|PUT|DELETE)",
+  glob="app/api/**/*.ts",
+  output_mode="content",
+  "-n": true
+)
+```
+
+### Tous les `TODO` et `FIXME` du projet
+
+```bash
+Grep(
+  pattern="(TODO|FIXME):",
+  output_mode="content",
+  "-n": true,
+  "-C": 1
+)
+```
+
+### Recherche multilignes
+
+Pour trouver un bloc qui s'étend sur plusieurs lignes :
+
+```bash
+Grep(
+  pattern="export default function.*\\{[^}]*useEffect",
+  multiline=true,
+  type="tsx"
+)
+```
+
+### Compter les `console.log` par fichier
+
+```bash
+Grep(
+  pattern="console\\.log",
+  type="ts",
+  output_mode="count"
+)
+```
+
+## Regex : la syntaxe ripgrep
+
+Grep utilise la syntaxe regex de ripgrep — proche de Rust regex, donc :
+
+- pas de lookbehind variable (mais le lookbehind fixe est OK selon version) ;
+- `\\d`, `\\w`, `\\s` standards ;
+- groupes nommés `(?P<name>...)` ;
+- alternation `(a|b)`, classes `[a-z]`, quantificateurs `*`, `+`, `?`, `{n,m}`.
+
+Important : dans un appel d'outil, les `\\` JSON doivent être doublés. `\\d+` dans le code → `\d+` pour ripgrep.
+
+## Pièges courants
+
+**Caractères spéciaux non échappés.** `.` matche n'importe quel caractère, pas un point littéral. Pour matcher `app.config.js`, écrivez `app\\.config\\.js`.
+
+**Multiline désactivé par défaut.** `.` ne matche pas `\n`. Pour traverser des lignes, activez `multiline=true`.
+
+**`output_mode="content"` sans `-n`.** Sans numéros de ligne, vous ne pouvez pas situer le match. Activez `-n` quasi systématiquement.
+
+**`head_limit` oublié.** Sur un gros codebase, une recherche large peut retourner 5000 lignes. Limitez avec `head_limit=100`.
+
+**Confondre `glob` et `type`.** `glob="*.ts"` filtre par pattern. `type="ts"` utilise la table de types de ripgrep (qui inclut aussi `.tsx`, `.cts`, `.mts`). Préférez `type` quand il existe.
+
+**Recherche dans node_modules.** Grep respecte les `.gitignore` par défaut. Si vous voulez quand même chercher dans `node_modules`, il faut le préciser explicitement (selon la config).
+
+## Combinaisons typiques
+
+### Renommer une API en plusieurs étapes
+
+```bash
+# 1. Repérer tous les fichiers
+Grep(pattern="oldApiName", output_mode="files_with_matches")
+
+# 2. Pour chaque fichier
+Read(file_path="...")
+Edit(file_path="...", old_string="oldApiName", new_string="newApiName", replace_all=true)
+```
+
+### Diagnostiquer une erreur
+
+```bash
+# 1. Trouver l'erreur exacte
+Grep(pattern="Cannot read property 'foo' of undefined", output_mode="files_with_matches")
+
+# 2. Si elle vient d'une lib, chercher dans la source
+Grep(
+  pattern="property 'foo'",
+  path="/Users/harone/projet/node_modules/some-lib"
+)
+```
+
+### Cartographier un module
+
+```bash
+# Tous les exports d'un dossier
+Grep(
+  pattern="^export (const|function|class|type|interface)",
+  path="src/auth",
+  output_mode="content",
+  "-n": true
+)
+```
+
+## Contexte : -A, -B, -C
+
+- `-A 3` : 3 lignes **après** le match
+- `-B 3` : 3 lignes **avant**
+- `-C 3` : 3 lignes **avant et après**
+
+Très utile pour comprendre un usage sans devoir lire tout le fichier :
+
+```bash
+Grep(
+  pattern="useSupabase\\(\\)",
+  "-C": 5,
+  output_mode="content",
+  "-n": true
+)
+```
+
+## Performance
+
+Ripgrep est l'un des outils de grep les plus rapides au monde. Sur un repo Linux entier (40M lignes), il scanne en quelques secondes. Sur un projet typique, attendez-vous à < 100 ms.
+
+Bonnes pratiques pour rester rapide :
+
+- préférer `type=ts` à `glob="**/*.ts"` (plus rapide en interne) ;
+- filtrer par dossier avec `path` ;
+- éviter les regex en lookbehind lourdes.
+
+## Pour aller plus loin
+
+- [Documentation ripgrep](https://github.com/BurntSushi/ripgrep)
+- Voir aussi : `Glob` pour les noms de fichiers, `Read` pour lire un fichier identifié.
+- Astuce : combinez `output_mode="count"` + tri pour identifier les "hot files" d'une codebase — ceux qui contiennent le plus d'une chose donnée (logs, console, TODO, etc.).

@@ -1,0 +1,100 @@
+---
+title: "Code review automatisé"
+description: "Workflow pour auditer chaque PR avec Claude — /security-review, /review, GitHub Action."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+Faire relire chaque pull request par Claude permet de détecter les régressions, les fuites de secrets et les anti-patterns avant qu'un humain n'ouvre le diff. Ce workflow combine deux slash commands (`/review`, `/security-review`) et une GitHub Action déclenchée automatiquement à chaque PR.
+
+## Pourquoi automatiser la review
+
+Une review humaine prend en moyenne 30 minutes et reste sujette à la fatigue. Claude lit le diff complet, croise avec les fichiers impactés et produit un rapport structuré en moins d'une minute. Il ne remplace pas la review humaine — il la prépare, filtre le bruit et garantit qu'aucun PR ne part en production sans un premier passage.
+
+Les bénéfices observés sur un repo Next.js de taille moyenne :
+
+- Détection systématique de `console.log` oubliés, de `any` en TypeScript, de routes API sans vérification d'auth.
+- Repérage des secrets commités par erreur (clés Supabase, tokens Vercel).
+- Suggestions de refacto sur des fonctions trop longues ou dupliquées.
+
+## Slash commands prêts à l'emploi
+
+Claude Code ships avec deux commandes intégrées qui couvrent 80 % des besoins.
+
+```bash
+/review
+/security-review
+```
+
+`/review` produit un rapport général : qualité, lisibilité, tests, types. `/security-review` se concentre sur les vulnérabilités : injection SQL, XSS, auth manquante, secrets hardcodés, dépendances vulnérables.
+
+Vous pouvez aussi créer votre commande personnalisée dans `.claude/commands/review-pr.md` :
+
+```text
+Analyse le diff entre la branche actuelle et main.
+Pour chaque fichier modifié :
+1. Vérifie qu'il n'y a pas de secret, clé API ou token.
+2. Vérifie que les routes API ont une vérification d'auth.
+3. Repère les TODO, FIXME et console.log oubliés.
+4. Suggère 1 à 3 améliorations concrètes.
+Termine par un verdict : APPROVE, REQUEST_CHANGES ou COMMENT.
+```
+
+## Brancher Claude sur GitHub Actions
+
+Le vrai déclic vient quand la review tourne sans intervention. Voici un workflow minimal qui s'exécute à chaque PR ouverte ou mise à jour.
+
+```bash
+# .github/workflows/claude-review.yml
+name: Claude PR Review
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          command: /review
+          post_comment: true
+```
+
+Le commentaire généré apparaît directement dans la PR, avec les lignes annotées. L'équipe peut ensuite valider, demander un fix ou ignorer.
+
+## Affiner les règles de review
+
+Pour adapter la review à votre stack, créez un `CLAUDE.md` à la racine décrivant les conventions du projet : framework, patterns d'auth, structure des routes, conventions de nommage. Claude lit ce fichier avant chaque review et applique vos règles plutôt que des règles génériques.
+
+Exemple de prompt à intégrer dans le fichier :
+
+```text
+Conventions de review pour ce repo :
+- Toutes les routes /api/* doivent vérifier un Bearer token Supabase.
+- Pas de `any` en TypeScript — préférer `unknown` + narrowing.
+- Les composants React doivent rester sous 300 lignes.
+- Tout fichier qui touche au paiement requiert un test unitaire.
+```
+
+## Gérer le coût et le bruit
+
+Une review automatique sur chaque commit peut devenir coûteuse et générer du bruit. Quelques garde-fous :
+
+- Limiter le déclenchement aux PRs (pas aux pushes sur les branches feature).
+- Skip les PRs draft via `if: github.event.pull_request.draft == false`.
+- Cacher la review derrière un label `needs-claude-review` pour ne consommer que sur demande.
+
+## Pour aller plus loin
+
+- Documentation officielle de la `claude-code-action` sur GitHub.
+- Combiner avec `/security-review` dans un job séparé pour produire deux commentaires distincts.
+- Ajouter un job qui exécute `npm run lint` et passe le résultat à Claude pour corrélation.
+- Mesurer le taux de faux positifs sur 20 PR avant de bloquer le merge sur le verdict de Claude.

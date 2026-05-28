@@ -1,0 +1,164 @@
+---
+title: "Tool use patterns"
+description: "Patterns récurrents d'utilisation des outils Claude Code — parallélisation, chaînage, branching."
+updatedAt: "2026-05-19"
+readingMinutes: 7
+---
+
+Au-delà de chaque outil pris isolément, ce qui fait l'efficacité de Claude Code est la **manière de les enchaîner**. Trois patterns reviennent constamment : la **parallélisation**, le **chaînage** et le **branching**. Maîtriser ces trois schémas, c'est passer d'un assistant qui exécute pas à pas à un assistant qui orchestre des workflows.
+
+## Pattern 1 : la parallélisation
+
+**Idée :** lancer plusieurs outils dans un même message tool calls, quand ils sont indépendants.
+
+### Quand paralléliser
+
+- Plusieurs `Read` sur des fichiers différents ;
+- Plusieurs `Glob` ou `Grep` indépendants ;
+- Plusieurs commandes `git` lecture seule (`git status`, `git diff`, `git log`) ;
+- Plusieurs `WebFetch` sur des URLs non liées ;
+- Plusieurs `Task` (subagents) sur des périmètres distincts.
+
+### Exemple : exploration initiale d'un repo
+
+```bash
+# Dans un seul message, 4 outils en parallèle
+Read(file_path="/.../README.md")
+Read(file_path="/.../package.json")
+Read(file_path="/.../CLAUDE.md")
+Glob(pattern="app/**/page.tsx")
+```
+
+Au lieu de 4 messages séquentiels, Claude récupère tout en une seule "tour" — c'est 3 à 4x plus rapide.
+
+### Exemple : audit git
+
+```bash
+Bash(command="git status", description="Status")
+Bash(command="git diff", description="Unstaged diff")
+Bash(command="git diff --cached", description="Staged diff")
+Bash(command="git log --oneline -10", description="Recent commits")
+```
+
+### Quand ne PAS paralléliser
+
+- L'outil B dépend du résultat de l'outil A (ex. lire un fichier dont le chemin vient d'un Glob précédent) ;
+- Vous voulez décider en fonction d'un premier résultat ;
+- Vous touchez aux mêmes ressources (deux Edit sur le même fichier).
+
+## Pattern 2 : le chaînage
+
+**Idée :** enchaîner séquentiellement des outils où chaque étape utilise le résultat de la précédente.
+
+### Workflow type : trouver → lire → modifier
+
+```bash
+# 1. Trouver
+Grep(pattern="oldFunctionName", output_mode="files_with_matches")
+
+# 2. Lire chaque fichier identifié
+Read(file_path="/.../A.ts")
+Read(file_path="/.../B.ts")
+
+# 3. Éditer
+Edit(file_path="/.../A.ts", old_string="oldFunctionName", new_string="newFunctionName", replace_all=true)
+Edit(file_path="/.../B.ts", old_string="oldFunctionName", new_string="newFunctionName", replace_all=true)
+```
+
+L'étape 1 conditionne 2, qui conditionne 3. Pas de parallélisation possible entre les étapes — mais les outils **à l'intérieur** d'une étape peuvent être parallèles.
+
+### Chaînage avec validation
+
+```bash
+# 1. Lire un fichier de config
+Read(file_path="/.../config.ts")
+
+# 2. Modifier
+Edit(file_path="/.../config.ts", old_string="...", new_string="...")
+
+# 3. Vérifier que la build passe
+Bash(command="npm run build", description="Verify build")
+
+# 4. Si OK → commit ; sinon → debug
+```
+
+## Pattern 3 : le branching
+
+**Idée :** prendre une décision après un outil, et brancher vers un sous-workflow différent selon le résultat.
+
+### Exemple : diagnostic puis fix
+
+```bash
+# 1. Diagnostiquer
+Bash(command="npm test", description="Run tests")
+```
+
+Selon le résultat :
+
+- **Tests passent** → terminer ou commiter.
+- **Tests échouent dans le module X** → lire `X.test.ts`, lire `X.ts`, identifier le bug, corriger, relancer.
+- **Tests échouent dans plusieurs modules** → `Task(subagent...)` pour analyser, ou lancer plusieurs Read en parallèle.
+
+### Exemple : exploration adaptative
+
+```bash
+Glob(pattern="**/auth/**/*.ts")
+```
+
+- 0 résultat → l'auth est ailleurs, élargir la recherche
+- 5 résultats → tout lire en parallèle
+- 50 résultats → grep pour cibler ou subagent pour résumer
+
+## Combinaisons de patterns
+
+Les workflows réels combinent les trois.
+
+### Refactoring d'une API
+
+```text
+1. Parallèle : Read(README), Read(package.json), Glob(**/api/*.ts)
+2. Chaînage : Grep(pattern="oldApi") → choix de la stratégie
+3. Branching : selon nombre de fichiers
+   - peu : Edit direct dans chaque
+   - beaucoup : Task subagent par sous-module
+4. Parallèle : tous les Edit indépendants
+5. Chaînage : Bash(build) → Bash(test) → si OK commit
+```
+
+### Investigation d'un bug
+
+```text
+1. Parallèle : Read(stack trace fichier), Grep(message d'erreur), git log
+2. Branching :
+   - bug récent → git diff sur derniers commits
+   - bug ancien → exploration plus large
+3. Chaînage : reproduction → diagnostic → fix → test → commit
+```
+
+## Bonnes pratiques
+
+**Pensez "dépendances" avant chaque message.** Avant d'envoyer une tool call, demandez-vous : "Quels autres outils puis-je lancer en parallèle ?". Si la réponse est "rien", c'est une étape unique. Sinon, regroupez.
+
+**Limitez le fan-out parallèle.** 5-8 outils en parallèle = OK. 30 en parallèle = output illisible, surcoût en tokens, et risque de course critique. Préférez le map-reduce via subagents.
+
+**Documentez le plan via TodoWrite.** Pour un workflow long, matérialisez le plan. Cela aide l'utilisateur à suivre et vous à ne pas oublier.
+
+**Échouez tôt.** Si une étape critique rate (ex. build), ne continuez pas en aveugle. Branchez vers le debug.
+
+**Validez avant de commiter.** Le chaînage classique se termine par : `build OK + test OK + diff revu` → commit. Pas avant.
+
+## Anti-patterns
+
+| Symptôme | Problème | Remède |
+|----------|----------|--------|
+| 10 messages "Read fichier X" séparés | Pas de parallélisation | Regrouper en un message |
+| Edit sans Read préalable | Risque d'écraser de l'inattendu | Toujours lire avant |
+| Bash en boucle de polling | Gaspillage de tokens | run_in_background + Monitor |
+| Subagent pour 1 Read | Overhead injustifié | Faire le Read directement |
+| Toujours en mode séquentiel | Lent | Identifier les indépendances |
+
+## Pour aller plus loin
+
+- [Documentation Claude Code](https://docs.claude.com/en/docs/claude-code)
+- Voir aussi : `Task` pour déléguer un sous-workflow, `TodoWrite` pour formaliser le plan.
+- Astuce : pour un projet complexe, créez un skill qui encode votre workflow type (audit-react, migration-db, etc.) — Claude appliquera automatiquement le bon pattern de parallélisation et chaînage.

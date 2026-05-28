@@ -1,0 +1,108 @@
+---
+title: "Claude Opus 4.7 — haute réflexion"
+description: "Le modèle premium d'Anthropic : capacités, benchmarks, cas d'usage."
+updatedAt: "2026-05-19"
+readingMinutes: 8
+---
+
+`claude-opus-4-7` est le modèle haut de gamme de la famille Claude 4.x. Conçu pour les tâches qui exigent une **réflexion profonde**, une planification multi-étapes et une grande rigueur de raisonnement, Opus 4.7 se positionne comme le modèle de référence pour la recherche, l'ingénierie logicielle complexe et les workflows agentiques de longue durée. Il est plus lent et plus cher que Sonnet, mais reste irremplaçable dès que la qualité de la sortie prime sur le coût.
+
+## Positionnement dans la gamme
+
+Opus 4.7 succède à Opus 4.5 et 4.6. La principale évolution porte sur l'**extended thinking**, la stabilité sur les tâches longues (agents qui tournent plusieurs heures) et les performances sur les benchmarks de code (SWE-bench, Terminal-Bench).
+
+| Critère | Opus 4.7 | Sonnet 4.6 | Haiku 4.5 |
+|---|---|---|---|
+| Vitesse | Lente | Moyenne | Très rapide |
+| Coût relatif | Élevé | Moyen | Faible |
+| Raisonnement | Excellent | Très bon | Bon |
+| Cas typique | Recherche, agents longs | Code quotidien | Volume, classification |
+
+> Astuce : utiliser Opus pour la **planification** et Sonnet pour l'**exécution** est un pattern courant qui combine qualité et coût.
+
+## Capacités clés
+
+- **Extended thinking** étendu : Opus 4.7 peut allouer un budget de tokens de réflexion plus large que les modèles Sonnet/Haiku.
+- **Tool use** robuste : meilleure tenue sur les chaînes de plus de 50 appels d'outils sans dégradation.
+- **Vision** : lecture de captures d'écran, schémas, PDF — utile pour debug d'UI ou extraction structurée.
+- **Contexte 200K tokens** d'entrée, comme l'ensemble de la gamme 4.x.
+
+## Appel via le SDK
+
+```ts
+import Anthropic from "@anthropic-ai/sdk";
+
+const client = new Anthropic();
+
+const message = await client.messages.create({
+  model: "claude-opus-4-7",
+  max_tokens: 4096,
+  thinking: { type: "enabled", budget_tokens: 10000 },
+  messages: [
+    { role: "user", content: "Analyse ce bug de race condition..." },
+  ],
+});
+
+console.log(message.content);
+```
+
+Côté Python :
+
+```python
+from anthropic import Anthropic
+
+client = Anthropic()
+msg = client.messages.create(
+    model="claude-opus-4-7",
+    max_tokens=4096,
+    thinking={"type": "enabled", "budget_tokens": 10000},
+    messages=[{"role": "user", "content": "Planifie une migration Postgres."}],
+)
+```
+
+## Cas d'usage où Opus brille
+
+1. **Refactorings architecturaux** sur des codebases de plus de 100k lignes
+2. **Recherche scientifique** : lecture critique d'un papier + génération d'hypothèses
+3. **Agents long-running** (Claude Code en mode auto, agents Computer Use)
+4. **Stratégie produit** : analyse SWOT, roadmap, arbitrages
+5. **Audit de sécurité** : revue manuelle assistée, détection de vulnérabilités subtiles
+
+## Quand ne PAS prendre Opus
+
+- Classification simple → Haiku suffit largement
+- Génération de code "boilerplate" → Sonnet est plus rentable
+- Chatbot grand public à fort trafic → coût prohibitif
+- Tâches sub-secondes où la latence est critique
+
+> Règle pragmatique : si Sonnet 4.6 fait le job avec un prompt soigné, reste sur Sonnet. Passe à Opus quand tu observes des **erreurs de raisonnement répétées** que les itérations de prompt ne corrigent pas.
+
+## Benchmarks indicatifs
+
+Les chiffres précis varient selon les évaluations publiées par Anthropic. Sur SWE-bench Verified, Opus 4.7 occupe la première place de la gamme Anthropic [à vérifier sur la page officielle des benchmarks]. Sur Terminal-Bench, MMLU et GPQA, Opus reste sensiblement au-dessus de Sonnet, avec un écart qui se creuse sur les tâches **multi-étapes** (où l'extended thinking change la donne).
+
+## Bonnes pratiques de prompting
+
+- Donner un **rôle** clair (« Tu es un ingénieur sénior spécialisé en systèmes distribués »).
+- Décomposer les demandes complexes en étapes numérotées.
+- Activer le **thinking** avec un budget proportionnel à la complexité (5k–20k tokens).
+- Utiliser **prompt caching** pour les longs prompts système répétés — Opus en bénéficie particulièrement vu son coût d'input.
+
+```json
+{
+  "system": [
+    {
+      "type": "text",
+      "text": "Tu es un assistant de revue de code...",
+      "cache_control": { "type": "ephemeral" }
+    }
+  ]
+}
+```
+
+## Pour aller plus loin
+
+- Documentation officielle des modèles : https://docs.anthropic.com/en/docs/about-claude/models
+- Guide extended thinking : https://docs.claude.com
+- Article voisin : [Choisir le bon modèle](/wiki/modeles/choisir-bon-modele)
+- Article voisin : [Extended Thinking : mécanismes et token budgeting](/wiki/modeles/extended-thinking-mecanismes)

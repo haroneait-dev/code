@@ -1,0 +1,95 @@
+---
+title: "Skill vs agent vs MCP : quelles différences ?"
+description: "Comprendre les trois grands mécanismes d'extension de Claude Code et savoir quand utiliser chacun."
+updatedAt: "2026-05-19"
+readingMinutes: 7
+---
+
+Claude Code propose trois mécanismes d'extension qui se ressemblent en surface mais répondent à des besoins très différents : les **Skills**, les **subagents** et les **serveurs MCP**. Bien comprendre leurs frontières évite d'écrire un MCP là où un simple Skill suffirait, ou de surcharger un subagent avec une logique qui aurait dû vivre dans un outil externe.
+
+## Le Skill : un dossier d'instructions versionnable
+
+Un Skill est un dossier contenant un fichier `SKILL.md` (frontmatter YAML + corps Markdown) que Claude active automatiquement quand le contexte l'exige. C'est essentiellement un **prompt système enrichi**, packagé pour être réutilisable.
+
+```md
+---
+name: pdf-form-filler
+description: Remplit automatiquement des PDF interactifs avec pdftk
+allowed-tools:
+  - Bash
+  - Read
+  - Write
+---
+
+# PDF Form Filler
+
+Quand l'utilisateur demande de remplir un PDF, suis cette procédure...
+```
+
+Le Skill ne tourne pas dans un processus séparé : son contenu est injecté dans la fenêtre de contexte au moment opportun. Pas de serveur, pas de port, pas de runtime.
+
+## Le subagent : une tâche déléguée
+
+Un subagent est une **sous-conversation** lancée par Claude principal pour effectuer une tâche isolée, avec sa propre fenêtre de contexte. On les déclenche via l'outil `Task` ou en les définissant comme types personnalisés dans `.claude/agents/`. Ils brillent pour :
+
+- Recherches exploratoires sur un gros codebase sans polluer le contexte principal
+- Workflows multi-étapes nécessitant de garder le contexte propre
+- Tâches longues qu'on veut exécuter en parallèle
+
+Contrairement au Skill, le subagent **consomme des tokens** à chaque invocation et démarre une nouvelle session.
+
+## Le MCP : un serveur d'outils externe
+
+Un serveur **Model Context Protocol** expose des outils (`tools`), des ressources (`resources`) et des prompts via un protocole standard JSON-RPC. C'est un **processus séparé** qui tourne en local ou en remote et avec lequel Claude dialogue.
+
+```bash
+claude mcp add github -- npx -y @modelcontextprotocol/server-github
+```
+
+Un MCP est indispensable quand vous voulez :
+
+- Appeler une API externe avec authentification gérée hors de Claude
+- Exposer des données vivantes (DB, Notion, GitHub) comme ressources
+- Partager les mêmes outils entre Claude Code, Claude Desktop et d'autres clients
+
+## Tableau récapitulatif
+
+| Critère | Skill | Subagent | MCP |
+|---|---|---|---|
+| Forme | Dossier `.md` | Conversation isolée | Serveur JSON-RPC |
+| Activation | Auto / manuel | Outil `Task` | Outils exposés |
+| Coût tokens | Injection contextuelle | Nouvelle session | Round-trip outil |
+| Persistance | Stateless | Stateless | Peut être stateful |
+| Idéal pour | Procédures + heuristiques | Tâches isolées lourdes | Intégrations externes |
+
+## Quand choisir quoi ?
+
+**Choisissez un Skill** quand vous voulez encapsuler un savoir-faire (une checklist, une convention, une recette) que Claude doit appliquer naturellement quand le contexte s'y prête. Exemple : `react-best-practices`, `security-review`.
+
+**Choisissez un subagent** quand la tâche est lourde, autonome et qu'elle bénéficie d'un contexte vierge. Exemple : auditer la sécurité d'un module entier, refactorer un dossier de 50 fichiers.
+
+**Choisissez un MCP** quand vous avez besoin d'un canal vers un service externe (API, base de données, SaaS). Exemple : Slack, Linear, Supabase, Stripe.
+
+## Composer les trois
+
+Les trois ne sont pas exclusifs. Un usage avancé typique :
+
+1. Un **MCP Linear** expose les tickets comme outils.
+2. Un **Skill** `ticket-resolver` décrit la procédure pour transformer un ticket en PR.
+3. Un **subagent** est invoqué pour explorer le code lié au ticket sans polluer la session.
+
+```bash
+# Installer un MCP, un Skill et utiliser un subagent
+claude mcp add linear -- npx -y @linear/mcp
+npx claude-mem add ticket-resolver
+# Le subagent est invoqué dynamiquement via l'outil Task
+```
+
+Le Skill agit comme **chef d'orchestre** : il sait quand appeler le MCP, quand déléguer à un subagent, et quand répondre lui-même.
+
+## Pour aller plus loin
+
+- Documentation officielle des Skills : https://docs.claude.com/en/docs/claude-code/skills
+- Référence MCP : https://modelcontextprotocol.io
+- Dépôt `anthropics/skills` pour étudier des cas réels : https://github.com/anthropics/skills
+- Article wiki « Structure d'un skill » pour passer à la pratique.

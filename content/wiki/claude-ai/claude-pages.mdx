@@ -1,0 +1,35 @@
+---
+title: "Claude Pages"
+description: "L'espace d'édition collaborative pour documents longs sur Claude.ai."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+Claude Pages est l'interface d'édition longue introduite par Anthropic pour transformer une conversation en véritable document de travail. Plutôt que de générer un mur de texte dans le fil de discussion, Claude bascule automatiquement vers une vue dédiée dès qu'il produit un contenu structuré de plus de quelques centaines de mots : rapport, mémo, spécification technique, post de blog ou support de présentation. Cette séparation entre le chat (zone de dialogue) et la Page (zone d'édition) reproduit ce que l'on connaît dans Notion ou Google Docs, tout en gardant l'IA à portée de clic pour réviser le contenu.
+
+## Quand Pages se déclenche
+
+Le déclenchement est en grande partie automatique. Claude détecte qu'une réponse mérite un format long lorsque vous demandez : "rédige", "écris un article", "prépare un brief", "transforme ces notes en compte-rendu". Vous pouvez aussi forcer le passage en cliquant sur l'icône "Open in Pages" en haut à droite d'une réponse. À l'inverse, pour les réponses courtes, le mode chat reste actif afin de préserver la lisibilité du fil. La Page créée est sauvegardée dans la conversation et apparaît dans l'historique sous forme de fichier joint.
+
+## Édition assistée par l'IA
+
+Une fois la Page ouverte, deux modes coexistent. Le mode "édition manuelle" vous laisse modifier le texte au clavier comme dans n'importe quel éditeur. Le mode "édition assistée" permet de sélectionner un paragraphe et de demander à Claude une transformation ciblée : raccourcir, allonger, traduire, changer de ton, ajouter un exemple, corriger la grammaire. La sélection s'envoie comme contexte à l'IA, qui retourne une proposition de remplacement validable d'un clic. Les modifications sont versionnées : un historique latéral permet de revenir à une version antérieure.
+
+## Collaboration et partage
+
+Pages prend en charge le partage par lien. Sur les plans Pro et Team, vous pouvez générer une URL publique en lecture seule, ou inviter des collaborateurs de votre workspace en édition. Les commentaires fonctionnent par sélection de texte, à la manière de Google Docs. Lorsqu'un collaborateur intervient, Claude peut continuer à assister sans casser les modifications humaines, à condition de cibler des plages précises. Attention : la collaboration en temps réel sur la même Page reste limitée à quelques participants simultanés et n'a pas la robustesse d'un éditeur conçu pour les équipes (pas de présence détaillée, pas de suggestions structurées comme dans Microsoft Word).
+
+## Formats d'export
+
+Une Page peut être exportée en Markdown, PDF, DOCX ou copiée en HTML enrichi. L'export Markdown est le plus fidèle, car c'est le format natif que Claude manipule en coulisse. L'export DOCX convertit les titres, listes, tableaux et blocs de code en styles Word standard, ce qui facilite l'intégration dans un workflow d'entreprise. Le PDF reprend la mise en forme de la Page avec une typographie épurée, sans pagination personnalisable.
+
+## Limites à connaître
+
+Pages n'est pas un substitut à un CMS ou à un éditeur de docs. Il n'y a pas (encore) de gestion de dossiers, de tags, ni de recherche transversale entre Pages. Chaque document reste rattaché à une conversation, ce qui peut compliquer le retrouvage si vous en produisez beaucoup. Les images générées par Claude ne sont pas réintégrées automatiquement : vous devez les insérer manuellement. Enfin, les Pages partagées publiquement n'embarquent pas Claude — les visiteurs voient le document mais ne peuvent pas dialoguer avec l'IA dessus.
+
+## Pour aller plus loin
+
+- Documentation officielle Anthropic sur Pages
+- Comparaison Pages vs Artifacts : quand utiliser l'un ou l'autre
+- Workflow type : utiliser Pages pour rédiger une spec technique en duo avec Claude
+- Astuces : démarrer une Page en collant un brouillon existant et demander une refonte

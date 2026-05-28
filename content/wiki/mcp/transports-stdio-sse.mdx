@@ -1,0 +1,88 @@
+---
+title: "Transports MCP : Stdio vs SSE"
+description: "Choisir entre Stdio pour les serveurs locaux et SSE/HTTP pour les serveurs distants — cas d'usage et trade-offs."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+Un serveur MCP communique avec son client (Claude Desktop, Claude Code, un IDE) via un **transport**. Le protocole en définit deux principaux : **Stdio** pour l'exécution locale et **SSE / HTTP streamable** pour le distant. Le choix conditionne l'architecture, la sécurité et l'expérience utilisateur.
+
+## Stdio : le transport local par défaut
+
+Avec Stdio, le client lance le serveur MCP comme un sous-processus et communique via **stdin / stdout**. Les messages JSON-RPC sont échangés ligne par ligne ; stderr est réservé aux logs.
+
+Avantages :
+- **Zéro configuration réseau** — pas de port, pas de CORS, pas de TLS
+- **Sécurité implicite** : le serveur tourne avec les droits de l'utilisateur, sur sa machine
+- **Latence négligeable**
+- **Cycle de vie simple** : le client tue le processus quand il ferme
+
+Inconvénients :
+- Le serveur doit être **installé localement** (npm, pip, binaire)
+- Pas de partage entre plusieurs utilisateurs ou machines
+- Mises à jour gérées par chaque poste
+
+C'est le choix par défaut pour les serveurs filesystem, git, sqlite, ou tout outil qui doit accéder aux fichiers de l'utilisateur.
+
+## SSE et HTTP streamable : le transport distant
+
+Le transport HTTP avec **Server-Sent Events** (ou la version plus récente *streamable HTTP*) permet d'exposer un serveur MCP comme un service web. Le client se connecte à une URL, négocie une session, puis échange des messages JSON-RPC bidirectionnels (le serveur pousse via SSE, le client poste en HTTP).
+
+Avantages :
+- **Hébergement centralisé** : un seul déploiement pour toute l'équipe
+- **Mises à jour instantanées** côté serveur
+- **Accès à des ressources cloud** (bases internes, APIs privées) sans installer de credentials sur chaque poste
+- **Multi-tenant** possible avec authentification
+
+Inconvénients :
+- Nécessite **TLS, auth, rate limiting**
+- Plus de surface d'attaque
+- Latence réseau
+- Sessions à gérer (reconnexion, timeouts)
+
+## Cas d'usage typiques
+
+**Stdio est idéal pour :**
+- Accéder au filesystem local
+- Manipuler un repo git
+- Lancer des outils CLI (docker, kubectl, terraform)
+- Interagir avec une base SQLite locale
+- Tout serveur qui doit voir ce que l'utilisateur voit
+
+**SSE / HTTP est idéal pour :**
+- Exposer un CRM, un ERP, une base interne
+- Partager un connecteur entre toute une équipe
+- Brancher Claude.ai (web) qui ne peut pas lancer de processus local
+- Intégrations SaaS où le serveur agrège plusieurs APIs
+
+## Configuration côté client
+
+Dans `claude_desktop_config.json` ou `~/.claude/mcp.json` :
+
+```json
+{
+  "mcpServers": {
+    "filesystem": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/Users/me/docs"]
+    },
+    "company-api": {
+      "url": "https://mcp.acme.com/sse",
+      "headers": { "Authorization": "Bearer ${ACME_TOKEN}" }
+    }
+  }
+}
+```
+
+## Sécurité : ne pas mélanger les niveaux de confiance
+
+Un serveur Stdio hérite des droits de l'utilisateur — il peut lire vos clés SSH. Un serveur SSE distant doit être traité comme une dépendance tierce : auditez son code, vérifiez son hébergeur, isolez les tokens.
+
+Évitez d'exposer un serveur Stdio sensible (filesystem complet, shell) via un wrapper HTTP sans authentification stricte — c'est le chemin le plus court vers une RCE.
+
+## Pour aller plus loin
+
+- Documentation transports : [modelcontextprotocol.io/docs/concepts/transports](https://modelcontextprotocol.io)
+- Exemple de serveur SSE en TypeScript dans le SDK officiel
+- Cloudflare Workers et Vercel proposent des templates pour héberger un MCP HTTP
+- Étudier le passage de SSE à *streamable HTTP* (spec 2025) pour les nouveaux déploiements

@@ -1,0 +1,116 @@
+---
+title: "Best practices production"
+description: "Retries, observability, fallbacks, timeouts, monitoring et alertes pour mettre l'API Claude en production sereinement."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+Passer un POC Claude en production demande bien plus qu'un simple `client.messages.create()`. Un appel API peut échouer pour des dizaines de raisons : rate limit, timeout réseau, overload côté Anthropic, modèle qui rate son JSON. Voici la checklist battle-tested pour bâtir une intégration robuste.
+
+## Retries avec backoff exponentiel et jitter
+
+Les SDK Anthropic officiels font déjà 2 retries par défaut, mais c'est rarement suffisant en production. Configurez explicitement votre stratégie et **ajoutez du jitter** pour éviter les thundering herds.
+
+```python
+import anthropic
+from anthropic import APIStatusError
+
+client = anthropic.Anthropic(
+    max_retries=5,
+    timeout=60.0,  # secondes
+)
+
+# Pour un contrôle fin, désactivez les retries SDK et faites-le vous-même
+try:
+    resp = client.with_options(max_retries=0).messages.create(...)
+except APIStatusError as e:
+    if e.status_code in (429, 529, 500, 502, 503, 504):
+        # backoff + jitter + retry
+        ...
+```
+
+Règles d'or : retry uniquement sur `429`, `5xx` et `529 overloaded`. **Jamais** sur `4xx` (sauf 429) — ce sont des erreurs de votre côté, retry empire la situation.
+
+## Timeouts : connect, read, total
+
+Distinguez le timeout de connexion (5 s suffisent) du timeout de lecture (long, surtout en streaming). Une réponse Claude Sonnet peut prendre 30-60 s sur un long output. En streaming, le bon timeout est entre les chunks, pas global.
+
+```ts
+import Anthropic from "@anthropic-ai/sdk";
+
+const client = new Anthropic({
+  timeout: 120_000,   // 2 min global
+  maxRetries: 4,
+});
+
+// Par requête, vous pouvez surcharger
+const resp = await client.messages.create(
+  { model: "claude-sonnet-4-6", max_tokens: 4096, messages },
+  { timeout: 180_000 }
+);
+```
+
+## Fallbacks multi-modèles
+
+Quand `claude-sonnet-4-6` est overloaded (status 529), basculer automatiquement sur Haiku ou sur une version précédente évite l'incident utilisateur. Implémentez une **cascade** :
+
+```python
+MODEL_CASCADE = [
+    "claude-sonnet-4-6",
+    "claude-sonnet-4-5",
+    "claude-haiku-4-5",
+]
+
+def resilient_call(messages):
+    for model in MODEL_CASCADE:
+        try:
+            return client.messages.create(model=model, max_tokens=1024, messages=messages)
+        except anthropic.APIStatusError as e:
+            if e.status_code == 529 and model != MODEL_CASCADE[-1]:
+                continue
+            raise
+```
+
+Versionnez le modèle utilisé dans votre réponse pour pouvoir l'auditer a posteriori.
+
+## Observability : logs structurés et traces
+
+Tracez chaque appel avec ces champs minimum : `request_id` (header `request-id` de la réponse), modèle, `input_tokens`, `output_tokens`, latence, statut, et un hash du prompt pour le debug sans logger de PII.
+
+```ts
+const start = Date.now();
+const resp = await client.messages.create(payload);
+logger.info({
+  request_id: resp._request_id,
+  model: resp.model,
+  input_tokens: resp.usage.input_tokens,
+  output_tokens: resp.usage.output_tokens,
+  cache_read: resp.usage.cache_read_input_tokens,
+  latency_ms: Date.now() - start,
+  stop_reason: resp.stop_reason,
+}, "claude_call");
+```
+
+Branchez ça sur Datadog, Grafana ou OpenTelemetry. Le `request_id` est l'identifiant à fournir au support Anthropic en cas de bug.
+
+## Monitoring et alertes
+
+Mettez en place quatre alertes minimum :
+
+1. **Taux d'erreur > 1 %** sur une fenêtre de 5 min → quelque chose se passe.
+2. **Latence p95 > 10 s** → soit Anthropic, soit vos prompts ont grossi.
+3. **Coût/heure > budget** → fuite ou prompt qui explose en tokens.
+4. **Cache hit rate < 70 %** (si vous utilisez le cache) → invalidations involontaires.
+
+Surveillez aussi le ratio `cache_read_input_tokens / input_tokens` : c'est l'indicateur le plus rentable à optimiser.
+
+## Idempotence et déduplication
+
+Utilisez le header `Idempotency-Key` (UUID v4) pour garantir qu'un retry ne crée pas un double appel facturé. Particulièrement critique pour les opérations longues ou batch.
+
+## Pour aller plus loin
+
+- Activez le **prompt caching** dès qu'un prompt système dépasse 1 024 tokens — 90 % d'économie sur les hits.
+- Pour les workloads asynchrones non-urgents, utilisez la **Message Batches API** : -50 % de coût, latence sous 24 h.
+- Implémentez un **circuit breaker** (lib `pybreaker` ou `opossum` en JS) pour couper rapidement quand Anthropic est down.
+- Loggez systématiquement les `stop_reason` : `max_tokens` vs `end_turn` vs `tool_use` vous dit beaucoup sur la santé de vos prompts.

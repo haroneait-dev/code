@@ -1,0 +1,134 @@
+---
+title: "/mcp et /permissions : MCP et permissions à la volée"
+description: "Gérer les serveurs MCP actifs et ajuster les permissions sans quitter la session."
+updatedAt: "2026-05-19"
+readingMinutes: 5
+---
+
+Deux commandes natives transforment Claude Code en outil ajustable en pleine session : `/mcp` pour inspecter et activer/désactiver les serveurs Model Context Protocol, et `/permissions` pour autoriser ou interdire des tools sans éditer `settings.json` à la main. Maîtriser ces deux commandes, c'est éviter les redémarrages constants et garder le contrôle fin sur ce que Claude peut faire.
+
+## /mcp — état des serveurs MCP
+
+MCP (Model Context Protocol) est le système de plugins externes de Claude Code : un serveur MCP expose des tools (Supabase, Vercel, Gmail, GitHub, etc.) que Claude peut appeler. La commande `/mcp` affiche l'état de tous les serveurs configurés :
+
+```bash
+> /mcp
+MCP servers:
+  supabase       [connected]  12 tools
+  vercel         [connected]  18 tools
+  gmail          [auth required]
+  github         [connected]   8 tools
+  canva          [disabled]
+```
+
+Quatre états possibles :
+
+- **connected** : le serveur tourne et ses tools sont disponibles
+- **auth required** : configuration OAuth en attente — relancez le flow
+- **disabled** : désactivé dans la config, peut être réactivé
+- **error** : le serveur a planté, regardez les logs
+
+`/mcp` permet aussi d'authentifier en live un serveur qui le demande. C'est très pratique pour Gmail, Google Drive, ou tout MCP avec OAuth : un lien s'affiche, vous l'ouvrez dans le navigateur, vous validez, et les tools deviennent immédiatement disponibles dans la session sans redémarrage.
+
+## /permissions — autoriser un tool en live
+
+Par défaut, Claude Code demande confirmation avant d'exécuter une commande Bash, d'éditer un fichier en dehors du projet, ou de lancer un tool sensible. `/permissions` permet de pré-autoriser ou bloquer des patterns à la volée :
+
+```bash
+> /permissions
+Current permissions:
+  Allow: Bash(npm:*), Bash(git status), Read, Edit, Write
+  Deny:  Bash(rm -rf:*), Bash(curl:*)
+  Ask:   Bash(*), WebFetch
+
+Add a permission? (allow/deny/ask)
+```
+
+Vous pouvez ajouter une règle sans quitter la session :
+
+```bash
+> /permissions allow Bash(supabase:*)
+Added: Allow Bash(supabase:*)
+```
+
+Effet immédiat : Claude peut désormais lancer `supabase migration new`, `supabase db reset`, etc. sans demander à chaque fois. Les permissions ajoutées via `/permissions` sont persistées dans `.claude/settings.local.json` (par défaut) ou `~/.claude/settings.json` selon votre choix.
+
+## Patterns courants
+
+**Autoriser un script de build entier** :
+
+```bash
+> /permissions allow Bash(npm run:*)
+> /permissions allow Bash(npm test:*)
+```
+
+**Bloquer une opération dangereuse pour la session** :
+
+```bash
+> /permissions deny Bash(git push --force:*)
+> /permissions deny Bash(rm -rf:*)
+```
+
+**Restreindre l'accès web** :
+
+```bash
+> /permissions deny WebFetch
+> /permissions allow WebFetch(https://docs.claude.com/*)
+```
+
+Le matcher supporte les wildcards (`*`) et les préfixes (`Bash(npm:*)`). Les règles plus spécifiques l'emportent sur les plus générales.
+
+## Coordination MCP + permissions
+
+Quand vous activez un MCP via `/mcp`, les tools qu'il expose ne sont pas automatiquement permis pour autant. Vous pouvez les autoriser collectivement :
+
+```bash
+> /permissions allow mcp__supabase
+```
+
+Ce pattern autorise tous les tools dont le nom commence par `mcp__supabase` — typiquement `mcp__supabase__execute_sql`, `mcp__supabase__list_tables`, etc. C'est plus sûr que d'autoriser `*` et plus rapide que de cocher 12 tools un par un.
+
+## Bonnes pratiques
+
+1. **Ne jamais autoriser `Bash(*)` globalement** : c'est l'équivalent de désactiver le sandbox. Préférez des préfixes ciblés.
+2. **Séparer les permissions projet vs perso** : les règles d'équipe vont dans `.claude/settings.json` (versionné), vos préférences perso dans `.claude/settings.local.json` (gitignoré).
+3. **Vérifier avant un long run** : si vous lancez Claude sur une tâche autonome de 30 minutes, faites `/permissions` d'abord pour pré-autoriser ce dont il aura besoin — ça évite que la session se bloque sur un prompt à minuit.
+4. **Auditer périodiquement** : `/permissions` sans argument liste tout ; supprimez ce qui n'est plus utilisé.
+
+## Exemple : structure type d'un projet
+
+`.claude/settings.json` (versionné) :
+
+```json
+{
+  "permissions": {
+    "allow": [
+      "Read", "Edit", "Write",
+      "Bash(npm:*)", "Bash(git status)", "Bash(git diff:*)"
+    ],
+    "deny": [
+      "Bash(rm -rf:*)",
+      "Bash(git push --force:*)"
+    ]
+  },
+  "mcpServers": {
+    "supabase": { "command": "npx", "args": ["-y", "@supabase/mcp-server"] }
+  }
+}
+```
+
+`.claude/settings.local.json` (gitignoré) :
+
+```json
+{
+  "permissions": {
+    "allow": ["Bash(gh:*)", "Bash(vercel:*)"]
+  }
+}
+```
+
+## Pour aller plus loin
+
+- Doc officielle : https://docs.claude.com/en/docs/claude-code/slash-commands
+- Documentation MCP : https://modelcontextprotocol.io/
+- Skill `fewer-permission-prompts` pour générer un allowlist optimal depuis vos transcripts

@@ -1,0 +1,71 @@
+---
+title: "Model Drift et mises à jour silencieuses"
+description: "Détecter les changements de comportement entre versions de Claude, pinner les bons identifiants de modèle, et industrialiser vos regression tests."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+Un prompt qui marchait parfaitement hier peut donner des résultats différents demain — même sans modifier votre code. C'est ce qu'on appelle le **model drift** : les fournisseurs publient régulièrement de nouvelles versions, et les alias `latest` basculent silencieusement. Cet article explique comment s'en protéger.
+
+## Pourquoi le drift arrive
+
+Trois mécanismes principaux :
+
+1. **Bascule d'alias** : `claude-sonnet-4-6-latest` pointe vers la dernière révision. Quand Anthropic publie une mise à jour mineure (`-20260301` → `-20260415`), votre app change de modèle sans déploiement de votre part.
+2. **Mise à jour interne** : même à snapshot identique, l'infrastructure d'inférence évolue (quantization, optimisations) avec des effets marginaux sur les sorties.
+3. **Dépréciation** : un modèle ancien est retiré (typiquement 12 mois après sa sortie). Si vous n'avez pas migré, vos requêtes échouent ou sont redirigées vers un successeur.
+
+Le drift se manifeste de manières variées : longueur des réponses qui change, formatage Markdown différent, ton plus ou moins verbeux, ou — plus subtil — basculement d'une réponse correcte vers une réponse plausible mais fausse.
+
+## Pinning des versions : la règle d'or
+
+**N'utilisez jamais `-latest` en production.** Utilisez toujours un identifiant daté complet :
+
+```ts
+// À éviter
+model: "claude-sonnet-4-6-latest"
+
+// À faire
+model: "claude-sonnet-4-6-20251201"
+```
+
+Stockez ce snapshot dans une variable d'environnement (`CLAUDE_MODEL_ID`) pour pouvoir le basculer sans redéploiement. Documentez la version active dans votre README et votre changelog produit.
+
+Pour les workloads expérimentaux (sandbox, A/B test), `latest` reste acceptable — à condition de tagger les requêtes pour distinguer les résultats.
+
+## Construire un harness de regression tests
+
+Une suite de tests de régression LLM ressemble à une suite de tests classique, avec quelques particularités :
+
+1. **Dataset de référence** : 30 à 100 cas représentatifs du produit, avec sortie attendue ou critère de validation.
+2. **Métriques multiples** : exact match (pour les sorties structurées JSON), similarité sémantique (cosine sur embeddings) pour les réponses libres, ou LLM-as-judge avec un modèle plus capable.
+3. **Snapshot des sorties** : conserver l'output du modèle de référence pour comparer textuellement entre deux versions (diff humainement lisible).
+4. **Exécution automatique** : à chaque PR qui touche un prompt, ou hebdomadairement sur cron pour détecter le drift côté fournisseur.
+
+Outils utiles : **promptfoo** (open source, YAML-driven), **Braintrust** (SaaS avec UI), ou un script Node maison qui appelle l'API et compare via `vitest` snapshots.
+
+## Détecter le drift en production
+
+Au-delà des tests offline, instrumentez le runtime :
+
+- **Logging structuré** : chaque appel API loggue `model_id`, longueur d'output, latence, tool calls effectués, et un échantillon du contenu.
+- **Métriques agrégées** : Datadog/Grafana sur la longueur moyenne, le taux de tool_use, le ratio d'`end_turn` vs `max_tokens`.
+- **Sampling humain** : 1 % des conversations relues manuellement chaque semaine pour repérer les régressions qualitatives.
+
+Une alerte simple : si la longueur moyenne des réponses change de plus de 20 % sur une semaine glissante, déclenchez une investigation.
+
+## Plan de migration entre versions
+
+Quand une nouvelle version arrive (Sonnet 4.6 → 4.7) :
+
+1. Lancer la regression suite contre les deux modèles en parallèle.
+2. Comparer scores, coûts, latence, et diffs textuels.
+3. Identifier les prompts qui régressent et les ajuster (souvent : reformulation, ajout d'exemples, contraintes plus explicites).
+4. Déployer derrière feature flag, monter en charge progressivement (1 %, 10 %, 100 %).
+5. Garder l'ancienne version comme fallback pendant 30 jours minimum.
+
+## Pour aller plus loin
+
+- Documentation Anthropic sur la politique de dépréciation des modèles.
+- Voir aussi le wiki sur les benchmarks pour la méthodologie d'évaluation reproductible.
+- Bibliothèque `promptfoo` : https://www.promptfoo.dev/

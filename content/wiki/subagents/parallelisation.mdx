@@ -1,0 +1,40 @@
+---
+title: "Parallélisation des subagents"
+description: "Lancer plusieurs subagents en même temps dans un seul message Task, gérer la concurrence et éviter les collisions."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+La parallélisation est l'un des plus gros leviers de productivité avec les subagents. Bien utilisée, elle divise le temps d'attente par 3 ou 4 sur des tâches d'exploration. Mal utilisée, elle multiplie les coûts pour rien et produit des résultats incohérents.
+
+## Le principe : un seul message, plusieurs Task
+
+Pour lancer plusieurs subagents en parallèle, il faut les invoquer dans le même message assistant, dans le même bloc d'appels d'outils. Si vous envoyez trois Tasks dans trois messages séparés, ils s'exécuteront séquentiellement. Si vous les groupez dans un seul message, ils partent en même temps. C'est purement mécanique : l'orchestrateur attend que tous les outils d'un même tour soient résolus avant de poursuivre.
+
+Concrètement, dans un appel typique : trois blocs Task lancés simultanément, chacun avec son propre prompt et son propre type de subagent. Le temps total devient `max(t1, t2, t3)` au lieu de `t1 + t2 + t3`.
+
+## Quand paralléliser
+
+Trois cas se prêtent bien à la parallélisation. Premièrement, les recherches indépendantes : trouver tous les usages de X dans le frontend pendant qu'un autre cherche dans le backend. Deuxièmement, les vérifications croisées : un subagent lit le code, un autre lit les tests, un troisième lit la documentation, puis vous comparez. Troisièmement, le fan-out d'audit : lister les vulnérabilités, lister les TODO, lister les types `any`, tout en parallèle.
+
+## Quand ne pas paralléliser
+
+Si les subagents doivent partager un état ou se baser sur les résultats les uns des autres, la parallélisation n'a pas de sens. Si le subagent B a besoin de savoir ce qu'a trouvé A, il faut deux tours séquentiels. De même, si vos subagents écrivent dans les mêmes fichiers, vous risquez des conflits : la parallélisation est réservée à la lecture et à l'analyse, pas à l'écriture concurrente.
+
+## Gestion de la concurrence
+
+Chaque subagent a son propre contexte isolé : ils ne se voient pas. Cela évite les conditions de course sur la mémoire, mais cela signifie aussi qu'ils peuvent dupliquer du travail si vous ne découpez pas bien les prompts. Une bonne pratique : préciser explicitement le périmètre de chacun dans son prompt (« ne regarde que `app/api/` », « limite-toi aux fichiers `.tsx` »). Sinon les trois subagents vont lire les mêmes fichiers et vous payez trois fois.
+
+## Limites pratiques
+
+L'orchestrateur tolère un nombre raisonnable de subagents en parallèle (typiquement jusqu'à 10), mais au-delà la valeur ajoutée diminue : la latence du plus lent domine, et les coûts s'accumulent. Pour les très gros audits, mieux vaut faire deux vagues de cinq subagents que dix d'un coup. Surveillez aussi la taille des résumés renvoyés : si chaque subagent vous renvoie 2000 tokens, dix subagents = 20k tokens injectés d'un coup dans la conversation principale.
+
+## Agréger les résultats
+
+Une fois les subagents revenus, vous avez `n` réponses à fusionner. Trois patterns marchent bien : une synthèse manuelle dans le tour suivant, un dernier subagent dédié à l'agrégation, ou un format de sortie commun (JSON, liste à puces) qui rend la fusion mécanique. Pour les audits, demandez à chaque subagent de renvoyer la même structure : c'est trivial à concaténer ensuite.
+
+## Pour aller plus loin
+
+- Article voisin : `quand-deleguer` pour décider en amont si la délégation est pertinente.
+- Article voisin : `cout-token-budgeting` pour mesurer le surcoût de la parallélisation.
+- Article voisin : `erreurs-courantes` pour les pièges classiques de prompts mal cadrés.

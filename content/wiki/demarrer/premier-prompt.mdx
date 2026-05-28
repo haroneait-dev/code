@@ -1,0 +1,109 @@
+---
+title: "Votre premier prompt"
+description: "Lancer Claude Code et formuler une première requête efficace dans un projet."
+updatedAt: "2026-05-19"
+readingMinutes: 5
+---
+
+Maintenant que Claude Code est installé, il est temps de l'essayer sur un vrai projet. Ce guide vous accompagne pour lancer la session, comprendre l'interface du REPL, et écrire un premier prompt qui produit un résultat utile dès la première tentative.
+
+## Lancer Claude Code
+
+Ouvrez un terminal **dans le dossier de votre projet** :
+
+```bash
+cd ~/projets/mon-app
+claude
+```
+
+Au premier lancement, Claude Code vous demande de vous authentifier (compte Claude ou clé API). Une fois connecté, vous arrivez dans le **REPL interactif** : un prompt clignotant attend votre première requête.
+
+> Toujours lancer Claude Code depuis la racine du projet. Il indexe le dossier courant et ses sous-dossiers — pas le dossier parent.
+
+## Anatomie de la session
+
+L'interface du REPL contient quatre zones :
+
+1. **Le prompt** (en bas) : où vous tapez votre message
+2. **La zone de conversation** (au milieu) : historique des échanges
+3. **La barre de statut** (en bas) : tokens utilisés, modèle actif, mode permissions
+4. **Les tool calls** : Claude affiche en temps réel les lectures, écritures, commandes bash
+
+Tapez `/help` pour voir toutes les commandes slash disponibles, et `/exit` (ou `Ctrl+C` deux fois) pour quitter.
+
+## Formuler un premier prompt utile
+
+Le réflexe naturel est de poser une question vague comme "explique mon projet". Préférez des prompts **concrets, contextuels et orientés résultat** :
+
+```text
+Lis le fichier package.json et README.md, puis fais-moi un résumé
+en 5 points : stack technique, scripts disponibles, structure du
+projet, et 2 améliorations possibles.
+```
+
+Pourquoi ça marche :
+
+- **Lis le fichier...** : indique explicitement à Claude quels fichiers consulter
+- **5 points** : structure la sortie attendue
+- **2 améliorations possibles** : oriente vers une analyse, pas juste une description
+
+## Exemples de premiers prompts par cas d'usage
+
+| Objectif | Prompt suggéré |
+|---|---|
+| Onboarding sur un projet | "Lis le README et la structure du dossier, puis explique-moi l'architecture en 3 paragraphes" |
+| Fix bug | "Quand je lance `npm test`, le test X échoue avec [erreur]. Trouve la cause et propose un patch" |
+| Nouvelle feature | "Ajoute une route GET /api/health qui renvoie `{status: 'ok'}` en suivant les conventions du projet" |
+| Refactoring | "Le fichier `utils/db.ts` fait 400 lignes. Découpe-le en modules cohérents sans changer l'API publique" |
+| Documentation | "Génère un `CONTRIBUTING.md` adapté à ce repo, en français, en t'inspirant du style du README" |
+
+## Le pouvoir du contexte
+
+Claude Code lit les fichiers que vous **mentionnez explicitement** ou qu'il juge pertinents. Pour maximiser la précision :
+
+- Utilisez `@nom-de-fichier` pour attacher un fichier au prompt
+- Mentionnez les chemins relatifs : `src/components/Button.tsx`
+- Évoquez les contraintes du projet : "respecte ESLint", "TypeScript strict", "pas de dépendance externe"
+
+```text
+@src/api/users.ts @src/types/user.ts
+
+Ajoute une fonction `findByEmail(email: string)` qui réutilise le
+client Supabase déjà importé. Gère le cas where user introuvable
+en retournant `null`.
+```
+
+## Itérer plutôt que tout demander d'un coup
+
+Un prompt réussi avec Claude Code, ce n'est pas un essai parfait — c'est une **conversation**. Posez d'abord une petite tâche, lisez le résultat, puis affinez :
+
+```text
+> Première itération
+"Liste les routes API du dossier app/api"
+
+> Deuxième itération (après lecture)
+"Ajoute une route POST /api/feedback qui suit le même pattern
+que /api/wiki, avec validation Zod"
+
+> Troisième itération
+"Ajoute aussi un test minimal pour cette route dans __tests__/"
+```
+
+## Quitter et reprendre une session
+
+Pour sortir : tapez `/exit` ou faites `Ctrl+C` deux fois. Pour reprendre la dernière conversation :
+
+```bash
+claude --resume
+# ou
+claude -c
+```
+
+Cela restaure l'historique complet de votre dernière session dans ce projet.
+
+## Pour aller plus loin
+
+- [Modes interactif vs one-shot](/wiki/demarrer/modes-interactif-one-shot) — quand utiliser chacun
+- [Le fichier CLAUDE.md](/wiki/demarrer/claude-md) — donner un contexte permanent à Claude
+- [Permissions et sandbox](/wiki/demarrer/permissions-sandbox) — contrôler ce que Claude peut faire
+- [Documentation officielle](https://docs.claude.com/claude-code) — référence Anthropic

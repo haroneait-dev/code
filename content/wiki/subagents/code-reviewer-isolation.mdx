@@ -1,0 +1,67 @@
+---
+title: "Le subagent code-reviewer en isolation"
+description: "Auditer une PR avant validation humaine grâce à un subagent au prompt isolé du contexte parent."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+Le pattern `code-reviewer` est l'un des usages les plus rentables des subagents Claude Code. L'idée : avant qu'un humain (ou l'agent principal) ne valide une PR, on spawn un subagent dédié qui relit le diff avec un œil neuf, sans connaître ni les compromis ni les raccourcis qu'on a pris pendant l'implémentation. Cette isolation est le cœur de la valeur ajoutée.
+
+## Pourquoi isoler le reviewer
+
+Un agent qui vient d'écrire du code est biaisé. Il connaît ses propres choix, il a justifié ses TODO en interne, il sait pourquoi telle abstraction "ira pour plus tard". Bref, il défend son travail. Si on lui demande "relis-toi", il valide.
+
+Un subagent reviewer reçoit uniquement :
+
+- le diff (`git diff main...HEAD`),
+- les fichiers touchés en intégralité,
+- un cahier des charges minimal ("vérifie sécurité, lisibilité, tests").
+
+Il n'a **aucune trace** de la conversation parente, des prompts précédents, des excuses du codeur. Il juge le code tel qu'il est. C'est exactement ce qu'on veut.
+
+## Anatomie du prompt
+
+Un bon prompt de code-reviewer tient en 5 sections :
+
+1. **Rôle** : "Tu es un reviewer senior. Tu ne codes pas, tu critiques."
+2. **Périmètre** : "Ne commente que les fichiers du diff. N'explore pas le reste du repo sauf nécessité."
+3. **Critères** : sécurité (injection, secrets), correction (edge cases, off-by-one), lisibilité (noms, complexité), tests (couverture du nouveau code).
+4. **Format de sortie** : JSON ou markdown structuré avec `severity: critical | major | minor | nit`.
+5. **Interdictions** : ne pas valider, ne pas merger, ne pas modifier de fichier.
+
+Ce dernier point est crucial. On retire les outils d'écriture (`Edit`, `Write`) du subagent. Il ne peut que lire et rapporter. Cela évite qu'il "corrige gentiment" un bug qu'il aurait dû signaler.
+
+## Workflow type sur une PR
+
+```
+1. Agent principal termine l'implémentation
+2. Agent principal exécute `git diff` et capture la sortie
+3. Spawn subagent "code-reviewer" avec diff + fichiers touchés
+4. Subagent retourne une liste structurée d'observations
+5. Agent principal présente la liste à l'humain
+6. Humain tranche : ignore, fix maintenant, ouvre des issues
+```
+
+L'étape 5 est non négociable. Le reviewer propose, l'humain dispose. Un subagent qui auto-fix ses propres findings recrée le biais qu'on cherchait à éviter.
+
+## Ce que l'isolation rate (et c'est OK)
+
+Le reviewer isolé ne sait pas que vous aviez convenu avec l'équipe de remettre la refacto à plus tard. Il va flagger la duplication. Il ne sait pas que la fonction `legacyParse` est gardée volontairement. Il va suggérer de la supprimer.
+
+Ces "faux positifs" sont le prix de l'objectivité. Triez-les rapidement plutôt que de polluer le prompt avec mille exceptions — sinon vous reconstituez le biais. Un reviewer trop renseigné devient complice.
+
+## Outils recommandés
+
+- Donnez accès à `Read`, `Grep`, `Bash(git diff:*)`, `Bash(git log:*)`.
+- Retirez `Write`, `Edit`, `Bash(rm:*)`, `Bash(git commit:*)`, `Bash(git push:*)`.
+- Si vous voulez qu'il vérifie que les tests passent, autorisez `Bash(npm test:*)` en lecture seule.
+
+## Intégration CI / hooks
+
+Vous pouvez câbler un hook `Stop` qui, à la fin d'une session d'édition, déclenche automatiquement le subagent reviewer. Combiné à un commentaire GitHub via `gh pr comment`, vous obtenez une review IA sur chaque PR sans intervention manuelle. Coût typique : quelques centimes par PR pour un gain de relecture significatif.
+
+## Pour aller plus loin
+
+- Versionner le prompt du reviewer dans `.claude/agents/code-reviewer.md` et l'itérer comme un test : ajouter une catégorie quand un bug réel a échappé, jamais "pour faire propre".
+- Croiser avec un subagent `security-reviewer` plus pointu pour les PR touchant l'auth ou les paiements.
+- Lire l'article sur le partage d'état pour transmettre les findings au workflow suivant (création d'issues, mise à jour de tracker).

@@ -1,0 +1,119 @@
+---
+title: "Gestion fine du Rate Limiting"
+description: "Parser les headers anthropic-ratelimit-* pour adapter dynamiquement la charge et éviter les 429."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+Subir un `429 Too Many Requests` en pleine prod, c'est l'assurance d'incidents utilisateurs. Plutôt que d'attendre l'erreur pour réagir, Anthropic expose sur **chaque réponse** une dizaine de headers `anthropic-ratelimit-*` qui décrivent l'état exact de vos quotas. Bien parser ces headers permet de construire un ordonnanceur adaptatif qui maximise le débit sans jamais dépasser.
+
+## Les headers exposés
+
+À chaque réponse 2xx (et même sur les 429), Anthropic renvoie :
+
+| Header | Signification |
+|---|---|
+| `anthropic-ratelimit-requests-limit` | RPM max autorisé |
+| `anthropic-ratelimit-requests-remaining` | RPM restants dans la fenêtre |
+| `anthropic-ratelimit-requests-reset` | ISO 8601, fin de la fenêtre RPM |
+| `anthropic-ratelimit-tokens-limit` | TPM max (input + output) |
+| `anthropic-ratelimit-tokens-remaining` | Tokens restants |
+| `anthropic-ratelimit-tokens-reset` | Reset de la fenêtre tokens |
+| `anthropic-ratelimit-input-tokens-*` | Variantes pour les input tokens |
+| `anthropic-ratelimit-output-tokens-*` | Variantes pour les output tokens |
+| `retry-after` | Secondes à attendre avant de réessayer (sur 429) |
+
+Les fenêtres sont glissantes sur 1 minute. Le quota n'est pas remis à zéro brutalement : il se reconstitue continuellement.
+
+## Lire les headers dans le SDK
+
+Les SDK Python et TypeScript exposent les headers via `with_raw_response`.
+
+```python
+import anthropic
+client = anthropic.Anthropic()
+
+raw = client.messages.with_raw_response.create(
+    model="claude-sonnet-4-6",
+    max_tokens=1024,
+    messages=[{"role": "user", "content": "Hi"}],
+)
+print(raw.headers["anthropic-ratelimit-tokens-remaining"])
+print(raw.headers["anthropic-ratelimit-tokens-reset"])
+
+message = raw.parse()  # le Message original
+```
+
+En TypeScript :
+
+```ts
+const { data, response } = await client.messages
+  .create({ model: "claude-sonnet-4-6", max_tokens: 1024, messages })
+  .withResponse();
+
+const remaining = Number(response.headers.get("anthropic-ratelimit-tokens-remaining"));
+const resetIso = response.headers.get("anthropic-ratelimit-tokens-reset");
+```
+
+## Construire un throttler adaptatif
+
+L'idée : maintenir en mémoire un état `{ tokens_remaining, reset_at }` mis à jour à chaque réponse. Avant d'envoyer une requête, on estime ses tokens (input + max_tokens) et on attend si le solde est insuffisant.
+
+```python
+import time, datetime as dt
+
+class RateLimitState:
+    def __init__(self):
+        self.tokens_remaining = 1_000_000
+        self.reset_at = dt.datetime.now(dt.timezone.utc)
+
+    def update(self, headers):
+        self.tokens_remaining = int(headers.get("anthropic-ratelimit-tokens-remaining", 0))
+        self.reset_at = dt.datetime.fromisoformat(
+            headers["anthropic-ratelimit-tokens-reset"].replace("Z", "+00:00")
+        )
+
+    def wait_if_needed(self, estimated_tokens):
+        if estimated_tokens > self.tokens_remaining:
+            sleep_s = (self.reset_at - dt.datetime.now(dt.timezone.utc)).total_seconds()
+            time.sleep(max(0.5, sleep_s))
+```
+
+Cette logique évite ~99 % des 429 en charge soutenue, tout en utilisant ~95 % du quota disponible.
+
+## Gérer le 429 résiduel
+
+Même avec un throttler parfait, vous prendrez occasionnellement un 429 (latence réseau, plusieurs workers en parallèle). Respectez **toujours** le header `retry-after` plutôt qu'un backoff arbitraire.
+
+```ts
+async function callWithRetry(payload) {
+  for (let i = 0; i < 5; i++) {
+    try {
+      return await client.messages.create(payload);
+    } catch (e) {
+      if (e.status === 429) {
+        const wait = Number(e.headers?.get("retry-after") ?? 2) * 1000;
+        await new Promise(r => setTimeout(r, wait + Math.random() * 500));
+        continue;
+      }
+      throw e;
+    }
+  }
+  throw new Error("Rate limit retries exhausted");
+}
+```
+
+Le `Math.random() * 500` ajoute du **jitter**, indispensable quand plusieurs instances retry en même temps.
+
+## Priorisation et files d'attente
+
+Quand le throttler est saturé, ne traitez pas toutes les requêtes égalitairement : priorisez les appels utilisateur synchrones (UI) au détriment des jobs background. Utilisez deux files séparées (BullMQ, Sidekiq, SQS FIFO) avec des poids de consommation différents.
+
+Pour les workloads massifs non temps réel, basculez sur la **Message Batches API** : aucune limite RPM/TPM compétitive avec les appels synchrones, et -50 % de prix.
+
+## Pour aller plus loin
+
+- Exposez les valeurs `tokens_remaining` et `requests_remaining` en métriques Prometheus pour visualiser votre consommation en temps réel.
+- Demandez une **augmentation de quota** via la console Anthropic dès que votre consommation dépasse 70 % du plafond sur les pics.
+- Le **prompt caching** réduit drastiquement les input tokens facturés au quota — c'est le levier #1 pour tenir vos limites.
+- Distribuez vos clés API par environnement : un job d'analytics qui consomme tout le quota ne doit pas tuer votre API user-facing.

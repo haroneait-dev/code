@@ -1,0 +1,119 @@
+---
+title: "Premier appel API"
+description: "Faire votre premier Hello World avec l'API Anthropic en curl, Python et TypeScript."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+Avant de plonger dans les SDK officiels, il est utile de comprendre ce qui se passe vraiment quand on envoie une requête à l'API Anthropic. Ce guide vous montre comment réaliser votre tout premier appel, étape par étape, dans trois environnements : terminal (curl), Python et TypeScript.
+
+## Récupérer votre clé API
+
+Rendez-vous sur la [console Anthropic](https://console.anthropic.com), créez un compte si nécessaire, puis allez dans **Settings → API Keys** pour générer une nouvelle clé. Une clé ressemble à `sk-ant-api03-...`.
+
+Conservez-la dans une variable d'environnement plutôt que de l'écrire en dur dans votre code :
+
+```bash
+export ANTHROPIC_API_KEY="sk-ant-api03-votre-cle-ici"
+```
+
+Sur macOS / Linux, ajoutez cette ligne dans `~/.zshrc` ou `~/.bashrc` pour qu'elle persiste entre les sessions.
+
+## Hello world avec curl
+
+Le moyen le plus rapide de tester l'API est d'envoyer une requête HTTP brute. L'endpoint est `https://api.anthropic.com/v1/messages`.
+
+```bash
+curl https://api.anthropic.com/v1/messages \
+  -H "x-api-key: $ANTHROPIC_API_KEY" \
+  -H "anthropic-version: 2023-06-01" \
+  -H "content-type: application/json" \
+  -d '{
+    "model": "claude-sonnet-4-6",
+    "max_tokens": 1024,
+    "messages": [
+      {"role": "user", "content": "Dis bonjour en français."}
+    ]
+  }'
+```
+
+Trois headers sont obligatoires : `x-api-key` (votre clé), `anthropic-version` (la version de l'API) et `content-type`. Le body est un JSON qui indique le modèle, le nombre maximum de tokens en sortie et la liste des messages.
+
+## Hello world en Python
+
+Sans SDK, on peut faire la même requête avec `requests` :
+
+```python
+import os
+import requests
+
+response = requests.post(
+    "https://api.anthropic.com/v1/messages",
+    headers={
+        "x-api-key": os.environ["ANTHROPIC_API_KEY"],
+        "anthropic-version": "2023-06-01",
+        "content-type": "application/json",
+    },
+    json={
+        "model": "claude-sonnet-4-6",
+        "max_tokens": 1024,
+        "messages": [
+            {"role": "user", "content": "Dis bonjour en français."}
+        ],
+    },
+)
+
+data = response.json()
+print(data["content"][0]["text"])
+```
+
+La réponse est un objet JSON dont le champ `content` est un tableau de blocs. Le bloc de type `text` contient la réponse textuelle du modèle.
+
+## Hello world en TypeScript
+
+En Node.js, on peut utiliser le `fetch` natif (disponible depuis Node 18) :
+
+```ts
+const response = await fetch("https://api.anthropic.com/v1/messages", {
+  method: "POST",
+  headers: {
+    "x-api-key": process.env.ANTHROPIC_API_KEY!,
+    "anthropic-version": "2023-06-01",
+    "content-type": "application/json",
+  },
+  body: JSON.stringify({
+    model: "claude-sonnet-4-6",
+    max_tokens: 1024,
+    messages: [
+      { role: "user", content: "Dis bonjour en français." },
+    ],
+  }),
+});
+
+const data = await response.json();
+console.log(data.content[0].text);
+```
+
+## Comprendre la réponse
+
+Une réponse typique ressemble à ceci :
+
+```json
+{
+  "id": "msg_01ABC...",
+  "type": "message",
+  "role": "assistant",
+  "model": "claude-sonnet-4-6",
+  "content": [
+    { "type": "text", "text": "Bonjour !" }
+  ],
+  "stop_reason": "end_turn",
+  "usage": { "input_tokens": 12, "output_tokens": 4 }
+}
+```
+
+Les champs essentiels : `content` (la réponse), `stop_reason` (pourquoi le modèle s'est arrêté : `end_turn`, `max_tokens`, `tool_use`...) et `usage` (les tokens consommés, utile pour suivre votre facturation).
+
+## Pour aller plus loin
+
+Une fois ce premier appel maîtrisé, passez aux SDK officiels (`anthropic` pour Python, `@anthropic-ai/sdk` pour TypeScript) qui gèrent automatiquement la sérialisation, les types, le streaming et les erreurs. Consultez aussi la documentation des [messages multi-tours](https://docs.anthropic.com/en/api/messages), du [system prompt](https://docs.anthropic.com/en/docs/build-with-claude/system-prompts) et du [streaming](https://docs.anthropic.com/en/api/messages-streaming) pour construire des applications plus riches.

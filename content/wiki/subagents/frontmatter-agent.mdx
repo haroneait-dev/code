@@ -1,0 +1,90 @@
+---
+title: "Frontmatter agent"
+description: "Référence des champs YAML supportés dans les fichiers de subagents : name, description, tools, model, isolation."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+Le frontmatter YAML en tête d'un fichier `.claude/agents/<nom>.md` configure entièrement le comportement du subagent : son identité, ses outils, son modèle, son degré d'isolation. Maîtriser ces champs permet d'arbitrer finement entre coût, latence, sécurité et qualité. Voici la référence pratique des champs supportés et leurs valeurs recommandées.
+
+## Squelette minimal
+
+Seuls `name` et `description` sont strictement requis. Tout le reste a des valeurs par défaut sensées.
+
+```md
+---
+name: doc-writer
+description: Génère et met à jour la documentation Markdown à partir du code source.
+tools: Read, Glob, Grep, Write, Edit
+model: sonnet
+---
+
+Tu es rédacteur technique...
+```
+
+Le `name` doit être en kebab-case, unique dans le projet, et correspondre au nom du fichier sans l'extension. C'est l'identifiant utilisé par l'agent principal pour invoquer le subagent.
+
+## `tools` — allowlist explicite
+
+Le champ `tools` accepte une liste séparée par des virgules. Omettre le champ donne accès à *tous* les outils, ce qu'il faut éviter en pratique.
+
+```md
+---
+tools: Read, Grep, Glob, Bash
+---
+```
+
+Les outils MCP sont disponibles via leur nom complet, par exemple `mcp__supabase__execute_sql`. Pour autoriser tous les outils d'un serveur MCP, certaines versions acceptent un wildcard `mcp__supabase__*`. En cas de doute, listez explicitement les outils dont l'agent a besoin et rien d'autre.
+
+## `model` — arbitrage coût/qualité
+
+Trois alias sont reconnus, qui pointent vers le dernier snapshot stable de chaque famille :
+
+- `haiku` — rapide et économique, parfait pour les classifications, le tri, les agents très spécialisés sur une tâche courte.
+- `sonnet` — défaut équilibré, suffisant pour la grande majorité des subagents (revue de code, refactor, doc).
+- `opus` — raisonnement profond, à réserver aux tâches d'architecture, debug complexe ou planification multi-étapes.
+
+```md
+---
+model: haiku
+---
+```
+
+Vous pouvez aussi pinner un snapshot précis (`claude-sonnet-4-6`, `claude-opus-4-7`) si vous voulez figer le comportement.
+
+## `description` — déclencheur de délégation
+
+Le champ joue deux rôles : libellé humain et critère de routage pour l'agent principal. Préférez les formulations impératives qui décrivent *quand* invoquer le subagent.
+
+```md
+---
+description: À utiliser PROACTIVEMENT après chaque modification dans /app/api/ pour vérifier l'authentification et les permissions RLS.
+---
+```
+
+Le mot `PROACTIVEMENT` (ou `MUST BE USED`) en majuscules biaise fortement l'agent principal vers une délégation automatique sans intervention de l'utilisateur.
+
+## Isolation et contexte
+
+Par construction, chaque appel de subagent ouvre une fenêtre de contexte vierge : le subagent ne voit pas l'historique de la conversation principale, seulement le prompt d'invocation et son propre prompt système. Cette isolation est non négociable et constitue le principal atout des subagents pour préserver la fenêtre principale.
+
+Certaines versions exposent un champ `isolation: strict | inherit` pour ajuster ce comportement (par exemple hériter du `CLAUDE.md` projet). En l'absence du champ, l'isolation par défaut est stricte. Le subagent renvoie un *résumé* à l'agent principal — pas son transcript complet — ce qui économise massivement de tokens.
+
+## Champs additionnels utiles
+
+Selon la version du CLI, vous pouvez aussi rencontrer :
+
+- `color` — couleur d'affichage dans `/agents`, purement cosmétique.
+- `disallowed_tools` — l'inverse de `tools`, pratique quand vous voulez « tout sauf X ».
+- `permission_mode` — surcharge le mode de permission (par exemple `acceptEdits` pour un agent qui ne demande jamais de confirmation).
+
+```bash
+# Vérifier la configuration effective d'un agent
+/agents
+```
+
+## Pour aller plus loin
+
+- « Créer un subagent custom » donne un exemple complet de bout en bout.
+- « Coût et token budgeting » détaille l'impact du choix de `model`.
+- « Code-reviewer & isolation » montre comment exploiter l'isolation pour des revues robustes.

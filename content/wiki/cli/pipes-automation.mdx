@@ -1,0 +1,100 @@
+---
+title: "Pipes et automation"
+description: "Chaîner Claude Code avec d'autres outils CLI via pipes Unix et sortie JSON pour automatiser des workflows."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+Claude Code respecte la philosophie Unix : il lit `stdin`, écrit sur `stdout`, et renvoie un code de retour. Cela le rend immédiatement composable avec `grep`, `jq`, `xargs`, `awk` ou n'importe quel outil shell. Cette page montre comment construire des pipelines fiables autour de `claude -p`.
+
+## Lire depuis stdin
+
+On peut alimenter Claude avec la sortie d'un autre outil via un pipe classique.
+
+```bash
+git log --oneline -20 | claude -p "Transforme ces commits en notes de release Markdown"
+```
+
+Claude reçoit la sortie de `git log` comme contexte et produit une réponse texte. C'est la primitive de base de toutes les automations : tout ce qui passe sur `stdout` peut devenir un prompt.
+
+```bash
+cat erreur.log | claude -p "Identifie la cause racine et propose un correctif"
+```
+
+## Sortie JSON et parsing avec jq
+
+Pour des pipelines robustes, on combine `--output-format json` avec `jq`. Cela évite de parser du texte fragile.
+
+```bash
+claude -p "Liste 5 améliorations à apporter à ce code" \
+  --output-format json \
+  | jq -r '.result'
+```
+
+Pour extraire le coût et l'ID de session :
+
+```bash
+claude -p "Génère un test unitaire" --output-format json | jq '{
+  cost: .total_cost_usd,
+  session: .session_id,
+  result: .result
+}'
+```
+
+Avec `--output-format stream-json`, chaque ligne est un évènement JSON. On peut filtrer en temps réel.
+
+```bash
+claude -p "Refactorise app/page.tsx" --output-format stream-json \
+  | jq -c 'select(.type == "tool_use") | {tool: .name, input: .input}'
+```
+
+## Chaîner plusieurs invocations
+
+Le pattern classique : générer un plan, puis exécuter chaque étape dans un sous-prompt.
+
+```bash
+PLAN=$(claude -p "Plan en 3 étapes pour ajouter l'auth Supabase" --output-format json | jq -r .result)
+
+echo "$PLAN" | while IFS= read -r step; do
+  claude -p "Exécute l'étape : $step" --permission-mode acceptEdits
+done
+```
+
+On peut aussi enchaîner via `--resume` pour garder le contexte conversationnel entre les étapes.
+
+## Traiter des fichiers en masse
+
+Avec `xargs` ou `find`, on parallélise sur des centaines de fichiers.
+
+```bash
+find src -name "*.ts" | xargs -I {} -P 4 \
+  claude -p "Ajoute une JSDoc en haut de ce fichier : {}" \
+  --allowed-tools "Read,Edit" \
+  --permission-mode acceptEdits
+```
+
+`-P 4` lance 4 invocations en parallèle. Attention à la facturation et aux limites de rate : mieux vaut commencer avec `-P 1` puis augmenter.
+
+## Intégration avec des hooks Git
+
+Un `pre-commit` hook peut appeler Claude pour vérifier le diff avant chaque commit.
+
+```bash
+#!/usr/bin/env bash
+DIFF=$(git diff --cached)
+RESULT=$(echo "$DIFF" | claude -p "Y a-t-il des secrets dans ce diff ? Réponds OUI ou NON." --output-format json | jq -r .result)
+
+if [ "$RESULT" = "OUI" ]; then
+  echo "Commit bloqué : secret détecté"
+  exit 1
+fi
+```
+
+C'est une garantie supplémentaire avant que le code ne quitte la machine.
+
+## Pour aller plus loin
+
+- Utiliser `tee` pour à la fois logger et continuer le pipe : `claude -p "..." | tee out.txt | jq .`
+- Wrapper `claude -p` dans une fonction shell qui ajoute des flags par défaut (`--output-format json`, `--allowed-tools`).
+- Combiner avec `gh` (GitHub CLI) pour commenter automatiquement les PR avec une revue Claude.
+- Utiliser `entr` ou `fswatch` pour relancer Claude sur chaque modification de fichier en mode TDD.

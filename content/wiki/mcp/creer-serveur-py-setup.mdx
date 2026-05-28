@@ -1,0 +1,158 @@
+---
+title: "Créer un serveur MCP Python : setup & primitives"
+description: "mcp SDK Python, démarrer un serveur, FastMCP."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+Le SDK Python officiel `mcp` propose une API très ergonomique baptisée **FastMCP**, inspirée de FastAPI : on déclare ses tools et resources avec des décorateurs, le SDK s'occupe du protocole. C'est souvent le moyen le plus rapide de transformer un script Python existant en serveur MCP utilisable par Claude.
+
+## Installation
+
+FastMCP requiert Python 3.10+. L'outil officiel `uv` (rapide, géré par Astral) est recommandé pour gérer l'environnement.
+
+```bash
+uv init mcp-mon-serveur
+cd mcp-mon-serveur
+uv add "mcp[cli]" httpx
+```
+
+Pour les utilisateurs plus traditionnels :
+
+```bash
+pip install "mcp[cli]" httpx
+```
+
+L'extra `[cli]` fournit la commande `mcp` qui inclut l'inspecteur et le lanceur de dev.
+
+## Squelette FastMCP
+
+Tout tient dans un seul fichier au départ. L'API est volontairement minimaliste.
+
+```python
+from mcp.server.fastmcp import FastMCP
+
+mcp = FastMCP("mon-serveur")
+
+if __name__ == "__main__":
+    mcp.run()
+```
+
+Démarrez en mode dev (avec l'inspecteur web) :
+
+```bash
+uv run mcp dev server.py
+```
+
+Vous obtenez une URL locale qui ouvre une UI pour tester vos tools manuellement.
+
+## Déclarer un tool
+
+Un tool est une fonction Python décorée avec `@mcp.tool()`. Les annotations de type servent à générer le schéma JSON automatiquement. Une docstring claire aide Claude à choisir le bon tool.
+
+```python
+@mcp.tool()
+async def get_meteo(ville: str, unite: str = "celsius") -> str:
+    """Récupère la météo actuelle d'une ville.
+
+    Args:
+        ville: Nom de la ville (ex: "Paris")
+        unite: "celsius" ou "fahrenheit"
+    """
+    async with httpx.AsyncClient() as client:
+        r = await client.get(f"https://api.meteo.com/{ville}")
+        data = r.json()
+    return f"{data['temp']}° à {ville}"
+```
+
+Les types complexes fonctionnent aussi via Pydantic :
+
+```python
+from pydantic import BaseModel
+
+class Adresse(BaseModel):
+    rue: str
+    ville: str
+    code_postal: str
+
+@mcp.tool()
+def valider_adresse(adresse: Adresse) -> bool:
+    """Valide une adresse postale française."""
+    return len(adresse.code_postal) == 5
+```
+
+## Déclarer une resource
+
+Les resources sont des données lisibles, identifiées par URI. Le décorateur `@mcp.resource()` accepte des templates avec paramètres.
+
+```python
+@mcp.resource("config://app")
+def get_config() -> str:
+    """Configuration applicative."""
+    return '{"version": "1.0", "env": "prod"}'
+
+@mcp.resource("user://{user_id}")
+def get_user(user_id: str) -> str:
+    """Profil d'un utilisateur."""
+    return fetch_user_from_db(user_id)
+```
+
+La différence clé avec un tool : une resource est conçue pour être **lue** (sans effet de bord), un tool pour **agir**. Cette distinction aide Claude à raisonner sur quand l'invoquer.
+
+## Déclarer un prompt
+
+Les prompts sont des templates réutilisables, exposés comme slash commands dans Claude Code.
+
+```python
+from mcp.server.fastmcp.prompts import base
+
+@mcp.prompt()
+def debug_erreur(message: str) -> list[base.Message]:
+    """Analyse une erreur et propose des pistes."""
+    return [
+        base.UserMessage(f"J'ai cette erreur : {message}"),
+        base.UserMessage("Analyse-la et propose 3 hypothèses."),
+    ]
+```
+
+## Brancher à Claude Code
+
+Une fois le serveur prêt, ajoutez-le à votre config :
+
+```bash
+claude mcp add mon-serveur -- uv run --directory /chemin/vers/projet server.py
+```
+
+Ou manuellement dans `~/.claude/mcp.json` :
+
+```json
+{
+  "mcpServers": {
+    "mon-serveur": {
+      "command": "uv",
+      "args": ["run", "--directory", "/chemin/vers/projet", "server.py"]
+    }
+  }
+}
+```
+
+## Logging et debug
+
+FastMCP expose un logger via le contexte. Injectez `Context` dans n'importe quel tool pour logger ou envoyer des progressions.
+
+```python
+from mcp.server.fastmcp import Context
+
+@mcp.tool()
+async def long_traitement(items: list[str], ctx: Context) -> str:
+    for i, item in enumerate(items):
+        await ctx.info(f"Traitement {item}")
+        await ctx.report_progress(i + 1, len(items))
+    return "Terminé"
+```
+
+## Pour aller plus loin
+
+- Doc officielle : github.com/modelcontextprotocol/python-sdk
+- Exemples : `mcp.server.fastmcp.examples` contient une dizaine de serveurs prêts à étudier
+- Déploiement Python : packager avec `uv build` puis publier sur PyPI, ou conteneuriser avec Docker

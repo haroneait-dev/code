@@ -1,0 +1,77 @@
+---
+title: "Configurer les IDE (VS Code, Cursor, Windsurf, Zed)"
+description: "Extensions officielles et tierces dans les éditeurs modernes pour intégrer Claude Code au workflow IDE."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+Claude Code est nativement un CLI, mais il s'intègre élégamment dans la plupart des éditeurs modernes via des extensions ou un terminal embarqué. Cette page récapitule la configuration recommandée pour VS Code, Cursor, Windsurf et Zed afin de garder votre flux d'édition fluide tout en gardant Claude à portée de main.
+
+## VS Code et l'extension officielle
+
+L'extension officielle `Anthropic.claude-code` s'installe depuis le Marketplace ou en ligne de commande :
+
+```bash
+code --install-extension anthropic.claude-code
+```
+
+Une fois activée, ouvrez un dossier puis lancez la palette (`Cmd+Shift+P`) et tapez `Claude Code: Start Session`. L'extension détecte automatiquement le binaire `claude` et ouvre un panneau latéral qui partage le contexte des fichiers ouverts. Pensez à autoriser l'accès au workspace dans les paramètres `claude-code.workspaceTrust`.
+
+```json
+{
+  "claude-code.autoAttachActiveEditor": true,
+  "claude-code.terminal.integrated": true,
+  "claude-code.theme": "dark-beige"
+}
+```
+
+## Cursor
+
+Cursor embarque déjà une IA propriétaire, mais Claude Code y reste utile pour les tâches longues (refactor, audit). Deux approches coexistent :
+
+1. **Terminal intégré** : `Ctrl+\`` puis `claude` — la session hérite du dossier courant.
+2. **Tâche personnalisée** dans `.vscode/tasks.json` pour lancer un one-shot rapide.
+
+```json
+{
+  "label": "Claude one-shot",
+  "type": "shell",
+  "command": "claude -p \"${input:prompt}\" --output-format json"
+}
+```
+
+## Windsurf et Zed
+
+Windsurf (Codeium) reprend l'architecture de VS Code et accepte donc l'extension officielle via OpenVSX si elle est publiée, sinon basculer sur le terminal natif. Zed, lui, n'a pas d'extension dédiée mais propose un terminal modal performant (`cmd-j`) ainsi qu'une assistant panel compatible MCP — vous pouvez exposer Claude Code via un serveur MCP local.
+
+| Éditeur  | Extension native | Terminal intégré | MCP supporté |
+|----------|------------------|------------------|--------------|
+| VS Code  | Oui              | Oui              | Oui          |
+| Cursor   | Partiel          | Oui              | Oui          |
+| Windsurf | Via OpenVSX      | Oui              | Oui          |
+| Zed      | Non              | Oui (modal)      | Oui          |
+
+## Astuces de productivité
+
+- Mappez un raccourci global à `claude -c` (continuer la dernière session) pour reprendre instantanément un fil de travail.
+- Activez le mode `--watch` lorsqu'un build tourne en arrière-plan : Claude peut réagir aux logs de Turbopack.
+- Désactivez l'auto-formatage agressif (Prettier on save) pendant qu'un edit est en cours pour éviter les conflits de patch.
+
+```ts
+// keybindings.json (VS Code)
+{
+  "key": "ctrl+alt+c",
+  "command": "workbench.action.terminal.sendSequence",
+  "args": { "text": "claude -c\n" }
+}
+```
+
+## Sécurité et workspace trust
+
+Tous ces éditeurs respectent un modèle de confiance. Avant d'autoriser Claude Code à écrire dans un dossier, vérifiez que la racine est bien « trusted ». Sous VS Code, ouvrez `File → Manage Workspace Trust`. Sous Cursor et Windsurf, la première ouverture déclenche un prompt similaire. Refusez la confiance pour les dépôts inconnus afin de garder les hooks et permissions sous contrôle.
+
+## Pour aller plus loin
+
+- [Documentation officielle de l'extension VS Code](https://docs.claude.com/claude-code/vscode)
+- [Guide MCP pour Zed](https://zed.dev/docs/assistant/mcp)
+- [Modèle de `settings.json` partagé en équipe](https://github.com/anthropics/claude-code/tree/main/examples/ide)

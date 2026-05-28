@@ -1,0 +1,43 @@
+---
+title: "Onboarding nouveau dev"
+description: "Utiliser Claude pour accélérer l'arrivée d'un nouveau dev sur le codebase et raccourcir le time-to-first-PR."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+L'onboarding est le moment où une équipe perd le plus de temps : un nouveau dev passe des semaines à reconstruire mentalement ce que les autres ont déjà digéré. Claude Code, bien configuré, divise ce délai par deux ou trois. L'idée n'est pas de remplacer le mentor humain, mais de fournir un binôme disponible 24/7 qui connaît le repo aussi bien que les anciens.
+
+## Préparer un CLAUDE.md d'accueil
+
+Le fichier `CLAUDE.md` à la racine devient le manuel d'orientation. Il doit contenir l'essentiel : stack, architecture en 10 lignes, conventions de nommage, commandes courantes, pièges connus. Un nouveau dev qui lance `claude` dans le repo se retrouve immédiatement avec un assistant déjà briefé. Évite l'exhaustivité : ce fichier n'est pas une doc, c'est un cahier de bord. Tout ce qui change rarement, tout ce qui n'est pas évident depuis le code.
+
+Ajoute un fichier `ONBOARDING.md` plus détaillé que tu pointes depuis le CLAUDE.md. Il contient l'arbre de décision « j'ai un bug, par où chercher ? », les liens vers Notion, Linear, le Slack channel.
+
+## Premier jour : laisser explorer
+
+Demande au nouveau dev de poser ses questions à Claude avant de déranger l'équipe : `Explique-moi le flux d'authentification`, `Pourquoi utilise-t-on Hono plutôt qu'Express ici ?`, `Quel test je dois lancer si je modifie src/billing/ ?`. Claude lit les fichiers, croise avec le CLAUDE.md et répond en contexte. Les questions qui restent floues remontent à l'humain — et elles sont souvent les plus pertinentes.
+
+Donne-lui un ticket bonbon dès le premier jour : changer un libellé, ajouter un log, écrire un test manquant. Claude l'aide à trouver le bon fichier, à respecter les conventions et à ouvrir un PR propre. Le but est de toucher au workflow complet (branche, commit, CI, review) en 24h.
+
+## Générer des tours guidés
+
+Crée des slash commands d'onboarding réutilisables. Par exemple `/tour-auth` qui demande à Claude d'expliquer le module auth avec liens vers les fichiers, ou `/tour-deploy` qui retrace ce qui se passe quand on push sur main. Stockés dans `.claude/commands/`, ils deviennent un parcours guidé que chaque nouveau peut suivre à son rythme.
+
+Tu peux aussi générer un quiz : `Pose-moi 10 questions sur l'architecture du repo, corrige mes réponses en pointant les fichiers concernés`. Ludique et redoutablement efficace pour ancrer les connaissances.
+
+## Cadrer les premières PR
+
+Demande au nouveau de toujours faire passer ses PR par une auto-review Claude avant de solliciter l'équipe : `Relis mon diff, vérifie le respect des conventions du CLAUDE.md, propose des améliorations`. Cela élimine les remarques de surface (formatage, naming, tests manquants) et permet aux reviewers humains de se concentrer sur le fond.
+
+Côté reviewer, garde l'œil humain critique : Claude peut valider du code qui suit les conventions mais rate l'intention business. Le mentor reste indispensable sur les décisions produit.
+
+## Mesurer et itérer
+
+Mesure le time-to-first-PR, le time-to-prod, le nombre de questions Slack la première semaine. Si certaines questions reviennent souvent, c'est que le CLAUDE.md est incomplet : enrichis-le. L'onboarding devient un cycle d'amélioration continue du repo lui-même.
+
+## Pour aller plus loin
+
+- Demande au nouveau dev d'écrire les sections du CLAUDE.md qui lui ont manqué pendant son onboarding
+- Crée un subagent `code-explorer` spécialisé dans la cartographie de modules inconnus
+- Enregistre une session pair-programming entre un senior et Claude pour les patterns complexes
+- Programme un retour à 30/60/90 jours pour ajuster le matériel d'accueil

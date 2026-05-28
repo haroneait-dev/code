@@ -1,0 +1,111 @@
+---
+title: "Résilience multi-cloud"
+description: "Architecture de fallback Anthropic, AWS Bedrock et GCP Vertex pour viser 99,99 % d'uptime."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+Aucun cloud n'est infaillible. Pour les workloads critiques (support client, agents internes, pipelines de production), une stratégie multi-cloud sur Claude permet d'atteindre un objectif **99,99 % uptime** sans dépendre d'un fournisseur unique. Les trois canaux (API Anthropic, AWS Bedrock, GCP Vertex AI) exposent exactement la même famille de modèles, ce qui rend le fallback trivial à implémenter.
+
+## Pourquoi viser le multi-cloud
+
+- Découplage des incidents : une panne régionale AWS n'affecte pas GCP.
+- Souveraineté : router selon la résidence des données (UE vs US).
+- Négociation commerciale : ne pas être prisonnier d'un seul provider.
+- Test de continuité : exigence fréquente en audit ISO 22301.
+
+```yaml
+sla_targets:
+  availability: 99.99%   # ≈ 52 min/an
+  p95_latency_ms: 1500
+  error_budget_monthly: 0.01%
+```
+
+## Topologie de référence
+
+Un *router* applicatif intercepte chaque requête, sélectionne un fournisseur primaire et bascule en cas d'échec. Les trois canaux doivent être actifs en permanence (warm), pas seulement déclarés.
+
+```yaml
+providers:
+  primary:
+    name: anthropic_api
+    region: global
+    weight: 70
+  secondary:
+    name: aws_bedrock
+    region: us-east-1
+    weight: 20
+  tertiary:
+    name: gcp_vertex
+    region: europe-west1
+    weight: 10
+strategy: weighted_with_failover
+health_check_interval_s: 15
+```
+
+## Implémentation du failover
+
+Côté code, abstraire le client derrière une interface unique et router selon la disponibilité. Exemple Python simplifié :
+
+```python
+from anthropic import Anthropic, AnthropicBedrock, AnthropicVertex
+
+clients = [
+    ("anthropic", Anthropic()),
+    ("bedrock",   AnthropicBedrock(aws_region="us-east-1")),
+    ("vertex",    AnthropicVertex(region="europe-west1", project_id="prod")),
+]
+
+def call_with_failover(messages, model="claude-sonnet-4-6"):
+    last_err = None
+    for name, client in clients:
+        try:
+            return client.messages.create(
+                model=model, max_tokens=1024, messages=messages
+            )
+        except Exception as e:
+            last_err = e
+            continue
+    raise RuntimeError(f"All providers failed: {last_err}")
+```
+
+Pour aller plus loin, externaliser cette logique dans un **AI Gateway** (Vercel AI Gateway, LiteLLM, Portkey) qui gère retry exponentiel, circuit breaker et observabilité.
+
+## Health checks et circuit breaker
+
+Un endpoint malade doit être écarté avant qu'il ne dégrade la latence globale. Sondes recommandées :
+
+```bash
+# Sonde légère toutes les 15 secondes
+curl -s -o /dev/null -w "%{http_code} %{time_total}\n" \
+  -X POST https://api.anthropic.com/v1/messages \
+  -H "x-api-key: $ANTHROPIC_API_KEY" \
+  -H "anthropic-version: 2023-06-01" \
+  -H "content-type: application/json" \
+  -d '{"model":"claude-haiku-4-6","max_tokens":1,"messages":[{"role":"user","content":"ping"}]}'
+```
+
+Au-delà de N erreurs consécutives, ouvrir le circuit pendant 30 secondes avant un *half-open retry*.
+
+## Coûts et idempotence
+
+Le multi-cloud induit un sur-coût (deux abonnements minimum, debug double). Mitiger en :
+
+```json
+{
+  "optimisations": {
+    "cache_responses": "redis_ttl_300s",
+    "idempotency_key": "uuid_v4_par_requete",
+    "prompt_caching": "actif_sur_chaque_provider",
+    "model_routing": "haiku_pour_classification_sonnet_pour_synthèse"
+  }
+}
+```
+
+L'idempotency key évite de payer deux fois la même requête en cas de retry sur un autre cloud.
+
+## Pour aller plus loin
+
+- Articles wiki : `aws-bedrock`, `gcp-vertex`, `sovereign-hosting`
+- Patterns SRE : *circuit breaker*, *bulkhead*, *exponential backoff with jitter*
+- Outils : LiteLLM, Portkey, Vercel AI Gateway

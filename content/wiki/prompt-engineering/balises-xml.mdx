@@ -1,0 +1,109 @@
+---
+title: "Balises XML pour structurer"
+description: "Pourquoi Claude excelle avec XML et comment utiliser <task>, <document>, <example> pour des prompts robustes."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+Claude a été entraîné massivement sur des données structurées avec des balises XML. Conséquence : il distingue beaucoup mieux les différentes parties d'un prompt quand elles sont encadrées par des balises. C'est probablement la technique la plus rentable du prompt engineering pour Claude — coût zéro, gain énorme.
+
+## Pourquoi XML plutôt que markdown ou JSON
+
+Markdown est ambigu : un `##` peut désigner un titre de section ou apparaître dans le contenu de l'utilisateur. JSON est strict mais lourd à écrire à la main et fragile dès qu'on inclut du texte libre avec guillemets. XML, lui, est tolérant aux retours à la ligne, supporte n'importe quel contenu textuel, et offre une délimitation visuelle nette pour Claude.
+
+Claude reconnaît n'importe quel nom de balise — vous n'êtes pas limité à un vocabulaire prédéfini. Choisissez des noms sémantiques et cohérents dans tout votre prompt.
+
+## La balise `<task>` : isoler l'instruction
+
+Quand votre prompt mélange contexte, documents et instructions, isolez la tâche dans une balise dédiée. Claude la repérera immédiatement, même au milieu de 10 000 tokens de contexte.
+
+```xml
+<context>
+  Tu es un analyste financier qui résume des rapports trimestriels
+  pour des investisseurs institutionnels.
+</context>
+
+<task>
+  Résume le rapport ci-dessous en 5 points clés, avec un focus
+  sur la marge opérationnelle et la trésorerie.
+</task>
+```
+
+## La balise `<document>` : encadrer les contenus injectés
+
+Dès que vous injectez du contenu externe (PDF, e-mail, code, transcript), encadrez-le. Cela évite que des phrases du document soient interprétées comme des instructions — une forme basique de protection contre l'injection de prompt.
+
+```xml
+<document source="rapport-q1-2026.pdf">
+  Chiffre d'affaires : 142 M€ (+18% YoY)
+  Marge opérationnelle : 23,4%
+  ...
+</document>
+```
+
+Si vous injectez plusieurs documents, numérotez-les et demandez à Claude de citer ses sources :
+
+```xml
+<documents>
+  <document index="1" title="Rapport Q1">...</document>
+  <document index="2" title="Note interne RH">...</document>
+</documents>
+```
+
+## La balise `<example>` : guider par démonstration
+
+Les exemples encadrés deviennent des références claires que Claude peut imiter sans confondre avec la tâche réelle. Groupez plusieurs exemples dans un conteneur `<examples>` pour signaler qu'il s'agit d'une série.
+
+```xml
+<examples>
+  <example>
+    <input>Le client est mécontent du délai de livraison.</input>
+    <output>Catégorie : LOGISTIQUE | Urgence : HAUTE</output>
+  </example>
+  <example>
+    <input>Comment réinitialiser mon mot de passe ?</input>
+    <output>Catégorie : SUPPORT | Urgence : BASSE</output>
+  </example>
+</examples>
+```
+
+## Imbriquer pour structurer finement
+
+Les balises peuvent s'imbriquer librement. C'est utile pour les prompts complexes où chaque section a sa propre sous-structure :
+
+```xml
+<analysis_request>
+  <persona>Consultant en cybersécurité</persona>
+  <constraints>
+    <length>maximum 500 mots</length>
+    <tone>technique mais pédagogique</tone>
+  </constraints>
+  <subject>
+    Audit du fichier de configuration ci-joint.
+  </subject>
+</analysis_request>
+```
+
+Cette imbrication permet aussi de demander à Claude de structurer sa réponse en XML, ce qui facilite le parsing côté code :
+
+```xml
+<output_format>
+  <summary>Synthèse en 2 phrases</summary>
+  <findings>
+    <finding severity="high|medium|low">...</finding>
+  </findings>
+  <recommendations>Actions concrètes</recommendations>
+</output_format>
+```
+
+## Bonnes pratiques
+
+Restez cohérent dans votre nommage — si vous commencez avec `<document>`, ne passez pas à `<doc>` ou `<file>` en cours de prompt. Évitez les noms de balises HTML standard (`<div>`, `<p>`) qui peuvent activer des biais d'entraînement. Préférez des noms métier explicites (`<contract>`, `<ticket>`, `<email>`).
+
+Enfin, demandez explicitement à Claude d'utiliser les balises dans sa réponse si vous voulez parser le résultat : "Réponds en utilisant les balises définies dans `<output_format>`".
+
+## Pour aller plus loin
+
+- Approfondissez l'anatomie d'un prompt pour savoir quoi placer dans chaque balise.
+- Lisez le guide few-shot prompting pour exploiter `<examples>` à fond.
+- Consultez la documentation Anthropic sur le "Prompt structuring" pour les patterns avancés.

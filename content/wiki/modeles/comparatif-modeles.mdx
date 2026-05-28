@@ -1,0 +1,105 @@
+---
+title: "Comparatif des modèles Claude"
+description: "Tableau récapitulatif Opus / Sonnet / Haiku — quand choisir lequel."
+updatedAt: "2026-05-19"
+readingMinutes: 6
+---
+
+La famille Claude 4.x propose trois tiers principaux : **Opus**, **Sonnet** et **Haiku**. Chacun cible un compromis différent entre qualité, vitesse et coût. Cet article synthétise les différences pour t'aider à arbitrer rapidement, sans relire toute la documentation.
+
+## Vue d'ensemble
+
+| Critère | Opus 4.7 | Sonnet 4.6 | Haiku 4.5 |
+|---|---|---|---|
+| ID modèle | `claude-opus-4-7` | `claude-sonnet-4-6` | `claude-haiku-4-5-20251001` |
+| Niveau | Premium | Standard | Compact |
+| Qualité raisonnement | Excellent | Très bon | Bon |
+| Vitesse | Lente | Moyenne | Rapide |
+| Coût input/output | Élevé | Moyen | Faible |
+| Contexte | 200K | 200K | 200K |
+| Extended thinking | Oui (budget large) | Oui | Oui (budget réduit) |
+| Vision | Oui | Oui | Oui |
+| Tool use | Excellent | Excellent | Bon |
+
+## Profil par cas d'usage
+
+| Cas d'usage | Choix recommandé |
+|---|---|
+| Chatbot grand public | Haiku → Sonnet en fallback |
+| IDE assistant (Claude Code, Cursor) | Sonnet 4.6 |
+| Agent long-running multi-heures | Opus 4.7 |
+| Classification, modération | Haiku 4.5 |
+| Analyse de papier scientifique | Opus 4.7 |
+| Génération de tests unitaires | Sonnet 4.6 |
+| Extraction structurée à volume | Haiku 4.5 |
+| Refactor d'architecture | Opus 4.7 |
+| Résumé d'emails | Haiku 4.5 |
+| Recherche et planning produit | Opus 4.7 |
+
+## Coût relatif (ordre de grandeur)
+
+| Modèle | Input | Output |
+|---|---|---|
+| Opus 4.7 | $$$$ | $$$$ |
+| Sonnet 4.6 | $$ | $$ |
+| Haiku 4.5 | $ | $ |
+
+Les tarifs exacts évoluent — consulte https://www.anthropic.com/pricing pour les prix actuels en USD par million de tokens.
+
+## Latence typique
+
+| Modèle | Premier token | 1000 tokens générés |
+|---|---|---|
+| Opus 4.7 | ~1-2s | ~20-40s |
+| Sonnet 4.6 | ~500ms-1s | ~10-20s |
+| Haiku 4.5 | ~300-600ms | ~3-6s |
+
+> Ces ordres de grandeur valent pour des prompts moyens (~5k tokens d'entrée), sans extended thinking.
+
+## Cascade : combiner les trois
+
+Un pattern productif est la **cascade** :
+
+```ts
+async function answer(query: string) {
+  // 1. Haiku trie
+  const intent = await classify(query); // claude-haiku-4-5-20251001
+
+  if (intent === "simple") {
+    return await haikuAnswer(query);
+  }
+
+  if (intent === "code") {
+    return await sonnetAnswer(query); // claude-sonnet-4-6
+  }
+
+  // 2. Cas complexe → Opus
+  return await opusAnswer(query); // claude-opus-4-7
+}
+```
+
+Cette approche optimise le coût : la majorité des requêtes s'arrêtent à Haiku.
+
+## Choisir par contrainte dominante
+
+| Contrainte dominante | Choix |
+|---|---|
+| Latence < 1s | Haiku |
+| Coût < $0.001 / requête | Haiku |
+| Qualité maximale | Opus |
+| Compromis | Sonnet |
+| Code quotidien | Sonnet |
+| Recherche / agents complexes | Opus |
+
+## Erreurs courantes
+
+- **Prendre Opus par défaut** : surcoût significatif sans gain de qualité dans 80 % des cas.
+- **Prendre Haiku pour du code complexe** : taux d'erreur trop élevé.
+- **Ignorer le prompt caching** : sur Sonnet/Opus, les gains de coût sont substantiels sur les prompts répétitifs.
+
+## Pour aller plus loin
+
+- Doc officielle modèles : https://docs.anthropic.com/en/docs/about-claude/models
+- Pricing : https://www.anthropic.com/pricing
+- Article voisin : [Choisir le bon modèle](/wiki/modeles/choisir-bon-modele)
+- Article voisin : [Pricing et tokens](/wiki/modeles/pricing-tokens)
