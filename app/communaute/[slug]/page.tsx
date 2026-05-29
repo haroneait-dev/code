@@ -1,13 +1,18 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ChevronRight, MessageCircle, ThumbsUp } from "lucide-react";
+import { ChevronRight, MessageCircle } from "lucide-react";
 import { SiteHeader } from "@/components/site/SiteHeader";
 import { SiteFooter } from "@/components/site/SiteFooter";
 import { Avatar } from "@/components/site/Avatar";
-import { getPostBySlug, listComments } from "@/lib/community/queries";
+import {
+  getPostBySlug,
+  listComments,
+  getUserVotes,
+} from "@/lib/community/queries";
 import { categoryLabel } from "@/lib/community/categories";
 import { getServerSupabase } from "@/lib/supabase-server";
 import { CommentTree, ReplyForm } from "@/components/community/CommentTree";
+import { VoteWidget } from "@/components/community/VoteWidget";
 
 type Props = { params: Promise<{ slug: string }> };
 
@@ -36,6 +41,15 @@ export default async function PostPage({ params }: Props) {
     data: { user },
   } = await supabase.auth.getUser();
   const canPost = !!user;
+  const isMyPost = user?.id === post.author_id;
+
+  const userVotes = user
+    ? await getUserVotes(user.id, [
+        { kind: "post", ids: [post.id] },
+        { kind: "comment", ids: comments.map((c) => c.id) },
+      ])
+    : {};
+  const postVote = (userVotes[post.id] ?? 0) as -1 | 0 | 1;
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -57,65 +71,86 @@ export default async function PostPage({ params }: Props) {
         </nav>
 
         {/* Post */}
-        <article className="bg-surface-container-lowest border border-outline-variant rounded-2xl p-6 md:p-8 mb-8">
-          <header className="flex items-center gap-3 mb-5 min-w-0">
-            <Avatar
-              name={post.author?.display_name ?? post.author?.username ?? "?"}
-              initial={(post.author?.username?.[0] ?? "?").toUpperCase()}
-              size={40}
+        <article className="bg-surface-container-lowest border border-outline-variant rounded-2xl p-6 md:p-8 mb-8 flex gap-5">
+          <div className="hidden sm:block shrink-0 pt-1">
+            <VoteWidget
+              targetKind="post"
+              targetId={post.id}
+              initialScore={post.score}
+              initialValue={postVote}
+              canVote={canPost && !isMyPost}
             />
-            <div className="min-w-0">
-              {post.author?.username ? (
-                <Link
-                  href={`/u/${post.author.username}`}
-                  className="text-body-rt font-medium text-on-surface hover:text-primary transition-colors truncate block"
-                >
-                  {post.author.display_name ?? post.author.username}
-                </Link>
-              ) : (
-                <span className="text-body-rt font-medium text-on-surface">
-                  Anonyme
-                </span>
-              )}
-              <div className="text-xs text-on-surface-variant">
-                {post.author?.username ? `@${post.author.username} · ` : ""}
-                {relativeTime(post.created_at)}
+          </div>
+          <div className="flex-1 min-w-0">
+            <header className="flex items-center gap-3 mb-5 min-w-0">
+              <Avatar
+                name={post.author?.display_name ?? post.author?.username ?? "?"}
+                initial={(post.author?.username?.[0] ?? "?").toUpperCase()}
+                size={40}
+              />
+              <div className="min-w-0">
+                {post.author?.username ? (
+                  <Link
+                    href={`/u/${post.author.username}`}
+                    className="text-body-rt font-medium text-on-surface hover:text-primary transition-colors truncate block"
+                  >
+                    {post.author.display_name ?? post.author.username}
+                  </Link>
+                ) : (
+                  <span className="text-body-rt font-medium text-on-surface">
+                    Anonyme
+                  </span>
+                )}
+                <div className="text-xs text-on-surface-variant">
+                  {post.author?.username ? `@${post.author.username} · ` : ""}
+                  {relativeTime(post.created_at)}
+                </div>
               </div>
+            </header>
+
+            <h1 className="font-display-xl text-[28px] md:text-[36px] font-bold tracking-tight mb-4 text-on-surface leading-[1.15]">
+              {post.title}
+            </h1>
+
+            {post.body && (
+              <div className="text-body-rt text-on-surface whitespace-pre-wrap leading-relaxed mb-5">
+                {post.body}
+              </div>
+            )}
+
+            {post.tags.length > 0 && (
+              <div className="flex flex-wrap gap-2 mb-5">
+                {post.tags.map((t) => (
+                  <span
+                    key={t}
+                    className="px-2 py-1 bg-surface-container rounded text-xs text-on-surface-variant"
+                  >
+                    #{t}
+                  </span>
+                ))}
+              </div>
+            )}
+
+            <div className="flex items-center gap-5 pt-4 border-t border-outline-variant/60 text-body-sm text-on-surface-variant sm:hidden">
+              <VoteWidget
+                targetKind="post"
+                targetId={post.id}
+                initialScore={post.score}
+                initialValue={postVote}
+                canVote={canPost && !isMyPost}
+                orientation="horizontal"
+              />
+              <span className="inline-flex items-center gap-1.5">
+                <MessageCircle className="w-4 h-4" strokeWidth={1.75} />
+                {post.comment_count} commentaires
+              </span>
             </div>
-          </header>
-
-          <h1 className="font-display-xl text-[28px] md:text-[36px] font-bold tracking-tight mb-4 text-on-surface leading-[1.15]">
-            {post.title}
-          </h1>
-
-          {post.body && (
-            <div className="text-body-rt text-on-surface whitespace-pre-wrap leading-relaxed mb-5">
-              {post.body}
+            <div className="hidden sm:flex items-center gap-5 pt-4 border-t border-outline-variant/60 text-body-sm text-on-surface-variant">
+              <span className="inline-flex items-center gap-1.5">
+                <MessageCircle className="w-4 h-4" strokeWidth={1.75} />
+                {post.comment_count} commentaires
+              </span>
             </div>
-          )}
-
-          {post.tags.length > 0 && (
-            <div className="flex flex-wrap gap-2 mb-5">
-              {post.tags.map((t) => (
-                <span
-                  key={t}
-                  className="px-2 py-1 bg-surface-container rounded text-xs text-on-surface-variant"
-                >
-                  #{t}
-                </span>
-              ))}
-            </div>
-          )}
-
-          <div className="flex items-center gap-5 pt-4 border-t border-outline-variant/60 text-body-sm text-on-surface-variant">
-            <span className="inline-flex items-center gap-1.5">
-              <ThumbsUp className="w-4 h-4" strokeWidth={1.75} />
-              {post.score} points
-            </span>
-            <span className="inline-flex items-center gap-1.5">
-              <MessageCircle className="w-4 h-4" strokeWidth={1.75} />
-              {post.comment_count} commentaires
-            </span>
           </div>
         </article>
 
@@ -144,6 +179,8 @@ export default async function PostPage({ params }: Props) {
             postId={post.id}
             comments={comments}
             canPost={canPost}
+            userVotes={userVotes}
+            currentUserId={user?.id ?? null}
           />
         </section>
       </main>

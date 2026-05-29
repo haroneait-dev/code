@@ -11,8 +11,8 @@ export interface Profile {
   display_name: string | null;
   bio: string | null;
   avatar_url: string | null;
-  karma_post: number;
-  karma_comment: number;
+  points_post: number;
+  points_comment: number;
   onboarded: boolean;
   created_at: string;
 }
@@ -24,8 +24,8 @@ export interface PublicProfile {
   display_name: string | null;
   bio: string | null;
   avatar_url: string | null;
-  karma_post: number;
-  karma_comment: number;
+  points_post: number;
+  points_comment: number;
   created_at: string;
 }
 

@@ -28,7 +28,7 @@ export default async function PublicProfilePage({ params }: Props) {
   const { data: profile } = await supabase
     .from("community_profiles")
     .select(
-      "user_id, username, display_name, bio, avatar_url, karma_post, karma_comment, created_at"
+      "user_id, username, display_name, bio, avatar_url, points_post, points_comment, created_at"
     )
     .eq("username", username)
     .maybeSingle();
@@ -89,7 +89,7 @@ export default async function PublicProfilePage({ params }: Props) {
               <div className="flex flex-wrap items-center justify-center sm:justify-start gap-4 text-body-sm text-on-surface-variant">
                 <span className="inline-flex items-center gap-1.5">
                   <ThumbsUp className="w-4 h-4" strokeWidth={1.5} />
-                  {p.karma_post + p.karma_comment} karma
+                  {p.points_post + p.points_comment} points
                 </span>
                 <span className="inline-flex items-center gap-1.5">
                   <Calendar className="w-4 h-4" strokeWidth={1.5} />

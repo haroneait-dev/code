@@ -119,6 +119,27 @@ export async function listComments(
   return attachAuthors((data ?? []) as CommentWithAuthor[]);
 }
 
+export async function getUserVotes(
+  userId: string,
+  targets: { kind: "post" | "comment"; ids: string[] }[]
+): Promise<Record<string, -1 | 1>> {
+  const supabase = await getServerSupabase();
+  const map: Record<string, -1 | 1> = {};
+  for (const t of targets) {
+    if (t.ids.length === 0) continue;
+    const { data } = await supabase
+      .from("community_votes")
+      .select("target_id, value")
+      .eq("voter_id", userId)
+      .eq("target_kind", t.kind)
+      .in("target_id", t.ids);
+    for (const row of (data as { target_id: string; value: -1 | 1 }[]) ?? []) {
+      map[row.target_id] = row.value;
+    }
+  }
+  return map;
+}
+
 export async function countPostsByCategory(): Promise<Record<string, number>> {
   const supabase = await getServerSupabase();
   const { data, error } = await supabase

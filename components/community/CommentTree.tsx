@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Reply, MessageCircle } from "lucide-react";
 import { Avatar } from "@/components/site/Avatar";
+import { VoteWidget } from "@/components/community/VoteWidget";
 import type { CommentWithAuthor } from "@/lib/community/queries";
 
 type Node = CommentWithAuthor & { children: Node[] };
@@ -30,10 +31,14 @@ export function CommentTree({
   postId,
   comments,
   canPost,
+  userVotes = {},
+  currentUserId = null,
 }: {
   postId: string;
   comments: CommentWithAuthor[];
   canPost: boolean;
+  userVotes?: Record<string, -1 | 1>;
+  currentUserId?: string | null;
 }) {
   const tree = useMemo(() => buildTree(comments), [comments]);
   return (
@@ -50,6 +55,8 @@ export function CommentTree({
           postId={postId}
           depth={0}
           canPost={canPost}
+          userVotes={userVotes}
+          currentUserId={currentUserId}
         />
       ))}
     </ul>
@@ -61,15 +68,22 @@ function CommentItem({
   postId,
   depth,
   canPost,
+  userVotes,
+  currentUserId,
 }: {
   node: Node;
   postId: string;
   depth: number;
   canPost: boolean;
+  userVotes: Record<string, -1 | 1>;
+  currentUserId: string | null;
 }) {
   const [replyOpen, setReplyOpen] = useState(false);
 
   const indent = Math.min(depth, 5) * 16;
+  const isMine = currentUserId === node.author_id;
+  const myVote = (userVotes[node.id] ?? 0) as -1 | 0 | 1;
+
   return (
     <li>
       <div
@@ -96,22 +110,30 @@ function CommentItem({
           )}
           <span>·</span>
           <span>{relativeTime(node.created_at)}</span>
-          <span>·</span>
-          <span>{node.score} pts</span>
         </div>
         <div className="text-body-rt text-on-surface whitespace-pre-wrap mb-2 leading-relaxed">
           {node.body}
         </div>
-        {canPost && (
-          <button
-            type="button"
-            onClick={() => setReplyOpen((v) => !v)}
-            className="inline-flex items-center gap-1.5 text-xs text-on-surface-variant hover:text-primary transition-colors"
-          >
-            <Reply className="w-3.5 h-3.5" strokeWidth={1.75} />
-            Répondre
-          </button>
-        )}
+        <div className="flex items-center gap-3">
+          <VoteWidget
+            targetKind="comment"
+            targetId={node.id}
+            initialScore={node.score}
+            initialValue={myVote}
+            canVote={canPost && !isMine}
+            orientation="horizontal"
+          />
+          {canPost && (
+            <button
+              type="button"
+              onClick={() => setReplyOpen((v) => !v)}
+              className="inline-flex items-center gap-1.5 text-xs text-on-surface-variant hover:text-primary transition-colors"
+            >
+              <Reply className="w-3.5 h-3.5" strokeWidth={1.75} />
+              Répondre
+            </button>
+          )}
+        </div>
         {replyOpen && (
           <div className="mt-3">
             <ReplyForm
@@ -131,6 +153,8 @@ function CommentItem({
               postId={postId}
               depth={depth + 1}
               canPost={canPost}
+              userVotes={userVotes}
+              currentUserId={currentUserId}
             />
           ))}
         </ul>
