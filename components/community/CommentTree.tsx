@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Reply, MessageCircle } from "lucide-react";
+import { Reply, MessageCircle, Trash2 } from "lucide-react";
 import { Avatar } from "@/components/site/Avatar";
 import { VoteWidget } from "@/components/community/VoteWidget";
 import type { CommentWithAuthor } from "@/lib/community/queries";
@@ -133,6 +133,7 @@ function CommentItem({
               Répondre
             </button>
           )}
+          {isMine && <DeleteCommentButton id={node.id} />}
         </div>
         {replyOpen && (
           <div className="mt-3">
@@ -236,6 +237,39 @@ export function ReplyForm({
         )}
       </div>
     </form>
+  );
+}
+
+function DeleteCommentButton({ id }: { id: string }) {
+  const router = useRouter();
+  const [loading, setLoading] = useState(false);
+  const onClick = async () => {
+    if (!confirm("Supprimer ce commentaire ?")) return;
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/community/comments/${id}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        alert(data.error ?? "Échec de la suppression");
+        return;
+      }
+      router.refresh();
+    } finally {
+      setLoading(false);
+    }
+  };
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={loading}
+      className="inline-flex items-center gap-1.5 text-xs text-on-surface-variant hover:text-error transition-colors disabled:opacity-50"
+    >
+      <Trash2 className="w-3.5 h-3.5" strokeWidth={1.75} />
+      {loading ? "…" : "Supprimer"}
+    </button>
   );
 }
 

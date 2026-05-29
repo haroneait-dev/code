@@ -13,6 +13,7 @@ import { categoryLabel } from "@/lib/community/categories";
 import { getServerSupabase } from "@/lib/supabase-server";
 import { CommentTree, ReplyForm } from "@/components/community/CommentTree";
 import { VoteWidget } from "@/components/community/VoteWidget";
+import { DeletePostButton } from "@/components/community/DeletePostButton";
 
 type Props = { params: Promise<{ slug: string }> };
 
@@ -144,12 +145,14 @@ export default async function PostPage({ params }: Props) {
                 <MessageCircle className="w-4 h-4" strokeWidth={1.75} />
                 {post.comment_count} commentaires
               </span>
+              {isMyPost && <DeletePostButton slug={post.slug} />}
             </div>
             <div className="hidden sm:flex items-center gap-5 pt-4 border-t border-outline-variant/60 text-body-sm text-on-surface-variant">
               <span className="inline-flex items-center gap-1.5">
                 <MessageCircle className="w-4 h-4" strokeWidth={1.75} />
                 {post.comment_count} commentaires
               </span>
+              {isMyPost && <DeletePostButton slug={post.slug} />}
             </div>
           </div>
         </article>
