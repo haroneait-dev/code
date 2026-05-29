@@ -3,8 +3,10 @@ import { createServerClient } from "@supabase/ssr";
 import { isAdminEmail } from "@/lib/admin";
 
 const PROTECTED_PREFIXES = ["/learn", "/wiki", "/communaute"];
+const COMMUNITY_USERNAME_PREFIXES = ["/communaute", "/messages", "/profil"];
 const ADMIN_PREFIXES = ["/admin"];
 const PENDING_PATH = "/pending";
+const ONBOARDING_PATH = "/onboarding";
 
 export async function proxy(req: NextRequest) {
   const res = NextResponse.next({ request: { headers: req.headers } });
@@ -54,23 +56,36 @@ export async function proxy(req: NextRequest) {
     return res; // admins bypass the pending check
   }
 
-  // Protected route + logged in: check approval status
-  if (isProtected && user) {
+  const needsUsername = COMMUNITY_USERNAME_PREFIXES.some(
+    (p) => path === p || path.startsWith(`${p}/`)
+  );
+
+  // Protected route + logged in: check approval status (and username if needed)
+  if ((isProtected || needsUsername) && user) {
     // Admins always have access
     if (isAdminEmail(user.email)) return res;
 
-    // Look up profile status (RLS lets users read their own row)
+    // Look up profile (RLS lets users read their own row)
     const { data: profile } = await supabase
       .from("profiles")
-      .select("status")
+      .select("status, username")
       .eq("user_id", user.id)
       .maybeSingle();
 
-    const status = (profile as { status?: string } | null)?.status ?? "pending";
+    const p = profile as
+      | { status?: string; username?: string | null }
+      | null;
+    const status = p?.status ?? "pending";
 
     if (status !== "approved") {
       const url = req.nextUrl.clone();
       url.pathname = PENDING_PATH;
+      return NextResponse.redirect(url);
+    }
+
+    if (needsUsername && !p?.username) {
+      const url = req.nextUrl.clone();
+      url.pathname = ONBOARDING_PATH;
       return NextResponse.redirect(url);
     }
   }
@@ -83,10 +98,14 @@ export const config = {
     "/learn/:path*",
     "/wiki/:path*",
     "/communaute/:path*",
+    "/messages/:path*",
+    "/profil/:path*",
     "/admin/:path*",
     "/learn",
     "/wiki",
     "/communaute",
+    "/messages",
+    "/profil",
     "/admin",
   ],
 };

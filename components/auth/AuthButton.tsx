@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
-import { ArrowRight, LogOut, ShieldCheck } from "lucide-react";
+import { ArrowRight, LogOut, ShieldCheck, User, Settings } from "lucide-react";
 import type { Session } from "@supabase/supabase-js";
 import { getSupabase } from "@/lib/supabase";
 import { isAdminEmail } from "@/lib/admin";
@@ -13,6 +13,7 @@ import { AuthModal } from "./AuthModal";
 export function AuthButton() {
   const [open, setOpen] = useState(false);
   const [session, setSession] = useState<Session | null>(null);
+  const [username, setUsername] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -26,6 +27,28 @@ export function AuthButton() {
     );
     return () => sub.subscription.unsubscribe();
   }, []);
+
+  useEffect(() => {
+    if (!session?.user) {
+      setUsername(null);
+      return;
+    }
+    let cancelled = false;
+    getSupabase()
+      .from("profiles")
+      .select("username")
+      .eq("user_id", session.user.id)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (cancelled) return;
+        setUsername(
+          (data as { username: string | null } | null)?.username ?? null
+        );
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [session?.user]);
 
   // Auto-open modal when redirected from a protected route (?login=1)
   useEffect(() => {
@@ -96,6 +119,24 @@ export function AuthButton() {
                   </div>
                 )}
               </div>
+              {username && (
+                <Link
+                  href={`/u/${username}`}
+                  onClick={() => setMenuOpen(false)}
+                  className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-body-sm text-on-surface hover:bg-surface-container transition-colors"
+                >
+                  <User className="w-4 h-4" strokeWidth={1.75} />
+                  Mon profil
+                </Link>
+              )}
+              <Link
+                href={username ? "/profil/parametres" : "/onboarding"}
+                onClick={() => setMenuOpen(false)}
+                className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-body-sm text-on-surface hover:bg-surface-container transition-colors"
+              >
+                <Settings className="w-4 h-4" strokeWidth={1.75} />
+                Paramètres
+              </Link>
               {isAdminEmail(email) && (
                 <Link
                   href="/admin/users"
