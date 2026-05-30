@@ -4,12 +4,13 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Menu, X } from "lucide-react";
 
-type NavKey = "formation" | "wiki" | "communaute" | null;
+type NavKey = "formation" | "wiki" | "communaute" | "messages" | null;
 
 const LINKS: { key: Exclude<NavKey, null>; href: string; label: string }[] = [
   { key: "formation", href: "/learn", label: "Formation" },
   { key: "wiki", href: "/wiki", label: "Wiki" },
   { key: "communaute", href: "/communaute", label: "Communauté" },
+  { key: "messages", href: "/messages", label: "Messages" },
 ];
 
 export function MobileNav({ active = null }: { active?: NavKey }) {

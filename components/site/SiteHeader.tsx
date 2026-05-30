@@ -3,8 +3,9 @@ import { Suspense } from "react";
 import { Search } from "lucide-react";
 import { AuthButton } from "@/components/auth/AuthButton";
 import { MobileNav } from "@/components/site/MobileNav";
+import { NotificationBell } from "@/components/notifications/NotificationBell";
 
-type NavKey = "formation" | "wiki" | "communaute" | null;
+type NavKey = "formation" | "wiki" | "communaute" | "messages" | null;
 
 export function SiteHeader({
   active = null,
@@ -39,6 +40,9 @@ export function SiteHeader({
             <Link href="/communaute" className={linkClass("communaute")}>
               Communauté
             </Link>
+            <Link href="/messages" className={linkClass("messages")}>
+              Messages
+            </Link>
           </nav>
         </div>
 
@@ -59,6 +63,9 @@ export function SiteHeader({
               </span>
             </div>
           )}
+          <Suspense fallback={<div className="w-9 h-9" aria-hidden />}>
+            <NotificationBell />
+          </Suspense>
           <Suspense
             fallback={<div className="w-[120px] h-9" aria-hidden />}
           >

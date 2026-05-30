@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Reply, MessageCircle, Trash2 } from "lucide-react";
 import { Avatar } from "@/components/site/Avatar";
 import { VoteWidget } from "@/components/community/VoteWidget";
+import { ReportButton } from "@/components/community/ReportButton";
 import type { CommentWithAuthor } from "@/lib/community/queries";
 
 type Node = CommentWithAuthor & { children: Node[] };
@@ -133,7 +134,11 @@ function CommentItem({
               Répondre
             </button>
           )}
-          {isMine && <DeleteCommentButton id={node.id} />}
+          {isMine ? (
+            <DeleteCommentButton id={node.id} />
+          ) : (
+            canPost && <ReportButton targetKind="comment" targetId={node.id} />
+          )}
         </div>
         {replyOpen && (
           <div className="mt-3">

@@ -14,6 +14,7 @@ import { getServerSupabase } from "@/lib/supabase-server";
 import { CommentTree, ReplyForm } from "@/components/community/CommentTree";
 import { VoteWidget } from "@/components/community/VoteWidget";
 import { DeletePostButton } from "@/components/community/DeletePostButton";
+import { ReportButton } from "@/components/community/ReportButton";
 
 type Props = { params: Promise<{ slug: string }> };
 
@@ -145,14 +146,22 @@ export default async function PostPage({ params }: Props) {
                 <MessageCircle className="w-4 h-4" strokeWidth={1.75} />
                 {post.comment_count} commentaires
               </span>
-              {isMyPost && <DeletePostButton slug={post.slug} />}
+              {isMyPost ? (
+                <DeletePostButton slug={post.slug} />
+              ) : (
+                <ReportButton targetKind="post" targetId={post.id} />
+              )}
             </div>
             <div className="hidden sm:flex items-center gap-5 pt-4 border-t border-outline-variant/60 text-body-sm text-on-surface-variant">
               <span className="inline-flex items-center gap-1.5">
                 <MessageCircle className="w-4 h-4" strokeWidth={1.75} />
                 {post.comment_count} commentaires
               </span>
-              {isMyPost && <DeletePostButton slug={post.slug} />}
+              {isMyPost ? (
+                <DeletePostButton slug={post.slug} />
+              ) : (
+                <ReportButton targetKind="post" targetId={post.id} />
+              )}
             </div>
           </div>
         </article>
