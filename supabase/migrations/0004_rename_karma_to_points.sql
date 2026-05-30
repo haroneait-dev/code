@@ -1,24 +1,44 @@
 -- ─────────────────────────────────────────────────────────────────────
--- Rename "karma_*" columns to "points_*" and update dependent objects
--- Run in Supabase SQL Editor after 0003.
+-- Idempotent rename: karma_* columns → points_*, refresh dependent objects
+-- Safe to re-run (handles partial state and missing columns)
 -- ─────────────────────────────────────────────────────────────────────
 
--- The community_profiles view selects karma_* columns, so drop it first.
+-- 1) Drop view (it depends on the columns and will be recreated)
 drop view if exists public.community_profiles;
 
--- Rename columns on profiles
-alter table public.profiles
-  rename column karma_post to points_post;
+-- 2) Rename only when the old column still exists
+do $$
+begin
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'profiles'
+      and column_name = 'karma_post'
+  ) then
+    alter table public.profiles rename column karma_post to points_post;
+  end if;
 
-alter table public.profiles
-  rename column karma_comment to points_comment;
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'profiles'
+      and column_name = 'karma_comment'
+  ) then
+    alter table public.profiles rename column karma_comment to points_comment;
+  end if;
+end$$;
 
--- Recreate the index with the new name
+-- 3) Ensure points_* exist (covers fresh installs and any prior partial run)
+alter table public.profiles
+  add column if not exists points_post integer not null default 0,
+  add column if not exists points_comment integer not null default 0;
+
+-- 4) Refresh index
 drop index if exists public.profiles_karma_post_idx;
 create index if not exists profiles_points_post_idx
   on public.profiles(points_post desc);
 
--- Recreate the public view with the new column names
+-- 5) Recreate the public view with the new column names
 create view public.community_profiles
 with (security_invoker = false) as
   select
@@ -35,7 +55,7 @@ with (security_invoker = false) as
 
 grant select on public.community_profiles to anon, authenticated;
 
--- Update the vote-delta function to write to the renamed columns
+-- 6) Update the vote-delta function to write to the renamed columns
 create or replace function public.apply_vote_delta(
   p_target_kind text,
   p_target_id   uuid,
