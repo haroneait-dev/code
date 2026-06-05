@@ -50,6 +50,28 @@ create index if not exists messages_conversation_idx
   on public.messages(conversation_id, created_at desc);
 
 -- =====================================================================
+-- Helper SECURITY DEFINER : casse la récursion RLS sur conversation_participants.
+-- Une policy de SELECT qui interroge sa PROPRE table provoque une
+-- "infinite recursion" Postgres → lecture en erreur → 404 sur /messages/[id].
+-- Le helper lit la table en bypassant le RLS (definer), donc pas de récursion.
+-- =====================================================================
+
+create or replace function public.is_conversation_participant(conv uuid)
+returns boolean
+language sql
+security definer
+stable
+set search_path = public
+as $$
+  select exists (
+    select 1 from public.conversation_participants
+    where conversation_id = conv and user_id = auth.uid()
+  );
+$$;
+
+grant execute on function public.is_conversation_participant(uuid) to authenticated, anon;
+
+-- =====================================================================
 -- RLS
 -- =====================================================================
 
@@ -57,12 +79,7 @@ alter table public.conversations enable row level security;
 
 drop policy if exists "conversations: participant read" on public.conversations;
 create policy "conversations: participant read" on public.conversations
-  for select using (
-    exists (
-      select 1 from public.conversation_participants
-      where conversation_id = conversations.id and user_id = auth.uid()
-    )
-  );
+  for select using ( public.is_conversation_participant(id) );
 
 drop policy if exists "conversations: authenticated create" on public.conversations;
 create policy "conversations: authenticated create" on public.conversations
@@ -70,16 +87,13 @@ create policy "conversations: authenticated create" on public.conversations
 
 alter table public.conversation_participants enable row level security;
 
+-- NB : version NON récursive (le helper bypasse le RLS). Une policy qui
+-- interrogeait conversation_participants depuis conversation_participants
+-- provoquait une "infinite recursion" → 404.
 drop policy if exists "participants: own rows read" on public.conversation_participants;
-create policy "participants: own rows read" on public.conversation_participants
-  for select using (
-    user_id = auth.uid()
-    or exists (
-      select 1 from public.conversation_participants p2
-      where p2.conversation_id = conversation_participants.conversation_id
-        and p2.user_id = auth.uid()
-    )
-  );
+drop policy if exists "participants: read in my conversations" on public.conversation_participants;
+create policy "participants: read in my conversations" on public.conversation_participants
+  for select using ( public.is_conversation_participant(conversation_id) );
 
 drop policy if exists "participants: insert self" on public.conversation_participants;
 create policy "participants: insert self" on public.conversation_participants
@@ -94,12 +108,7 @@ alter table public.messages enable row level security;
 
 drop policy if exists "messages: participant read" on public.messages;
 create policy "messages: participant read" on public.messages
-  for select using (
-    exists (
-      select 1 from public.conversation_participants
-      where conversation_id = messages.conversation_id and user_id = auth.uid()
-    )
-  );
+  for select using ( public.is_conversation_participant(conversation_id) );
 
 drop policy if exists "messages: participant send" on public.messages;
 create policy "messages: participant send" on public.messages
