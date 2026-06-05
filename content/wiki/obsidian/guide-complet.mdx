@@ -1,0 +1,85 @@
+---
+title: "Obsidian + Claude : le guide complet"
+description: "Connecter ton vault Obsidian à Claude — approche directe (fichiers) et approche MCP, cas d'usage concrets et sécurité."
+updatedAt: "2026-06-05"
+readingMinutes: 9
+---
+
+Obsidian est un éditeur de notes basé sur des fichiers Markdown stockés en local (un « vault » est simplement un dossier de fichiers `.md` sur ton disque). Cette particularité en fait un terrain idéal pour Claude : un coffre Obsidian n'est rien d'autre qu'une arborescence de fichiers texte que Claude sait lire, écrire, relier et restructurer.
+
+Il existe **deux grandes manières** de faire travailler Claude sur un vault Obsidian, et il est important de bien les distinguer :
+
+1. **L'approche directe (fichiers)** — On pointe Claude Code sur le dossier du vault. Comme ce ne sont que des fichiers Markdown, Claude les manipule directement, sans aucune installation supplémentaire. C'est l'approche la plus simple et la plus puissante pour de gros remaniements.
+2. **L'approche MCP (Model Context Protocol)** — On installe un serveur MCP qui expose le vault à Claude via l'API REST locale d'Obsidian. Cela permet à Claude Desktop, Claude Code et certaines intégrations de lire/écrire dans le vault « à chaud », pendant qu'Obsidian est ouvert, avec accès au contexte (note active, recherche, backlinks).
+
+> Ce guide couvre la philosophie et l'approche directe. Pour la configuration détaillée des serveurs MCP, voir [Serveurs MCP Obsidian : installation & config](/wiki/obsidian/serveurs-mcp).
+
+## Pourquoi connecter Obsidian à Claude ?
+
+Le vrai déblocage, c'est de sortir l'IA de la fenêtre de chat. Au lieu de copier-coller des notes dans une conversation, Claude « connaît » directement ton vault et peut :
+
+- **Restructurer un coffre** : renommer, déplacer, fusionner des notes, harmoniser les titres et le frontmatter YAML.
+- **Créer des notes de zéro** ou des notes liées entre elles, avec les backlinks `[[...]]` corrects.
+- **Construire des tableaux de bord** (notes index, MOC — Maps of Content) qui agrègent et organisent le reste du vault.
+- **Faire de la recherche plein texte floue** sur l'ensemble des notes et en extraire le contexte.
+- **Découvrir les backlinks** et les connexions entre idées que tu n'avais pas repérées.
+- **Aider à la rédaction longue** : des utilisateurs rapportent écrire ~2 000 mots en ~90 minutes en s'appuyant sur Claude Desktop branché à leur vault, parce que les notes servent de matière première et de mémoire externe.
+
+L'idée force : ton vault devient à la fois la **source de contexte** et la **destination** du travail de Claude.
+
+## L'approche directe avec Claude Code (la plus simple)
+
+Comme un vault = un dossier de `.md`, tu n'as **rien à installer de spécial**. Il suffit d'ouvrir Claude Code dans le dossier du vault.
+
+```bash
+# Aller dans le dossier de ton vault Obsidian
+cd ~/Documents/MonVault
+
+# Lancer Claude Code
+claude
+```
+
+À partir de là, tu peux demander des choses comme :
+
+- « Liste toutes les notes sans tag et propose-moi des tags cohérents. »
+- « Crée une MOC `Index - Productivité.md` qui relie toutes les notes du dossier `productivite/`. »
+- « Repère les notes orphelines (sans aucun backlink) et propose des liens pertinents. »
+- « Uniformise le frontmatter YAML de toutes les notes : champs `title`, `date`, `tags`. »
+- « Convertis mes listes à puces en notes atomiques liées entre elles. »
+
+**Avantages** : zéro configuration, accès complet aux fichiers, idéal pour les opérations massives et le refactoring de vault.
+
+**Limite** : Claude travaille sur les fichiers « à froid ». Il ne voit pas l'état d'Obsidian en temps réel (note active, sélection) à moins de passer par MCP.
+
+> **Conseil** : travaille toujours sur un vault **versionné avec Git**, ou fais une sauvegarde avant un gros remaniement. Tu pourras revenir en arrière en cas de besoin.
+
+## Directe ou MCP : laquelle choisir ?
+
+| Objectif | Approche conseillée | Exemple de prompt |
+|---|---|---|
+| Refactor massif du vault | Claude Code (direct) | « Renomme toutes les notes au format `YYYY-MM-DD - titre` et corrige les backlinks. » |
+| Générer des notes liées pendant que tu écris | MCP (Claude Desktop) | « Crée une note atomique pour chaque concept cité dans la note active et relie-les. » |
+| Construire un dashboard / MOC | Claude Code ou MCP | « Génère `MOC - Apprentissage.md` qui regroupe les notes du dossier `learning/` par thème. » |
+| Recherche transversale | MCP | « Trouve toutes les notes parlant de X et résume les points communs. » |
+| Rédaction longue assistée | MCP (Claude Desktop) | « Aide-moi à rédiger cet article à partir de mes notes `[[brouillon]]` et `[[sources]]`. » |
+| Nettoyage du frontmatter | Claude Code | « Uniformise les champs YAML et corrige les tags incohérents. » |
+
+En résumé : **approche directe pour les gros chantiers**, **MCP pour travailler en continu pendant qu'Obsidian est ouvert**.
+
+## Bonnes pratiques & sécurité
+
+- **Tout reste local** : avec le plugin Local REST API, l'accès au vault se fait en local sur ta machine. Ne partage jamais ta clé d'API et ne l'expose pas sur Internet.
+- **Versionne avec Git** : un vault sous Git te permet d'annuler n'importe quelle modification de Claude. C'est le meilleur filet de sécurité.
+- **Commence petit** : teste les serveurs MCP sur un vault de test avant de les lancer sur ton coffre principal.
+- **Sois explicite** : démarre tes sessions par « utilise Obsidian / le vault » pour que Claude appelle bien les outils MCP.
+- **Un port par vault** : si tu utilises plusieurs vaults avec un plugin MCP, attribue un port unique à chacun pour éviter les conflits.
+
+## Aller plus loin
+
+- [Serveurs MCP Obsidian : installation & config](/wiki/obsidian/serveurs-mcp) — le pas-à-pas pour brancher Obsidian à chaud.
+- [Introduction au MCP](/wiki/mcp/introduction-mcp) — comprendre le protocole sous-jacent.
+- [Sources & ressources externes](/wiki/actualites/sources-ressources) — tous les liens GitHub et forums Obsidian.
+
+---
+
+*Cet article fait partie du wiki Claude Mastery. Non affilié à Anthropic. Claude™ est une marque d'Anthropic, PBC.*

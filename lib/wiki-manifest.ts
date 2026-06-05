@@ -16,7 +16,9 @@ export type CategoryId =
   | "api"
   | "workflows"
   | "claude-ai"
-  | "enterprise";
+  | "enterprise"
+  | "obsidian"
+  | "actualites";
 
 export type CategoryIcon =
   | "terminal"
@@ -132,6 +134,18 @@ export const CATEGORIES: Category[] = [
     name: "Architecture & Enterprise",
     icon: "lock",
     description: "Déploiement, sécurité, conformité, multi-cloud.",
+  },
+  {
+    id: "obsidian",
+    name: "Obsidian + Claude",
+    icon: "layers",
+    description: "Connecter ton vault Obsidian à Claude — approche fichiers et MCP.",
+  },
+  {
+    id: "actualites",
+    name: "Actualités & ressources",
+    icon: "zap",
+    description: "Nouveautés Claude Code 2026 et sources externes fiables.",
   },
 ];
 
@@ -360,6 +374,14 @@ export const ARTICLE_STUBS: ArticleStub[] = [
   { category: "enterprise", slug: "prompt-injection-enterprise", title: "Détection des prompt injections (Enterprise)", description: "LLM-as-a-Judge en amont et en aval des appels." },
   { category: "enterprise", slug: "api-gateways", title: "Gestion des clés API et API Gateways", description: "Proxys (Kong, Cloudflare, LiteLLM) — rotation, cache, rate-limit." },
   { category: "enterprise", slug: "threat-modeling-agents", title: "Threat modeling pour agents autonomes", description: "Risques d'exécution autonome de code dans un réseau d'entreprise." },
+
+  // ═══ OBSIDIAN + CLAUDE ═══════════════════════════════════════════
+  { category: "obsidian", slug: "guide-complet", title: "Obsidian + Claude : le guide complet", description: "Connecter ton vault Obsidian à Claude — approche directe (fichiers) et approche MCP, cas d'usage, sécurité." },
+  { category: "obsidian", slug: "serveurs-mcp", title: "Serveurs MCP Obsidian : installation & config", description: "Local REST API, mcp-obsidian, obsidian-claude-code-mcp — configuration Claude Desktop & Claude Code, dépannage." },
+
+  // ═══ ACTUALITÉS & RESSOURCES ═════════════════════════════════════
+  { category: "actualites", slug: "nouveautes-2026", title: "Nouveautés Claude Code (2026)", description: "Opus 4.8 par défaut, computer use, auto mode, orchestration multi-agents, mémoire « dreaming », installeur natif." },
+  { category: "actualites", slug: "sources-ressources", title: "Sources & ressources externes", description: "Liens officiels Anthropic, MCP, Obsidian, changelogs — la base de données externe du wiki." },
 ];
 
 // ─── Helpers ─────────────────────────────────────────────────────────
