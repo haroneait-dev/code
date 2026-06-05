@@ -34,10 +34,15 @@ async function attachAuthors<T extends { author_id: string }>(
   if (rows.length === 0) return rows.map((r) => ({ ...r, author: null }));
   const supabase = await getServerSupabase();
   const ids = Array.from(new Set(rows.map((r) => r.author_id)));
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("community_profiles")
     .select("user_id, username, display_name, avatar_url")
     .in("user_id", ids);
+  if (error) {
+    // Si la vue est cassée/absente, tous les auteurs deviendraient "Anonyme"
+    // silencieusement — on logue pour que ça remonte dans les logs Vercel.
+    console.error("[community.attachAuthors] failed:", error.message);
+  }
   const map = new Map<string, Author>();
   for (const a of (data as Author[] | null) ?? []) {
     map.set(a.user_id, a);
