@@ -3,9 +3,12 @@ import { getServerSupabase, getServiceSupabase } from "@/lib/supabase-server";
 
 export async function POST(
   req: Request,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ slug: string }> }
 ) {
-  const { id: postId } = await params;
+  // NB : ce segment partage le param `[slug]` avec posts/[slug]/route.ts
+  // (Next.js impose le même nom pour des segments dynamiques frères),
+  // mais le client envoie ici l'UUID du post — la requête filtre donc sur `id`.
+  const { slug: postId } = await params;
 
   const supabase = await getServerSupabase();
   const {
