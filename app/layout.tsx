@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Hanken_Grotesk, Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
+import { ChatWidget } from "@/components/site/ChatWidget";
 
 const hanken = Hanken_Grotesk({
   subsets: ["latin"],
@@ -85,7 +86,10 @@ export default function RootLayout({
       lang="fr"
       className={`${hanken.variable} ${inter.variable} ${jbm.variable}`}
     >
-      <body className="font-body-rt antialiased">{children}</body>
+      <body className="font-body-rt antialiased">
+        {children}
+        <ChatWidget />
+      </body>
     </html>
   );
 }
