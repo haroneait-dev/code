@@ -1,9 +1,9 @@
 import Link from "next/link";
 import { Suspense } from "react";
-import { Search } from "lucide-react";
 import { AuthButton } from "@/components/auth/AuthButton";
 import { MobileNav } from "@/components/site/MobileNav";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
+import { SiteSearch } from "@/components/site/SiteSearch";
 
 type NavKey = "formation" | "wiki" | "communaute" | "messages" | null;
 
@@ -47,22 +47,7 @@ export function SiteHeader({
         </div>
 
         <div className="flex items-center gap-3">
-          {showSearch && (
-            <div className="hidden md:flex items-center bg-surface-container-lowest border border-outline-variant rounded-lg px-3 py-1.5 focus-within:border-primary transition-colors">
-              <Search
-                className="w-4 h-4 text-on-surface-variant mr-2"
-                strokeWidth={1.75}
-              />
-              <input
-                className="bg-transparent border-none text-body-sm text-on-surface focus:ring-0 placeholder:text-on-surface-variant w-48 outline-none"
-                placeholder="Rechercher…"
-                type="text"
-              />
-              <span className="text-xs text-on-surface-variant border border-outline-variant rounded px-1 ml-2 font-code-md">
-                ⌘K
-              </span>
-            </div>
-          )}
+          {showSearch && <SiteSearch />}
           <Suspense fallback={<div className="w-9 h-9" aria-hidden />}>
             <NotificationBell />
           </Suspense>
