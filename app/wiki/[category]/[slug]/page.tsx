@@ -49,6 +49,9 @@ const CAT_ICONS = {
 };
 
 export function generateStaticParams() {
+  console.log(
+    `[wiki-diag] generateStaticParams slug: ARTICLE_STUBS=${ARTICLE_STUBS.length} CATEGORIES=${CATEGORIES.length}`,
+  );
   return ARTICLE_STUBS.map((a) => ({ category: a.category, slug: a.slug }));
 }
 
