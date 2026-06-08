@@ -42,12 +42,7 @@ async function tryReadMdx(
         (data.readingMinutes as number) ?? estimateReading(content),
       body: content.trim(),
     };
-  } catch (err) {
-    console.log(
-      `[wiki-diag] tryReadMdx ECHEC cwd=${process.cwd()} file=${file} code=${
-        (err as NodeJS.ErrnoException)?.code ?? "?"
-      }`,
-    );
+  } catch {
     return null;
   }
 }
@@ -70,9 +65,6 @@ export async function loadArticle(
   // 2) Fallback: stub-only article (still renders an empty page so links don't 404)
   const stub = ARTICLE_STUBS.find(
     (a) => a.category === category && a.slug === slug
-  );
-  console.log(
-    `[wiki-diag] loadArticle ${category}/${slug} mdx=${!!file} stub=${!!stub} stubsTotal=${ARTICLE_STUBS.length}`,
   );
   if (!stub) return null;
 
