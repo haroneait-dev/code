@@ -1,122 +1,115 @@
 ---
-title: "Implémentation technique du Prompt Caching"
-description: "Activer cache_control, gérer le TTL, mesurer les économies et structurer ses prompts pour maximiser le cache hit."
-updatedAt: "2026-05-19"
-readingMinutes: 6
+title: "Le prompt caching (API)"
+description: "Réduire coûts et latence avec le prompt caching de l'API Claude : ce qui est mis en cache, automatique vs explicite, multiplicateurs de prix, préfixe minimal par modèle, vérification des hits, invalidateurs silencieux, et interaction avec Batch et extended thinking."
+updatedAt: "2026-06-08"
+readingMinutes: 9
 ---
 
-Le **Prompt Caching** d'Anthropic permet de mettre en cache côté serveur les portions stables d'un prompt (system, outils, documents, exemples) pour ne pas les facturer plein tarif à chaque appel. Les tokens en cache hit coûtent **10% du tarif d'entrée standard**, soit **-90% d'économies** sur la partie cachée. C'est le levier d'optimisation #1 sur l'API Claude en 2026.
+Le **prompt caching** met en cache des portions de prompt réutilisées (gros contexte système, documents, exemples) pour que les requêtes suivantes qui partagent ce préfixe soient **plus rapides et moins chères**. C'est l'une des optimisations les plus efficaces de l'[API](/wiki/api).
 
-## Activer le caching
+## L'invariant à retenir : c'est un préfixe
 
-Le caching est **généralement disponible** (GA) — plus besoin du header beta `anthropic-beta: prompt-caching-2024-07-31` sur les modèles récents, mais il reste accepté pour compatibilité. Vous marquez les *breakpoints* de cache via `cache_control: { type: "ephemeral" }`.
+Le cache est un **match de préfixe**. La clé est dérivée des **octets exacts** du prompt rendu jusqu'au bloc marqué `cache_control` (le « breakpoint ») inclus. **Un seul octet qui change quelque part dans le préfixe invalide tout ce qui suit.**
+
+L'ordre de rendu est **`tools` → `system` → `messages`**. Un breakpoint sur le dernier bloc `system` met donc en cache `tools` + `system` ensemble. Conséquence pratique : place le **contenu stable d'abord** (prompt système figé, liste d'outils déterministe) et le **contenu volatil après** le dernier breakpoint (horodatages, identifiants par requête, la question qui varie).
+
+## Automatique vs explicite
+
+- **Automatique** : passe `cache_control: {type: "ephemeral"}` au niveau de la requête — le cache se pose sur le dernier bloc cacheable. La façon la plus simple, sans placer manuellement de breakpoints.
+- **Explicite** : tu marques un bloc précis avec `cache_control` pour contrôler le point de césure (utile pour un préfixe partagé suivi d'une question variable).
+
+Pris en charge sur **tous les modèles Claude actifs**. **Maximum 4 breakpoints** `cache_control` par requête.
 
 ```python
-import anthropic
-
-client = anthropic.Anthropic()
-
 response = client.messages.create(
-    model="claude-sonnet-4-6",
+    model="claude-opus-4-8",
     max_tokens=1024,
     system=[
         {
             "type": "text",
-            "text": "Tu es un assistant juridique expert en droit français...",
-            "cache_control": {"type": "ephemeral"}
-        },
-        {
-            "type": "text",
-            "text": LONG_LEGAL_CORPUS,  # 50k tokens
+            "text": LONG_CONTEXTE_PARTAGE,        # gros, stable
             "cache_control": {"type": "ephemeral"}
         }
     ],
-    messages=[{"role": "user", "content": "Analyse ce contrat..."}]
+    messages=[{"role": "user", "content": "La question qui varie..."}],
 )
-
-print(response.usage)
-# cache_creation_input_tokens: 50234 (1er appel)
-# cache_read_input_tokens: 50234 (appels suivants)
 ```
 
-## TTL : 5 minutes ou 1 heure
+## Les multiplicateurs de prix
 
-Par défaut, le cache vit **5 minutes** depuis le dernier accès (TTL glissant). Pour des workloads moins fréquents, vous pouvez demander un TTL d'**1 heure** :
+Le cache introduit une structure de prix par rapport au prix d'entrée de base :
 
-```json
-{
-  "type": "text",
-  "text": "...",
-  "cache_control": { "type": "ephemeral", "ttl": "1h" }
-}
-```
+| Opération | Multiplicateur |
+|---|---|
+| Écriture cache **5 minutes** (TTL par défaut) | **1,25×** le prix d'entrée de base |
+| Écriture cache **1 heure** (`ttl: "1h"`) | **2×** |
+| **Lecture** depuis le cache | **0,1×** (≈ 90 % d'économie) |
 
-Le TTL 1h est légèrement plus cher à l'écriture (≈ 2× le tarif d'entrée standard contre 1.25× pour le 5min), mais reste rentable dès **3-4 hits** sur l'heure.
+Ces multiplicateurs **se cumulent** avec d'autres modificateurs (remise [Batch](/wiki/batch), résidence des données).
 
-## Où placer les breakpoints
+**Seuil de rentabilité.** Avec le TTL 5 min, deux requêtes suffisent à rentabiliser (1,25× + 0,1× = 1,35× contre 2× sans cache). Avec le TTL 1 h, il faut au moins trois requêtes (2× + 0,2× = 2,2× contre 3×). Le TTL 1 h garde l'entrée vivante malgré des trous dans un trafic en rafales, mais l'écriture doublée demande plus de lectures pour être amortie.
 
-Vous avez droit à **4 breakpoints** `cache_control` par requête. La règle d'or : **du plus stable au plus volatile**, dans cet ordre :
+## Le préfixe minimal cacheable (gotcha 2026)
 
-1. `tools` (rarement modifiés)
-2. `system` (instructions de base + corpus de référence)
-3. Premiers messages `user` contenant des documents fixes
-4. Exemples few-shot
+En dessous d'une certaine taille, **le préfixe ne se met pas en cache — sans erreur**, juste `cache_creation_input_tokens: 0`. Et ce seuil **dépend du modèle** :
 
-```ts
-const msg = await client.messages.create({
-  model: "claude-sonnet-4-6",
-  max_tokens: 1024,
-  tools: [...largeToolset, { ...lastTool, cache_control: { type: "ephemeral" }}],
-  system: [
-    { type: "text", text: SYSTEM_PROMPT, cache_control: { type: "ephemeral" }},
-  ],
-  messages: [
-    { role: "user", content: [
-      { type: "text", text: KNOWLEDGE_BASE, cache_control: { type: "ephemeral" }},
-      { type: "text", text: userQuestion }
-    ]}
-  ]
-});
-```
+| Modèle | Préfixe minimal |
+|---|---:|
+| Opus 4.8 / 4.7 / 4.6 / 4.5, Haiku 4.5 | **4096 tokens** |
+| Sonnet 4.6, Haiku 3.5 | **2048 tokens** |
+| Sonnet 4.5 / 4 / 3.7 | **1024 tokens** |
 
-Tout ce qui se trouve **avant** un breakpoint est caché. Tout ce qui se trouve **après** ne l'est pas.
+Piège concret : un prompt de 3000 tokens **se cache sur Sonnet 4.5 mais pas sur Opus 4.8**. Si tu changes de modèle sans revoir la taille du préfixe, ton cache peut silencieusement cesser de fonctionner.
 
-## Mesurer les économies
+## Vérifier que ça marche
 
-Le champ `usage` retourne 4 compteurs :
+L'objet `usage` de la réponse rapporte l'activité de cache :
 
-```json
-{
-  "input_tokens": 120,
-  "cache_creation_input_tokens": 0,
-  "cache_read_input_tokens": 50234,
-  "output_tokens": 432
-}
-```
+| Champ | Sens |
+|---|---|
+| `cache_creation_input_tokens` | Tokens écrits dans le cache (premium d'écriture ~1,25×) |
+| `cache_read_input_tokens` | Tokens servis depuis le cache (payés ~0,1×) |
+| `input_tokens` | Tokens traités plein tarif (le **reste non caché** uniquement) |
 
-Calcul du coût sur Sonnet 4.6 (prix indicatifs : input $3/M, cache write 5min $3.75/M, cache read $0.30/M) :
+> ⚠️ `input_tokens` n'est **que** le reste non caché. La taille totale du prompt = `input_tokens + cache_creation_input_tokens + cache_read_input_tokens`. Si ton agent a tourné des heures mais que `input_tokens` affiche 4 K, le reste venait du cache : regarde la somme, pas le champ seul.
 
-```python
-def cost(u, model_in=3, model_cache_write=3.75, model_cache_read=0.30):
-    return (
-        u["input_tokens"] * model_in
-      + u["cache_creation_input_tokens"] * model_cache_write
-      + u["cache_read_input_tokens"] * model_cache_read
-    ) / 1_000_000
-```
+Si `cache_read_input_tokens` reste à **zéro** sur des requêtes répétées au préfixe identique, un **invalidateur silencieux** est à l'œuvre.
 
-Sur un agent qui réutilise 50k tokens de contexte 100 fois/heure, le caching économise typiquement **80 à 92%** de la facture d'entrée.
+## Les invalidateurs silencieux
 
-## Pièges courants
+À traquer dans tout ce qui alimente le préfixe :
 
-- **Min 1024 tokens** (Sonnet/Opus) ou **2048** sur Haiku pour qu'un bloc soit cachable.
-- Toute modification — même un espace — **invalide** le cache du bloc et de tout ce qui suit.
-- Le cache est **scopé par organisation + API key + modèle** : pas de partage entre clés.
-- Combinable avec **Batch API** : les économies se cumulent.
+- `datetime.now()` / `Date.now()` / `time.time()` interpolé dans le prompt système → le préfixe change à chaque requête.
+- `uuid4()` / identifiants de requête placés tôt dans le contenu → idem.
+- `json.dumps(d)` **sans** `sort_keys=True`, ou itération d'un `set` → sérialisation non déterministe, les octets diffèrent.
+- ID de session/utilisateur interpolé dans le prompt système → préfixe par utilisateur, aucun partage possible entre utilisateurs.
+- **Changer les `tools` ou le `model` en cours de conversation** → les outils sont rendus en position 0, et les caches sont indexés par modèle : tout est invalidé.
+
+> Le cache est scopé par **organisation + clé d'API + modèle** : pas de partage entre clés.
+
+## Interaction avec l'extended thinking
+
+Les blocs de réflexion ([extended thinking](/wiki/extended-thinking)) ne peuvent **pas** porter de `cache_control` explicite, mais ils sont **mis en cache automatiquement** comme partie du contenu lors des appels suivants (typiquement quand tu renvoies les blocs de thinking avec des résultats d'outils pour continuer). Lus depuis le cache, ils comptent comme tokens d'entrée.
+
+## Interaction avec le Batch
+
+Les remises [Batch](/wiki/batch) et caching **se cumulent**. Comme les requêtes batch sont asynchrones, les hits de cache sont « best-effort ». Pour les maximiser : utilise la durée **1 heure**, garde des blocs `cache_control` **identiques** dans chaque requête, et maintiens un flux régulier de requêtes.
+
+## Bonnes pratiques
+
+- Mets en cache ce qui est **stable et volumineux** (prompt système long, documents de référence) et place le breakpoint **après**.
+- Garde le prompt système **figé** : injecte le contexte dynamique plus loin dans `messages`, pas dans le `system`.
+- Sérialise les outils de façon **déterministe** (tri par nom) et ne les change pas en cours de route.
+- Choisis la durée selon la fréquence de réutilisation (5 min pour des rafales rapprochées, 1 h pour des traitements espacés).
+- Surveille `cache_read_input_tokens` pour vérifier l'efficacité réelle.
 
 ## Pour aller plus loin
 
-- Documentation : `docs.anthropic.com/claude/docs/prompt-caching`
-- Auditez vos prompts avec un script qui logue `cache_read / (cache_read + cache_creation + input)` — visez > 0.9 en régime stable.
-- Pour les agents Claude Code et MCP, le caching des `tools` à lui seul économise déjà 40 à 60% sur les boucles agentiques.
-- Surveillez les coûts dans la Console Anthropic : un onglet dédié sépare désormais cache write / cache read.
+- [L'API Anthropic](/wiki/api)
+- [L'API Batch](/wiki/batch)
+- [La réflexion étendue](/wiki/extended-thinking)
+- [Tarification & optimisation des coûts](/wiki/tarification)
+
+### Sources officielles
+- Prompt caching : https://platform.claude.com/docs/en/build-with-claude/prompt-caching
+- Tarification : https://platform.claude.com/docs/en/about-claude/pricing

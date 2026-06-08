@@ -1,0 +1,60 @@
+---
+title: "Claude sur Bedrock, Vertex & Foundry"
+description: "Déployer Claude et Claude Code via les fournisseurs cloud : Amazon Bedrock, Google Cloud Vertex AI et Microsoft Foundry. Prérequis (accès modèle, IAM, réseau, garde-fous), réglages gérés, IDs de modèles et limites de fonctionnalités."
+updatedAt: "2026-06-08"
+readingMinutes: 8
+---
+
+Pour rester dans ta gouvernance, ta région et ta facturation existantes, tu peux consommer les [modèles](/wiki/modeles) Claude via **Amazon Bedrock**, **Google Cloud Vertex AI** ou **Microsoft Foundry**, plutôt que par l'[API Anthropic](/wiki/api) directe. Claude Code fonctionne avec ces fournisseurs (`CLAUDE_CODE_USE_BEDROCK=1`, `CLAUDE_CODE_USE_VERTEX=1`, etc.).
+
+## Les quatre prérequis d'un déploiement
+
+Avant un déploiement (l'exemple type est AWS, mais la logique vaut pour les trois) :
+
+1. **Accès au modèle** — active les modèles Anthropic dans Bedrock / Vertex / Foundry (ou expose un endpoint compatible dans ton VPC).
+2. **Permissions** — IAM (AWS) ou équivalent, pour autoriser les appels.
+3. **Chemin réseau** — connectivité (VPC, passerelle). Côté Claude Code, on pointe souvent `ANTHROPIC_BASE_URL` vers une passerelle interne (voir [variables d'environnement](/wiki/cli/variables-env)).
+4. **Garde-fous opérationnels** — permissions, sandbox, audit (voir [Workflows & Sécurité](/wiki/workflows)).
+
+## Réglages gérés (managed settings)
+
+Pour Bedrock/Vertex/Foundry, distribue la configuration de façon **centralisée** via des **réglages gérés** (fichier, plist macOS, ou registre Windows selon l'OS et le MDM). Les équipes plateforme y définissent versions de modèles, politiques d'authentification et réglages de sécurité que les utilisateurs **ne peuvent pas** outrepasser localement. Ces politiques **priment** sur les réglages utilisateur et projet ([hiérarchie settings.json](/wiki/cli/settings-json)).
+
+Configure aussi des **permissions gérées** pour contrôler finement les [outils](/wiki/outils) et actions autorisés, et un **épinglage de modèle** (model pinning) pour figer la version utilisée.
+
+## IDs de modèles : attention au préfixe
+
+Le format de l'ID dépend du fournisseur :
+
+- **Amazon Bedrock** (partenaire) : les IDs portent un préfixe `anthropic.` — par exemple `anthropic.claude-opus-4-8`. Utiliser un ID first-party (`claude-opus-4-8`) sur un client Bedrock renvoie une erreur.
+- **Claude Platform on AWS** (opéré par Anthropic, parité d'API totale) : IDs **bruts** (`claude-opus-4-8`), **sans** préfixe. À ne pas confondre avec Bedrock.
+- **Vertex / Foundry** : IDs propres au fournisseur — consulte leur console.
+
+## Modèles & fonctionnalités supportés : les limites
+
+Les fonctionnalités ne sont pas toutes identiques selon le fournisseur. Points notables :
+
+- Pour certaines fonctionnalités récentes (dont le **mode auto**), seuls **Opus 4.7 et 4.8** sont pris en charge sur Bedrock/Vertex/Foundry — et le mode auto y est **désactivé** tant que `CLAUDE_CODE_ENABLE_AUTO_MODE` n'est pas posé (voir [modes de permission](/wiki/cli/permissions-modes)).
+- Les modèles plus anciens (Sonnet 4.5, Opus 4.5, Haiku, claude-3) ne sont pas pris en charge pour ces fonctionnalités.
+- **Bedrock, Vertex et Foundry ne supportent pas les outils côté serveur d'Anthropic** (code execution, web search/fetch hébergés) ni les **Managed Agents**. Pour des agents sur ces providers, on passe par l'API Claude + tool use côté client.
+- Certaines capacités liées à un abonnement claude.ai (ex. dépôt GitHub connecté) ne sont **pas** disponibles sur ces providers.
+
+> Avant un choix d'architecture, vérifie la **matrice de compatibilité** (modèles × fonctionnalités × fournisseur) dans la doc officielle : elle évolue.
+
+## Observabilité & coûts
+
+Claude Code supporte la télémétrie **OpenTelemetry** pour envoyer des métriques détaillées vers ta stack. Sur AWS, les **profils d'inférence applicatifs** Bedrock permettent un suivi de coûts taggé et des métriques CloudWatch par équipe, projet ou environnement. AWS propose aussi de la capacité réservée et de l'inférence batch.
+
+## Auto-hébergement
+
+Quand un contrôle maximal est requis, des modèles auto-hébergés peuvent être exposés dans ton propre **VPC** via un endpoint compatible — au prix d'une complexité opérationnelle supérieure.
+
+## Pour aller plus loin
+
+- [Architecture & Enterprise](/wiki/enterprise)
+- [Variables d'environnement](/wiki/cli/variables-env) · [Le fichier settings.json](/wiki/cli/settings-json)
+- [Modes de permission](/wiki/cli/permissions-modes) · [Workflows & Sécurité](/wiki/workflows)
+
+### Sources officielles
+- Documentation Claude Code : https://docs.claude.com/en/docs/claude-code/overview
+- Contact commercial Enterprise : https://www.anthropic.com/contact-sales

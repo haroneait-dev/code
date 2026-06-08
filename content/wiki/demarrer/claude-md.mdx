@@ -1,60 +1,31 @@
 ---
-title: "Le fichier CLAUDE.md"
-description: "Anatomie complète d'un CLAUDE.md efficace pour guider Claude Code dans votre projet."
-updatedAt: "2026-05-19"
-readingMinutes: 8
+title: "Mémoire & gestion du contexte (CLAUDE.md)"
+description: "Le fichier CLAUDE.md et la gestion du contexte dans Claude Code : hiérarchie des fichiers mémoire, anatomie d'un bon CLAUDE.md, /init et /memory, compaction automatique, et pourquoi un contexte propre vaut mieux qu'un gros contexte."
+updatedAt: "2026-06-08"
+readingMinutes: 9
 ---
 
-`CLAUDE.md` est le fichier le plus important de votre projet quand vous utilisez Claude Code. C'est un **prompt système permanent** que Claude lit à chaque session : ses instructions remplacent ou complètent ses comportements par défaut. Un bon `CLAUDE.md` divise par dix le nombre de prompts nécessaires et élimine les erreurs récurrentes.
+Le `CLAUDE.md` contient les **instructions et le contexte** que Claude charge au démarrage de chaque session. C'est le levier de [prompt engineering](/wiki/prompt-engineering) le plus rentable dans Claude Code : plus il est clair, moins tu répètes de contexte, et mieux l'agent choisit ses [outils](/wiki/outils). (À distinguer de [`settings.json`](/wiki/cli/settings-json), qui est de la configuration, pas des instructions.)
 
 ## Comment Claude découvre `CLAUDE.md`
 
-Claude Code cherche le fichier à plusieurs niveaux, dans l'ordre :
+Claude Code cherche le fichier à plusieurs niveaux, et **concatène** tout ce qu'il trouve dans le contexte système (le plus proche du projet pèse le plus) :
 
 1. `./CLAUDE.md` — racine du projet courant
 2. `./CLAUDE.local.md` — overrides personnels (à `.gitignore`)
-3. Tous les `CLAUDE.md` des dossiers parents jusqu'à `$HOME`
-4. `~/.claude/CLAUDE.md` — config globale utilisateur
+3. Les `CLAUDE.md` des dossiers parents jusqu'à `$HOME`
+4. `~/.claude/CLAUDE.md` — préférences globales utilisateur
 
-Tous les fichiers trouvés sont **concaténés et injectés** dans le contexte système. Plus le fichier est proche du projet, plus il a de poids.
+> Utilise [`/memory`](/wiki/slash-commands) dans le REPL pour voir exactement ce qui est chargé, et [`/init`](/wiki/slash-commands) pour générer un premier `CLAUDE.md` en analysant le projet.
 
-> Utilisez `/memory` dans le REPL pour voir exactement ce qui est chargé.
+## Que mettre dans un CLAUDE.md
 
-## Structure recommandée
+Garde-le **court (300–800 mots)** et structuré :
 
-Un bon `CLAUDE.md` reste **court (300-800 mots)** et structuré en sections claires. Voici un template éprouvé :
-
-```markdown
-# Nom du Projet
-
-Description en une phrase de ce que fait le projet.
-
-## Stack
-- Framework principal + version
-- Langage + version
-- Bases de données / services tiers
-- Outils de build et de test
-
-## Architecture
-Vue d'ensemble des dossiers principaux et de leur rôle.
-
-## Commandes
-| Commande | Usage |
-|---|---|
-| `npm run dev` | Démarrer en local |
-| `npm test` | Lancer la suite de tests |
-
-## Conventions de code
-Règles non négociables (TypeScript strict, naming, imports...).
-
-## À éviter
-Dossiers, fichiers ou patterns à ne pas toucher.
-
-## Workflow git
-Branches, conventions de commits, processus PR.
-```
-
-## Exemple concret : projet Next.js + Supabase
+- **Stack & architecture** : langages, frameworks, structure des dossiers.
+- **Commandes** : dev, build, test, lint.
+- **Conventions** : nommage, style, règles (« pas de `any` en TS »).
+- **Pièges** : ce qui casse souvent, ce qu'il ne faut pas toucher.
 
 ```markdown
 # Mon SaaS
@@ -64,42 +35,23 @@ Application SaaS de gestion de tâches multi-tenants.
 ## Stack
 - Next.js 16 App Router + TypeScript strict
 - Supabase (Auth + Postgres + RLS)
-- Tailwind CSS + shadcn/ui
-- Tests : Vitest + Playwright
-
-## Architecture
-- `app/` — App Router, un dossier = une route
-- `components/` — composants UI réutilisables
-- `lib/` — utilitaires (supabase client, helpers)
-- `types/` — types TypeScript partagés
 
 ## Commandes
-- `pnpm dev` — dev server
-- `pnpm build` — build production
-- `pnpm test` — tests unitaires
-- `pnpm e2e` — tests Playwright
+- `pnpm dev` · `pnpm test` · `pnpm build`
 
 ## Conventions
-- Toujours TypeScript strict, pas de `any`
-- Composants en PascalCase, hooks en `useX`
-- Server Components par défaut, `'use client'` seulement si nécessaire
-- Imports absolus via `@/`
-- Tailwind classes triées (prettier-plugin-tailwindcss)
-
-## Patterns importants
-- Toute query Supabase passe par `lib/supabase-server.ts` côté serveur
-- L'auth est gérée via `middleware.ts` (redirige les non-connectés)
-- Les Server Actions sont dans `app/**/actions.ts`
+- Composants PascalCase dans `components/`
+- Server Components par défaut ; `'use client'` seulement si nécessaire
+- Toujours typer ; éviter `any`
 
 ## À éviter
-- Ne pas modifier `supabase/migrations/` à la main → utiliser `pnpm db:migrate`
-- Ne pas committer dans `main` directement → toujours via PR
-- Pas de `console.log` dans le code livré (utiliser `lib/logger.ts`)
+- Ne pas modifier `supabase/migrations/` à la main → `pnpm db:migrate`
+- Pas de `console.log` livré (utiliser `lib/logger.ts`)
 ```
 
-## Les sections qui rapportent le plus
+Tu peux référencer d'autres fichiers via `@chemin/fichier` (`Voir @docs/STYLE_GUIDE.md`) — Claude les lit au besoin sans surcharger le contexte initial.
 
-D'expérience, ces sections produisent le meilleur ROI :
+## Les sections qui rapportent le plus
 
 | Section | Pourquoi |
 |---|---|
@@ -110,69 +62,34 @@ D'expérience, ces sections produisent le meilleur ROI :
 
 ## Erreurs courantes
 
-**Trop long.** Un `CLAUDE.md` de 5000 mots pollue le contexte. Visez 300-800 mots maximum. Si vous avez plus à dire, créez des fichiers thématiques liés (`ARCHITECTURE.md`, `STYLE_GUIDE.md`) et référencez-les.
+- **Trop long** : un `CLAUDE.md` de 5000 mots pollue le contexte. Découpe en fichiers thématiques référencés via `@`.
+- **Trop vague** : « respecter les bonnes pratiques » n'aide pas. Préfère « pas de `any`, utiliser `unknown` si le type est inconnu ».
+- **Pas à jour** : un fichier obsolète induit Claude en erreur de façon active.
+- **Mélange instructions / doc** : `CLAUDE.md` = instructions à Claude, pas explication du projet aux humains (c'est le rôle du README).
 
-**Trop vague.** "Respecter les bonnes pratiques" n'aide pas. Préférez : "Pas de `any` en TypeScript, utiliser `unknown` si le type est inconnu".
+> Anthropic ne publie pas le prompt système interne de Claude Code. On personnalise via `CLAUDE.md` ou le flag `--append-system-prompt`, pas en essayant de « deviner » le prompt système.
 
-**Pas à jour.** Si vous changez de stack, mettez `CLAUDE.md` à jour. Un fichier obsolète induit Claude en erreur de façon active.
+## La compaction du contexte
 
-**Mélange instructions et documentation.** `CLAUDE.md` est pour les **instructions à Claude**, pas pour expliquer le projet aux humains (c'est le rôle du README).
+Une session longue accumule tout : lectures de fichiers, sorties d'outils, raisonnements intermédiaires, impasses. Passé environ deux tiers de la fenêtre de contexte, le rapport signal/bruit se dégrade et la qualité baisse — **pas** parce que le modèle a changé, mais parce que le contexte est saturé.
 
-## Hiérarchie projet/utilisateur/local
+Claude Code **compacte automatiquement** la conversation autour de 95 % de capacité (résumé du passé pour libérer de la place). Tu peux :
 
-Vous pouvez stratifier vos instructions :
+- compacter manuellement avec [`/compact`](/wiki/slash-commands) ;
+- désactiver la compaction auto avec `DISABLE_AUTOCOMPACT=1` ([variables d'environnement](/wiki/cli/variables-env)) ;
+- **déléguer** les recherches lourdes à des [subagents](/wiki/subagents/creer-subagent-custom) (qui lisent dans leur propre contexte et ne remontent qu'un résumé).
 
-```text
-~/.claude/CLAUDE.md          → préférences globales (langue, ton)
-~/projets/CLAUDE.md          → conventions de tous vos projets
-~/projets/app/CLAUDE.md      → spécifique au projet
-~/projets/app/CLAUDE.local.md → overrides perso (à .gitignore)
-```
+## Le vrai principe : contexte propre > gros contexte
 
-Exemple de `~/.claude/CLAUDE.md` personnel :
-
-```markdown
-# Préférences globales
-
-- Répondre en français
-- Privilégier des explications concises
-- Pas d'emoji dans les commits
-- Toujours utiliser `pnpm` plutôt que `npm` si possible
-```
-
-## Importer d'autres fichiers
-
-Vous pouvez référencer d'autres fichiers depuis `CLAUDE.md` via `@chemin/fichier` :
-
-```markdown
-## Conventions
-Voir @docs/STYLE_GUIDE.md pour les détails complets.
-
-## Architecture
-Voir @docs/ARCHITECTURE.md.
-```
-
-Claude lira ces fichiers au besoin sans surcharger le contexte initial.
-
-## Mettre à jour CLAUDE.md depuis Claude
-
-Vous pouvez demander à Claude lui-même de proposer une mise à jour :
-
-```text
-Lis CLAUDE.md, puis ajoute une section "Tests" qui documente
-notre stack Vitest + Playwright, avec les commandes principales.
-```
-
-Ou utilisez la commande slash dédiée :
-
-```text
-/init
-```
-
-Cette commande analyse le projet et génère/met à jour `CLAUDE.md` automatiquement.
+Beaucoup pensent que « plus de données dans le contexte = meilleures réponses ». C'est faux : un contexte **ciblé et structuré** bat un gros contexte bruité. C'est aussi pourquoi, pour une base de connaissances ou un chatbot, l'**indexation** (récupérer les bons morceaux) compte plus que le volume brut. Le `CLAUDE.md` et les [subagents](/wiki/subagents) sont tes deux outils pour garder ce contexte propre.
 
 ## Pour aller plus loin
 
-- [Configurer un projet](/wiki/demarrer/configurer-projet) — préparation complète d'un repo
-- [Le fichier de config globale](/wiki/demarrer/config-globale) — config utilisateur
-- [Documentation memory](https://docs.claude.com/claude-code/memory) — référence Anthropic
+- [Prompt Engineering](/wiki/prompt-engineering)
+- [Le fichier settings.json](/wiki/cli/settings-json)
+- [Créer des subagents personnalisés](/wiki/subagents/creer-subagent-custom)
+- [Configurer un projet](/wiki/demarrer/configurer-projet) · [Le fichier de config globale](/wiki/demarrer/config-globale)
+
+### Sources officielles
+- Réglages & mémoire : https://code.claude.com/docs/en/settings
+- Documentation Claude Code : https://docs.claude.com/en/docs/claude-code/overview

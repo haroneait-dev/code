@@ -1,104 +1,83 @@
 ---
-title: "Message Batches API : traiter en masse à -50%"
-description: "Traiter des milliers de requêtes Claude en asynchrone, suivre le statut et diviser les coûts par deux."
-updatedAt: "2026-05-19"
-readingMinutes: 6
+title: "L'API Batch (Message Batches)"
+description: "Traiter de gros volumes à -50 % avec l'API Message Batches de Claude : structure d'une requête (custom_id, params), limites (100 000 requêtes / 256 Mo / 29 jours), traitement asynchrone sous 24 h, et combinaison avec le prompt caching."
+updatedAt: "2026-06-08"
+readingMinutes: 7
 ---
 
-La **Message Batches API** d'Anthropic permet d'envoyer jusqu'à **100 000 requêtes** dans un seul batch, traitées de manière asynchrone en moins de 24 heures (souvent quelques minutes). Le tarif est **réduit de 50%** par rapport aux appels synchrones, ce qui en fait l'outil parfait pour les workloads non temps-réel : génération de contenu en masse, annotation de datasets, évaluations, classification d'archives, enrichissement de bases de données.
+L'API **Message Batches** traite de nombreuses requêtes [Messages](/wiki/api) de façon **asynchrone et concurrente**, à **50 % du prix standard**. C'est l'outil idéal pour les charges non urgentes : classification, génération en masse, enrichissement de données, évaluations.
+
+## La remise de 50 %
+
+Toute l'utilisation d'un batch est facturée à **la moitié** des prix standard de l'API, sur l'input **et** l'output. La remise est **inconditionnelle** : pas de seuil de volume à atteindre. Elle se cumule avec le [prompt caching](/wiki/prompt-caching).
+
+## Délai et limites
+
+- Les batchs sont traités **sous 24 heures** (souvent quelques minutes à 1–2 h en pratique). Au-delà de 24 h, les requêtes restantes passent en `expired`.
+- **100 000 requêtes** ou **256 Mo** par batch — divise si nécessaire.
+- Les résultats restent disponibles **29 jours** après création.
+- Comme un batch peut dépasser 5 minutes, privilégie la durée de cache **1 heure** si tu utilises le caching, pour de meilleurs taux de hit.
+
+## Structure d'une requête
+
+Un Message Batch est une **liste de requêtes**. Chaque requête comprend :
+
+- un **`custom_id`** unique pour identifier la requête au retour (1 à 64 caractères, motif `^[a-zA-Z0-9_-]{1,64}$`) ;
+- un objet **`params`** avec les paramètres standard de l'API Messages.
+
+```javascript
+const batch = await client.messages.batches.create({
+  requests: [
+    { custom_id: "ticket-001",
+      params: { model: "claude-haiku-4-5", max_tokens: 256,
+                messages: [{ role: "user", content: "Classe ce ticket : …" }] } },
+    { custom_id: "ticket-002",
+      params: { model: "claude-haiku-4-5", max_tokens: 256,
+                messages: [{ role: "user", content: "Classe ce ticket : …" }] } }
+  ]
+});
+console.log(batch.id, batch.processing_status);
+```
+
+## Suivre le statut, récupérer les résultats
+
+Le batch passe par `in_progress` puis `ended`. Le champ `request_counts` détaille `processing`, `succeeded`, `errored`, `canceled`, `expired`. On **interroge** (poll) jusqu'à complétion — un intervalle de 30 s à 2 min suffit.
+
+```python
+while True:
+    batch = client.messages.batches.retrieve(batch.id)
+    if batch.processing_status == "ended":
+        break
+    time.sleep(60)
+
+for entry in client.messages.batches.results(batch.id):
+    if entry.result.type == "succeeded":
+        save(entry.custom_id, entry.result.message.content[0].text)
+    else:
+        log_error(entry.custom_id, entry.result)   # errored | expired | canceled
+```
+
+Chaque résultat est rattaché à son `custom_id` ; loguer systématiquement `custom_id` ↔ `message.id` simplifie le rapprochement comptable et le debug.
+
+## Paramètres non supportés
+
+Un petit nombre de paramètres de l'API Messages ne sont **pas** acceptés en batch ; les inclure renvoie une erreur de validation. Vérifie la doc officielle pour la liste à jour avant de bâtir ton pipeline.
+
+## Combiner avec le prompt caching
+
+Les remises [caching](/wiki/prompt-caching) et batch **se cumulent** : l'effet combiné peut faire tomber le coût effectif autour d'un dixième du tarif non-caché. Comme le traitement est asynchrone, les hits de cache sont best-effort. Pour les maximiser : blocs `cache_control` **identiques** dans chaque requête, contexte partagé maximal, durée de cache **1 heure**, et flux de requêtes régulier.
 
 ## Quand utiliser le Batch ?
 
-Posez-vous une seule question : **avez-vous besoin de la réponse dans la seconde ?** Si non, le batch est presque toujours le bon choix.
-
-- Génération nocturne de résumés (newsletters, rapports).
-- Évaluation d'un nouveau prompt sur 10 000 exemples.
-- Migration : reclassifier toute une base existante.
-- Enrichissement SEO : reformuler des milliers de fiches produit.
-
-## Créer un batch
-
-Chaque requête du batch est une `MessageCreateParams` standard, encapsulée dans un objet avec un `custom_id` unique pour retrouver le résultat plus tard.
-
-```python
-import anthropic
-from anthropic.types.messages.batch_create_params import Request
-
-client = anthropic.Anthropic()
-
-batch = client.messages.batches.create(
-    requests=[
-        Request(
-            custom_id=f"item-{i}",
-            params={
-                "model": "claude-sonnet-4-6",
-                "max_tokens": 512,
-                "messages": [{"role": "user", "content": f"Résume : {text}"}],
-            },
-        )
-        for i, text in enumerate(my_documents)
-    ]
-)
-print(batch.id, batch.processing_status)
-```
-
-## Suivre le statut
-
-Le batch passe par `in_progress` puis `ended`. Le champ `request_counts` détaille `processing`, `succeeded`, `errored`, `canceled`, `expired`.
-
-```python
-batch = client.messages.batches.retrieve(batch.id)
-print(batch.processing_status)
-print(batch.request_counts)
-# RequestCounts(processing=0, succeeded=9987, errored=13, canceled=0, expired=0)
-```
-
-Pour les pipelines, polling toutes les 30 s à 2 min suffit largement.
-
-```ts
-while (true) {
-  const b = await client.messages.batches.retrieve(batchId);
-  if (b.processing_status === "ended") break;
-  await new Promise(r => setTimeout(r, 60_000));
-}
-```
-
-## Récupérer les résultats
-
-Une fois `ended`, les résultats se streament en JSONL via `.results()`. Chaque ligne contient le `custom_id` et le résultat (success ou error).
-
-```python
-for entry in client.messages.batches.results(batch.id):
-    if entry.result.type == "succeeded":
-        msg = entry.result.message
-        save(entry.custom_id, msg.content[0].text)
-    else:
-        log_error(entry.custom_id, entry.result)
-```
-
-Format JSONL d'une ligne :
-
-```json
-{
-  "custom_id": "item-42",
-  "result": {
-    "type": "succeeded",
-    "message": { "id": "msg_...", "content": [{"type":"text","text":"..."}], "usage": {...} }
-  }
-}
-```
-
-## Limites et bonnes pratiques
-
-- **24 h max** d'exécution : au-delà, les requêtes restantes passent en `expired`.
-- **100 000 requêtes** ou **256 Mo** par batch — divisez si nécessaire.
-- Les résultats restent disponibles **29 jours**.
-- **Compatible** avec le tool use, la vision, le prompt caching (économies cumulables : -50% batch × -90% cache).
-- Pour annuler : `client.messages.batches.cancel(batch_id)` — les requêtes en cours terminent, les autres sont annulées.
+- ✅ Traitements **hors ligne** et **non urgents** (rapports nocturnes, ré-étiquetage massif, génération de descriptions, évaluations sur 10 000 exemples).
+- ✅ Gros volumes où le coût prime sur la latence.
+- ❌ Réponses **temps réel** (chatbot interactif) → reste sur l'API Messages standard avec le streaming.
 
 ## Pour aller plus loin
 
-- Documentation : `docs.anthropic.com/claude/docs/message-batches`
-- Cumulez **Batch + Prompt Caching** sur un long system prompt partagé : c'est l'astuce pricing la plus rentable de l'écosystème Anthropic.
-- Pour des volumes > 1M/jour, contactez le sales pour des limites custom.
-- Côté observabilité, loguez systématiquement `custom_id` ↔ `message.id` pour le rapprochement comptable et le debug.
+- [L'API Anthropic](/wiki/api)
+- [Le prompt caching](/wiki/prompt-caching)
+- [Tarification & optimisation des coûts](/wiki/tarification)
+
+### Sources officielles
+- Batch processing : https://platform.claude.com/docs/en/build-with-claude/batch-processing
