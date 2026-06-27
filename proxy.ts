@@ -5,7 +5,6 @@ import { isAdminEmail } from "@/lib/admin";
 const PROTECTED_PREFIXES = ["/learn", "/wiki", "/communaute"];
 const COMMUNITY_USERNAME_PREFIXES = ["/communaute", "/messages", "/profil"];
 const ADMIN_PREFIXES = ["/admin"];
-const PENDING_PATH = "/pending";
 const ONBOARDING_PATH = "/onboarding";
 
 export async function proxy(req: NextRequest) {
@@ -53,37 +52,28 @@ export async function proxy(req: NextRequest) {
       url.pathname = "/";
       return NextResponse.redirect(url);
     }
-    return res; // admins bypass the pending check
+    return res; // admins bypass the username check
   }
 
   const needsUsername = COMMUNITY_USERNAME_PREFIXES.some(
     (p) => path === p || path.startsWith(`${p}/`)
   );
 
-  // Protected route + logged in: check approval status (and username if needed)
-  if ((isProtected || needsUsername) && user) {
+  // Community route + logged in: make sure a username is set (self-service onboarding)
+  if (needsUsername && user) {
     // Admins always have access
     if (isAdminEmail(user.email)) return res;
 
     // Look up profile (RLS lets users read their own row)
     const { data: profile } = await supabase
       .from("profiles")
-      .select("status, username")
+      .select("username")
       .eq("user_id", user.id)
       .maybeSingle();
 
-    const p = profile as
-      | { status?: string; username?: string | null }
-      | null;
-    const status = p?.status ?? "pending";
+    const p = profile as { username?: string | null } | null;
 
-    if (status !== "approved") {
-      const url = req.nextUrl.clone();
-      url.pathname = PENDING_PATH;
-      return NextResponse.redirect(url);
-    }
-
-    if (needsUsername && !p?.username) {
+    if (!p?.username) {
       const url = req.nextUrl.clone();
       url.pathname = ONBOARDING_PATH;
       return NextResponse.redirect(url);

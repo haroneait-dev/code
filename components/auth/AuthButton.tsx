@@ -139,12 +139,12 @@ export function AuthButton() {
               </Link>
               {isAdminEmail(email) && (
                 <Link
-                  href="/admin/users"
+                  href="/admin/reports"
                   onClick={() => setMenuOpen(false)}
                   className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-body-sm text-on-surface hover:bg-surface-container transition-colors"
                 >
                   <ShieldCheck className="w-4 h-4" strokeWidth={1.75} />
-                  Administration
+                  Modération
                 </Link>
               )}
               <button

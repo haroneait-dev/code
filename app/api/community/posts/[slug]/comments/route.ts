@@ -43,13 +43,13 @@ export async function POST(
   // Check profile gate
   const { data: profile } = await admin
     .from("profiles")
-    .select("status, username")
+    .select("username")
     .eq("user_id", user.id)
     .maybeSingle();
-  const p = profile as { status: string; username: string | null } | null;
-  if (!p || p.status !== "approved" || !p.username) {
+  const p = profile as { username: string | null } | null;
+  if (!p || !p.username) {
     return NextResponse.json(
-      { error: "Tu dois être approuvé et avoir un pseudo pour commenter." },
+      { error: "Tu dois avoir un pseudo pour commenter." },
       { status: 403 }
     );
   }

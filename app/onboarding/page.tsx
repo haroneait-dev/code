@@ -20,12 +20,12 @@ export default async function OnboardingPage() {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("username, display_name, status")
+    .select("username, display_name")
     .eq("user_id", user.id)
     .maybeSingle();
 
   const p = profile as
-    | { username: string | null; display_name: string | null; status: string }
+    | { username: string | null; display_name: string | null }
     | null;
 
   // Already onboarded → send to home

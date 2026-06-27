@@ -37,14 +37,14 @@ export async function POST(req: Request) {
 
   const { data: profile } = await admin
     .from("profiles")
-    .select("status, username")
+    .select("username")
     .eq("user_id", user.id)
     .maybeSingle();
-  const p = profile as { status: string; username: string | null } | null;
-  if (!p || p.status !== "approved" || !p.username) {
+  const p = profile as { username: string | null } | null;
+  if (!p || !p.username) {
     return NextResponse.json(
       {
-        error: "Tu dois être approuvé et avoir choisi un pseudo pour envoyer un message.",
+        error: "Tu dois avoir choisi un pseudo pour envoyer un message.",
       },
       { status: 403 }
     );
