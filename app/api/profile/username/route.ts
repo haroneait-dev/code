@@ -1,32 +1,10 @@
 import { NextResponse } from "next/server";
 import { getServerSupabase, getServiceSupabase } from "@/lib/supabase-server";
-import { isValidUsername, normalizeUsername } from "@/lib/community/types";
-
-const RESERVED = new Set([
-  "admin",
-  "administrator",
-  "root",
-  "support",
-  "moderator",
-  "claude",
-  "anthropic",
-  "system",
-  "official",
-  "staff",
-  "moi",
-  "me",
-  "you",
-  "null",
-  "undefined",
-  "api",
-  "auth",
-  "login",
-  "signup",
-  "settings",
-  "profil",
-  "profile",
-  "u",
-]);
+import {
+  isValidUsername,
+  normalizeUsername,
+  isReservedUsername,
+} from "@/lib/community/types";
 
 export async function POST(req: Request) {
   const supabase = await getServerSupabase();
@@ -56,7 +34,7 @@ export async function POST(req: Request) {
       { status: 400 }
     );
   }
-  if (RESERVED.has(username)) {
+  if (isReservedUsername(username)) {
     return NextResponse.json(
       { error: "Ce pseudo est réservé." },
       { status: 400 }

@@ -7,6 +7,7 @@ import { ArrowRight, LogOut, ShieldCheck, User, Settings } from "lucide-react";
 import type { Session } from "@supabase/supabase-js";
 import { getSupabase } from "@/lib/supabase";
 import { isAdminEmail } from "@/lib/admin";
+import { isPseudoEmail, pseudoFromEmail } from "@/lib/pseudo-auth";
 import { Avatar } from "@/components/site/Avatar";
 import { AuthModal } from "./AuthModal";
 
@@ -85,7 +86,10 @@ export function AuthButton() {
 
   if (session?.user) {
     const email = session.user.email ?? "";
-    const name = (session.user.user_metadata?.user_name as string) ?? email;
+    const name =
+      username ??
+      (session.user.user_metadata?.user_name as string) ??
+      pseudoFromEmail(email);
     const initial = (name[0] ?? "?").toUpperCase();
 
     return (
@@ -113,7 +117,7 @@ export function AuthButton() {
                 <div className="text-body-sm font-medium text-on-surface truncate">
                   {name}
                 </div>
-                {email !== name && (
+                {email !== name && !isPseudoEmail(email) && (
                   <div className="text-xs text-on-surface-variant truncate">
                     {email}
                   </div>

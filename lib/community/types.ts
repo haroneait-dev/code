@@ -106,3 +106,35 @@ export function isValidUsername(input: string): boolean {
 export function normalizeUsername(input: string): string {
   return input.trim().toLowerCase();
 }
+
+// Usernames reserved for the system / routes. Shared so the client can reject
+// them before creating an account (kept in sync with /api/profile/username).
+export const RESERVED_USERNAMES = new Set([
+  "admin",
+  "administrator",
+  "root",
+  "support",
+  "moderator",
+  "claude",
+  "anthropic",
+  "system",
+  "official",
+  "staff",
+  "moi",
+  "me",
+  "you",
+  "null",
+  "undefined",
+  "api",
+  "auth",
+  "login",
+  "signup",
+  "settings",
+  "profil",
+  "profile",
+  "u",
+]);
+
+export function isReservedUsername(username: string): boolean {
+  return RESERVED_USERNAMES.has(username);
+}

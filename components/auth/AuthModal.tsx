@@ -2,14 +2,16 @@
 
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { Github, Mail, Sparkles, X, Loader2, CheckCircle2 } from "lucide-react";
+import { AtSign, Lock, Sparkles, X, Loader2 } from "lucide-react";
 import { getSupabase } from "@/lib/supabase";
+import { pseudoToEmail } from "@/lib/pseudo-auth";
+import {
+  isValidUsername,
+  normalizeUsername,
+  isReservedUsername,
+} from "@/lib/community/types";
 
-type State =
-  | { kind: "idle" }
-  | { kind: "loading"; method: "github" | "email" }
-  | { kind: "sent" }
-  | { kind: "error"; message: string };
+type Mode = "signup" | "login";
 
 export function AuthModal({
   open,
@@ -18,10 +20,13 @@ export function AuthModal({
   open: boolean;
   onClose: () => void;
 }) {
-  const [email, setEmail] = useState("");
-  const [state, setState] = useState<State>({ kind: "idle" });
+  const [mode, setMode] = useState<Mode>("signup");
+  const [pseudo, setPseudo] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  // Close on Escape
+  // Close on Escape + lock scroll
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
@@ -38,8 +43,11 @@ export function AuthModal({
   // Reset when closed
   useEffect(() => {
     if (!open) {
-      setState({ kind: "idle" });
-      setEmail("");
+      setMode("signup");
+      setPseudo("");
+      setPassword("");
+      setError(null);
+      setLoading(false);
     }
   }, [open]);
 
@@ -48,40 +56,97 @@ export function AuthModal({
 
   if (!open || !mounted) return null;
 
-  const signInGitHub = async () => {
-    setState({ kind: "loading", method: "github" });
+  const username = normalizeUsername(pseudo);
+  const pseudoFormatOk = isValidUsername(username);
+  const passwordOk = password.length >= 6;
+  const canSubmit = pseudoFormatOk && passwordOk && !loading;
+
+  // Once authenticated, do a full navigation so the server (proxy + RSC)
+  // picks up the freshly-set session cookies. Respect ?from= if present.
+  const redirectAfterAuth = () => {
+    const params = new URLSearchParams(window.location.search);
+    const from = params.get("from");
+    window.location.assign(from && from.startsWith("/") ? from : "/");
+  };
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!pseudoFormatOk) {
+      setError(
+        "Pseudo invalide : 3 à 20 caractères, minuscules, chiffres et _."
+      );
+      return;
+    }
+    if (mode === "signup" && isReservedUsername(username)) {
+      setError("Ce pseudo est réservé, choisis-en un autre.");
+      return;
+    }
+    if (!passwordOk) {
+      setError("Mot de passe : 6 caractères minimum.");
+      return;
+    }
+
+    setError(null);
+    setLoading(true);
+    const supabase = getSupabase();
+    const email = pseudoToEmail(username);
+
     try {
-      const supabase = getSupabase();
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: "github",
-        options: { redirectTo: `${window.location.origin}/auth/callback` },
-      });
-      if (error) throw error;
+      if (mode === "signup") {
+        const { data, error: signUpError } = await supabase.auth.signUp({
+          email,
+          password,
+        });
+        if (signUpError) {
+          if (/already|registered|exist/i.test(signUpError.message)) {
+            setError(
+              "Ce pseudo est déjà pris. Passe sur « Se reconnecter »."
+            );
+          } else {
+            setError(signUpError.message);
+          }
+          setLoading(false);
+          return;
+        }
+        if (!data.session) {
+          // Email confirmation is still enabled in Supabase — not supported here.
+          setError(
+            "Inscription bloquée : désactive « Confirm email » dans Supabase pour autoriser l'accès direct."
+          );
+          setLoading(false);
+          return;
+        }
+        // Enregistre le pseudo sur le profil
+        const res = await fetch("/api/profile/username", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ username, display_name: username }),
+        });
+        if (!res.ok) {
+          const d = await res.json().catch(() => ({}));
+          setError(d.error ?? "Erreur lors de l'enregistrement du pseudo.");
+          setLoading(false);
+          return;
+        }
+      } else {
+        const { error: signInError } =
+          await supabase.auth.signInWithPassword({ email, password });
+        if (signInError) {
+          setError("Pseudo ou mot de passe incorrect.");
+          setLoading(false);
+          return;
+        }
+      }
+      redirectAfterAuth();
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Erreur inconnue";
-      setState({ kind: "error", message });
+      setError(
+        err instanceof Error ? err.message : "Erreur réseau, réessaie."
+      );
+      setLoading(false);
     }
   };
 
-  const sendMagicLink = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!email.trim()) return;
-    setState({ kind: "loading", method: "email" });
-    try {
-      const supabase = getSupabase();
-      const { error } = await supabase.auth.signInWithOtp({
-        email: email.trim(),
-        options: {
-          emailRedirectTo: `${window.location.origin}/auth/callback`,
-        },
-      });
-      if (error) throw error;
-      setState({ kind: "sent" });
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Erreur inconnue";
-      setState({ kind: "error", message });
-    }
-  };
+  const isSignup = mode === "signup";
 
   return createPortal(
     <div
@@ -94,135 +159,130 @@ export function AuthModal({
       {/* Backdrop */}
       <div className="fixed inset-0 bg-on-surface/20 backdrop-blur-sm" />
 
-      {/* Centering wrapper that grows with content */}
+      {/* Centering wrapper */}
       <div className="relative flex min-h-full items-center justify-center p-4 py-8">
-        {/* Card */}
         <div
           onClick={(e) => e.stopPropagation()}
           className="relative w-full max-w-md bg-surface-container-lowest rounded-2xl border border-outline-variant shadow-2xl p-8 sm:p-10 my-auto"
         >
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="Fermer"
-          className="absolute top-4 right-4 w-8 h-8 inline-flex items-center justify-center rounded-full text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors"
-        >
-          <X className="w-5 h-5" strokeWidth={1.75} />
-        </button>
-
-        {/* Icon */}
-        <div className="flex justify-center mb-6">
-          <div
-            className="w-14 h-14 rounded-2xl flex items-center justify-center"
-            style={{ backgroundColor: "#f0eae0" }}
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Fermer"
+            className="absolute top-4 right-4 w-8 h-8 inline-flex items-center justify-center rounded-full text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors"
           >
-            <Sparkles className="w-7 h-7 text-primary" strokeWidth={1.75} />
+            <X className="w-5 h-5" strokeWidth={1.75} />
+          </button>
+
+          {/* Icon */}
+          <div className="flex justify-center mb-6">
+            <div
+              className="w-14 h-14 rounded-2xl flex items-center justify-center"
+              style={{ backgroundColor: "#f0eae0" }}
+            >
+              <Sparkles className="w-7 h-7 text-primary" strokeWidth={1.75} />
+            </div>
           </div>
-        </div>
 
-        <h2
-          id="auth-modal-title"
-          className="font-display-xl text-[28px] font-bold text-center text-on-surface tracking-tight mb-2"
-        >
-          Bienvenue
-        </h2>
-        <p className="text-center text-on-surface-variant font-body-rt text-body-rt mb-8">
-          Connectez-vous pour continuer vers Claude Mastery.
-        </p>
+          <h2
+            id="auth-modal-title"
+            className="font-display-xl text-[28px] font-bold text-center text-on-surface tracking-tight mb-2"
+          >
+            {isSignup ? "Choisis ton pseudo" : "Re-bienvenue"}
+          </h2>
+          <p className="text-center text-on-surface-variant font-body-rt text-body-rt mb-8">
+            {isSignup
+              ? "Un pseudo + un mot de passe, et tu y as accès à vie."
+              : "Reconnecte-toi avec ton pseudo et ton mot de passe."}
+          </p>
 
-        {state.kind === "sent" ? (
-          <div className="text-center py-6">
-            <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-primary/10 mb-4">
-              <CheckCircle2
-                className="w-6 h-6 text-primary"
+          <form onSubmit={submit}>
+            {/* Pseudo */}
+            <label
+              htmlFor="auth-pseudo"
+              className="block font-body-sm text-body-sm font-medium text-on-surface mb-2"
+            >
+              Pseudo
+            </label>
+            <div className="relative mb-1">
+              <AtSign
+                className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-on-surface-variant"
                 strokeWidth={1.75}
               />
+              <input
+                id="auth-pseudo"
+                type="text"
+                required
+                value={pseudo}
+                onChange={(e) => setPseudo(e.target.value)}
+                placeholder="ton_pseudo"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                maxLength={20}
+                className="w-full h-12 bg-surface-container-low border border-outline-variant rounded-lg pl-10 pr-3 font-body-rt text-body-rt text-on-surface placeholder:text-on-surface-variant outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
+              />
             </div>
-            <p className="font-body-rt text-on-surface mb-2">
-              Lien magique envoyé.
-            </p>
-            <p className="text-body-sm text-on-surface-variant">
-              Vérifiez vos emails à <strong>{email}</strong>.
-            </p>
-          </div>
-        ) : (
-          <>
-            {/* GitHub */}
-            <button
-              type="button"
-              onClick={signInGitHub}
-              disabled={state.kind === "loading"}
-              className="w-full h-12 inline-flex items-center justify-center gap-2 rounded-lg bg-on-surface text-inverse-on-surface font-body-rt text-body-rt font-medium hover:opacity-90 disabled:opacity-60 transition-opacity"
-            >
-              {state.kind === "loading" && state.method === "github" ? (
-                <Loader2 className="w-5 h-5 animate-spin" strokeWidth={1.75} />
-              ) : (
-                <Github className="w-5 h-5" strokeWidth={1.75} />
-              )}
-              Continuer avec GitHub
-            </button>
-
-            {/* Divider */}
-            <div className="flex items-center gap-3 my-6">
-              <div className="flex-1 h-px bg-outline-variant" />
-              <span className="text-xs text-on-surface-variant">ou</span>
-              <div className="flex-1 h-px bg-outline-variant" />
-            </div>
-
-            {/* Email magic link */}
-            <form onSubmit={sendMagicLink}>
-              <label
-                htmlFor="auth-email"
-                className="block font-body-sm text-body-sm font-medium text-on-surface mb-2"
-              >
-                Adresse email
-              </label>
-              <div className="relative mb-4">
-                <Mail
-                  className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-on-surface-variant"
-                  strokeWidth={1.75}
-                />
-                <input
-                  id="auth-email"
-                  type="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="nom@exemple.com"
-                  className="w-full h-12 bg-surface-container-low border border-outline-variant rounded-lg pl-10 pr-3 font-body-rt text-body-rt text-on-surface placeholder:text-on-surface-variant outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
-                />
-              </div>
-              <button
-                type="submit"
-                disabled={state.kind === "loading" || !email.trim()}
-                className="w-full h-12 inline-flex items-center justify-center gap-2 rounded-lg bg-primary text-on-primary font-body-rt text-body-rt font-medium hover:opacity-90 disabled:opacity-60 transition-opacity"
-              >
-                {state.kind === "loading" && state.method === "email" && (
-                  <Loader2 className="w-4 h-4 animate-spin" strokeWidth={1.75} />
-                )}
-                Recevoir un lien magique
-              </button>
-            </form>
-
-            {state.kind === "error" && (
-              <p className="mt-4 text-sm text-error text-center">
-                {state.message}
+            {isSignup && (
+              <p className="text-xs text-on-surface-variant mb-4">
+                3 à 20 caractères : minuscules, chiffres et <code>_</code>.
               </p>
             )}
 
-            <p className="text-center text-xs text-on-surface-variant mt-6 leading-relaxed">
-              En continuant, vous acceptez nos{" "}
-              <a href="#" className="underline hover:text-on-surface">
-                Conditions
-              </a>{" "}
-              et notre{" "}
-              <a href="#" className="underline hover:text-on-surface">
-                Politique de confidentialité
-              </a>
-              .
-            </p>
-          </>
-        )}
+            {/* Mot de passe */}
+            <label
+              htmlFor="auth-password"
+              className={`block font-body-sm text-body-sm font-medium text-on-surface mb-2 ${
+                isSignup ? "" : "mt-4"
+              }`}
+            >
+              Mot de passe
+            </label>
+            <div className="relative mb-4">
+              <Lock
+                className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-on-surface-variant"
+                strokeWidth={1.75}
+              />
+              <input
+                id="auth-password"
+                type="password"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                autoComplete={isSignup ? "new-password" : "current-password"}
+                className="w-full h-12 bg-surface-container-low border border-outline-variant rounded-lg pl-10 pr-3 font-body-rt text-body-rt text-on-surface placeholder:text-on-surface-variant outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={!canSubmit}
+              className="w-full h-12 inline-flex items-center justify-center gap-2 rounded-lg bg-primary text-on-primary font-body-rt text-body-rt font-medium hover:opacity-90 disabled:opacity-60 transition-opacity"
+            >
+              {loading && <Loader2 className="w-4 h-4 animate-spin" strokeWidth={1.75} />}
+              {isSignup ? "Créer mon accès" : "Se reconnecter"}
+            </button>
+
+            {error && (
+              <p className="mt-4 text-sm text-error text-center">{error}</p>
+            )}
+          </form>
+
+          {/* Toggle créer / se reconnecter */}
+          <p className="text-center text-body-sm text-on-surface-variant mt-6">
+            {isSignup ? "Tu as déjà un pseudo ?" : "Première visite ?"}{" "}
+            <button
+              type="button"
+              onClick={() => {
+                setMode(isSignup ? "login" : "signup");
+                setError(null);
+              }}
+              className="text-primary font-medium hover:underline"
+            >
+              {isSignup ? "Se reconnecter" : "Créer un pseudo"}
+            </button>
+          </p>
         </div>
       </div>
     </div>,
