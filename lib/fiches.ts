@@ -878,6 +878,592 @@ export const FICHES: Fiche[] = [
     tags: ["cisa", "nsa", "défensif", "gouvernement"],
     wikiHref: "/wiki/modeles/fable-5-mythos-5",
   },
+
+  // ═══════════════════════════════════════════════════════════════════
+  // LOT 2 — CLAUDE CODE (approfondissement)
+  // ═══════════════════════════════════════════════════════════════════
+  {
+    id: "cc-skills-batch",
+    title: "Le système de skills et le skill /batch",
+    category: "Claude Code",
+    difficulty: "Avancé",
+    summary:
+      "Les skills étendent Claude Code avec des commandes personnalisées. Le skill /batch orchestre des changements à grande échelle : il découpe le travail en 5 à 30 unités, lance des agents en worktrees isolés, et ouvre une PR par unité.",
+    technicalDetails:
+      "Un skill est un dossier contenant un SKILL.md (frontmatter + instructions) et éventuellement des scripts. La découverte est automatique depuis des dossiers imbriqués. Les skills supportent la substitution de variables ($ARGUMENTS, $ARGUMENTS[N], ${CLAUDE_SESSION_ID}) pour un comportement dynamique par session.\n\n/batch est l'exemple emblématique : il analyse le code, découpe en unités indépendantes, présente un plan pour approbation, puis lance des agents en arrière-plan dans des worktrees Git isolés. Chaque agent implémente son unité, lance les tests et ouvre une pull request. C'est le pattern de migration à grande échelle en parallèle.",
+    codeSnippet:
+      "---\nname: batch\ndescription: Applique un changement à grande échelle en parallèle\n---\nAnalyse la base, découpe en 5-30 unités, ouvre une PR par unité.",
+    tags: ["skills", "batch", "worktrees", "parallélisation"],
+    wikiHref: "/wiki/skills/structure-skill",
+  },
+  {
+    id: "cc-hooks-lifecycle",
+    title: "Les hooks : automatiser le cycle de vie",
+    category: "Claude Code",
+    difficulty: "Avancé",
+    summary:
+      "Les hooks exécutent des commandes à des moments précis du cycle de vie : avant/après un outil (PreToolUse, PostToolUse), au démarrage/arrêt de session, à la soumission d'un prompt, ou sur notification.",
+    technicalDetails:
+      "Un hook est déclaré dans settings.json avec un événement (matcher) et une commande. PreToolUse peut bloquer une action (ex. refuser un rm -rf), PostToolUse peut valider ou formater (ex. lancer prettier après une édition). Le hook reçoit le contexte via stdin en JSON et peut renvoyer une décision.\n\nCas d'usage courants : linter/formatter automatique après édition, notification système à la fin d'un agent, garde-fou de sécurité (bloquer les commandes dangereuses), et injection de contexte au démarrage (SessionStart). Le traitement de la sortie du hook est traité comme un retour utilisateur par Claude.",
+    codeSnippet:
+      '{\n  "hooks": {\n    "PostToolUse": [{\n      "matcher": "Edit|Write",\n      "hooks": [{ "type": "command", "command": "npx prettier --write $CLAUDE_FILE_PATHS" }]\n    }]\n  }\n}',
+    tags: ["hooks", "posttooluse", "automation", "settings"],
+    wikiHref: "/wiki/hooks/hook-lifecycle",
+  },
+  {
+    id: "cc-subagents-custom",
+    title: "Créer un subagent personnalisé",
+    category: "Claude Code",
+    difficulty: "Avancé",
+    summary:
+      "Un subagent custom est un fichier Markdown avec frontmatter (nom, description, outils, modèle) qui définit un agent spécialisé — code-reviewer, explorateur, planificateur — délégable depuis la session principale.",
+    technicalDetails:
+      "Le frontmatter déclare le nom, une description (qui sert au routage : quand déléguer à cet agent), la liste d'outils autorisés et un modèle éventuel. Le corps Markdown est le system prompt de l'agent. Placés dans .claude/agents/, ils sont découverts automatiquement.\n\nL'intérêt : isoler un contexte (un code-reviewer ne pollue pas la session principale), restreindre les outils (un explorateur en lecture seule), et choisir le bon modèle par tâche (Haiku pour explorer, Opus pour raisonner). La délégation économise des tokens sur la session parente en déportant le travail.",
+    codeSnippet:
+      "---\nname: code-reviewer\ndescription: Revoit un diff pour bugs et régressions\ntools: Read, Grep, Bash(git diff:*)\nmodel: sonnet\n---\nTu es un relecteur senior. Signale bugs et régressions, classés par gravité.",
+    tags: ["subagents", "frontmatter", "délégation", "isolation"],
+    wikiHref: "/wiki/subagents/creer-subagent-custom",
+  },
+  {
+    id: "cc-slash-commands",
+    title: "Créer une slash command",
+    category: "Claude Code",
+    difficulty: "Intermédiaire",
+    summary:
+      "Une slash command custom est un fichier Markdown dans .claude/commands/ : le nom du fichier devient la commande, son contenu le prompt, avec substitution d'arguments via $ARGUMENTS.",
+    technicalDetails:
+      "Crée .claude/commands/ma-commande.md ; `/ma-commande` l'invoque. Le frontmatter peut restreindre les outils et décrire l'usage. $ARGUMENTS injecte le texte passé après la commande ; $ARGUMENTS[0], [1]… ciblent des positions. Tu peux aussi injecter la sortie d'une commande bash de façon sécurisée.\n\nLes slash commands partagent la logique avec les skills mais sont plus légères : idéales pour des raccourcis d'équipe versionnés dans le repo (ex. /review, /changelog, /deploy). Elles se partagent en committant le dossier .claude/commands/.",
+    codeSnippet:
+      "# .claude/commands/changelog.md\nGénère une entrée de changelog pour : $ARGUMENTS\nBasée sur `git log` depuis le dernier tag.",
+    tags: ["slash-commands", "arguments", "partage-équipe", "raccourcis"],
+    wikiHref: "/wiki/slash-commands/creer-slash-command",
+  },
+  {
+    id: "cc-checkpoints",
+    title: "--continue, --resume et checkpoints",
+    category: "Claude Code",
+    difficulty: "Débutant",
+    summary:
+      "`claude --continue` reprend la dernière session, `--resume` choisit une session précise, et les checkpoints permettent de restaurer un état antérieur après une fausse route.",
+    technicalDetails:
+      "Claude Code persiste l'état des sessions : historique, fichiers modifiés, contexte. `--continue` (ou `-c`) reprend automatiquement la plus récente dans le repo courant ; `--resume` liste les sessions et laisse choisir. Utile après une fermeture accidentelle ou pour reprendre un chantier le lendemain.\n\nLes checkpoints capturent des points de restauration : si l'agent part dans une mauvaise direction, on revient à un état sain sans tout perdre. Combiné à Git (worktrees, commits fréquents), c'est un filet de sécurité robuste pour les sessions longues.",
+    codeSnippet:
+      "claude --continue          # reprend la dernière session\nclaude --resume            # choisit parmi les sessions\n# /rewind pour revenir à un checkpoint",
+    tags: ["sessions", "continue", "resume", "checkpoints"],
+    wikiHref: "/wiki/cli/continue-checkpoints",
+  },
+  {
+    id: "cc-computer-use",
+    title: "Computer use depuis le CLI",
+    category: "Claude Code",
+    difficulty: "Avancé",
+    summary:
+      "Claude peut lancer des applications natives et naviguer dans des interfaces graphiques directement depuis le terminal, élargissant ce que l'agent peut « toucher » au-delà du seul code.",
+    technicalDetails:
+      "Le computer use permet à l'agent de percevoir un écran (captures) et d'agir (clics, saisie clavier, navigation). Depuis le CLI, cela ouvre des workflows où Claude teste une UI réelle, remplit un formulaire, ou interagit avec un outil sans API. La compréhension d'images haute résolution (Opus 4.7 supporte jusqu'à 2576 px sur le bord long) améliore nettement l'analyse de captures d'écran.\n\nÀ manier avec des garde-fous : le computer use donne à l'agent un contrôle large. Réserve-le à des environnements isolés, avec permissions strictes, et une approbation humaine pour les actions sensibles.",
+    codeSnippet: null,
+    tags: ["computer-use", "gui", "vision", "automation"],
+    wikiHref: "/wiki/modeles/vision-capacites",
+  },
+  {
+    id: "cc-settings-json",
+    title: "settings.json : les 5 niveaux",
+    category: "Claude Code",
+    difficulty: "Intermédiaire",
+    summary:
+      "La configuration de Claude Code se fusionne depuis plusieurs niveaux (entreprise, utilisateur, projet partagé, projet local, ligne de commande), du plus général au plus spécifique.",
+    technicalDetails:
+      "Les settings se cumulent : config d'entreprise (managée), ~/.claude/settings.json (utilisateur), .claude/settings.json (projet, versionné), .claude/settings.local.json (projet, local non versionné), puis les flags CLI. Le plus spécifique gagne. On y déclare le bloc permissions (allow/deny/ask), les hooks, le champ env, la sélection de modèle et les MCP.\n\nBonne pratique : mets les règles d'équipe dans le settings versionné (.claude/settings.json), les préférences perso dans settings.local.json (dans .gitignore), et réserve les flags CLI aux surcharges ponctuelles. Ne committe jamais de secrets dans un settings versionné.",
+    codeSnippet:
+      '// .claude/settings.json (versionné, partagé équipe)\n{\n  "permissions": { "allow": ["Read", "Grep", "Bash(npm test:*)"], "deny": ["Bash(rm:*)"] },\n  "env": { "NODE_ENV": "test" }\n}',
+    tags: ["settings", "permissions", "configuration", "équipe"],
+    wikiHref: "/wiki/cli/settings-json",
+  },
+
+  // ═══════════════════════════════════════════════════════════════════
+  // LOT 2 — MCP (approfondissement)
+  // ═══════════════════════════════════════════════════════════════════
+  {
+    id: "mcp-primitives",
+    title: "Resources, Tools, Prompts : les 3 primitives",
+    category: "MCP",
+    difficulty: "Intermédiaire",
+    summary:
+      "Un serveur MCP expose trois types de capacités : les Tools (actions exécutables), les Resources (données lisibles), et les Prompts (modèles réutilisables). Bien choisir la primitive change l'expérience.",
+    technicalDetails:
+      "Les Tools sont des fonctions que le modèle appelle (effets de bord possibles : écrire, requêter). Les Resources sont des données identifiées par URI que l'hôte peut charger dans le contexte (fichiers, enregistrements) — en lecture. Les Prompts sont des modèles paramétrés que l'utilisateur invoque explicitement (ex. « /résume-ce-ticket »).\n\nRègle de choix : une action avec effet → Tool ; une donnée à exposer sans action → Resource ; un workflow guidé côté utilisateur → Prompt. Confondre Tool et Resource (tout mettre en Tool) alourdit le raisonnement du modèle et augmente les appels inutiles.",
+    codeSnippet: null,
+    tags: ["primitives", "tools", "resources", "prompts"],
+    wikiHref: "/wiki/mcp/primitives-resources-tools-prompts",
+  },
+  {
+    id: "mcp-json-rpc",
+    title: "JSON-RPC 2.0 sous le capot",
+    category: "MCP",
+    difficulty: "Avancé",
+    summary:
+      "MCP repose sur JSON-RPC 2.0 : des messages requête/réponse typés (method, params, id) échangés entre client et serveur, avec une phase de découverte des capacités.",
+    technicalDetails:
+      "L'échange débute par un handshake d'initialisation, puis le client appelle des méthodes comme tools/list (découverte) et tools/call (exécution). Chaque message porte un id pour corréler requête et réponse ; les notifications (sans id) servent aux événements. Les erreurs suivent le format standard JSON-RPC (code, message, data).\n\nComprendre cette couche aide à débugger : un outil « invisible » vient souvent d'une réponse tools/list mal formée ; une erreur d'exécution remonte comme une erreur JSON-RPC. MCP Inspector affiche ces messages bruts, ce qui rend le protocole concret.",
+    codeSnippet:
+      '{ "jsonrpc": "2.0", "id": 1, "method": "tools/call",\n  "params": { "name": "get_weather", "arguments": { "city": "Paris" } } }',
+    tags: ["json-rpc", "protocole", "réseau", "debugging"],
+    wikiHref: "/wiki/mcp/json-rpc-mapping",
+  },
+  {
+    id: "mcp-memory-server",
+    title: "Le serveur Memory (knowledge graph)",
+    category: "MCP",
+    difficulty: "Intermédiaire",
+    summary:
+      "Le serveur MCP Memory construit un graphe de connaissances persistant : entités, relations et observations que Claude peut consulter et enrichir entre les sessions.",
+    technicalDetails:
+      "Contrairement au contexte volatil d'une session, le serveur Memory stocke des faits structurés (nœuds = entités, arêtes = relations) dans un graphe persistant. Claude peut y ajouter des observations (« l'utilisateur préfère X »), interroger les relations, et rappeler des informations de sessions passées.\n\nCas d'usage : mémoire d'équipe partagée, préférences durables, base de connaissances projet. Attention à la confidentialité : ce qui entre dans le graphe persiste. Structure les entités clairement et purge ce qui est sensible ou obsolète.",
+    codeSnippet:
+      '{\n  "mcpServers": {\n    "memory": {\n      "command": "npx",\n      "args": ["-y", "@modelcontextprotocol/server-memory"]\n    }\n  }\n}',
+    tags: ["memory", "knowledge-graph", "persistance", "mémoire"],
+    wikiHref: "/wiki/mcp/serveur-memory",
+  },
+  {
+    id: "mcp-oauth",
+    title: "OAuth 2.1 pour les serveurs distants",
+    category: "MCP",
+    difficulty: "Avancé",
+    summary:
+      "Les serveurs MCP distants en Streamable HTTP s'authentifient via OAuth 2.1 : l'utilisateur autorise l'accès sans jamais partager ses identifiants avec l'hôte.",
+    technicalDetails:
+      "Le flux OAuth évite de stocker des jetons statiques : le serveur redirige vers une page d'autorisation (souvent via l'élicitation en mode URL), l'utilisateur consent, et un jeton scoped est émis. Les scopes limitent ce que l'hôte peut faire (lecture seule vs écriture).\n\nC'est le mécanisme adapté aux SaaS multi-utilisateurs : chaque utilisateur a ses propres droits, révocables. En stdio local, on reste souvent sur un jeton en variable d'environnement ; en production distante, OAuth 2.1 est la norme pour la sécurité et la traçabilité.",
+    codeSnippet: null,
+    tags: ["oauth", "authentification", "streamable-http", "scopes"],
+    wikiHref: "/wiki/mcp/securite-mcp",
+  },
+  {
+    id: "mcp-ca-mcp",
+    title: "CA-MCP : mémoire partagée multi-agents",
+    category: "MCP",
+    difficulty: "Avancé",
+    summary:
+      "Les recherches 2026 sur les architectures multi-agents (CA-MCP) montrent qu'un magasin de contexte partagé via MCP améliore significativement les performances des LLM sur des benchmarks complexes.",
+    technicalDetails:
+      "CA-MCP (Context-Aware MCP) étend le protocole avec un magasin de contexte partagé entre serveurs collaborant. Plusieurs agents accèdent à une mémoire commune standardisée, ce qui évite la redondance et améliore la cohérence des décisions sur des tâches multi-étapes.\n\nLes études rapportent des gains statistiquement significatifs par rapport à des agents isolés. C'est un argument pour standardiser la mémoire partagée entre outils plutôt que de la réinventer par intégration. La feuille de route MCP inclut aussi la migration de session lors du scale-out et des pistes d'audit structurées pour les SIEM d'entreprise.",
+    codeSnippet: null,
+    tags: ["ca-mcp", "multi-agents", "mémoire-partagée", "recherche"],
+    wikiHref: "/wiki/mcp/evolution-2026-apps-elicitation",
+  },
+  {
+    id: "mcp-limites",
+    title: "Les limites du protocole MCP",
+    category: "MCP",
+    difficulty: "Intermédiaire",
+    summary:
+      "MCP ne fait pas tout : il ne gère pas la logique métier complexe côté modèle, dépend de la qualité des descriptions d'outils, et introduit une surface de confiance (serveur = code exécuté).",
+    technicalDetails:
+      "Le modèle décide d'appeler un outil à partir de sa description en langage naturel : une description vague ou trompeuse mène à des appels ratés ou dangereux. MCP ne valide pas la sémantique métier — c'est au serveur d'implémenter les garde-fous. Trop d'outils exposés diluent l'attention du modèle et augmentent les erreurs de sélection.\n\nCôté sécurité, chaque serveur est du code de confiance : un serveur malveillant peut exfiltrer des données ou agir de façon destructrice. Limite le nombre d'outils, soigne les descriptions, audite les serveurs tiers, et applique le système de permissions à trois niveaux.",
+    codeSnippet: null,
+    tags: ["limites", "confiance", "descriptions", "sécurité"],
+    wikiHref: "/wiki/mcp/limites-protocole",
+  },
+  {
+    id: "mcp-serveur-python",
+    title: "Créer un serveur MCP en Python",
+    category: "MCP",
+    difficulty: "Avancé",
+    summary:
+      "Le SDK Python permet de créer un serveur MCP avec des décorateurs : déclarer un outil, son schéma d'entrée et sa logique, puis exposer via stdio ou HTTP.",
+    technicalDetails:
+      "Avec le SDK officiel (FastMCP-style), on décore une fonction pour l'exposer comme outil ; le type hints et la docstring alimentent le schéma et la description. La logique s'écrit en Python idiomatique, avec accès aux bibliothèques scientifiques ou métier. Le transport stdio convient au local ; pour la production, on expose en Streamable HTTP.\n\nDistribue via PyPI (installable par pipx/uvx), Docker, ou exécutable. Gère les secrets via variables d'environnement. Teste toujours avec MCP Inspector avant de connecter à Claude, pour valider schéma et descriptions.",
+    codeSnippet:
+      '@mcp.tool()\ndef get_weather(city: str) -> str:\n    """Récupère la météo pour une ville donnée."""\n    return fetch_weather(city)',
+    tags: ["python", "sdk", "fastmcp", "développement"],
+    wikiHref: "/wiki/mcp/creer-serveur-py-setup",
+  },
+
+  // ═══════════════════════════════════════════════════════════════════
+  // LOT 2 — PROMPT ENGINEERING (approfondissement)
+  // ═══════════════════════════════════════════════════════════════════
+  {
+    id: "pe-structured-outputs",
+    title: "Structured outputs (le remplaçant du prefilling)",
+    category: "Prompt Engineering",
+    difficulty: "Intermédiaire",
+    summary:
+      "Sur les modèles où le prefilling est bloqué (Sonnet 5), les structured outputs garantissent un JSON conforme à un schéma via `output_config.format` — plus fiable qu'un prompt qui « demande » du JSON.",
+    technicalDetails:
+      "Au lieu d'espérer que le modèle produise du JSON valide, tu déclares un schéma et l'API contraint la sortie à s'y conformer. Fini les erreurs de virgule, les champs manquants ou le texte parasite avant/après. C'est la méthode recommandée pour tout pipeline de données sur les modèles récents.\n\nCombine avec des balises XML pour délimiter l'entrée, et un few-shot pour montrer la granularité attendue. Le schéma joue le rôle de contrat : le code en aval peut parser sans défense excessive. Pour les modèles compatibles prefilling, les deux approches coexistent, mais les structured outputs sont plus robustes.",
+    codeSnippet:
+      'output_config = {\n  "format": {\n    "type": "json_schema",\n    "schema": { "type": "object", "properties": { "titre": {"type":"string"} }, "required": ["titre"] }\n  }\n}',
+    tags: ["structured-outputs", "json-schema", "format", "pipeline"],
+    wikiHref: "/wiki/prompt-engineering/output-format",
+  },
+  {
+    id: "pe-role-prompting",
+    title: "Role prompting : donner un rôle",
+    category: "Prompt Engineering",
+    difficulty: "Débutant",
+    summary:
+      "Attribuer un rôle précis (« Tu es un relecteur de sécurité senior ») oriente le ton, le niveau de détail et les priorités de la réponse — souvent plus efficace via le system prompt.",
+    technicalDetails:
+      "Le rôle agit comme un raccourci contextuel : « expert SRE » active un registre technique et des réflexes (observabilité, post-mortem) sans les lister. Place-le de préférence dans le system prompt, qui définit le comportement global, plutôt que dans chaque message user.\n\nSois spécifique : « relecteur de sécurité spécialisé en injections » bat « expert ». Combine avec la motivation contextuelle (pour qui, pourquoi). Évite le rôle décoratif qui n'apporte rien (« assistant serviable ») : le rôle doit changer concrètement la sortie attendue.",
+    codeSnippet:
+      'system = "Tu es un relecteur de code senior spécialisé en sécurité applicative. ' +
+      'Tu signales les vulnérabilités par gravité et proposes un correctif minimal."',
+    tags: ["role-prompting", "system-prompt", "ton", "expertise"],
+    wikiHref: "/wiki/prompt-engineering/role-prompting",
+  },
+  {
+    id: "pe-system-vs-user",
+    title: "System prompt vs user prompt",
+    category: "Prompt Engineering",
+    difficulty: "Débutant",
+    summary:
+      "Le system prompt fixe le comportement durable (rôle, règles, format) ; le user prompt porte la tâche ponctuelle. Bien répartir évite de répéter les règles à chaque tour.",
+    technicalDetails:
+      "Mets dans le system tout ce qui est stable sur la conversation : rôle, ton, contraintes de format, règles métier, garde-fous. Garde dans le user la demande spécifique et ses données. Cette séparation rend les prompts plus courts, plus cachables (prompt caching sur le préfixe stable), et plus prévisibles.\n\nErreur fréquente : tout empiler dans le user, ce qui fait dériver le comportement d'un tour à l'autre. Autre piège : des instructions contradictoires entre system et user — en cas de conflit, sois explicite sur la priorité. Le system est aussi le bon endroit pour la persona et les interdits durables.",
+    codeSnippet: null,
+    tags: ["system-prompt", "user-prompt", "architecture", "caching"],
+    wikiHref: "/wiki/prompt-engineering/system-vs-user",
+  },
+  {
+    id: "pe-prompt-caching",
+    title: "Prompt caching : concevoir pour le cache",
+    category: "Prompt Engineering",
+    difficulty: "Avancé",
+    summary:
+      "Le prompt caching réutilise le calcul d'un préfixe stable (system, docs, exemples) sur plusieurs requêtes, réduisant fortement latence et coût. La clé : mettre le stable au début, le variable à la fin.",
+    technicalDetails:
+      "Le cache s'applique à un préfixe identique entre requêtes. Structure : d'abord les éléments durables (system prompt, documentation, few-shot, définitions d'outils), ensuite seulement la partie variable (la question du tour). Un changement en tête invalide tout le cache aval — d'où l'importance de l'ordre.\n\nLes tokens en cache-hit sont facturés à tarif réduit et servis plus vite. Pour un assistant qui répond sur un gros corpus stable, c'est un levier majeur. Marque les points de cache selon le SDK, mesure le taux de hit, et évite d'insérer du contenu volatil (timestamp, id de session) dans le préfixe stable.",
+    codeSnippet: null,
+    tags: ["prompt-caching", "coût", "latence", "préfixe"],
+    wikiHref: "/wiki/prompt-engineering/prompt-caching-concepts",
+  },
+  {
+    id: "pe-lost-in-middle",
+    title: "Lost in the middle sur contexte long",
+    category: "Prompt Engineering",
+    difficulty: "Intermédiaire",
+    summary:
+      "Sur un contexte très long, l'information placée au milieu est moins bien exploitée que celle en tête ou en fin. Structure le document et positionne l'essentiel aux extrémités.",
+    technicalDetails:
+      "Même avec 1M de tokens, la répartition de l'attention n'est pas uniforme. Les instructions critiques gagnent à être placées en fin de prompt (juste avant la génération). Les documents longs bénéficient d'une structure explicite : table des matières, résumés en tête de section, balises XML pour délimiter, et rappel des points clés en clôture.\n\nStratégies complémentaires : le RAG (n'injecter que les passages pertinents plutôt que tout), le reranking des extraits, et le prompt chaining (extraire d'abord, raisonner ensuite). Vérifie par des tests ciblés que l'information centrale est bien utilisée.",
+    codeSnippet: null,
+    tags: ["lost-in-the-middle", "contexte-long", "structure", "rag"],
+    wikiHref: "/wiki/prompt-engineering/lost-in-the-middle",
+  },
+  {
+    id: "pe-meta-prompting",
+    title: "Meta-prompting : Claude écrit tes prompts",
+    category: "Prompt Engineering",
+    difficulty: "Intermédiaire",
+    summary:
+      "Utilise Claude pour rédiger et améliorer tes prompts : décris la tâche et les critères, et demande-lui un prompt optimisé. Anthropic fournit même un outil dédié de génération de prompts.",
+    technicalDetails:
+      "Le méta-prompting exploite la connaissance qu'a le modèle des bonnes pratiques : donne-lui l'objectif, les contraintes, le format attendu et des exemples de bons/mauvais résultats, et demande un prompt structuré (rôle, XML, few-shot). Itère en lui montrant les sorties ratées pour qu'il corrige le prompt.\n\nL'outil de génération de prompts d'Anthropic (dans la console) automatise cette démarche pour produire un point de départ solide. Reste critique : un prompt généré doit être testé sur des cas réels et des edge cases avant mise en production. Le méta-prompting accélère le premier jet, il ne remplace pas l'évaluation.",
+    codeSnippet:
+      "Rédige un prompt système pour extraire des dates d'un texte en JSON.\nContraintes : gérer l'absence (null), formats FR/EN, sortie strictement JSON.\nFournis 3 exemples few-shot dont un cas vide.",
+    tags: ["meta-prompting", "génération", "itération", "outil"],
+    wikiHref: "/wiki/prompt-engineering/meta-prompting",
+  },
+  {
+    id: "pe-tester-prompt",
+    title: "Tester un prompt (évaluation & regression)",
+    category: "Prompt Engineering",
+    difficulty: "Avancé",
+    summary:
+      "Un prompt en production a besoin d'une suite d'évals : un jeu de cas représentatifs avec sorties attendues, rejoué à chaque modification pour détecter les régressions.",
+    technicalDetails:
+      "Constitue un dataset de cas (entrées + sorties/critères attendus), incluant des edge cases. Mesure automatiquement : correspondance exacte, validation de schéma, ou notation par un LLM-juge selon une grille. Rejoue la suite à chaque changement de prompt ou de modèle — c'est ce qui protège des régressions silencieuses (ex. un nouveau modèle change de comportement).\n\nSurveille aussi la dérive de modèle (claude-X-latest peut évoluer). Épingle une version pour la reproductibilité, et re-teste avant de suivre un « latest ». L'éval systématique transforme le prompt engineering d'un art en discipline mesurable.",
+    codeSnippet: null,
+    tags: ["évaluation", "regression", "llm-judge", "dataset"],
+    wikiHref: "/wiki/prompt-engineering/tester-prompt",
+  },
+
+  // ═══════════════════════════════════════════════════════════════════
+  // LOT 2 — ENTREPRISE & COÛTS
+  // ═══════════════════════════════════════════════════════════════════
+  {
+    id: "ent-batch-api",
+    title: "Batch API : -50 % sur le volume",
+    category: "Entreprise",
+    difficulty: "Intermédiaire",
+    summary:
+      "Le Batch API traite de grands volumes de requêtes en asynchrone (sous 24h) avec une réduction d'environ 50 % sur le prix des tokens — idéal pour les traitements non temps réel.",
+    technicalDetails:
+      "Tu soumets un lot de requêtes, l'API les traite en arrière-plan et tu récupères les résultats quand ils sont prêts (souvent bien avant la limite de 24h). Le rabais d'environ moitié sur input et output en fait le choix par défaut pour l'enrichissement de données, la classification de masse, la génération offline, ou le backfill.\n\nÀ combiner avec le prompt caching pour empiler les économies. Ne l'utilise pas pour de l'interactif (latence non garantie). Structure tes requêtes avec un id pour recorréler les réponses, et gère les échecs partiels du lot.",
+    codeSnippet: null,
+    tags: ["batch-api", "coût", "asynchrone", "volume"],
+    wikiHref: "/wiki/api/batch-api",
+  },
+  {
+    id: "ent-rate-limits",
+    title: "Rate limits et montée en tier",
+    category: "Entreprise",
+    difficulty: "Intermédiaire",
+    summary:
+      "Les limites de débit (requêtes et tokens par minute) dépendent de ton tier d'usage. On monte de tier avec l'historique de dépense ; les en-têtes de réponse indiquent l'état des quotas.",
+    technicalDetails:
+      "Chaque réponse renvoie des en-têtes (limites restantes, reset) : lis-les pour piloter ton débit plutôt que de tâtonner. En cas de 429, applique un backoff exponentiel avec jitter. Les tiers supérieurs relèvent les plafonds ; la progression suit l'ancienneté et le volume de dépense.\n\nPour Claude Code, les limites ont été relevées en 2026 (débit doublé). `claude agents --json` indique ce qui bloque une session en attente. Anticipe les pics (batch de nuit, Batch API) et distribue la charge pour éviter de saturer une fenêtre.",
+    codeSnippet:
+      "# En-têtes utiles\nanthropic-ratelimit-requests-remaining\nanthropic-ratelimit-tokens-remaining\nanthropic-ratelimit-tokens-reset",
+    tags: ["rate-limits", "tiers", "429", "quotas"],
+    wikiHref: "/wiki/api/rate-limit-headers",
+  },
+  {
+    id: "ent-content-safety",
+    title: "Modération et Content Safety",
+    category: "Entreprise",
+    difficulty: "Intermédiaire",
+    summary:
+      "Anthropic fournit des garde-fous de modération contre les contenus toxiques ou illégaux. En entreprise, on ajoute souvent une couche de classification en amont et en aval des appels.",
+    technicalDetails:
+      "Les modèles refusent nativement certaines catégories (violence, contenu illégal, cyber offensif). Pour un produit grand public, complète avec une modération applicative : classer l'entrée utilisateur avant l'appel, et la sortie avant affichage. Un modèle rapide (Haiku) fait un bon classifieur peu coûteux.\n\nCadre les faux positifs : un refus légitime peut frustrer un usage valable (sécurité défensive, fiction). Prévois un message clair et une voie d'appel. Documente ta politique de contenu et journalise les refus pour l'améliorer.",
+    codeSnippet: null,
+    tags: ["modération", "content-safety", "guardrails", "classification"],
+    wikiHref: "/wiki/enterprise/content-safety",
+  },
+  {
+    id: "ent-sovereign-hosting",
+    title: "Sovereign hosting & résidence des données",
+    category: "Entreprise",
+    difficulty: "Avancé",
+    summary:
+      "Pour les données réglementées, la résidence géographique compte : EU Data Boundary, options RGPD/HIPAA, et certifications (SOC 2 Type II) permettent de garder les données dans la bonne juridiction.",
+    technicalDetails:
+      "Déployer via Bedrock/Vertex dans une région européenne, activer le zero data retention, et contractualiser les garanties (DPA, annexes RGPD) répond aux exigences de souveraineté. Le choix de la région détermine où les données sont traitées et stockées.\n\nPour la santé ou la finance, vérifie les certifications applicables et les frontières de données de bout en bout (y compris logs et caches). La conformité n'est pas qu'un réglage : c'est une architecture (région, ZDR, chiffrement CMEK, contrôle d'accès) et une gouvernance documentée.",
+    codeSnippet: null,
+    tags: ["souveraineté", "rgpd", "eu-data-boundary", "hipaa"],
+    wikiHref: "/wiki/enterprise/sovereign-hosting",
+  },
+  {
+    id: "ent-multi-cloud",
+    title: "Résilience multi-cloud",
+    category: "Entreprise",
+    difficulty: "Avancé",
+    summary:
+      "Router les appels entre l'API Anthropic, Bedrock et Vertex avec un fallback automatique protège d'une panne d'un fournisseur — utile pour viser une haute disponibilité.",
+    technicalDetails:
+      "Une couche d'abstraction (gateway ou SDK) tente le fournisseur primaire, puis bascule vers un secondaire en cas d'erreur/indisponibilité. Attention aux différences d'IDs de modèles et de fonctionnalités entre plateformes (Priority Tier, certaines API legacy exclues). Normalise les requêtes pour qu'elles fonctionnent partout.\n\nL'épisode Fable 5/Mythos 5 (suspension réglementaire de 19 jours) rappelle qu'un modèle peut disparaître soudainement : le fallback ne concerne pas que les pannes techniques mais aussi la disponibilité réglementaire. Teste régulièrement le chemin de secours pour qu'il fonctionne le jour J.",
+    codeSnippet: null,
+    tags: ["multi-cloud", "fallback", "haute-disponibilité", "résilience"],
+    wikiHref: "/wiki/enterprise/resilience-multi-cloud",
+  },
+  {
+    id: "ent-cowork",
+    title: "Claude Cowork : travailler laptop fermé",
+    category: "Entreprise",
+    difficulty: "Intermédiaire",
+    summary:
+      "Les agents Claude peuvent continuer à travailler après la fermeture du laptop : l'exécution se poursuit côté cloud, et l'on rejoint la session quand une décision humaine est nécessaire.",
+    technicalDetails:
+      "La logique des agents persistants/à distance découple l'exécution de ta présence : un chantier long tourne côté infrastructure, avance en autonomie, et te notifie (hooks agent_needs_input / agent_completed) au moment utile. C'est la même philosophie que le mode ambiant de Claude Tag, appliquée au travail logiciel.\n\nCela change l'organisation : tu orchestres plusieurs agents en parallèle et reviens ponctuellement arbitrer, au lieu de superviser en continu. Prérequis : des garde-fous solides (permissions, tests, approbations) pour un travail non supervisé fiable.",
+    codeSnippet: null,
+    tags: ["cowork", "agents-persistants", "asynchrone", "notifications"],
+    wikiHref: "/wiki/actualites/claude-tag-slack",
+  },
+  {
+    id: "ent-managed-agents",
+    title: "Managed Agents (agents hébergés)",
+    category: "Entreprise",
+    difficulty: "Avancé",
+    summary:
+      "Les Managed Agents s'exécutent côté serveur dans un environnement managé (sandbox), permettant de déployer des agents sans gérer soi-même l'infrastructure d'exécution ni la boucle d'outils.",
+    technicalDetails:
+      "Plutôt que d'orchestrer localement la boucle appel-outil-réponse, tu délègues à un runtime managé qui exécute l'agent, gère les outils, la compaction de contexte et les permissions. C'est adapté aux produits qui exposent des capacités agentiques à leurs utilisateurs sans opérer une flotte d'exécuteurs.\n\nCombiné aux sandboxes (Vercel Sandbox, microVM éphémères) pour isoler le code généré, cela réduit la surface opérationnelle. Surveille les coûts (exécution + tokens) et applique des budgets, car un agent managé peut consommer de façon soutenue.",
+    codeSnippet: null,
+    tags: ["managed-agents", "sandbox", "runtime", "déploiement"],
+    wikiHref: "/wiki/enterprise/vercel-plugin-ai-sdk",
+  },
+
+  // ═══════════════════════════════════════════════════════════════════
+  // LOT 2 — MODÈLES & RECHERCHE (approfondissement)
+  // ═══════════════════════════════════════════════════════════════════
+  {
+    id: "mod-haiku-45",
+    title: "Claude Haiku 4.5 : vitesse et coût",
+    category: "Modèles & Recherche",
+    difficulty: "Débutant",
+    summary:
+      "Sorti en octobre 2025, Haiku 4.5 est le modèle rapide et économique : idéal pour la classification, l'extraction, le routage et le grand volume où la latence et le coût priment.",
+    technicalDetails:
+      "Haiku vise le meilleur rapport vitesse/coût. On l'emploie comme classifieur, extracteur, routeur (choisir vers quel modèle escalader), ou premier étage d'un pipeline (extraire avant qu'Opus ne synthétise). Il répond aux besoins des petites structures cherchant un assistant rapide et peu coûteux.\n\nLimite : sur le raisonnement complexe ou l'agentique longue, il plafonne — c'est là qu'on passe à Sonnet 5 ou Opus 4.8. Le bon design combine les modèles : Haiku pour le volume simple, Sonnet/Opus pour le difficile. Mesure la qualité sur tes cas avant de tout confier au moins cher.",
+    codeSnippet: 'model = "claude-haiku-4-5"  # rapide, économique, grand volume',
+    tags: ["haiku", "coût", "classification", "routage"],
+    wikiHref: "/wiki/modeles/haiku-4-5",
+  },
+  {
+    id: "mod-opus-47",
+    title: "Claude Opus 4.7 : images HD et task budgets",
+    category: "Modèles & Recherche",
+    difficulty: "Intermédiaire",
+    summary:
+      "Opus 4.7 (avril 2026) a introduit le raisonnement adaptatif, les images haute résolution (jusqu'à 2576 px), le niveau d'effort xhigh et les task budgets en bêta — mais avec un taux de refus élevé, corrigé par 4.8.",
+    technicalDetails:
+      "Opus 4.7 a marqué le passage au raisonnement adaptatif et a rejeté les paramètres de sampling non-défaut (contrainte reprise ensuite sur Sonnet 5). La compréhension d'images HD a nettement amélioré l'analyse de captures et de documents. Le niveau xhigh cible l'agentique de longue durée ; les task budgets (bêta) laissent le modèle voir un compte à rebours de tokens pour finir proprement.\n\nRevers documenté : un taux de faux refus élevé et une verbosité excessive dans les commentaires de code, plus des erreurs d'appels d'outils en sessions longues. Opus 4.8 a corrigé ces trois points. Historiquement instructif pour comprendre l'évolution vers les modèles plus directs.",
+    codeSnippet: null,
+    tags: ["opus-4-7", "images-hd", "task-budgets", "xhigh"],
+    wikiHref: "/wiki/modeles/opus-4-7",
+  },
+  {
+    id: "mod-choisir",
+    title: "Choisir le bon modèle",
+    category: "Modèles & Recherche",
+    difficulty: "Débutant",
+    summary:
+      "Règle simple : Haiku pour le volume simple et rapide, Sonnet 5 pour le code et l'agentique au quotidien, Opus 4.8 pour le raisonnement le plus dur et les domaines à forte responsabilité.",
+    technicalDetails:
+      "Commence par le modèle le moins cher qui tient la qualité sur tes cas, et n'escalade que si nécessaire. Sonnet 5 s'approche d'Opus 4.8 sur l'agentique pour ~3× moins cher : c'est le défaut raisonnable pour le développement. Réserve Opus 4.8 aux 5-10 % de tâches où Sonnet plafonne (juridique, finance, raisonnement profond).\n\nPour la latence critique, considère Opus 4.8 fast mode ou Haiku. Mesure toujours sur un dataset représentatif plutôt que de choisir au feeling. Et prévois un fallback en cas d'indisponibilité d'un modèle sensible.",
+    codeSnippet: null,
+    tags: ["choix-modèle", "coût", "qualité", "décision"],
+    wikiHref: "/wiki/modeles/choisir-bon-modele",
+  },
+  {
+    id: "mod-pricing",
+    title: "Ordres de grandeur de tarification",
+    category: "Modèles & Recherche",
+    difficulty: "Débutant",
+    summary:
+      "Repères 2026 (standard, /1M tokens) : Sonnet 5 à 3 $/15 $ (input/output), Opus 4.8 à 5 $/25 $, avec fast mode Opus à 10 $/50 $. Batch API et prompt caching réduisent la facture.",
+    technicalDetails:
+      "La facturation se fait au token, input et output séparés. Sonnet 5 est à 3 $/15 $ en standard (2 $/10 $ en lancement jusqu'au 31 août 2026) ; Opus 4.8 à 5 $/25 $, son fast mode à 10 $/50 $. Attention au tokenizer de Sonnet 5 (+30 % de tokens pour le même texte) qui augmente le coût réel même à prix par token inchangé.\n\nLeviers cumulables : Batch API (~-50 %), prompt caching (préfixe stable à tarif réduit), et le bon dimensionnement du modèle par tâche. Trace le champ usage de chaque réponse pour suivre input/output/thinking et repérer les gaspillages.",
+    codeSnippet: null,
+    tags: ["pricing", "tokens", "batch", "caching"],
+    wikiHref: "/wiki/modeles/pricing-tokens",
+  },
+  {
+    id: "mod-interleaved-thinking",
+    title: "Interleaved thinking (pensée imbriquée)",
+    category: "Modèles & Recherche",
+    difficulty: "Avancé",
+    summary:
+      "La pensée imbriquée permet au modèle de réfléchir, d'appeler un outil, d'analyser le résultat, puis de reprendre sa réflexion — le fondement des workflows agentiques fiables.",
+    technicalDetails:
+      "Sans pensée imbriquée, le modèle devait figer tout son plan avant le premier appel d'outil. Avec elle, il alterne raisonnement et actions : requêter une base, lire le retour, ajuster son plan, continuer. Le raisonnement adaptatif l'active automatiquement sur les modèles 2026.\n\nC'est ce qui rend possibles le débogage itératif (lire une erreur → tester une hypothèse → corriger) et l'exploration de code (chercher → lire → chercher plus finement). Pour en profiter, laisse un effort suffisant (high/xhigh) et des `max_tokens` généreux, puisque thinking + réponse partagent le budget.",
+    codeSnippet: null,
+    tags: ["interleaved-thinking", "agentique", "outils", "raisonnement"],
+    wikiHref: "/wiki/modeles/adaptive-thinking-effort",
+  },
+  {
+    id: "mod-vision",
+    title: "Claude Vision : lire images et documents",
+    category: "Modèles & Recherche",
+    difficulty: "Intermédiaire",
+    summary:
+      "Claude analyse images, captures d'écran, schémas et documents. La montée en résolution (jusqu'à 2576 px sur le bord long depuis Opus 4.7) a amélioré la lecture d'UI et de documents denses.",
+    technicalDetails:
+      "Cas d'usage : décrire une maquette, extraire des données d'un tableau scanné, débugger une UI à partir d'une capture, lire un diagramme d'architecture. Une meilleure résolution signifie moins de perte de détail sur le texte fin et les interfaces complexes. Fournis des images nettes et cadrées pour de meilleurs résultats.\n\nLimites : la vision reste faillible sur du texte très petit, des tableaux ambigus ou des captures bruitées. Pour des données critiques, demande une extraction structurée puis fais valider, et croise avec une source de vérité quand c'est possible.",
+    codeSnippet: null,
+    tags: ["vision", "images", "ocr", "résolution"],
+    wikiHref: "/wiki/modeles/vision-capacites",
+  },
+  {
+    id: "mod-model-drift",
+    title: "Model drift et versions -latest",
+    category: "Modèles & Recherche",
+    difficulty: "Avancé",
+    summary:
+      "Suivre un alias -latest expose au model drift : le comportement peut changer sans action de ta part. Pour la reproductibilité, épingle une version précise et re-teste avant de migrer.",
+    technicalDetails:
+      "Un alias comme claude-X-latest peut pointer vers une version mise à jour, modifiant subtilement les sorties (format, verbosité, refus). Pour un produit, cela peut casser des parseurs ou dégrader une éval. Épingle un ID de modèle daté/versionné en production, et traite chaque montée de version comme un changement à tester.\n\nMets en place une suite d'évals de non-régression, rejouée à chaque migration. Surveille aussi les changements documentés (ex. suppression de budget_tokens, rejet des paramètres de sampling, nouveau tokenizer) qui exigent des ajustements de code au-delà du simple ID.",
+    codeSnippet: 'model = "claude-sonnet-5"  # épinglé, pas un alias -latest volatil',
+    tags: ["model-drift", "versioning", "reproductibilité", "évals"],
+    wikiHref: "/wiki/modeles/model-drift",
+  },
+
+  // ═══════════════════════════════════════════════════════════════════
+  // LOT 2 — SÉCURITÉ (approfondissement)
+  // ═══════════════════════════════════════════════════════════════════
+  {
+    id: "sec-glasswing",
+    title: "Un cadre industriel d'évaluation des jailbreaks",
+    category: "Sécurité",
+    difficulty: "Avancé",
+    summary:
+      "Après l'épisode Fable 5/Mythos 5, Anthropic et ses partenaires (Amazon, Microsoft, Google) ont proposé un cadre industriel commun pour évaluer la gravité des jailbreaks, avec accès gouvernemental préalable aux modèles.",
+    technicalDetails:
+      "Le cadre inclut des engagements inédits : fournir aux évaluateurs gouvernementaux désignés un accès préalable aux modèles et à leurs garde-fous avant sortie publique, permettant des évaluations indépendantes des capacités. Un système de partage rapide d'informations notifie les homologues gouvernementaux lors de la découverte d'abus, avec participation à une chambre de compensation des vulnérabilités inter-agences.\n\nC'est une réponse structurelle à la tension entre diffusion de modèles frontière et sécurité nationale. Pour un praticien, le signal est clair : les capacités cyber des modèles sont désormais un sujet réglementé, et la disponibilité d'un modèle peut dépendre d'évaluations externes.",
+    codeSnippet: null,
+    tags: ["jailbreak", "gouvernance", "évaluation", "sécurité-nationale"],
+    wikiHref: "/wiki/modeles/fable-5-mythos-5",
+  },
+  {
+    id: "sec-sandbox-execution",
+    title: "Exécuter du code d'agent en sandbox",
+    category: "Sécurité",
+    difficulty: "Avancé",
+    summary:
+      "Le code généré par un agent doit s'exécuter dans un environnement isolé (microVM éphémère type Vercel Sandbox), jamais directement sur ton serveur hôte.",
+    technicalDetails:
+      "Une sandbox Firecracker/microVM isole l'exécution : le code n'a pas accès aux secrets de l'hôte ni au réseau interne, et l'environnement est détruit après usage. C'est le pattern recommandé (via HarnessAgent + createVercelSandbox, runtime node24) pour toute plateforme laissant des agents exécuter du code utilisateur ou généré.\n\nComplète par des permissions en allowlist, pas d'accès réseau sortant par défaut, des limites de ressources (CPU, mémoire, temps), et une journalisation des actions. Le J-space a montré qu'un modèle peut préméditer un sabotage invisible : l'isolation est la défense qui ne dépend pas de la bonne foi de l'agent.",
+    codeSnippet:
+      'const sandbox = await createVercelSandbox({ runtime: "node24" });\n// le code généré s\'exécute ici, pas sur l\'hôte',
+    tags: ["sandbox", "microvm", "isolation", "exécution"],
+    wikiHref: "/wiki/enterprise/threat-modeling-agents",
+  },
+  {
+    id: "sec-audit-trail",
+    title: "Audit trail des actions d'agents",
+    category: "Sécurité",
+    difficulty: "Intermédiaire",
+    summary:
+      "Journaliser chaque action d'outil (qui, quoi, quand, résultat) est indispensable pour la conformité, le débogage et l'investigation post-incident des systèmes agentiques.",
+    technicalDetails:
+      "Un agent qui lit, écrit et exécute doit laisser une trace exploitable : appels d'outils, arguments, décisions d'approbation, sorties. En entreprise, ces logs alimentent un SIEM (Security Information and Event Management) pour détecter les anomalies et répondre aux exigences réglementaires. La feuille de route MCP prévoit des pistes d'audit structurées à cette fin.\n\nBonnes pratiques : horodatage, identité de l'agent/session, corrélation des étapes d'un workflow (via workflow.run_id en OTel), et rétention adaptée à la politique de données. Ne loggue pas de secrets en clair. L'audit trail est autant un outil de sécurité que de confiance produit.",
+    codeSnippet: null,
+    tags: ["audit", "logging", "siem", "conformité"],
+    wikiHref: "/wiki/workflows/audit-trail",
+  },
+  {
+    id: "sec-bash-injection",
+    title: "Injection bash sécurisée dans les commandes",
+    category: "Sécurité",
+    difficulty: "Avancé",
+    summary:
+      "Les slash commands et hooks peuvent injecter la sortie de commandes bash dans un prompt. À sécuriser : jamais de contenu non fiable interpolé sans échappement ni périmètre restreint.",
+    technicalDetails:
+      "Injecter `$(git log)` ou une sortie de script dans un prompt est puissant mais risqué : si le contenu injecté provient d'une source non fiable (nom de branche, message de commit, fichier externe), il peut contenir des instructions d'injection. Traite ces sorties comme des données, pas des instructions (balises, marquage explicite).\n\nRestreins les commandes autorisées via l'allowlist de permissions (ex. Bash(git diff:*) et non Bash(*)), évite d'exécuter du contenu arbitraire, et n'accorde pas d'accès réseau/écriture inutile. Le principe du moindre privilège s'applique aussi aux commandes injectées.",
+    codeSnippet:
+      "# Restreindre finement (settings.json)\n\"allow\": [\"Bash(git diff:*)\", \"Bash(npm test:*)\"]\n\"deny\":  [\"Bash(rm:*)\", \"Bash(curl:*)\"]",
+    tags: ["bash", "injection", "moindre-privilège", "slash-commands"],
+    wikiHref: "/wiki/slash-commands/bash-injection-securisee",
+  },
+  {
+    id: "sec-hooks-rce",
+    title: "Sécurité des hooks : éviter le RCE",
+    category: "Sécurité",
+    difficulty: "Avancé",
+    summary:
+      "Un hook exécute des commandes arbitraires sur ta machine. Un settings.json malveillant (repo cloné, config partagée) peut donc mener à une exécution de code à distance — à auditer avant d'exécuter.",
+    technicalDetails:
+      "Comme les hooks lancent des commandes shell déclenchées par des événements, un fichier de config piégé peut exécuter du code dès l'ouverture d'un projet ou l'usage d'un outil. Avant de faire confiance à un repo tiers, inspecte .claude/settings.json et les hooks déclarés. Ne lance pas Claude Code en bypassPermissions sur du code non audité.\n\nMesures : revue des hooks à l'onboarding d'un repo, exécution en environnement isolé pour le code inconnu, et séparation des configs de confiance (versionnées, revues) des configs locales. Traite un hook comme du code exécutable, avec la même vigilance que pour une dépendance.",
+    codeSnippet: null,
+    tags: ["hooks", "rce", "audit", "supply-chain"],
+    wikiHref: "/wiki/hooks/securite-rce",
+  },
+  {
+    id: "sec-llm-judge",
+    title: "LLM-as-a-Judge contre les injections",
+    category: "Sécurité",
+    difficulty: "Avancé",
+    summary:
+      "En entreprise, un LLM-juge placé en amont et en aval des appels détecte les tentatives de prompt injection et les sorties problématiques, comme couche de défense supplémentaire.",
+    technicalDetails:
+      "En amont : un classifieur (souvent un modèle rapide) évalue si l'entrée utilisateur ou le contenu récupéré contient une tentative d'injection (« ignore tes instructions… »). En aval : un juge vérifie que la sortie respecte les règles (pas de fuite de secret, pas d'action non autorisée) avant exécution/affichage.\n\nCe n'est pas infaillible (un juge peut aussi être trompé) : combine avec l'isolation instruction/données, le moindre privilège et l'approbation humaine pour les actions sensibles. La défense en profondeur — plusieurs couches imparfaites — bat une seule barrière supposée parfaite.",
+    codeSnippet: null,
+    tags: ["llm-judge", "prompt-injection", "défense-en-profondeur", "modération"],
+    wikiHref: "/wiki/enterprise/prompt-injection-enterprise",
+  },
+  {
+    id: "sec-faux-positifs-audit",
+    title: "Gérer les faux positifs d'un audit IA",
+    category: "Sécurité",
+    difficulty: "Intermédiaire",
+    summary:
+      "Un audit de sécurité par IA génère des faux positifs. Traite ses signalements comme des hypothèses à confirmer, priorise par gravité, et évite d'automatiser des corrections non vérifiées.",
+    technicalDetails:
+      "Un scan IA peut signaler une « vulnérabilité » qui n'en est pas (contexte manquant, faux motif). Le bon flux : l'IA détecte et explique, un humain (ou une seconde passe outillée : semgrep, tests) confirme, puis on corrige. Corriger en masse sur la seule foi de l'IA introduit du bruit, voire des régressions.\n\nPriorise par gravité et exploitabilité réelle, pas par volume de findings. Documente les faux positifs récurrents pour affiner le prompt d'audit. L'objectif est un signal actionnable à haute précision, pas une liste exhaustive ingérable.",
+    codeSnippet: null,
+    tags: ["faux-positifs", "audit", "triage", "vérification"],
+    wikiHref: "/wiki/workflows/faux-positifs-audit",
+  },
 ];
 
 // ─── Helpers ───────────────────────────────────────────────────────────
