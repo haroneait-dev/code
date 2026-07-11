@@ -1,0 +1,97 @@
+---
+title: "Prompter les modèles 2026 (Opus 4.6+ / Sonnet 5)"
+description: "Les nouvelles règles du prompt engineering : fin du sur-prompting, positivité prescriptive, prompt matching, contrôle par effort, et résolution des échecs courants."
+updatedAt: "2026-07-08"
+readingMinutes: 9
+---
+
+Les modèles Claude de 2026 (Opus 4.6, 4.7, 4.8, [Sonnet 5](/wiki/modeles/sonnet-5)) sont **plus directs, plus concis et plus ancrés dans les faits** que leurs prédécesseurs. Conséquence : ils **pénalisent l'ambiguïté et le sur-prompting** qui fonctionnaient avant. Voici comment adapter ta pratique.
+
+## La règle d'or : l'ambiguïté est l'ennemie
+
+L'analogie officielle d'Anthropic : si une instruction confuse était donnée à un collègue humain avec un contexte minimal, elle le désorienterait — le modèle réagit pareil.
+
+### Clarté, directivité, contexte
+
+- **Verbes d'action directs** : commence par « Génère », « Analyse », « Extrais », « Rédige ». Pas de préambule conversationnel.
+- **Motivation contextuelle** : explique **pourquoi** la tâche est faite et **pour qui**. Le modèle en déduit les paramètres non spécifiés (ton, niveau technique) et généralise mieux vers ton intention.
+
+### Positivité prescriptive
+
+Évite les consignes négatives. Dire « N'utilise pas de Markdown » ou « Ne sois pas verbeux » concentre l'attention du modèle sur le concept interdit et **augmente paradoxalement** le risque qu'il le produise. Prescris le comportement voulu :
+
+> ❌ « N'utilise pas de listes à puces. »
+> ✅ « Ta réponse doit être composée exclusivement de paragraphes en prose fluide, en texte brut. »
+
+### Prompt matching
+
+Claude **calque souvent le style de sa réponse sur celui de ta requête**. Si tu veux une sortie en prose simple sans formatage, rédige ta demande elle-même en prose simple, sans listes ni titres.
+
+## Structuration sémantique par balises XML
+
+Claude est entraîné à reconnaître la ségrégation sémantique via des **balises XML**. Structurer une requête complexe autour de balises élimine la confusion instructions/données :
+
+```xml
+<instructions>
+Extrais les entités nommées du texte fourni.
+</instructions>
+
+<input_data>
+{{ texte source ici }}
+</input_data>
+
+<constraints>
+- Réponds en JSON valide uniquement.
+- Si une entité est absente, utilise null.
+</constraints>
+
+<output_format>
+{"personnes": [], "organisations": [], "lieux": []}
+</output_format>
+```
+
+Voir aussi l'article dédié [Balises XML](/wiki/prompt-engineering/balises-xml).
+
+## Few-shot : couvrir les cas limites
+
+Pour les tâches d'extraction complexes (ex. alimenter une base de données), fournir **3 à 5 exemples** de sortie attendue améliore drastiquement la constance. Encapsule-les dans `<examples>` avec des sous-balises `<example>`. **Impératif** : les exemples doivent couvrir la diversité des cas — y compris les *edge cases* — sinon le modèle sur-apprend un motif restreint.
+
+## Prefilling : forcer un format strict
+
+> ⚠️ **Attention aux modèles récents.** Le prefilling du message assistant **n'est plus supporté sur Sonnet 5** (ni Sonnet 4.6) et renvoie une erreur 400. Utilise plutôt les **structured outputs** ou `output_config.format`.
+
+Sur les modèles qui l'acceptent encore, terminer la requête par la chaîne exacte qui doit débuter la réponse (ex. `{` pour du JSON) contraint le modèle à démarrer là, court-circuitant les phrases d'introduction (« Voici les données demandées : »).
+
+## Réduire le sur-prompting
+
+Avant, on forçait l'usage d'outils : « Au moindre doute, lance une recherche web ou lis les logs. » Sur **Opus 4.6+ et Sonnet 5**, cela provoque du **sur-déclenchement** : le modèle exécute des commandes bash parallèles massives et risque de saturer les ressources. Rends l'instruction **conditionnelle et ciblée** :
+
+> ✅ « Utilise l'outil de recherche **uniquement si** c'est indispensable pour améliorer ta compréhension factuelle du problème. »
+
+## Contrôle du raisonnement par effort
+
+Ne force plus la réflexion via `budget_tokens` (erreur 400 sur les modèles 2026). Le contrôle passe par le [paramètre effort](/wiki/modeles/adaptive-thinking-effort) (`low` → `max`, dont `xhigh`). Un `high` (défaut) demande au modèle de raisonner presque systématiquement avant de répondre, tout en activant la pensée imbriquée pour utiliser des outils en cours de route.
+
+## Résolution des échecs courants
+
+| Problème | Technique de résolution |
+|---|---|
+| Réponse générique / superficielle | Augmenter la spécificité des contraintes, donner des exemples de haut niveau, demander explicitement de « dépasser les concepts de base » |
+| Hallucination | Autoriser l'ignorance : « Si l'information n'est pas dans le texte, réponds exactement "Je ne sais pas" ou utilise `null` » |
+| Tâche trop complexe qui échoue | **Prompt chaining** : découper en appels API séquentiels, la sortie de l'étape 1 devenant l'entrée stricte de l'étape 2 |
+| Besoin de transparence | Demander un bloc `<thinking>` détaillé avant la conclusion en `<answer>` |
+| Erreurs de logique / code | Boucle d'auto-évaluation : « Avant de finaliser, vérifie tes conclusions par rapport aux contraintes initiales et aux critères de test » |
+
+## Architecture d'un méta-prompt d'extraction
+
+Pour un pipeline de données fiable (ex. alimenter automatiquement un wiki), combine ces techniques : définir le **rôle système** (expert veille IA), fournir le **contexte de la cible** (site éducatif exigeant des données denses), encapsuler les sources en **XML strict**, donner un **exemple few-shot** de sortie JSON parfaite, imposer des **règles positives** sur le ton et la profondeur, et — sur les modèles compatibles — pré-remplir la structure de sortie. Sur Sonnet 5, remplace le prefilling par des **structured outputs**.
+
+## Sources
+
+- [Prompting best practices — Claude Platform Docs](https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/overview)
+- [Prompting Claude Sonnet 5 — Claude Platform Docs](https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-sonnet-5)
+- [Bonnes pratiques de prompting — Claude Platform Docs (FR)](https://platform.claude.com/docs/fr/build-with-claude/prompt-engineering/overview)
+
+---
+
+*Cet article fait partie du wiki Claude Mastery. Non affilié à Anthropic. Claude™ est une marque d'Anthropic, PBC.*

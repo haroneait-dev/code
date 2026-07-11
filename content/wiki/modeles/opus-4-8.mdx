@@ -1,0 +1,61 @@
+---
+title: "Claude Opus 4.8 — le modèle frontière au quotidien"
+description: "Lancé le 28 mai 2026 : fast mode 2,5× plus rapide et 3× moins cher, record sur le benchmark Legal Agent, corrections des défauts d'Opus 4.7."
+updatedAt: "2026-07-08"
+readingMinutes: 7
+---
+
+**Claude Opus 4.8**, lancé le **28 mai 2026**, est le modèle le plus avancé d'Anthropic disponible publiquement — et le modèle par défaut de Claude Code sur les plans Max, Team Premium et Enterprise. C'est une itération de consolidation : elle corrige les irritants d'Opus 4.7 tout en repoussant les benchmarks.
+
+## Ce qu'Opus 4.8 corrige par rapport à 4.7
+
+Opus 4.7 avait introduit de vraies avancées (raisonnement adaptatif, images haute résolution jusqu'à 2 576 px sur le bord long, niveau d'effort `xhigh`, task budgets en bêta), mais aussi des défauts bien documentés par la communauté :
+
+- **Verbosité excessive** dans les commentaires de code générés ;
+- **Erreurs d'appels d'outils** en sessions agentiques longues ;
+- Un **taux de refus (faux positifs) anormalement élevé**, particulièrement signalé par les utilisateurs de Claude Code en avril 2026.
+
+Opus 4.8 corrige ces trois points. Côté alignement, l'évaluation interne d'Anthropic conclut à des sommets en matière de comportements prosociaux — soutien de l'autonomie de l'utilisateur, action dans son intérêt — un niveau que la presse spécialisée a qualifié de « proche de Mythos ».
+
+## Le fast mode : 2,5× plus rapide, 3× moins cher
+
+La grande nouveauté économique : le **fast mode** produit des tokens environ **2,5× plus vite** que le mode standard. Surtout, son prix chute de **30 $/150 $** (Opus 4.7) à **10 $/50 $** par million de tokens (input/output) — trois fois moins cher. La vitesse frontière devient accessible pour les usages interactifs où la latence compte : pair programming, chat produit, itérations rapides.
+
+Dans Claude Code, le fast mode se bascule avec `/fast`. Important : il utilise bien **Opus en sortie accélérée**, pas un modèle plus petit déguisé.
+
+| Mode | Input / 1M | Output / 1M | Vitesse |
+|---|---|---|---|
+| Opus 4.8 standard | 5 $ | 25 $ | 1× |
+| Opus 4.8 fast mode | 10 $ | 50 $ | ~2,5× |
+
+## Performances
+
+- **Record absolu sur le benchmark « Legal Agent »** d'Anthropic : premier modèle à franchir les **10 %** sur la norme *all-pass* globale — un indicateur direct de la quantité de travail juridique réel délégable en confiance.
+- **Précision de citation améliorée** sur les documents financiers denses (retours de l'orchestrateur Hebbia), avec une meilleure efficacité en tokens lors de la récupération d'informations.
+- Améliorations sensibles en **revue de code, planification algorithmique et débogage** — dans la continuité d'Opus 4.6, qui avait inauguré la fenêtre de contexte 1M (bêta).
+
+## Spécifications clés
+
+- **Contexte** : jusqu'à 1 000 000 tokens.
+- **Sortie** : 128 000 tokens en synchrone.
+- **Raisonnement** : adaptatif, contrôlé par le [paramètre effort](/wiki/modeles/adaptive-thinking-effort) (`low` → `max`, dont `xhigh` pour l'agentique de longue durée).
+- **Extended thinking manuel** (`budget_tokens`) : supprimé, renvoie une erreur 400 — comme sur [Sonnet 5](/wiki/modeles/sonnet-5).
+- **Sampling** : `temperature`/`top_p`/`top_k` non-défaut rejetés (introduit sur Opus 4.7).
+
+## Opus 4.8 ou Sonnet 5 ?
+
+Depuis le 30 juin 2026, [Sonnet 5](/wiki/modeles/sonnet-5) s'approche d'Opus 4.8 sur l'agentique pour 3× moins cher. La règle pratique :
+
+- **Sonnet 5** : agents à haut volume, code au quotidien, workloads où le coût domine.
+- **Opus 4.8** : raisonnement le plus difficile, domaines à forte responsabilité (juridique, finance), et les 5-10 % de tâches où Sonnet plafonne.
+- **Opus 4.8 fast mode** : quand tu veux le niveau Opus **et** une latence minimale, et que le budget suit.
+
+## Sources
+
+- [Introducing Claude Opus 4.8 — Anthropic](https://www.anthropic.com/news/claude-opus-4-8)
+- [Claude Opus 4.8 : fast mode 3× moins cher — VentureBeat](https://venturebeat.com/technology/anthropics-claude-opus-4-8-is-here-with-3x-cheaper-fast-mode-and-near-mythos-level-alignment)
+- [Anthropic launches Claude Opus 4.8 — Neowin](https://www.neowin.net/news/anthropic-launches-claude-opus-48-with-better-coding-and-lower-fast-mode-pricing/)
+
+---
+
+*Cet article fait partie du wiki Claude Mastery. Non affilié à Anthropic. Claude™ est une marque d'Anthropic, PBC.*

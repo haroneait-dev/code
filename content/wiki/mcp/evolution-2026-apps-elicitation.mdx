@@ -1,0 +1,77 @@
+---
+title: "MCP en 2026 : Apps, élicitation, sampling & Streamable HTTP"
+description: "L'évolution du Model Context Protocol : don à l'Agentic AI Foundation, MCP Apps (UI interactives), élicitation, sampling, et le passage au transport Streamable HTTP sans état."
+updatedAt: "2026-07-08"
+readingMinutes: 9
+---
+
+Le [Model Context Protocol](/wiki/mcp/introduction-mcp) a beaucoup mûri en 2026. Il est passé du statut de standard d'Anthropic à celui de standard neutre de l'industrie, et de simple canal de données à une véritable **chorégraphie agentique** avec interfaces interactives. Tour d'horizon des évolutions clés.
+
+## Un standard désormais neutre
+
+Le **9 décembre 2025**, Anthropic a **fait don du MCP à l'Agentic AI Foundation (AAIF)**, sous l'égide de la Linux Foundation. Le protocole cesse d'être « celui d'Anthropic » pour devenir un standard ouvert et neutre.
+
+- **Cofondateurs de l'AAIF** : Anthropic, Block, OpenAI.
+- **Membres Platinum** : Google, Microsoft, AWS, Cloudflare, Bloomberg.
+
+L'adoption suit : en mars 2026, le standard enregistrait des dizaines de millions de téléchargements mensuels de SDK et plus de 10 000 serveurs publics actifs. Comparaison courante : le MCP est « le port USB-C de la connectivité IA » — on implémente le protocole une fois, et toute application IA compatible s'y connecte.
+
+## MCP Apps : des interfaces interactives dans le chat
+
+Le protocole de base était limité au texte et aux données structurées JSON. **MCP Apps** (livré en janvier 2026, bâti sur **mcp-ui**) permet aux serveurs de renvoyer des **interfaces utilisateur interactives complètes** : tableaux de bord, graphiques, formulaires. Ces composants HTML sont rendus dans des **iframes isolés (sandboxed)** directement dans l'interface de chat de l'hôte (comme Claude Desktop), unifiant l'expérience sans quitter la conversation.
+
+## Élicitation : le serveur peut demander à l'utilisateur
+
+L'**élicitation** permet à un serveur de **suspendre son exécution** pour solliciter une intervention de l'utilisateur :
+
+- **Mode URL** : pour les interactions à sécurité critique (flux OAuth, configuration de paiement), le serveur redirige l'utilisateur vers une page web externe sécurisée, puis reprend la tâche.
+- **Mode formulaire** : le serveur présente une interface structurée pour lever une ambiguïté quand la requête initiale du modèle est incomplète.
+
+Depuis la spécification **2026-07-28** (release candidate), l'élicitation évolue : au lieu de maintenir un flux SSE ouvert, le serveur renvoie un `InputRequiredResult` avec les demandes d'entrée et un état de requête (SEP-2322, *Multi Round-Trip Requests*).
+
+## Sampling : le serveur peut demander au modèle de raisonner
+
+Le **sampling** inverse la relation habituelle : un serveur MCP peut demander des **complétions intermédiaires au modèle** pendant l'exécution d'une tâche. Plutôt que le modèle décide seul de tout, le serveur peut lui demander de raisonner sur un état de données précis, de valider des hypothèses, ou de générer du contenu avant de poursuivre un processus multi-étapes.
+
+Combinés, sampling + élicitation transforment le serveur en **participant actif** de la boucle agentique, et non plus en simple fournisseur passif de données.
+
+## Transports : le passage à Streamable HTTP
+
+L'évolution des couches de transport suit les besoins de déploiement :
+
+| Transport | Latence typique | Usage principal | Authentification |
+|---|---|---|---|
+| `stdio` | < 10 ms | Développement local, sur la machine de l'utilisateur | Jeton via variable d'env |
+| SSE *(historique)* | 100–500 ms | Serveur distant partagé | En-tête HTTP Bearer |
+| **Streamable HTTP** | 80–400 ms | Production, API cloud à grande échelle | OAuth 2.1, clé API |
+
+Depuis la spec de 2025-06-18, le **Streamable HTTP** est le transport de production : un point de terminaison HTTP unique avec streaming bidirectionnel, plus résilient aux déconnexions que SSE.
+
+Nouveauté majeure de la RC **2026-07-28** : le protocole devient **sans état (stateless)** au niveau transport. Avant, un client établissait une session, le serveur renvoyait un `Mcp-Session-Id`, et le client le transportait dans les requêtes suivantes — imposant des sessions persistantes (*sticky sessions*), des stores partagés et une gestion fine des gateways. Le passage au sans-état **simplifie drastiquement le scale-out** des serveurs MCP en production.
+
+## Sécurité : permissions granulaires
+
+Côté hôte, [Claude Code](/wiki/mcp/securite-mcp) applique un système à trois niveaux :
+
+1. **Autorisation systématique** (défaut) : confirmation demandée avant chaque exécution d'outil.
+2. **Autorisation de session** : valable pour la durée d'utilisation en cours.
+3. **Autorisation permanente** : liste blanche pour les outils de confiance absolue.
+
+La feuille de route du groupe de travail se concentre sur la migration de session lors du scale-out et sur des **pistes d'audit structurées** pour les environnements SIEM d'entreprise.
+
+## À retenir
+
+- MCP n'est plus « un connecteur de données » : avec Apps, sampling et élicitation, c'est un **framework d'interaction agentique** complet.
+- Pour la **production**, vise le **Streamable HTTP** (et bientôt le mode sans état) plutôt que SSE.
+- Le don à l'AAIF sécurise la **pérennité** du standard — un bon signal pour investir dans des serveurs MCP maison.
+
+## Sources
+
+- [MCP Is Growing Up — Agentic AI Foundation](https://aaif.io/blog/mcp-is-growing-up/)
+- [The 2026-07-28 MCP Specification Release Candidate — MCP Blog](https://blog.modelcontextprotocol.io/posts/2026-07-28-release-candidate/)
+- [Everything your team needs to know about MCP in 2026 — WorkOS](https://workos.com/blog/everything-your-team-needs-to-know-about-mcp-in-2026)
+- [Roadmap — Model Context Protocol](https://modelcontextprotocol.io/development/roadmap)
+
+---
+
+*Cet article fait partie du wiki Claude Mastery. Non affilié à Anthropic. Claude™ est une marque d'Anthropic, PBC.*

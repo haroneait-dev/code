@@ -1,0 +1,88 @@
+---
+title: "Raisonnement adaptatif & paramètre effort"
+description: "La fin de budget_tokens : comment fonctionne le thinking adaptatif, les 5 niveaux d'effort (low → max, dont xhigh), et le guide de migration API."
+updatedAt: "2026-07-08"
+readingMinutes: 8
+---
+
+Depuis Sonnet 3.7 (février 2025), on contrôlait la réflexion de Claude avec l'**extended thinking manuel** : `thinking: {type: "enabled", budget_tokens: N}`. Ce paradigme est mort. Sur les modèles 2026 — Opus 4.7, Opus 4.8 et [Sonnet 5](/wiki/modeles/sonnet-5) — il renvoie une **erreur API 400**. Voici ce qui le remplace.
+
+## Le raisonnement adaptatif (adaptive thinking)
+
+Avec `thinking: {type: "adaptive"}`, c'est **le modèle** qui évalue la complexité du problème et décide combien de calcul interne allouer : quasiment rien pour une reformulation, beaucoup pour un refactor multi-fichiers ou une question de recherche. Sur Sonnet 5, ce mode est **activé par défaut** — une requête sans champ `thinking` tourne en adaptatif.
+
+Le raisonnement adaptatif active automatiquement la **pensée imbriquée** (*interleaved thinking*) : le modèle peut réfléchir → appeler un outil (requête SQL, lecture de fichier) → analyser le résultat → reprendre sa réflexion → continuer. C'est le fondement structurel des workflows agentiques fiables : sans ça, le modèle devait décider de tout son plan avant le premier appel d'outil.
+
+```python
+# L'API moderne (Opus 4.7+, Sonnet 5)
+response = client.messages.create(
+    model="claude-sonnet-5",
+    max_tokens=16000,
+    thinking={"type": "adaptive"},   # défaut sur Sonnet 5
+    output_config={"effort": "high"},
+    messages=[...],
+)
+```
+
+> ⚠️ `max_tokens` couvre la sortie **totale** : tokens de réflexion + réponse. Dimensionne large pour les tâches complexes.
+
+## Le paramètre effort : 5 niveaux
+
+`effort` est un **signal comportemental, pas un budget strict de tokens**. Il indique au modèle combien investir — en réflexion, mais aussi en profondeur d'exploration et en usage d'outils.
+
+| Niveau | Usage recommandé |
+|---|---|
+| `low` | Tâches triviales, classification, extraction simple — latence minimale |
+| `medium` | Tâches courantes bien cadrées |
+| `high` | **Défaut** (équivaut à omettre le paramètre) — réflexion quasi systématique avant réponse |
+| `xhigh` | Les tâches de code et d'agentique les plus dures — sessions longues (30 min+), millions de tokens |
+| `max` | Effort maximal, sans considération de coût ni de latence |
+
+Le niveau `xhigh`, introduit avec Opus 4.7, a été calibré spécifiquement pour le codage agentique de longue durée : c'est le niveau qu'utilise Claude Code pour les gros chantiers.
+
+## Les task budgets (bêta)
+
+Complément de l'effort : les **budgets de tâches** permettent d'allouer une enveloppe de tokens à une mission. Le modèle « voit » un compte à rebours et priorise son travail pour terminer proprement avant épuisement — plutôt que d'être coupé net en plein milieu. Introduits en bêta avec Opus 4.7, ils sont utiles pour borner les coûts d'agents autonomes.
+
+## Guide de migration
+
+### Depuis budget_tokens
+
+```python
+# ❌ Avant (400 sur Opus 4.7+, Sonnet 5)
+thinking = {"type": "enabled", "budget_tokens": 32000}
+
+# ✅ Après
+thinking = {"type": "adaptive"}
+# + output_config={"effort": "xhigh"} si la tâche est vraiment dure
+```
+
+Sur Opus 4.6 et Sonnet 4.6, `budget_tokens` est encore **accepté mais déprécié** — migre dès maintenant, il sera retiré des prochains modèles.
+
+### Correspondance approximative
+
+- Petit `budget_tokens` (≤ 4k) → `effort: "low"` ou `"medium"`
+- Budget moyen (8k–32k) → `effort: "high"` (ou juste le défaut)
+- Gros budget (> 32k) → `effort: "xhigh"` ou `"max"`
+
+### À vérifier aussi en migrant
+
+- Les paramètres `temperature`, `top_p`, `top_k` non-défaut renvoient une 400 sur Opus 4.7+ et Sonnet 5.
+- Le prefilling du message assistant n'est plus supporté sur les Sonnet récents — utilise les structured outputs.
+- Sur Sonnet 5, recompte tes tokens : [nouveau tokenizer +30 %](/wiki/modeles/sonnet-5).
+
+## Bonnes pratiques
+
+1. **Commence par le défaut** (`high`, adaptatif) et n'ajuste que si mesuré : monter l'effort coûte cher, le baisser dégrade parfois silencieusement.
+2. **Ne force plus la réflexion par le prompt** (« réfléchis étape par étape pendant au moins 2000 mots ») : les modèles adaptatifs gèrent ça mieux seuls, et le sur-prompting déclenche du sur-raisonnement. Voir [Prompter les modèles 2026](/wiki/prompt-engineering/prompting-sonnet-5).
+3. **Trace le champ `usage`** de chaque réponse pour surveiller la part de tokens de réflexion dans ta facture.
+
+## Sources
+
+- [Effort — Claude Platform Docs](https://platform.claude.com/docs/en/build-with-claude/effort)
+- [Extended thinking — Claude Platform Docs](https://platform.claude.com/docs/en/build-with-claude/extended-thinking)
+- [Adaptive thinking — Amazon Bedrock](https://docs.aws.amazon.com/bedrock/latest/userguide/claude-messages-adaptive-thinking.html)
+
+---
+
+*Cet article fait partie du wiki Claude Mastery. Non affilié à Anthropic. Claude™ est une marque d'Anthropic, PBC.*

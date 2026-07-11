@@ -1,0 +1,68 @@
+---
+title: "Dynamic workflows & agents en arrière-plan"
+description: "Les mises à jour Claude Code de juillet 2026 : workflows dynamiques à sous-agents parallèles, agents en arrière-plan qui commit/push/PR seuls, résilience réseau et notifications."
+updatedAt: "2026-07-08"
+readingMinutes: 7
+---
+
+Les versions de Claude Code de juillet 2026 (série 2.1.x) consolident l'expérience agentique : l'agent reste actif plus longtemps, touche davantage du cycle de vie logiciel, et interrompt moins souvent le développeur. Voici les évolutions à connaître.
+
+## Dynamic workflows
+
+Les **workflows dynamiques** permettent à Claude de prendre en charge un problème à l'échelle d'une **base de code entière** :
+
+1. L'agent **planifie** le travail.
+2. Il exécute **des centaines de sous-agents en parallèle** dans une seule session.
+3. Il **vérifie ses résultats** de façon autonome contre la suite de tests existante.
+4. Il **rapporte** à l'utilisateur.
+
+C'est ce qui rend possibles des migrations de centaines de milliers de lignes sans supervision humaine continue. Un réglage **« Dynamic workflow size »** a été ajouté dans `/config` pour indiquer la taille que Claude donne généralement à ses workflows (nombre d'agents : small / medium / large). C'est une **directive indicative**, pas un plafond strict.
+
+Côté observabilité, les agents issus d'un workflow émettent désormais les attributs OpenTelemetry `workflow.run_id` et `workflow.name` : on peut reconstruire l'activité d'un run complet depuis les données OTel.
+
+## Agents en arrière-plan par défaut
+
+Les **sous-agents tournent désormais en arrière-plan par défaut** : Claude continue de travailler pendant leur exécution et est notifié à leur fin (auparavant en déploiement progressif).
+
+Surtout, les agents lancés depuis `claude agents` **ne s'arrêtent plus pour demander des instructions** une fois leur tâche de code terminée dans un worktree isolé. Ils enchaînent automatiquement :
+
+- **commit** → **push** → ouverture d'une **pull request (en draft)**.
+
+L'agent va donc jusqu'au bout du cycle sans intervention, dans un espace de travail Git isolé.
+
+## Notifications en arrière-plan
+
+Pour ne pas bloquer l'attention du développeur, deux événements de hook `Notification` ont été ajoutés :
+
+- `agent_needs_input` — une session attend une décision humaine.
+- `agent_completed` — une session a terminé son exécution.
+
+Tu peux les brancher sur une notification système, un message Slack, etc. Voir [les hooks de notification](/wiki/hooks/notification).
+
+## Résilience réseau et télémétrie
+
+Les workflows longs deviennent plus robustes :
+
+- Une **brève coupure réseau** en plein milieu d'une réponse **n'avorte plus** le cycle de travail.
+- Les erreurs transitoires (ex. `ECONNRESET`) déclenchent un **retry avec backoff exponentiel**.
+- Le watchdog de relance porte le nombre de tentatives par défaut à **300** pour les erreurs transitoires non liées à la capacité.
+
+## Compétence /dataviz
+
+La compétence **`/dataviz`** fournit des conseils architecturaux sur la conception de tableaux de bord interactifs et inclut un **validateur de palette de couleurs exécutable** — utile pour produire des visualisations cohérentes (light/dark, accessibles) plutôt que du texte brut.
+
+## Comment en profiter
+
+1. **Lance les gros chantiers en dynamic workflow** : décris l'objectif de haut niveau et laisse l'agent planifier/paralléliser/vérifier. Une **suite de tests solide** est ton garde-fou : c'est elle que l'agent utilise pour s'auto-vérifier.
+2. **Utilise les agents en arrière-plan** pour les tâches longues, et branche `agent_needs_input`/`agent_completed` sur tes notifications pour être rappelé au bon moment.
+3. **Attends-toi à des PR en draft** ouvertes automatiquement : adapte ta politique de revue en conséquence.
+
+## Sources
+
+- [Claude Code changelog — Claude Code Docs](https://code.claude.com/docs/en/changelog)
+- [Claude Code Updates by Anthropic — July 2026, Releasebot](https://releasebot.io/updates/anthropic/claude-code)
+- [Claude Code Dynamic Workflows: The Complete Guide — Developers Digest](https://www.developersdigest.tech/blog/claude-code-dynamic-workflows-guide)
+
+---
+
+*Cet article fait partie du wiki Claude Mastery. Non affilié à Anthropic. Claude™ est une marque d'Anthropic, PBC.*

@@ -1,6 +1,6 @@
 import type { MetadataRoute } from "next";
 import { curriculum } from "@/lib/curriculum";
-import { CATEGORIES } from "@/lib/wiki-manifest";
+import { CATEGORIES, ARTICLE_STUBS } from "@/lib/wiki-manifest";
 
 const siteUrl =
   process.env.NEXT_PUBLIC_SITE_URL ?? "https://claude-code-harone1.vercel.app";
@@ -12,6 +12,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { url: `${siteUrl}/`, lastModified: now, priority: 1.0 },
     { url: `${siteUrl}/learn`, lastModified: now, priority: 0.9 },
     { url: `${siteUrl}/wiki`, lastModified: now, priority: 0.8 },
+    { url: `${siteUrl}/fiches`, lastModified: now, priority: 0.8 },
     { url: `${siteUrl}/communaute`, lastModified: now, priority: 0.7 },
     { url: `${siteUrl}/experience`, lastModified: now, priority: 0.5 },
   ];
@@ -30,5 +31,11 @@ export default function sitemap(): MetadataRoute.Sitemap {
     priority: 0.6,
   }));
 
-  return [...staticPages, ...lessonPages, ...wikiPages];
+  const wikiArticles: MetadataRoute.Sitemap = ARTICLE_STUBS.map((a) => ({
+    url: `${siteUrl}/wiki/${a.category}/${a.slug}`,
+    lastModified: now,
+    priority: 0.6,
+  }));
+
+  return [...staticPages, ...lessonPages, ...wikiPages, ...wikiArticles];
 }

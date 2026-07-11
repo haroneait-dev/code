@@ -1,0 +1,59 @@
+---
+title: "Claude Code × Vercel : plugin, AI SDK & Gateway"
+description: "Le plugin Vercel pour agents de codage (47+ skills, validation PostToolUse), l'AI SDK 7 avec HarnessAgent en sandbox, et le routage via AI Gateway."
+updatedAt: "2026-07-08"
+readingMinutes: 8
+---
+
+Pour une plateforme hébergée sur Vercel (comme ce site), la synergie avec Claude Code est directe : l'agent génère nativement des structures Next.js (App Router, route handlers, middleware) que Vercel construit sans configuration additionnelle. En 2026, trois briques renforcent cette intégration.
+
+## Le déploiement continu piloté par Claude Code
+
+Le flux automatisé repose sur quatre prérequis : un dépôt Git local, un `package.json` avec les scripts de build, un `.gitignore` robuste (exclure `node_modules` et les `.env` locaux), et un compte Vercel connecté à GitHub.
+
+Claude Code orchestre le reste via des invites simples : il enchaîne `git init`, `git commit`, `gh repo create` pour initialiser un dépôt et pousser le code. Une fois le repo importé dans Vercel, **chaque push sur une branche de feature génère une URL de prévisualisation unique** — parfait pour des tests de bout en bout. Claude Code aide aussi à cartographier les **variables d'environnement** : un tableau listant chaque variable, son rôle, et si elle doit être exposée côté client (préfixe `NEXT_PUBLIC_`) ou rester serveur.
+
+## Le plugin Vercel pour agents de codage (mars 2026)
+
+Vercel a publié un **plugin officiel** compatible Claude Code (et Cursor) qui injecte un **graphe de connaissances relationnel** de la plateforme directement dans le contexte de l'agent. Il apporte :
+
+- **Plus de 47 compétences spécialisées** couvrant l'écosystème Vercel (Next.js, AI SDK, Turborepo, Vercel Functions…).
+- **Trois experts virtuels** : *AI Architect*, *Deployment Expert*, *Performance Optimizer*.
+- Des **commandes directes** comme `/bootstrap` ou `/deploy`.
+- Un **moteur de validation « PostToolUse »** : il vérifie en temps réel le code généré pour s'assurer que l'agent n'utilise **pas de modèles obsolètes, de paquets dépréciés ou d'API périmées**. C'est ce qui garantit du code conforme aux standards de production actuels (ex. éviter les vieux patterns Edge au profit de Fluid Compute).
+
+> Ce plugin est déjà actif dans cet environnement : c'est lui qui fournit les skills `vercel:*` et les corrections de connaissances Vercel injectées en début de session.
+
+## AI SDK 7 & HarnessAgent
+
+Pour construire **ta propre plateforme d'agents**, Vercel a introduit l'**AI SDK 7** avec l'abstraction **HarnessAgent**. Elle permet d'exécuter des harnais d'agents établis — y compris Claude Code — dans des **sandboxes hautement sécurisées**. Le SDK normalise l'accès aux compétences, aux flux de permissions et à la compaction de contexte.
+
+Concrètement, on instancie un agent en liant le harnais `claudeCode` à un `createVercelSandbox()`, exécutant les tâches dans un environnement isolé (runtime `node24`) — ce qui protège le serveur hôte de toute exécution de code potentiellement malveillante générée par l'IA. C'est le pattern recommandé pour faire tourner du code généré par agent sans exposer ton infrastructure.
+
+## Routage via Vercel AI Gateway
+
+L'infrastructure se sécurise et se monitore via le **Vercel AI Gateway**, qui expose des points de terminaison compatibles Anthropic. En configurant les variables d'environnement de Claude Code :
+
+```bash
+export ANTHROPIC_BASE_URL="https://<ton-gateway>.vercel.app/anthropic"
+export ANTHROPIC_CUSTOM_HEADERS="..."
+```
+
+…tout le trafic de l'agent passe par la passerelle Vercel. Bénéfices : **observabilité fine**, gestion des **limites de taux**, et **clés API centralisées** — même en utilisant un abonnement personnel Claude Max. Pour l'AI SDK, la recommandation par défaut est d'utiliser des chaînes `"provider/model"` (ex. `anthropic/claude-sonnet-5`) via le gateway, plutôt que d'ancrer un package provider-spécifique.
+
+## À retenir pour ce site
+
+1. **Le plugin fait déjà le gros du travail** : profite des skills `vercel:*` et de la validation PostToolUse pour rester à jour (Next.js 16, Fluid Compute, AI SDK v6/7).
+2. **Preview URLs = ton filet de sécurité** : chaque branche de feature se teste en isolation avant merge sur `main`.
+3. **Si tu ajoutes des features IA** (assistant, génération de contenu), route via l'AI Gateway pour l'observabilité et le contrôle des coûts — cohérent avec la roadmap de monétisation.
+
+## Sources
+
+- [Introducing the Vercel plugin for coding agents — Vercel](https://vercel.com/blog/introducing-the-vercel-plugin-for-coding-agents)
+- [Program Claude Code and other agent harnesses with AI SDK — Vercel](https://vercel.com/blog/program-claude-code-codex-and-other-agent-harnesses-with-ai-sdk)
+- [Claude Code and Claude Agent SDK — AI Gateway, Vercel](https://vercel.com/docs/ai-gateway/claude-code)
+- [Déployer un site sur Vercel avec Claude : guide complet — Ottho](https://ottho.co/blog/deployer-site-vercel-claude)
+
+---
+
+*Cet article fait partie du wiki Claude Mastery. Non affilié à Anthropic. Claude™ est une marque d'Anthropic, PBC.*

@@ -1,0 +1,45 @@
+---
+title: "L'auto-amélioration récursive de Claude"
+description: "Comment Claude écrit désormais l'essentiel du code d'Anthropic, et l'expérience d'optimisation où un modèle est passé de 3× à 52× d'accélération en moins d'un an."
+updatedAt: "2026-07-08"
+readingMinutes: 6
+---
+
+L'accélération des capacités de Claude ne tient pas qu'au volume de données ou à la puissance de calcul brute. Elle tient aussi à une **boucle de rétroaction** : Claude participe de plus en plus à l'ingénierie de la génération suivante de Claude. Anthropic a documenté ce phénomène dans *When AI builds itself*.
+
+## Claude écrit le code de Claude
+
+La contribution de Claude à sa propre base de code est passée de marginale à fondamentale en une année :
+
+- **Avant l'aperçu de recherche de Claude Code (2025)** : quelques pourcents du code seulement.
+- **Mai 2026** : **plus de 80 %** du code fusionné quotidiennement dans la base de code d'Anthropic est écrit ou généré de façon autonome par Claude.
+
+Les ingénieurs d'Anthropic rapportent que la **qualité** du code généré a atteint la **parité** avec celle d'un ingénieur senior humain début 2026, avec l'anticipation qu'elle devienne supérieure avant la fin de l'année.
+
+> Nuance importante : « 80 % du code généré » ne veut pas dire « 80 % du travail d'ingénierie ». La conception d'architecture, la revue, la décision et la responsabilité restent humaines. L'humain oriente et valide ; la machine exécute une part croissante de la frappe.
+
+## L'expérience d'optimisation : de 3× à 52×
+
+L'illustration la plus frappante concerne la capacité de Claude à mener des expériences de recherche itératives. Le test standard d'Anthropic : on donne à l'agent le code source qui entraîne un petit modèle, avec pour consigne de **l'optimiser pour qu'il s'exécute le plus vite possible**, tout en passant strictement les **mêmes contrôles d'exactitude mathématique**.
+
+| Date | Modèle | Accélération obtenue |
+|---|---|---|
+| Mai 2025 | Claude Opus 4 | ~3× |
+| Avril 2026 | Claude Mythos Preview | **52×** |
+
+Pour calibrer : un chercheur humain hautement qualifié met généralement **4 à 8 heures** de travail ininterrompu pour atteindre ~4× sur la même base. Dans ce domaine circonscrit — l'optimisation d'étapes au sein d'une expérience clairement définie — les capacités de Claude sont passées d'« outil très utile » à une **performance surhumaine** en moins de douze mois.
+
+## Ce qu'il faut en retenir (et relativiser)
+
+1. **Le périmètre compte.** Les 52× concernent une tâche d'optimisation **bien définie et mesurable**, pas la recherche ouverte. Là où le succès se vérifie automatiquement (tests, benchmarks de vitesse), l'IA excelle et itère vite.
+2. **La boucle se referme.** Plus Claude aide à construire Claude, plus le cycle de développement raccourcit. C'est le cœur du débat sur l'« auto-amélioration récursive » — à suivre avec un œil critique, car ces chiffres viennent d'évaluations internes.
+3. **Pour toi, praticien :** le message opérationnel est que déléguer les tâches d'optimisation *vérifiables* à un agent (avec une suite de tests solide comme garde-fou) est désormais un pattern gagnant. Le garde-fou — les tests d'exactitude — est ce qui rend l'accélération sûre.
+
+## Sources
+
+- [When AI builds itself — Anthropic](https://www.anthropic.com/news/when-ai-builds-itself)
+- [Engineering — Anthropic](https://www.anthropic.com/engineering)
+
+---
+
+*Cet article fait partie du wiki Claude Mastery. Non affilié à Anthropic. Claude™ est une marque d'Anthropic, PBC.*

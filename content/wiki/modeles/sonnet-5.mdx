@@ -1,0 +1,87 @@
+---
+title: "Claude Sonnet 5 — l'agentique à grande échelle"
+description: "Le Sonnet le plus agentique jamais publié : contexte 1M par défaut, raisonnement adaptatif, nouveau tokenizer, breaking changes API et guide de migration."
+updatedAt: "2026-07-08"
+readingMinutes: 9
+---
+
+Lancé le **30 juin 2026**, Claude Sonnet 5 (`claude-sonnet-5`) ouvre la cinquième génération de modèles Anthropic. Son positionnement est clair : offrir un niveau de performance proche d'Opus 4.8 sur les tâches agentiques — planification, navigation, terminal, refactors multi-fichiers — au prix d'un Sonnet.
+
+## Ce qui change vraiment
+
+### Un modèle pensé pour les agents
+
+Sonnet 5 est présenté par Anthropic comme « le Sonnet le plus agentique à ce jour ». Il planifie, utilise des outils (navigateurs, terminaux), et tourne en autonomie à un niveau qui, quelques mois plus tôt, exigeait des modèles de classe Opus. Les gains les plus nets par rapport à Sonnet 4.6 concernent le **code** et les **tâches agentiques** : raisonnement, tool use, travail de connaissance.
+
+### Contexte 1M par défaut
+
+La fenêtre de contexte est de **1 million de tokens par défaut** — c'est à la fois le défaut et le maximum, il n'existe pas de variante réduite. La sortie maximale est de **128 000 tokens**. De quoi charger une base de code entière ou un corpus documentaire complet dans une seule requête.
+
+### Raisonnement adaptatif activé par défaut
+
+Sur Sonnet 4.6, une requête sans champ `thinking` s'exécutait **sans** réflexion. Sur Sonnet 5, la même requête s'exécute **avec** le [raisonnement adaptatif](/wiki/modeles/adaptive-thinking-effort) : le modèle dose lui-même son effort interne — léger pour une reformulation rapide, lourd pour un refactor multi-fichiers. Pour désactiver : `thinking: {type: "disabled"}`.
+
+> ⚠️ `max_tokens` plafonne la sortie **totale** (thinking + réponse). Si ton workload tournait sans thinking sur Sonnet 4.6, revois tes limites.
+
+## Les trois breaking changes
+
+Sonnet 5 est un remplacement direct de Sonnet 4.6 (`claude-sonnet-4-6` → `claude-sonnet-5`), avec trois changements de comportement :
+
+1. **Raisonnement adaptatif par défaut** (voir ci-dessus).
+2. **L'extended thinking manuel est supprimé.** `thinking: {type: "enabled", budget_tokens: N}` — déprécié sur Sonnet 4.6 — renvoie désormais une **erreur 400**, comme sur Opus 4.7 et 4.8. Migre vers `thinking: {type: "adaptive"}` + le paramètre `effort`.
+3. **Les paramètres de sampling sont rejetés.** `temperature`, `top_p` ou `top_k` à une valeur non-défaut renvoient une **erreur 400**. Guide le comportement via le system prompt à la place. (Contrainte déjà introduite sur Opus 4.7.)
+
+À noter aussi, hérité de Sonnet 4.6 : le **prefilling du message assistant n'est pas supporté** (erreur 400). Utilise les structured outputs ou `output_config.format` pour forcer un format.
+
+```python
+# ❌ Ne fonctionne plus sur Sonnet 5 (400)
+thinking = {"type": "enabled", "budget_tokens": 32000}
+
+# ✅ À utiliser à la place
+thinking = {"type": "adaptive"}
+```
+
+## Le nouveau tokenizer : +30 % de tokens
+
+Sonnet 5 embarque un **nouveau tokenizer** : le même texte produit environ **30 % de tokens en plus** que sur Sonnet 4.6. Ce n'est pas un changement d'API (mêmes formats de requête/réponse), mais tout ce que tu mesures ou budgètes en tokens est affecté :
+
+- **Comptes de tokens** : ne réutilise pas des comptes mesurés sur les anciens modèles — recompte avec l'endpoint de token counting.
+- **Capacité réelle du contexte** : 1M de tokens, mais chaque token couvre moins de texte en moyenne.
+- **Budgets `max_tokens`** : une limite calibrée pour Sonnet 4.6 peut tronquer une sortie équivalente.
+- **Coût par requête** : le prix au token est inchangé, mais une requête équivalente coûte mécaniquement plus cher.
+
+## Tarification
+
+| Période | Input / 1M tokens | Output / 1M tokens |
+|---|---|---|
+| Tarif de lancement (jusqu'au 31 août 2026) | 2 $ | 10 $ |
+| Tarif standard (à partir du 1er septembre 2026) | 3 $ | 15 $ |
+
+Le tarif standard est identique à Sonnet 4.6 — mais garde en tête l'effet tokenizer sur la facture réelle. Le Batch API et le prompt caching s'appliquent normalement. Le **Priority Tier n'est pas disponible** sur Sonnet 5.
+
+## Garde-fous cybersécurité
+
+Sonnet 5 est le **premier modèle de classe Sonnet doté de garde-fous cybersécurité temps réel**. Les requêtes touchant à des sujets cyber interdits ou à haut risque peuvent être refusées — la réponse revient en HTTP 200 avec `stop_reason: "refusal"`, pas en erreur. À gérer explicitement dans ton code de production.
+
+## Disponibilité
+
+Dès le lancement : API Claude, Amazon Bedrock (hors API legacy `InvokeModel`/`Converse`), Google Cloud Vertex AI, Microsoft Foundry. Le zero data retention (ZDR) est supporté pour les organisations sous accord.
+
+## Checklist de migration depuis Sonnet 4.6
+
+1. Remplacer l'ID modèle : `claude-sonnet-4-6` → `claude-sonnet-5`.
+2. Recompter les prompts (tokenizer +30 %) et revoir les `max_tokens` serrés.
+3. Supprimer `budget_tokens` → passer à `thinking: {type: "adaptive"}`.
+4. Supprimer `temperature` / `top_p` / `top_k` non-défaut.
+5. Gérer `stop_reason: "refusal"` dans le code.
+
+## Sources
+
+- [Introducing Claude Sonnet 5 — Anthropic](https://www.anthropic.com/news/claude-sonnet-5)
+- [What's new in Claude Sonnet 5 — Claude Platform Docs](https://platform.claude.com/docs/en/about-claude/models/whats-new-sonnet-5)
+- [Anthropic launches Claude Sonnet 5 as a cheaper way to run agents — TechCrunch](https://techcrunch.com/2026/06/30/anthropic-launches-claude-sonnet-5-as-a-cheaper-way-to-run-agents/)
+- [What's new in Claude Sonnet 5 — Simon Willison](https://simonwillison.net/2026/Jun/30/claude-sonnet-5/)
+
+---
+
+*Cet article fait partie du wiki Claude Mastery. Non affilié à Anthropic. Claude™ est une marque d'Anthropic, PBC.*

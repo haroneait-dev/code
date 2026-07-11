@@ -1,0 +1,55 @@
+---
+title: "Claude Science — l'atelier IA pour chercheurs"
+description: "Le workbench scientifique d'Anthropic : 60+ compétences en génomique et chémoinformatique, intégration BioNeMo de NVIDIA, calcul distribué via Modal, artefacts reproductibles."
+updatedAt: "2026-07-08"
+readingMinutes: 6
+---
+
+Lancé le **30 juin 2026** (en bêta), **Claude Science** est un atelier IA (*AI workbench*) autonome conçu pour la rigueur scientifique — en particulier les sciences de la vie et la découverte de médicaments. C'est une application locale (**macOS et Linux**) pour les plans Pro, Max, Team et Enterprise.
+
+## Le problème résolu
+
+Les chercheurs en biologie computationnelle jonglent entre des dizaines de bases (PubMed, UniProt, PDB, Ensembl, Reactome, ClinVar, ChEMBL, GEO), chacune avec son schéma et son langage de requête, tout en gérant à la main des clusters de calcul (HPC) et des environnements R/Python. Claude Science unifie cet écosystème derrière un **agent coordinateur** doté d'un accès direct à **plus de 60 compétences préconfigurées** couvrant génomique, biologie structurale, protéomique et chémoinformatique.
+
+## Intégration NVIDIA BioNeMo
+
+Claude Science utilise les compétences du **NVIDIA BioNeMo Agent Toolkit** pour se connecter nativement aux modèles et bibliothèques biomédicaux de BioNeMo, dont **Evo 2**, **Boltz-2** et **OpenFold3**. Le chercheur accède ainsi à des modèles biomédicaux de pointe sans quitter l'atelier.
+
+## Reproductibilité par conception
+
+La science exige la reproductibilité. Quand l'agent génère un artefact complexe — structure protéique 3D, piste de navigateur génomique, structure chimique — il fournit **simultanément** :
+
+- le **code exact** qui a produit le résultat,
+- l'**environnement d'exécution** correspondant,
+- une **description en langage clair** de la méthodologie.
+
+Le chercheur interagit visuellement avec ces figures et demande des modifications en langage naturel (« passe l'axe en échelle log », « retire la grille ») : l'agent modifie alors **son propre code** pour mettre à jour la figure.
+
+## Calcul distribué via Modal (fan-out)
+
+Le goulot d'étranglement de la recherche biomédicale, c'est l'infrastructure de calcul : repliement de protéines, criblage virtuel de millions de composés… Claude Science le résout via une intégration profonde avec **Modal** (cloud serverless) — ou ton propre cluster HPC via SSH.
+
+Le flux type : le chercheur demande une analyse sur un gros jeu de données monocellulaire → Claude Science écrit le script Python → **demande l'approbation** du chercheur → orchestre le déploiement. La technique de **fan-out** distribue l'analyse sur des centaines de conteneurs GPU en parallèle. Les volumes de stockage partagés de Modal garantissent que les jeux de données massifs et les checkpoints ne transitent **qu'une fois**, éliminant la latence de mouvement de données entre étapes du pipeline. Ce qui prenait des heures d'exécution séquentielle + une expertise MLOps se fait en minutes, via conversation.
+
+## Programme de subventions
+
+Pour stimuler l'adoption, Anthropic et Modal financent des projets « AI for Science » :
+
+- Anthropic soutient jusqu'à **50 projets**, avec jusqu'à **30 000 $ de crédits** par projet.
+- Modal fournit jusqu'à **2 000 $ de calcul** pour des projets sélectionnés.
+- Candidatures ouvertes jusqu'au **15 juillet 2026**, notifications au 31 juillet, projets de septembre à décembre 2026.
+
+## Pourquoi ça compte
+
+Claude Science montre la spécialisation verticale de l'écosystème : au-delà du code générique, Anthropic package des **agents-métiers** (ici la R&D scientifique) qui combinent compétences spécialisées, artefacts inspectables et accès élastique au calcul. Le même schéma — coordinateur + compétences + compute à la demande — est transposable à d'autres domaines exigeants.
+
+## Sources
+
+- [Claude Science, an AI workbench for scientists — Anthropic](https://www.anthropic.com/news/claude-science-ai-workbench)
+- [NVIDIA BioNeMo Agent Toolkit in Claude Science — NVIDIA Blog](https://blogs.nvidia.com/blog/claude-science-bionemo-agent-toolkit/)
+- [Anthropic integration with Modal brings scalable compute to Claude Science — Modal](https://modal.com/blog/anthropic-claude-science)
+- [Anthropic Launches Claude Science AI Workbench — HPCwire/AIwire](https://www.hpcwire.com/aiwire/2026/06/30/anthropic-launches-claude-science-ai-workbench-for-scientific-research/)
+
+---
+
+*Cet article fait partie du wiki Claude Mastery. Non affilié à Anthropic. Claude™ est une marque d'Anthropic, PBC.*

@@ -4,11 +4,18 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Menu, X } from "lucide-react";
 
-type NavKey = "formation" | "wiki" | "communaute" | "messages" | null;
+type NavKey =
+  | "formation"
+  | "wiki"
+  | "fiches"
+  | "communaute"
+  | "messages"
+  | null;
 
 const LINKS: { key: Exclude<NavKey, null>; href: string; label: string }[] = [
   { key: "formation", href: "/learn", label: "Formation" },
   { key: "wiki", href: "/wiki", label: "Wiki" },
+  { key: "fiches", href: "/fiches", label: "Fiches" },
   { key: "communaute", href: "/communaute", label: "Communauté" },
   { key: "messages", href: "/messages", label: "Messages" },
 ];

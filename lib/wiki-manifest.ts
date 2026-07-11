@@ -170,6 +170,11 @@ export const ARTICLE_STUBS: ArticleStub[] = [
   { category: "demarrer", slug: "migration-openai", title: "Migrer de GPT-4o à Claude Sonnet", description: "Correspondance des concepts pour passer d'OpenAI à Anthropic." },
 
   // ═══ MODÈLES CLAUDE ══════════════════════════════════════════════
+  { category: "modeles", slug: "sonnet-5", title: "Claude Sonnet 5 — l'agentique à grande échelle", description: "Contexte 1M par défaut, raisonnement adaptatif, nouveau tokenizer (+30 %), breaking changes API et guide de migration." },
+  { category: "modeles", slug: "opus-4-8", title: "Claude Opus 4.8 — le modèle frontière au quotidien", description: "Fast mode 2,5× plus rapide et 3× moins cher, record sur le benchmark Legal Agent, corrections des défauts d'Opus 4.7." },
+  { category: "modeles", slug: "adaptive-thinking-effort", title: "Raisonnement adaptatif & paramètre effort", description: "La fin de budget_tokens : thinking adaptatif, les 5 niveaux d'effort (low → max, dont xhigh) et la migration API." },
+  { category: "modeles", slug: "fable-5-mythos-5", title: "Claude Fable 5 & Mythos 5 — les modèles frontière", description: "Fable 5 public, Mythos 5 réservé : lancement, suspension par contrôle des exportations, retour le 30 juin 2026." },
+  { category: "modeles", slug: "j-space-interpretabilite", title: "J-space : l'espace de travail interne de Claude", description: "La recherche de juillet 2026 sur le J-space et la J-lens, et ce que ça change pour la sécurité de l'IA." },
   { category: "modeles", slug: "opus-4-7", title: "Claude Opus 4.7 — haute réflexion", description: "Le modèle premium d'Anthropic : capacités, benchmarks, cas d'usage." },
   { category: "modeles", slug: "sonnet-4-6", title: "Claude Sonnet 4.6 — standard industrie pour le code", description: "Le workhorse pour le développement : équilibre vitesse/qualité." },
   { category: "modeles", slug: "haiku-4-5", title: "Claude Haiku 4.5 — vitesse et coût", description: "Le modèle rapide pour les tâches simples et le grand volume." },
@@ -202,6 +207,7 @@ export const ARTICLE_STUBS: ArticleStub[] = [
   { category: "cli", slug: "cicd-execution", title: "Mode non-interactif et CI/CD", description: "Automatiser des refactors via GitHub Actions, GitLab CI." },
   { category: "cli", slug: "multi-projet-context-switching", title: "Multi-projet et context switching", description: "Comment le CLI gère le passage entre repos Git." },
   { category: "cli", slug: "themes-accessibilite", title: "Thèmes et accessibilité", description: "Couleurs, contraste, mode compact, lecteurs d'écran." },
+  { category: "cli", slug: "dynamic-workflows-agents-arriere-plan", title: "Dynamic workflows & agents en arrière-plan", description: "Workflows dynamiques à sous-agents parallèles, agents qui commit/push/PR seuls, résilience réseau et notifications (juillet 2026)." },
 
   // ═══ OUTILS INTÉGRÉS ═════════════════════════════════════════════
   { category: "outils", slug: "read", title: "L'outil Read", description: "Lire des fichiers, images, PDF, notebooks — toutes les options." },
@@ -300,6 +306,7 @@ export const ARTICLE_STUBS: ArticleStub[] = [
   { category: "mcp", slug: "serveur-memory", title: "Le serveur MCP Memory (Knowledge Graph)", description: "Construire un graphe de connaissances persistant pour Claude." },
   { category: "mcp", slug: "serveur-puppeteer", title: "Le serveur MCP Puppeteer", description: "Automatisation web headless via Claude." },
   { category: "mcp", slug: "routing-aggregation", title: "Routing et agrégation de serveurs MCP", description: "Proxys MCP pour exposer plusieurs serveurs via un point d'entrée." },
+  { category: "mcp", slug: "evolution-2026-apps-elicitation", title: "MCP en 2026 : Apps, élicitation, sampling & Streamable HTTP", description: "Don à l'Agentic AI Foundation, MCP Apps (UI interactives), élicitation, sampling et transport sans état." },
 
   // ═══ PROMPT ENGINEERING ══════════════════════════════════════════
   { category: "prompt-engineering", slug: "anatomie-prompt", title: "Anatomie d'un prompt", description: "Les composants d'un prompt efficace." },
@@ -317,6 +324,7 @@ export const ARTICLE_STUBS: ArticleStub[] = [
   { category: "prompt-engineering", slug: "prefilling", title: "Prefilling (pré-remplissage de la réponse)", description: "Dicter les premiers mots de la réponse pour forcer un format." },
   { category: "prompt-engineering", slug: "meta-prompting", title: "Meta-Prompting avec Claude", description: "Utiliser Claude pour écrire de meilleurs prompts pour Claude." },
   { category: "prompt-engineering", slug: "lost-in-the-middle", title: "Lost in the Middle", description: "Structurer un document de 150K tokens pour éviter l'oubli central." },
+  { category: "prompt-engineering", slug: "prompting-sonnet-5", title: "Prompter les modèles 2026 (Opus 4.6+ / Sonnet 5)", description: "Fin du sur-prompting, positivité prescriptive, prompt matching, contrôle par effort et résolution des échecs." },
 
   // ═══ API ANTHROPIC ═══════════════════════════════════════════════
   { category: "api", slug: "premier-appel-api", title: "Premier appel API", description: "Hello world avec l'API Anthropic." },
@@ -375,6 +383,7 @@ export const ARTICLE_STUBS: ArticleStub[] = [
   { category: "enterprise", slug: "api-gateways", title: "Gestion des clés API et API Gateways", description: "Proxys (Kong, Cloudflare, LiteLLM) — rotation, cache, rate-limit." },
   { category: "enterprise", slug: "threat-modeling-agents", title: "Threat modeling pour agents autonomes", description: "Risques d'exécution autonome de code dans un réseau d'entreprise." },
   { category: "enterprise", slug: "clouds", title: "Claude sur Bedrock, Vertex & Foundry", description: "Déployer via Bedrock, Vertex AI et Foundry : prérequis, réglages gérés, IDs de modèles et limites." },
+  { category: "enterprise", slug: "vercel-plugin-ai-sdk", title: "Claude Code × Vercel : plugin, AI SDK & Gateway", description: "Le plugin Vercel pour agents (47+ skills, validation PostToolUse), l'AI SDK 7 avec HarnessAgent en sandbox, et le routage via AI Gateway." },
 
   // ═══ OBSIDIAN + CLAUDE ═══════════════════════════════════════════
   { category: "obsidian", slug: "guide-complet", title: "Obsidian + Claude : le guide complet", description: "Connecter ton vault Obsidian à Claude — approche directe (fichiers) et approche MCP, cas d'usage, sécurité." },
@@ -382,6 +391,10 @@ export const ARTICLE_STUBS: ArticleStub[] = [
 
   // ═══ ACTUALITÉS & RESSOURCES ═════════════════════════════════════
   { category: "actualites", slug: "nouveautes-2026", title: "Nouveautés Claude Code (2026)", description: "Opus 4.8 par défaut, computer use, auto mode, orchestration multi-agents, mémoire « dreaming », installeur natif." },
+  { category: "actualites", slug: "claude-tag-slack", title: "Claude Tag — l'IA ambiante dans Slack", description: "Le coéquipier IA persistant d'Anthropic et Salesforce : mémoire de canal, mode multi-joueurs et défis de gouvernance." },
+  { category: "actualites", slug: "claude-science", title: "Claude Science — l'atelier IA pour chercheurs", description: "60+ compétences en génomique/chémoinformatique, intégration BioNeMo de NVIDIA et calcul distribué via Modal." },
+  { category: "actualites", slug: "backdoor-chine-distillation", title: "Le « backdoor » chinois : traçage & distillation", description: "L'alerte NVDB de juillet 2026, la réalité du mécanisme anti-distillation, et le conflit Anthropic / Alibaba." },
+  { category: "actualites", slug: "auto-amelioration-recursive", title: "L'auto-amélioration récursive de Claude", description: "Claude écrit 80 % du code d'Anthropic, et l'expérience d'optimisation passée de 3× à 52× en moins d'un an." },
   { category: "actualites", slug: "sources-ressources", title: "Sources & ressources externes", description: "Liens officiels Anthropic, MCP, Obsidian, changelogs — la base de données externe du wiki." },
 ];
 

@@ -1,0 +1,58 @@
+---
+title: "Claude Tag — l'IA ambiante dans Slack"
+description: "Le coéquipier IA persistant d'Anthropic et Salesforce : mémoire de canal, mode multi-joueurs, comportement ambiant, et les défis de gouvernance/facturation."
+updatedAt: "2026-07-08"
+readingMinutes: 7
+---
+
+Fin juin 2026 (annonce du 23 juin), Anthropic et **Salesforce** ont lancé **Claude Tag**, une intégration Slack qui remplace l'ancienne app « Claude in Slack ». Le changement de paradigme est majeur : on passe d'un chatbot réactif à session isolée à un **coéquipier IA persistant, partagé et ambiant**.
+
+## Le modèle multi-joueurs
+
+Ancienne intégration : chaque interaction créait une session **privée** pour l'utilisateur. Claude Tag fonctionne à l'inverse. Quand tu l'invites dans un canal Slack, **un seul agent Claude est instancié pour ce canal**, avec une identité organisationnelle persistante.
+
+- N'importe quel membre peut taguer `@Claude` pour lui assigner une tâche.
+- Claude lit **le contexte de la conversation en cours** : il comprend les échanges précédents entre collègues.
+- Il publie ses résultats **dans les threads**, et chaque étape de son raisonnement est **visible par tout le canal**.
+- Conséquence directe : n'importe quel humain peut intervenir, corriger la trajectoire, ou **reprendre le travail** là où un collègue s'était arrêté. C'est la promesse « multi-joueurs » : les tâches semi-finies se passent de main en main.
+
+### Cloisonnement strict entre canaux
+
+Pour la confidentialité, Claude Tag **ne conserve aucune mémoire croisée entre canaux**. Ce qui est discuté dans le canal A n'est jamais rappelé dans le canal B. Cela évite les fuites accidentelles de données sensibles entre équipes.
+
+## Le mode ambiant
+
+L'aspect le plus disruptif. Activé, le mode **ambiant** fait que Claude n'attend plus d'être sollicité :
+
+- Il **surveille en autonomie** le flux du canal et les données des outils connectés (via [MCP](/wiki/mcp/introduction-mcp)).
+- S'il détecte une information critique pertinente, il **alerte l'équipe** de lui-même.
+- Il **relance les threads inactifs** restés sans résolution, assurant un suivi proactif des tâches asynchrones.
+
+Cette capacité à opérer sur des heures ou des jours permet de déléguer des tâches longues. En interne, Anthropic rapporte qu'environ **65 % du code de son équipe produit** passe désormais par des itérations avec Claude Tag — le temps se déplace de l'exécution unitaire vers l'**orchestration de plusieurs agents en parallèle**.
+
+## Disponibilité
+
+Claude Tag est en bêta pour les clients **Claude Enterprise et Team** utilisant Slack. Il remplace l'ancienne app « Claude in Slack », avec une période de migration de 30 jours pour les clients existants.
+
+## Les défis de gouvernance
+
+L'IA ambiante introduit de vrais risques opérationnels à anticiper :
+
+1. **Facturation au token, en continu.** Un agent laissé en mode ambiant dans un canal bavard, ou connecté à de grosses bases via MCP, ingère un flux permanent de contexte — et brûle vite les crédits. Configure des **limites de dépenses mensuelles** et des paquets d'accès aux outils **par canal**.
+2. **Absence d'approbation humaine obligatoire.** Des experts conformité soulignent que le mode ambiant, en l'état, ne comporte pas d'étape d'approbation humaine systématique avant d'exécuter une action dans un système externe. Pour les secteurs régulés (finance, santé), à encadrer prudemment.
+3. **Visibilité = surface d'exposition.** Tout le raisonnement est visible dans le canal : c'est excellent pour la collaboration, mais réfléchis à ce que tu connectes dans des canaux à large audience.
+
+## À retenir
+
+Claude Tag illustre la bascule vers l'**« IA ambiante »** en entreprise : moins de prompts explicites, plus de délégation asynchrone et de collaboration humain-agent dans le fil de travail existant. Le prix à payer : une discipline de gouvernance (budgets, permissions, points d'approbation) qui devient aussi importante que le prompt lui-même.
+
+## Sources
+
+- [Introducing Claude Tag — Anthropic](https://www.anthropic.com/news/claude-tag)
+- [Anthropic and Salesforce Announce New Claude to Slack Integration — Salesforce Ben](https://www.salesforceben.com/anthropic-and-salesforce-announce-new-claude-to-slack-integration/)
+- [Claude Tag is learning your company, one Slack message at a time — TechCrunch](https://techcrunch.com/2026/06/23/anthropics-claude-tag-is-learning-your-company-one-slack-message-at-a-time/)
+- [Anthropic releases Claude Tag, a virtual employee — Fortune](https://fortune.com/2026/06/23/anthropic-claude-tag-virtual-employee-tool-slack/)
+
+---
+
+*Cet article fait partie du wiki Claude Mastery. Non affilié à Anthropic. Claude™ est une marque d'Anthropic, PBC.*

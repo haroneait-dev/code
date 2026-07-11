@@ -5,7 +5,7 @@ import { MobileNav } from "@/components/site/MobileNav";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { SiteSearch } from "@/components/site/SiteSearch";
 
-type NavKey = "formation" | "wiki" | "communaute" | "messages" | null;
+type NavKey = "formation" | "wiki" | "fiches" | "communaute" | "messages" | null;
 
 export function SiteHeader({
   active = null,
@@ -36,6 +36,9 @@ export function SiteHeader({
             </Link>
             <Link href="/wiki" className={linkClass("wiki")}>
               Wiki
+            </Link>
+            <Link href="/fiches" className={linkClass("fiches")}>
+              Fiches
             </Link>
             <Link href="/communaute" className={linkClass("communaute")}>
               Communauté
