@@ -17,28 +17,28 @@ export function ArticleBody({ body }: { body: string }) {
           h2: (props) => (
             <h2
               {...props}
-              className="font-headline-lg text-[24px] font-semibold mt-12 mb-4 pb-2 border-b border-outline-variant text-on-surface scroll-mt-24"
+              className="font-headline-lg text-[26px] md:text-[29px] leading-[1.2] font-bold mt-16 mb-6 pb-3 border-b border-outline-variant text-on-surface scroll-mt-24"
             />
           ),
           h3: (props) => (
             <h3
               {...props}
-              className="font-headline-lg text-[20px] font-semibold mt-8 mb-3 text-on-surface scroll-mt-24"
+              className="font-headline-lg text-[21px] md:text-[22px] leading-[1.3] font-semibold mt-11 mb-4 text-on-surface scroll-mt-24"
             />
           ),
           p: (props) => (
             <p
               {...props}
-              className="font-body-rt text-body-rt text-on-surface leading-relaxed mb-4"
+              className="font-body-rt text-[17px] md:text-[18px] text-on-surface leading-[1.8] mb-6"
             />
           ),
           ul: (props) => (
-            <ul {...props} className="list-disc pl-6 mb-4 space-y-2 text-body-rt text-on-surface" />
+            <ul {...props} className="list-disc pl-6 mb-7 space-y-3 text-[17px] md:text-[18px] text-on-surface marker:text-outline" />
           ),
           ol: (props) => (
-            <ol {...props} className="list-decimal pl-6 mb-4 space-y-2 text-body-rt text-on-surface" />
+            <ol {...props} className="list-decimal pl-6 mb-7 space-y-3 text-[17px] md:text-[18px] text-on-surface marker:text-on-surface-variant" />
           ),
-          li: (props) => <li {...props} className="leading-relaxed" />,
+          li: (props) => <li {...props} className="leading-[1.75] pl-1" />,
           a: (props) => (
             <a
               {...props}
@@ -78,27 +78,27 @@ export function ArticleBody({ body }: { body: string }) {
           blockquote: (props) => (
             <blockquote
               {...props}
-              className="border-l-4 border-primary pl-4 py-2 my-4 italic text-on-surface-variant bg-primary-fixed/10 rounded-r"
+              className="border-l-[3px] border-primary-fixed-dim pl-5 pr-4 py-4 my-7 text-on-surface bg-surface-container-low rounded-r-md"
             />
           ),
           table: (props) => (
-            <div className="overflow-x-auto my-6 border border-outline-variant rounded-lg">
-              <table {...props} className="w-full text-sm" />
+            <div className="overflow-x-auto my-8 border border-outline-variant rounded-lg">
+              <table {...props} className="w-full text-[15px] leading-[1.6]" />
             </div>
           ),
           th: (props) => (
             <th
               {...props}
-              className="text-left px-3 py-2 border-b border-outline-variant bg-surface-container-low text-on-surface-variant font-semibold text-xs uppercase tracking-wider"
+              className="text-left align-bottom px-4 py-3 border-b border-outline-variant bg-surface-container-low text-on-surface font-semibold text-[14px]"
             />
           ),
           td: (props) => (
             <td
               {...props}
-              className="px-3 py-2 border-b border-outline-variant/60 text-on-surface"
+              className="align-top px-4 py-3 border-b border-outline-variant/60 text-on-surface"
             />
           ),
-          hr: () => <hr className="my-8 border-outline-variant" />,
+          hr: () => <hr className="my-12 border-outline-variant" />,
         }}
       >
         {body}
@@ -117,7 +117,7 @@ function CodeBlockCopy({ code, lang }: { code: string; lang: string }) {
     } catch {}
   };
   return (
-    <div className="bg-surface-container-lowest border border-outline-variant rounded-lg overflow-hidden my-5">
+    <div className="bg-surface-container-lowest border border-outline-variant rounded-lg overflow-hidden my-7">
       <div className="flex justify-between items-center px-4 py-2 border-b border-outline-variant">
         <span className="text-xs font-code-md text-on-surface-variant uppercase tracking-wider">
           {lang}
@@ -141,7 +141,7 @@ function CodeBlockCopy({ code, lang }: { code: string; lang: string }) {
           )}
         </button>
       </div>
-      <pre className="font-code-md text-code-md text-on-surface-variant overflow-x-auto p-4 m-0">
+      <pre className="font-code-md text-[14px] leading-[1.7] text-on-surface overflow-x-auto px-5 py-4 m-0">
         <code className={`language-${lang}`}>{code}</code>
       </pre>
     </div>

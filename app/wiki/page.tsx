@@ -1,46 +1,19 @@
 import Link from "next/link";
-import {
-  Terminal,
-  Sparkles,
-  Plug,
-  Layers,
-  Shield,
-  Wrench,
-  Command,
-  Zap,
-  Puzzle,
-  Users,
-  Cloud,
-  GitBranch,
-  Lock,
-  Globe,
-  ArrowRight,
-} from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { SiteHeader } from "@/components/site/SiteHeader";
 import { SiteFooter } from "@/components/site/SiteFooter";
-import { CATEGORIES, ARTICLE_STUBS, articleCount, stubsByCategory } from "@/lib/wiki-manifest";
-
-const ICONS = {
-  terminal: Terminal,
-  sparkles: Sparkles,
-  plug: Plug,
-  layers: Layers,
-  shield: Shield,
-  wrench: Wrench,
-  command: Command,
-  zap: Zap,
-  puzzle: Puzzle,
-  users: Users,
-  cloud: Cloud,
-  git: GitBranch,
-  lock: Lock,
-  globe: Globe,
-};
+import { SectionToc } from "@/components/site/SectionToc";
+import {
+  SECTIONS,
+  articleCount,
+  articleCountBySection,
+  categoriesBySection,
+} from "@/lib/wiki-manifest";
 
 export const metadata = {
-  title: "Wiki — Claude Mastery",
+  title: "Wiki",
   description:
-    "La référence francophone sur Claude Code, Claude API et l'écosystème Anthropic.",
+    "Le wiki francophone sur Claude et Claude Code : l'assistant au quotidien, l'agent de développement, les modèles et l'actualité.",
 };
 
 export default function WikiIndexPage() {
@@ -48,78 +21,58 @@ export default function WikiIndexPage() {
     <div className="min-h-screen flex flex-col">
       <SiteHeader active="wiki" showSearch />
 
-      <main className="flex-grow w-full max-w-container-max mx-auto px-margin-mobile md:px-margin-desktop py-16">
-        {/* Hero */}
-        <section className="mb-16 max-w-3xl">
-          <div className="mb-6">
-            <span className="tag-note">
-              Wiki Claude · {articleCount()} articles
-            </span>
-          </div>
-          <h1 className="font-display-xl text-display-xl md:text-[64px] md:leading-[1] font-extrabold tracking-tight mb-6 text-on-surface">
-            La <span className="text-mark">référence</span> francophone.
+      <main className="flex-grow w-full max-w-container-max mx-auto px-margin-mobile md:px-margin-desktop py-14 md:py-20">
+        <section className="mb-14 max-w-3xl">
+          <p className="tag-note mb-7">Wiki · {articleCount()} articles</p>
+          <h1 className="font-display-xl font-extrabold tracking-tight text-on-surface text-[40px] leading-[1.05] md:text-[64px] md:leading-[1] mb-6">
+            Tout le savoir, <span className="text-mark">rangé</span>.
           </h1>
-          <p className="font-body-rt text-body-rt md:text-[19px] text-on-surface-variant leading-relaxed">
-            Tout ce qu'il faut savoir sur Claude Code, l'API Anthropic, MCP,
-            les hooks, les skills et l'écosystème — organisé par thèmes.
+          <p className="text-[18px] md:text-[19px] text-on-surface-variant leading-relaxed">
+            Deux grandes parties : Claude, l'assistant que tout le monde peut
+            utiliser, et Claude Code, l'agent des développeurs. Plus les sujets
+            communs aux deux.
           </p>
         </section>
 
-        {/* Categories grid */}
-        <section className="mb-20">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {CATEGORIES.map((cat) => {
-              const Icon = ICONS[cat.icon];
-              const count = stubsByCategory(cat.id).length;
-              const firstSlug = stubsByCategory(cat.id)[0]?.slug;
-              const href = firstSlug ? `/wiki/${cat.id}/${firstSlug}` : `/wiki`;
-              return (
-                <Link
-                  key={cat.id}
-                  href={href}
-                  className="bg-surface-container-lowest border border-outline-variant rounded-xl p-6 soft-lift flex flex-col group"
-                >
-                  <div className="w-10 h-10 rounded-full bg-surface-container flex items-center justify-center mb-4 text-on-surface">
-                    <Icon className="w-5 h-5" strokeWidth={1.5} />
-                  </div>
-                  <h3 className="font-body-rt text-body-rt font-semibold mb-2 text-on-surface">
-                    {cat.name}
-                  </h3>
-                  <p className="text-body-sm text-on-surface-variant mb-4 flex-grow">
-                    {cat.description}
-                  </p>
-                  <div className="flex items-center justify-between mt-2">
-                    <span className="text-[12px] font-code-md text-primary bg-primary-fixed/30 inline-block px-2 py-1 rounded">
-                      {count} article{count > 1 ? "s" : ""}
-                    </span>
-                    <ArrowRight
-                      className="w-4 h-4 text-on-surface-variant group-hover:text-primary group-hover:translate-x-1 transition-all"
-                      strokeWidth={1.75}
-                    />
-                  </div>
-                </Link>
-              );
-            })}
-          </div>
-        </section>
+        <nav aria-label="Parties du wiki" className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-20">
+          {SECTIONS.map((s) => (
+            <a
+              key={s.id}
+              href={`#${s.id}`}
+              className="group bg-surface-container-lowest border border-outline-variant rounded-lg p-6 soft-lift flex flex-col"
+            >
+              <span className="font-headline-lg text-[22px] font-bold text-on-surface mb-2">
+                {s.name}
+              </span>
+              <span className="text-[15px] text-on-surface-variant leading-relaxed flex-grow mb-4">
+                {s.description}
+              </span>
+              <span className="font-mono text-[13px] text-on-surface-variant tabular-nums">
+                {articleCountBySection(s.id)} articles
+              </span>
+            </a>
+          ))}
+        </nav>
 
-        {/* All articles index — quick navigation */}
-        <section>
-          <h2 className="font-headline-lg text-headline-lg mb-8 text-on-surface">
-            Tous les articles
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-2">
-            {ARTICLE_STUBS.map((a) => (
-              <Link
-                key={`${a.category}-${a.slug}`}
-                href={`/wiki/${a.category}/${a.slug}`}
-                className="text-body-sm text-on-surface-variant hover:text-primary transition-colors py-1.5 truncate"
-              >
-                {a.title}
-              </Link>
-            ))}
-          </div>
-        </section>
+        {SECTIONS.map((s) => (
+          <section key={s.id} id={s.id} className="mb-20 scroll-mt-24">
+            <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 mb-10">
+              <h2 className="font-headline-lg text-[32px] md:text-[40px] leading-[1.1] font-bold tracking-tight">
+                {s.name}
+              </h2>
+              {s.href !== "/wiki" && (
+                <Link
+                  href={s.href}
+                  className="inline-flex items-center gap-1.5 font-semibold text-primary hover:underline underline-offset-4"
+                >
+                  Parcours conseillé
+                  <ArrowRight className="w-4 h-4" strokeWidth={2} />
+                </Link>
+              )}
+            </div>
+            <SectionToc categories={categoriesBySection(s.id).map((c) => c.id)} />
+          </section>
+        ))}
       </main>
 
       <SiteFooter />

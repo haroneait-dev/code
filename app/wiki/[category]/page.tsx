@@ -27,7 +27,7 @@ export default async function CategoryPage({
 
   return (
     <div className="min-h-screen flex flex-col">
-      <SiteHeader active="wiki" showSearch />
+      <SiteHeader active={cat?.section === "claude" ? "claude" : cat?.section === "code" ? "code" : "wiki"} showSearch />
 
       <main className="flex-grow w-full max-w-container-max mx-auto px-margin-mobile md:px-margin-desktop py-12">
         <nav className="flex items-center gap-2 text-on-surface-variant font-body-sm mb-8">

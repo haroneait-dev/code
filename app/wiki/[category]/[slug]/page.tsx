@@ -25,6 +25,7 @@ import { ArticleBody } from "@/components/wiki/ArticleBody";
 import {
   ARTICLE_STUBS,
   CATEGORIES,
+  SECTIONS,
   getCategory,
   stubsByCategory,
   type CategoryId,
@@ -77,6 +78,7 @@ export default async function ArticlePage({
   if (!cat || !article) notFound();
 
   const articlesInCat = stubsByCategory(cat.id);
+  const section = SECTIONS.find((sec) => sec.id === cat.section);
   const idx = articlesInCat.findIndex((a) => a.slug === slug);
   const prev = idx > 0 ? articlesInCat[idx - 1] : null;
   const next = idx < articlesInCat.length - 1 ? articlesInCat[idx + 1] : null;
@@ -91,16 +93,18 @@ export default async function ArticlePage({
 
   return (
     <div className="min-h-screen flex flex-col">
-      <SiteHeader active="wiki" showSearch />
+      <SiteHeader active={cat?.section === "claude" ? "claude" : cat?.section === "code" ? "code" : "wiki"} showSearch />
 
       <div className="flex-grow w-full max-w-container-max mx-auto px-margin-mobile md:px-margin-desktop flex gap-gutter py-8 relative">
         {/* Left sidebar — categories + articles in current cat */}
         <aside className="hidden lg:block w-72 flex-shrink-0 sticky top-[96px] h-[calc(100vh-120px)] overflow-y-auto pr-4">
           <h3 className="font-body-sm text-on-surface-variant uppercase tracking-wider mb-4 font-semibold text-xs">
-            Catégories
+            <Link href={section?.href ?? "/wiki"} className="hover:text-primary transition-colors">
+              {section ? `Partie ${section.name}` : "Catégories"}
+            </Link>
           </h3>
           <ul className="space-y-0.5 mb-6">
-            {CATEGORIES.map((c) => {
+            {CATEGORIES.filter((c) => c.section === cat.section).map((c) => {
               const Icon = CAT_ICONS[c.icon];
               const active = c.id === cat.id;
               const firstSlug = stubsByCategory(c.id)[0]?.slug;
@@ -161,14 +165,14 @@ export default async function ArticlePage({
           </nav>
 
           <article>
-            <h1 className="font-display-xl text-[40px] md:text-[48px] font-extrabold tracking-tight mb-4 text-on-surface leading-[1.1]">
+            <h1 className="font-display-xl text-[34px] md:text-[48px] font-extrabold tracking-tight mb-5 text-on-surface leading-[1.1]">
               {article.title}
             </h1>
-            <p className="text-on-surface-variant text-lg mb-6 leading-relaxed">
+            <p className="text-on-surface-variant text-[18px] md:text-[20px] mb-7 leading-[1.6]">
               {article.description}
             </p>
-            <div className="flex items-center gap-4 text-body-sm text-on-surface-variant pb-8 border-b border-outline-variant mb-10">
-              <span>Mis à jour le {article.updatedAt}</span>
+            <div className="flex items-center gap-4 text-body-sm text-on-surface-variant pb-8 border-b border-outline-variant mb-12">
+              <span>Mis à jour le {formatDateFr(article.updatedAt)}</span>
               <span className="w-1 h-1 bg-outline-variant rounded-full" />
               <span>{article.readingMinutes} min de lecture</span>
             </div>
@@ -243,4 +247,12 @@ function slugifyHeading(s: string): string {
     .replace(/[̀-ͯ]/g, "")
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
+}
+
+// « 2026-10-03 » → « 3 octobre 2026 » ; laisse passer les valeurs non datées
+function formatDateFr(value: string): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!m) return value;
+  const months = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"];
+  return `${Number(m[3])} ${months[Number(m[2]) - 1]} ${m[1]}`;
 }

@@ -1,53 +1,54 @@
 ---
-title: "Les Artifacts : fonctionnement et architecture"
-description: "Comment Claude.ai génère et rend les Artifacts en live : React, HTML, SVG, Markdown, et le sandboxing iframe."
-updatedAt: "2026-05-19"
+title: "Artifacts : graphiques, mini-applications et pages interactives"
+description: "Ce que sont les artifacts, ce qu'on peut créer avec (simulateurs, quiz, tableaux de bord, pages), comment les modifier, les partager et les rendre vivants."
+updatedAt: "2026-10-03"
 readingMinutes: 6
 ---
 
-Les Artifacts sont le mécanisme par lequel Claude.ai sort un contenu structuré du fil de conversation pour l'afficher dans un panneau dédié, à droite du chat. Plutôt que d'inonder le thread avec 300 lignes de code ou un long document, Claude détache l'objet, le rend interactif quand c'est possible, et permet de l'itérer version après version. Comprendre leur architecture aide à mieux les déclencher et à diagnostiquer les rendus qui cassent.
+Quand Claude produit quelque chose de plus riche qu'un texte, il l'affiche dans un **artifact** : un panneau à droite de la conversation qui contient un document, une page web, un graphique ou une petite application qui fonctionne. Vous pouvez l'utiliser, le modifier et le partager.
 
-## Quand un Artifact est déclenché
+## Ce qu'on peut créer
 
-Le modèle décide de créer un Artifact à partir de signaux implicites : contenu substantiel (plus de ~15 lignes), réutilisable (pas une réponse jetable), autonome (compréhensible hors du chat), ou explicitement demandé. Les types supportés sont aujourd'hui :
+- **Des mini-applications** : simulateur de prêt immobilier, calculateur de calories, minuteur de révisions, générateur de mots de passe.
+- **Des quiz et des fiches de révision** interactives.
+- **Des graphiques et tableaux de bord** à partir de vos données.
+- **Des diagrammes** : organigramme, frise chronologique, carte mentale, schéma de processus.
+- **Des pages web** : page de présentation, invitation, CV en ligne.
+- **Des jeux simples** pour apprendre ou s'amuser.
 
-- **Application React** (single-file, avec Tailwind, shadcn/ui et Recharts pré-chargés)
-- **Page HTML** complète avec CSS et JS inline
-- **SVG** rendu vectoriellement
-- **Markdown** formaté
-- **Mermaid** pour les diagrammes
-- **Code source** dans n'importe quel langage (sans exécution)
+Depuis mars 2026, Claude crée aussi des **graphiques et diagrammes interactifs directement dans la réponse**, et les artifacts fonctionnent dans l'application mobile.
 
-Vous pouvez forcer ou bloquer le comportement dans les paramètres : "Artifacts" peut être désactivé pour les utilisateurs qui préfèrent tout en ligne.
+Depuis septembre 2026, les artifacts accueillent aussi **Claude Docs, Claude Slides et Claude Design** pour les documents, présentations et maquettes. Voir [Fichiers, Docs, Slides et Design](/wiki/claude-ai/docs-slides-design).
 
-## Pipeline de génération
+## Demander un artifact
 
-Côté infrastructure, Claude émet une balise XML spéciale dans le stream — typiquement `<antartifact identifier="..." type="application/vnd.ant.react" title="...">` — que le frontend de Claude.ai intercepte. Le contenu de la balise n'est plus affiché en Markdown mais routé vers le panneau Artifacts. Quand on demande une mise à jour, deux modes coexistent :
+Décrivez simplement ce que vous voulez, avec qui va l'utiliser :
 
-- **Update** : patch ciblé d'une portion du code (économise des tokens, plus rapide)
-- **Rewrite** : régénération complète (utilisée pour les refontes structurelles)
+> Crée un simulateur de budget étudiant : loyer, courses, transport, loisirs. Je saisis mes revenus et mes dépenses, et ça m'affiche ce qui reste par mois avec un graphique. Couleurs douces, utilisable sur téléphone.
 
-Chaque modification crée une nouvelle version navigable via les flèches en bas du panneau.
+> Fais-moi un quiz de 15 questions sur la Révolution française, niveau 4e, avec correction et explication après chaque réponse.
 
-## Rendu live et sandboxing
+## Modifier
 
-Pour React et HTML, le rendu se fait dans une **iframe isolée** servie depuis un sous-domaine séparé (`*.artifacts.anthropic.com`). Cette isolation cross-origin empêche l'Artifact d'accéder aux cookies de session Claude.ai ou au DOM parent. Le bundler embarqué transpile le JSX à la volée via une version d'esbuild côté client, injecte React 18, Tailwind via CDN et expose une poignée de dépendances autorisées (`lucide-react`, `recharts`, `shadcn/ui`, `framer-motion`, `papaparse`, `lodash`).
+Demandez les changements en langage courant : « Ajoute un champ pour l'épargne », « Le graphique doit être en camembert », « Mets les questions dans le désordre ». Chaque modification crée une **nouvelle version** ; vous pouvez revenir à une version précédente.
 
-Les contraintes principales :
+## Partager
 
-- Pas de `fetch` vers des domaines arbitraires (CORS strict)
-- Pas d'import npm libre — seules les libs whitelistées sont disponibles
-- Pas de `localStorage` persistant (sandboxé par session)
-- Les images doivent venir d'URLs publiques ou être encodées en base64
+Un artifact peut être **publié** et partagé par lien. Selon votre offre, vous pouvez le partager avec des personnes précises, avec votre organisation, ou publiquement. Les personnes qui reçoivent le lien peuvent l'utiliser sans compte.
 
-## SVG, Mermaid et documents
+Pratique pour : un quiz envoyé à une classe, un outil de calcul partagé avec une équipe, une page d'invitation.
 
-Les SVG sont rendus directement dans le DOM Claude.ai (pas d'iframe) après assainissement contre les scripts inline. Mermaid passe par la lib officielle Mermaid.js côté client. Les documents Markdown bénéficient d'un rendu typographique soigné et d'un bouton d'export vers PDF ou copie.
+## Des données en direct
 
-## Publier et partager
+Un artifact peut être relié à vos **connecteurs** (Google Drive, Notion…) pour afficher des informations à jour chaque fois qu'on l'ouvre : un tableau de bord de projet, un suivi de commandes. Chaque personne qui l'ouvre utilise ses propres accès.
 
-Depuis 2024, les Artifacts React peuvent être publiés via un lien public (`claude.site/artifacts/...`). Le lien sert le bundle compilé sans exposer la conversation source. C'est devenu une mini-plateforme de partage de mini-apps, comparable à un CodePen embarqué dans Claude.
+## Les limites
+
+- Un artifact est **une seule page** : pas de base de données ni de comptes utilisateurs.
+- Il ne peut pas charger n'importe quelle ressource externe ; Claude intègre ce dont il a besoin.
+- Pour une vraie application avec serveur, il faut passer à du développement (par exemple avec [Claude Code](/claude-code)).
 
 ## Pour aller plus loin
 
-Pour maximiser la qualité d'un Artifact React, soyez explicite sur les contraintes : "single-file, Tailwind, shadcn/ui, pas de fetch externe, données mockées en haut du fichier". Si un rendu casse, ouvrez la console du navigateur (clic droit dans l'iframe → Inspecter) : la plupart des erreurs viennent d'imports manquants ou de versions Tailwind incompatibles. Pour des prototypes complexes, mieux vaut basculer sur un vrai projet Next.js et utiliser l'API plutôt que de pousser les limites du sandbox.
+- [Fichiers, Docs, Slides et Design](/wiki/claude-ai/docs-slides-design)
+- Pour les développeurs : [Artifacts depuis Claude Code](/wiki/cli/artifacts)

@@ -1,53 +1,51 @@
 ---
-title: "Project Knowledge Base : limites et partage"
-description: "Comprendre les quotas de tokens des Projects Claude.ai, optimiser la mémoire contextuelle et partager en équipe."
-updatedAt: "2026-05-19"
+title: "Bien nourrir un projet : documents et base de connaissances"
+description: "Quels documents ajouter à un projet, comment Claude les consulte (y compris la recherche automatique RAG sur les offres payantes), et comment obtenir des réponses fidèles à vos sources."
+updatedAt: "2026-10-03"
 readingMinutes: 6
 ---
 
-La Project Knowledge Base de Claude.ai joue le rôle d'une mémoire de long terme attachée à chaque Project. Tout ce qu'on y dépose est rechargé à chaque message de chaque thread du Project. C'est puissant — mais ce mécanisme a des limites strictes qu'il faut connaître pour ne pas saturer le contexte ni gaspiller son quota.
+La base de connaissances d'un [projet](/wiki/claude-ai/projects-creation) est ce qui le rend vraiment utile. Bien choisie, elle donne des réponses précises et fidèles à vos documents. Encombrée, elle produit des réponses floues.
 
-## Comment la base se charge dans le contexte
+## Comment Claude utilise vos documents
 
-À chaque tour de conversation, Claude.ai construit le prompt envoyé au modèle ainsi : instructions personnalisées + contenu de la knowledge base + historique du thread + nouveau message. La fenêtre de contexte est de 200 000 tokens sur Pro et Team, et peut atteindre 500 000 tokens sur Enterprise. La barre de remplissage visible sous la zone de saisie indique le taux d'occupation **avant** votre message.
+Tant que les documents tiennent dans sa mémoire de travail (son contexte), Claude **les lit en entier** à chaque conversation du projet.
 
-Au-delà de 80 % de remplissage, la qualité chute : Claude commence à oublier le début du thread, à mélanger des sources, et à survoler les fichiers les plus longs. Au-delà de 100 %, le système tronque automatiquement les sources les plus anciennes — ce qui peut produire des réponses fausses sans avertissement.
+Sur les offres payantes, quand la base devient trop grande, Claude passe automatiquement en **recherche dans les documents** (on parle de RAG) : au lieu de tout charger, il cherche les passages pertinents pour chaque question. La capacité d'un projet est alors multipliée **jusqu'à environ 10 fois**. Vous n'avez rien à activer.
 
-## Limites pratiques par fichier et par Project
+Conséquence pratique : avec une très grande base, demandez à Claude de **citer le document et le passage** utilisés, pour vérifier qu'il a trouvé le bon.
 
-Les ordres de grandeur officiels (au 2026-05) :
+## Quoi mettre dans la base
 
-- **Taille par fichier** : jusqu'à 30 Mo, 500 pages environ pour un PDF
-- **Nombre de fichiers** : pas de plafond strict, mais la somme doit tenir dans la fenêtre
-- **Types acceptés** : PDF, DOCX, TXT, MD, CSV, code source, images (analysées par vision)
-- **Pas de pièce vidéo ni audio** dans la base elle-même
+| À mettre | À éviter |
+|---|---|
+| Documents de référence stables (cours, procédures, chartes) | Brouillons et versions obsolètes |
+| Textes que vous citez souvent | Documents sans rapport avec le sujet |
+| Exemples de ce que vous attendez (bons e-mails, bons rapports) | Doublons du même contenu |
+| Glossaire, liste des personnes et des rôles | Fichiers illisibles (scans flous) |
 
-Une page PDF moyenne représente 500 à 1 000 tokens. Un Project bien dimensionné pour usage quotidien tient idéalement sous **40 % de remplissage**, ce qui laisse de la marge pour l'historique de conversation.
+Astuce : un document **« À savoir »** d'une page, écrit par vous (contexte, vocabulaire, règles), vaut souvent mieux que vingt fichiers bruts.
 
-## Maximiser le ratio signal/bruit
+## Rendre les documents faciles à exploiter
 
-Trois techniques rentables :
+- **Des noms de fichiers explicites** : « Cours-chapitre-3-responsabilite.pdf » plutôt que « scan0042.pdf ».
+- **Des PDF avec du vrai texte** : un scan de mauvaise qualité se lit mal. Si besoin, demandez d'abord à Claude de le retranscrire.
+- **Une version par document** : supprimez l'ancienne quand vous ajoutez la nouvelle.
+- **Des tableurs propres** : une ligne d'en-tête, pas de cellules fusionnées.
 
-1. **Résumer avant d'attacher.** Plutôt qu'un PDF de 200 pages, demandez à Claude de produire un résumé structuré, puis attachez le résumé. Vous gardez le PDF original en pièce jointe ponctuelle dans un thread quand le détail compte.
-2. **Indexer par tags Markdown.** Découpez vos sources en sections avec des headings clairs (`## Politique de retour`, `## Tarifs B2B`). Claude les retrouve mieux et cite plus précisément.
-3. **Purger régulièrement.** Tous les trois mois, relisez la base : ce qui n'a pas servi sort. Une base maigre est plus performante qu'une base exhaustive.
+## Obtenir des réponses fidèles
 
-## Partage en Team et Enterprise
+Ajoutez dans les instructions du projet :
 
-Sur Pro, les Projects sont strictement personnels. Sur Team et Enterprise, ils peuvent être :
+> Réponds d'abord à partir des documents du projet. Cite le nom du document et la section. Si l'information n'y est pas, dis-le clairement avant de répondre avec tes connaissances générales.
 
-- **Privés** : visibles uniquement par leur créateur
-- **Partagés à l'équipe** : tous les membres du workspace y accèdent en lecture/écriture
+Puis testez avec une question dont vous connaissez la réponse.
 
-Tout membre peut alors ajouter des fichiers, modifier les instructions et démarrer des threads. Les threads individuels restent privés par défaut — ce sont la connaissance et les instructions qui sont mutualisées. Sur Enterprise, on peut restreindre l'écriture à des rôles spécifiques et auditer les modifications.
+## Documents vivants
 
-## Pièges classiques
-
-- **Dupliquer la même information** dans plusieurs fichiers : Claude pondère mal et peut se contredire.
-- **Mettre du code obsolète** sans le marquer comme tel : le modèle le considère comme source de vérité.
-- **Charger des données sensibles** dans un Project partagé sans vérifier la politique de retention de l'organisation.
-- **Confondre Project knowledge et pièce jointe** : la pièce jointe d'un thread n'est lue que dans ce thread, alors que la knowledge l'est dans tous.
+Avec les [connecteurs](/wiki/claude-ai/integrations-natives), vous pouvez relier des fichiers Google Drive au projet : Claude lit la version à jour, sans que vous ayez à renvoyer le fichier à chaque modification.
 
 ## Pour aller plus loin
 
-Si votre base dépasse régulièrement 60 % de remplissage ou si plusieurs utilisateurs ont besoin de requêtes filtrées (par client, par produit), passez à une architecture RAG dédiée via l'API : embeddings + vector store + récupération à la demande. Vous gardez Claude.ai pour la conversation et l'itération, et vous laissez la recherche documentaire à un système conçu pour scaler.
+- [Les projets](/wiki/claude-ai/projects-creation)
+- [Vérifier les réponses](/wiki/claude-bases/verifier-reponses)
