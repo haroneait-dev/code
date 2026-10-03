@@ -1,40 +1,82 @@
 ---
-title: "Parallélisation des subagents"
-description: "Lancer plusieurs subagents en même temps dans un seul message Task, gérer la concurrence et éviter les collisions."
-updatedAt: "2026-05-19"
-readingMinutes: 6
+title: "Paralléliser les subagents"
+description: "Lancer plusieurs subagents en même temps dans Claude Code : arrière-plan par défaut, limite de 20 subagents simultanés, worktrees pour les écritures, /batch et dynamic workflows au-delà."
+updatedAt: "2026-10-03"
+readingMinutes: 4
 ---
 
-La parallélisation est l'un des plus gros leviers de productivité avec les subagents. Bien utilisée, elle divise le temps d'attente par 3 ou 4 sur des tâches d'exploration. Mal utilisée, elle multiplie les coûts pour rien et produit des résultats incohérents.
+Lancer plusieurs subagents en parallèle réduit fortement l'attente sur les tâches d'exploration ou d'audit. Mal découpé, le parallélisme multiplie les tokens et produit des résultats qui se recoupent. Voici comment Claude Code gère la concurrence en 2026 et comment en tirer parti.
 
-## Le principe : un seul message, plusieurs Task
+## Comment les subagents partent en parallèle
 
-Pour lancer plusieurs subagents en parallèle, il faut les invoquer dans le même message assistant, dans le même bloc d'appels d'outils. Si vous envoyez trois Tasks dans trois messages séparés, ils s'exécuteront séquentiellement. Si vous les groupez dans un seul message, ils partent en même temps. C'est purement mécanique : l'orchestrateur attend que tous les outils d'un même tour soient résolus avant de poursuivre.
+En session interactive, le fork mode est actif par défaut (v2.1.232 ou plus) : Claude Code lance **tous** les subagents en arrière-plan. Vous continuez à travailler pendant qu'ils tournent, et leurs résultats arrivent sous forme de notification de fin dans un tour suivant. Claude attend ces notifications avant de vous présenter une synthèse.
 
-Concrètement, dans un appel typique : trois blocs Task lancés simultanément, chacun avec son propre prompt et son propre type de subagent. Le temps total devient `max(t1, t2, t3)` au lieu de `t1 + t2 + t3`.
+En mode `-p` et dans l'Agent SDK, le fork mode est inactif : Claude lance les subagents en arrière-plan par défaut, mais au premier plan quand il a besoin du résultat pour continuer. Plusieurs appels de l'outil `Agent` dans un même tour partent alors en même temps.
+
+Dans les deux cas, il suffit de le demander clairement :
+
+```text
+Étudiez en parallèle, avec un subagent chacun :
+1. app/api/ : quelles routes vérifient le jeton Supabase ?
+2. lib/ : où le client Supabase est-il créé ?
+3. content/ : quels articles n'ont pas de champ updatedAt ?
+Chaque subagent répond en 10 lignes maximum.
+```
+
+## Les limites officielles
+
+| Limite | Valeur par défaut | Réglage |
+| --- | --- | --- |
+| Subagents simultanés dans une session | 20 | `CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS` |
+| Profondeur d'imbrication | 3 niveaux sous la conversation principale | `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH` |
+| Nombre total de subagents sur une session | aucune limite | |
+
+Au-delà de 20 subagents actifs, un nouvel appel échoue avec `Concurrent subagent limit reached` et Claude ne réessaie pas ; l'appel redevient possible dès qu'un emplacement se libère. Les sessions avec ultracode actif ne sont pas soumises à cette limite. Les agents des dynamic workflows et des équipes d'agents ont leurs propres limites.
+
+## Suivre et piloter les subagents
+
+- Le panneau sous la zone de saisie liste les subagents en cours, en arbre s'ils sont imbriqués.
+- `/tasks` liste tout ce qui tourne en arrière-plan, avec le modèle de chaque subagent ; `x` arrête l'élément sélectionné.
+- **Ctrl+B** envoie une tâche en cours en arrière-plan.
+- Les demandes de permission d'un subagent en arrière-plan apparaissent dans votre session principale, avec le nom de l'agent. Échap refuse l'appel d'outil sans arrêter l'agent.
 
 ## Quand paralléliser
 
-Trois cas se prêtent bien à la parallélisation. Premièrement, les recherches indépendantes : trouver tous les usages de X dans le frontend pendant qu'un autre cherche dans le backend. Deuxièmement, les vérifications croisées : un subagent lit le code, un autre lit les tests, un troisième lit la documentation, puis vous comparez. Troisièmement, le fan-out d'audit : lister les vulnérabilités, lister les TODO, lister les types `any`, tout en parallèle.
+- Recherches indépendantes : frontend et backend, trois bibliothèques candidates.
+- Vérifications croisées : un agent lit le code, un autre les tests, un troisième la documentation.
+- Audit en éventail : vulnérabilités, `TODO`, types `any`, chacun par un agent.
 
 ## Quand ne pas paralléliser
 
-Si les subagents doivent partager un état ou se baser sur les résultats les uns des autres, la parallélisation n'a pas de sens. Si le subagent B a besoin de savoir ce qu'a trouvé A, il faut deux tours séquentiels. De même, si vos subagents écrivent dans les mêmes fichiers, vous risquez des conflits : la parallélisation est réservée à la lecture et à l'analyse, pas à l'écriture concurrente.
+- Si B a besoin du résultat de A : enchaînez les deux (« utilisez l'agent X pour trouver, puis l'agent Y pour corriger »).
+- Si les agents écrivent dans les mêmes fichiers : risque de conflit. Donnez à chacun `isolation: worktree` (copie Git isolée) ou un périmètre de fichiers distinct.
 
-## Gestion de la concurrence
+## Découper pour éviter le travail en double
 
-Chaque subagent a son propre contexte isolé : ils ne se voient pas. Cela évite les conditions de course sur la mémoire, mais cela signifie aussi qu'ils peuvent dupliquer du travail si vous ne découpez pas bien les prompts. Une bonne pratique : préciser explicitement le périmètre de chacun dans son prompt (« ne regarde que `app/api/` », « limite-toi aux fichiers `.tsx` »). Sinon les trois subagents vont lire les mêmes fichiers et vous payez trois fois.
+Les subagents ne se voient pas entre eux. Sans périmètre explicite, trois agents liront les mêmes fichiers et vous paierez trois fois. Précisez dans chaque brief :
 
-## Limites pratiques
+- le dossier ou le motif de fichiers (« uniquement `app/api/**/*.ts` ») ;
+- ce qu'il ne faut pas regarder ;
+- un format de sortie commun (même tableau, mêmes colonnes) pour fusionner facilement.
 
-L'orchestrateur tolère un nombre raisonnable de subagents en parallèle (typiquement jusqu'à 10), mais au-delà la valeur ajoutée diminue : la latence du plus lent domine, et les coûts s'accumulent. Pour les très gros audits, mieux vaut faire deux vagues de cinq subagents que dix d'un coup. Surveillez aussi la taille des résumés renvoyés : si chaque subagent vous renvoie 2000 tokens, dix subagents = 20k tokens injectés d'un coup dans la conversation principale.
+## Surveiller le coût
 
-## Agréger les résultats
+Chaque subagent consomme ses propres tokens, sur les mêmes limites d'usage que votre session. Et tous les rapports reviennent dans la conversation principale : dix rapports de 2 000 tokens, c'est 20 000 tokens injectés d'un coup. Demandez des réponses courtes et structurées. Voir [Coût et budget de tokens](/wiki/subagents/cout-token-budgeting).
 
-Une fois les subagents revenus, vous avez `n` réponses à fusionner. Trois patterns marchent bien : une synthèse manuelle dans le tour suivant, un dernier subagent dédié à l'agrégation, ou un format de sortie commun (JSON, liste à puces) qui rend la fusion mécanique. Pour les audits, demandez à chaque subagent de renvoyer la même structure : c'est trivial à concaténer ensuite.
+## Au-delà d'une poignée d'agents
+
+- **`/batch`** : skill qui découpe un gros changement en 5 à 30 subagents isolés chacun dans un worktree.
+- **Dynamic workflows** : un script JavaScript orchestre des dizaines ou centaines d'agents (16 simultanés par défaut, 1 000 au maximum par exécution), avec recoupement des résultats. Suivi via `/workflows`. Voir [Dynamic workflows](/wiki/cli/dynamic-workflows-agents-arriere-plan).
+- **Agent view** : `claude agents` pour lancer et suivre plusieurs sessions indépendantes.
 
 ## Pour aller plus loin
 
-- Article voisin : `quand-deleguer` pour décider en amont si la délégation est pertinente.
-- Article voisin : `cout-token-budgeting` pour mesurer le surcoût de la parallélisation.
-- Article voisin : `erreurs-courantes` pour les pièges classiques de prompts mal cadrés.
+- [Quand déléguer à un subagent ?](/wiki/subagents/quand-deleguer)
+- [Sous-traitance récursive](/wiki/subagents/sous-traitance-recursive)
+- [Partage d'état entre agents](/wiki/subagents/state-sharing)
+
+## Sources
+
+- https://code.claude.com/docs/en/sub-agents
+- https://code.claude.com/docs/en/agents
+- https://code.claude.com/docs/en/workflows

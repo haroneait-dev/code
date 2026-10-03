@@ -1,90 +1,140 @@
 ---
-title: "Frontmatter agent"
-description: "Référence des champs YAML supportés dans les fichiers de subagents : name, description, tools, model, isolation."
-updatedAt: "2026-05-19"
-readingMinutes: 6
+title: "Frontmatter des subagents : référence des champs"
+description: "Tous les champs YAML reconnus par un subagent Claude Code (tools, disallowedTools, model, permissionMode, maxTurns, skills, mcpServers, hooks, memory, background, effort, isolation, color…) avec leurs valeurs et pièges."
+updatedAt: "2026-10-03"
+readingMinutes: 5
 ---
 
-Le frontmatter YAML en tête d'un fichier `.claude/agents/<nom>.md` configure entièrement le comportement du subagent : son identité, ses outils, son modèle, son degré d'isolation. Maîtriser ces champs permet d'arbitrer finement entre coût, latence, sécurité et qualité. Voici la référence pratique des champs supportés et leurs valeurs recommandées.
+Le frontmatter YAML en tête d'un fichier `.claude/agents/<nom>.md` configure le subagent : identité, outils, modèle, permissions, mémoire, isolation. Cette page liste les champs officiels et leurs valeurs. Les noms en plusieurs mots s'écrivent en camelCase et doivent correspondre exactement : un champ inconnu est ignoré sans message d'erreur.
 
 ## Squelette minimal
 
-Seuls `name` et `description` sont strictement requis. Tout le reste a des valeurs par défaut sensées.
-
-```md
+```markdown
 ---
 name: doc-writer
-description: Génère et met à jour la documentation Markdown à partir du code source.
-tools: Read, Glob, Grep, Write, Edit
-model: sonnet
+description: Met à jour la documentation Markdown à partir du code. À utiliser après un changement d'API.
 ---
 
-Tu es rédacteur technique...
+Vous êtes rédacteur technique...
 ```
 
-Le `name` doit être en kebab-case, unique dans le projet, et correspondre au nom du fichier sans l'extension. C'est l'identifiant utilisé par l'agent principal pour invoquer le subagent.
+Seuls `name` et `description` sont obligatoires. Le nom de fichier n'a pas besoin de correspondre au `name`.
 
-## `tools` — allowlist explicite
+## Tableau de référence
 
-Le champ `tools` accepte une liste séparée par des virgules. Omettre le champ donne accès à *tous* les outils, ce qu'il faut éviter en pratique.
+| Champ | Valeurs | Rôle |
+| --- | --- | --- |
+| `name` | texte, sans `:` ni `-` initial | Identifiant unique ; reçu par les hooks comme `agent_type` |
+| `description` | texte | Quand Claude doit déléguer à cet agent |
+| `tools` | liste ou chaîne séparée par des virgules | Liste blanche d'outils ; tous hérités si absent |
+| `disallowedTools` | même format | Outils retirés |
+| `model` | `sonnet`, `opus`, `haiku`, `fable`, ID complet, `inherit` | Modèle de l'agent |
+| `permissionMode` | `default` (alias `manual`), `acceptEdits`, `auto`, `dontAsk`, `bypassPermissions`, `plan` | Mode de permission |
+| `maxTurns` | entier | Nombre maximal de tours ; la sortie est alors marquée partielle |
+| `skills` | liste | Skills préchargées en entier au démarrage |
+| `mcpServers` | liste | Serveurs MCP propres à l'agent |
+| `hooks` | objet | Hooks actifs seulement pendant l'exécution de l'agent |
+| `memory` | `user`, `project`, `local` | Mémoire persistante entre sessions |
+| `background` | `true` | Toujours en arrière-plan |
+| `omitClaudeMd` | `true` | Ne charge pas les CLAUDE.md utilisateur, projet et local |
+| `effort` | `low`, `medium`, `high`, `xhigh`, `max` | Niveau d'effort, prioritaire sur celui de la session |
+| `isolation` | `worktree` | Exécution dans un worktree Git temporaire |
+| `color` | `red`, `blue`, `green`, `yellow`, `purple`, `orange`, `pink`, `cyan` | Couleur dans la liste des tâches et le transcript |
+| `initialPrompt` | texte | Premier message envoyé quand l'agent est l'agent de session (`--agent`) |
+| `experimental` | objet (`cacheTtl: 5m` ou `1h`) | Durée du cache de prompt pour cet agent |
 
-```md
----
+## `tools` et `disallowedTools`
+
+```yaml
 tools: Read, Grep, Glob, Bash
----
 ```
 
-Les outils MCP sont disponibles via leur nom complet, par exemple `mcp__supabase__execute_sql`. Pour autoriser tous les outils d'un serveur MCP, certaines versions acceptent un wildcard `mcp__supabase__*`. En cas de doute, listez explicitement les outils dont l'agent a besoin et rien d'autre.
+- Sans `tools`, l'agent hérite de tous les outils disponibles aux subagents, outils MCP compris.
+- Si les deux champs sont présents, `disallowedTools` s'applique d'abord.
+- Motifs MCP acceptés : `mcp__github` ou `mcp__github__*` (tout un serveur) ; dans `disallowedTools`, `mcp__*` retire tous les outils MCP.
+- Une entrée avec spécificateur comme `Bash(git push *)` dans `disallowedTools` retire **tout** l'outil `Bash`. Pour bloquer une seule commande, utilisez une règle `permissions.deny` dans vos réglages.
+- Si aucune entrée ne correspond à un outil réel (faute de frappe), l'agent refuse de démarrer avec une erreur qui nomme les entrées fautives.
+- Certains outils ne sont jamais donnés à un subagent (`AskUserQuestion`, `EnterPlanMode`, `Workflow`…), et un subagent en arrière-plan ne garde qu'une liste réduite d'outils intégrés (`Read`, `Grep`, `Glob`, `Bash`, `Edit`, `Write`, `WebFetch`, `WebSearch`, `Skill`, `SendMessage`…).
+- Ajouter `Agent` permet au subagent de lancer ses propres subagents, dans la limite de profondeur. La syntaxe `Agent(worker, researcher)` ne filtre les types que pour un agent lancé en session principale avec `claude --agent`.
 
-## `model` — arbitrage coût/qualité
+## `model`
 
-Trois alias sont reconnus, qui pointent vers le dernier snapshot stable de chaque famille :
+Ordre de résolution : paramètre `model` passé par Claude à l'appel, puis frontmatter, puis `CLAUDE_CODE_SUBAGENT_MODEL`, puis modèle de la conversation. Si le modèle principal appartient à la même famille que l'alias (par exemple `opus` alors que vous êtes sur Opus 5.5), l'agent reprend le modèle exact de la conversation. `/tasks` affiche le modèle réellement utilisé.
 
-- `haiku` — rapide et économique, parfait pour les classifications, le tri, les agents très spécialisés sur une tâche courte.
-- `sonnet` — défaut équilibré, suffisant pour la grande majorité des subagents (revue de code, refactor, doc).
-- `opus` — raisonnement profond, à réserver aux tâches d'architecture, debug complexe ou planification multi-étapes.
+## `permissionMode`
 
-```md
----
-model: haiku
----
+La valeur n'est respectée que si la conversation principale est en `default`, `dontAsk` ou `plan`. Si la session est en `auto`, `acceptEdits` ou `bypassPermissions`, le subagent suit ce mode et votre valeur est ignorée. Un agent ne peut jamais s'accorder `bypassPermissions` si la session ne l'a pas.
+
+## `skills`
+
+```yaml
+skills:
+  - api-conventions
+  - error-handling-patterns
 ```
 
-Vous pouvez aussi pinner un snapshot précis (`claude-sonnet-5-5`, `claude-opus-5-5`) si vous voulez figer le comportement.
+Le contenu complet de chaque skill est injecté au démarrage. Sans ce champ, l'agent peut quand même invoquer les skills via l'outil `Skill`. Les skills avec `disable-model-invocation: true` ne peuvent pas être préchargées.
 
-## `description` — déclencheur de délégation
+## `mcpServers`
 
-Le champ joue deux rôles : libellé humain et critère de routage pour l'agent principal. Préférez les formulations impératives qui décrivent *quand* invoquer le subagent.
-
-```md
----
-description: À utiliser PROACTIVEMENT après chaque modification dans /app/api/ pour vérifier l'authentification et les permissions RLS.
----
+```yaml
+mcpServers:
+  - playwright:
+      type: stdio
+      command: npx
+      args: ["-y", "@playwright/mcp@latest"]
+  - github
 ```
 
-Le mot `PROACTIVEMENT` (ou `MUST BE USED`) en majuscules biaise fortement l'agent principal vers une délégation automatique sans intervention de l'utilisateur.
+Une définition en ligne n'est connectée que pendant l'exécution de l'agent : ses descriptions d'outils n'encombrent pas la conversation principale. Un nom seul réutilise un serveur déjà configuré.
 
-## Isolation et contexte
+## `hooks`
 
-Par construction, chaque appel de subagent ouvre une fenêtre de contexte vierge : le subagent ne voit pas l'historique de la conversation principale, seulement le prompt d'invocation et son propre prompt système. Cette isolation est non négociable et constitue le principal atout des subagents pour préserver la fenêtre principale.
-
-Certaines versions exposent un champ `isolation: strict | inherit` pour ajuster ce comportement (par exemple hériter du `CLAUDE.md` projet). En l'absence du champ, l'isolation par défaut est stricte. Le subagent renvoie un *résumé* à l'agent principal — pas son transcript complet — ce qui économise massivement de tokens.
-
-## Champs additionnels utiles
-
-Selon la version du CLI, vous pouvez aussi rencontrer :
-
-- `color` — couleur d'affichage dans `/agents`, purement cosmétique.
-- `disallowed_tools` — l'inverse de `tools`, pratique quand vous voulez « tout sauf X ».
-- `permission_mode` — surcharge le mode de permission (par exemple `acceptEdits` pour un agent qui ne demande jamais de confirmation).
-
-```bash
-# Vérifier la configuration effective d'un agent
-/agents
+```yaml
+hooks:
+  PreToolUse:
+    - matcher: "Bash"
+      hooks:
+        - type: command
+          command: "./scripts/validate-readonly-query.sh"
 ```
+
+Tous les événements sont acceptés. Un hook `Stop` déclaré ici devient `SubagentStop` à l'exécution. Pour un agent de projet, ces hooks ne tournent qu'après acceptation de la confiance du dossier.
+
+## `memory`
+
+| Portée | Dossier |
+| --- | --- |
+| `user` | `~/.claude/agent-memory/<nom>/` |
+| `project` | `.claude/agent-memory/<nom>/` (versionnable, portée recommandée) |
+| `local` | `.claude/agent-memory-local/<nom>/` |
+
+L'agent reçoit les 200 premières lignes (ou 25 Ko) de `MEMORY.md`, et les outils `Read`, `Write` et `Edit` sont activés pour gérer ce dossier. Sans mémoire automatique activée, le champ n'a aucun effet.
+
+## `isolation: worktree`
+
+L'agent travaille dans un worktree Git temporaire, créé par défaut depuis votre branche par défaut (pas depuis le `HEAD` de la session). Le worktree est supprimé si l'agent ne modifie rien. Claude Code bloque les commandes qui tenteraient d'agir sur votre copie principale.
+
+## `background`
+
+`background: true` force l'exécution en arrière-plan. En session interactive, le fork mode lance déjà les subagents en arrière-plan par défaut ; le champ sert surtout en mode `-p` et avec l'Agent SDK.
+
+## Champs à ne pas utiliser
+
+Des articles plus anciens citaient `isolation: strict | inherit`, `disallowed_tools` ou `permission_mode`. Ces valeurs et graphies n'existent pas : elles sont ignorées sans erreur.
+
+## Vérifier un agent
+
+- `claude --debug` affiche pourquoi un fichier a été ignoré.
+- `claude plugin validate .claude/agents` signale le YAML invalide (v2.1.233 ou plus).
+- `/tasks` montre le modèle et l'effort d'un agent en cours.
 
 ## Pour aller plus loin
 
-- « Créer un subagent custom » donne un exemple complet de bout en bout.
-- « Coût et token budgeting » détaille l'impact du choix de `model`.
-- « Code-reviewer & isolation » montre comment exploiter l'isolation pour des revues robustes.
+- [Créer un subagent personnalisé](/wiki/subagents/creer-subagent-custom)
+- [Coût et budget de tokens](/wiki/subagents/cout-token-budgeting)
+- [Modes de permission](/wiki/cli/permissions-modes)
+
+## Sources
+
+- https://code.claude.com/docs/en/sub-agents

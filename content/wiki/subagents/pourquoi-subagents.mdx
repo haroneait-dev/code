@@ -1,57 +1,78 @@
 ---
-title: "Pourquoi des subagents ?"
-description: "Comprendre l'intérêt des subagents dans Claude Code : préservation du contexte, parallélisation et isolation des tâches."
-updatedAt: "2026-05-19"
-readingMinutes: 6
+title: "Pourquoi utiliser des subagents ?"
+description: "Ce qu'apporte un subagent dans Claude Code : contexte principal préservé, outils restreints, modèle moins cher et travail en arrière-plan, avec leurs limites."
+updatedAt: "2026-10-03"
+readingMinutes: 4
 ---
 
-Les subagents sont l'une des fonctionnalités les plus puissantes de Claude Code. Plutôt que de tout faire dans la même session, vous déléguez certaines tâches à des agents secondaires qui possèdent leur propre fenêtre de contexte. Le résultat : un agent principal plus concentré, des recherches parallèles et une meilleure qualité de réponse sur des projets complexes.
+Un subagent est un assistant spécialisé que Claude lance pour une tâche annexe. Il travaille dans sa propre fenêtre de contexte, avec son propre prompt système et ses propres outils, puis ne renvoie qu'un résumé. Vous gardez ainsi une conversation principale courte et lisible, même sur un gros projet.
 
-## Préserver le contexte principal
+## Le problème que résout un subagent
 
-Le contexte de l'agent principal est précieux. Chaque fichier lu, chaque commande exécutée et chaque message consomme des tokens qui finissent par diluer la qualité du raisonnement. Quand vous demandez à Claude « explore tout le dossier `app/` pour trouver où sont gérées les routes API », vous polluez la conversation avec des dizaines de milliers de tokens dont seul le résumé final vous intéresse.
+Chaque fichier lu, chaque sortie de commande et chaque résultat de recherche reste dans la conversation principale jusqu'au prochain `/clear` ou `/compact`. Si vous demandez « trouvez où sont gérées les routes API dans `app/` », Claude peut lire des dizaines de fichiers dont vous ne voulez que la conclusion.
 
-Un subagent règle ce problème : il fait le travail dans sa propre bulle, puis renvoie un seul message synthétique. Votre agent principal reçoit la conclusion sans subir le bruit intermédiaire.
+Avec un subagent, cette lecture se fait ailleurs. La documentation officielle le résume ainsi : utilisez-en un quand une tâche annexe inonderait la conversation de résultats de recherche, de logs ou de contenus de fichiers que vous ne relirez pas.
 
-## Paralléliser les tâches indépendantes
+## Ce que vous gagnez
 
-Claude Code peut lancer plusieurs subagents simultanément. C'est idéal pour les opérations indépendantes :
+| Avantage | Concrètement |
+| --- | --- |
+| Contexte préservé | L'exploration reste dans la fenêtre du subagent ; seul son rapport revient |
+| Contraintes | Le champ `tools` limite ce que le subagent peut faire (lecture seule, pas de `Bash`, etc.) |
+| Réutilisation | Un fichier dans `~/.claude/agents/` sert dans tous vos projets |
+| Spécialisation | Un prompt système dédié à un domaine (revue, tests, SQL) |
+| Coût | Vous pouvez router une tâche simple vers `haiku` avec `model: haiku` |
 
-- Recherche dans le frontend pendant qu'un autre agent fouille le backend
-- Analyse de trois bibliothèques candidates en parallèle
-- Génération de tests pour plusieurs modules en même temps
+## Ce qui a changé en 2026
 
-```bash
-# Exemple : demander à Claude d'analyser 3 zones du repo en parallèle
-> Lance 3 subagents Explore en parallèle : un sur app/api, un sur lib/, un sur content/
-```
+Plusieurs comportements récents modifient la façon de travailler :
 
-Le gain de temps est réel sur les gros codebases, et chaque subagent reste focalisé sur sa zone.
-
-## Isoler les tâches risquées ou bruyantes
-
-Certaines tâches sont par nature bruyantes ou risquées : refactor exploratoire, debug d'un test qui plante, recherche large avec beaucoup de faux positifs. Les confier à un subagent isole le « désordre » du contexte principal. Si le subagent échoue ou prend une mauvaise direction, vous n'avez perdu que sa fenêtre — votre conversation principale reste propre.
-
-C'est aussi utile pour les revues de code : un `code-reviewer` peut critiquer librement sans influencer le ton de l'agent qui écrit la suite.
+- **Arrière-plan par défaut** : en session interactive, le « fork mode » est actif et Claude Code lance les subagents en arrière-plan. Vous continuez à écrire pendant qu'ils travaillent ; leurs demandes de permission remontent dans votre session principale.
+- **Forks** : `/subtask <tâche>` lance un subagent qui hérite de toute la conversation, utile quand un subagent classique demanderait trop d'explications.
+- **Imbrication** : un subagent peut lancer ses propres subagents, jusqu'à trois niveaux sous la conversation principale par défaut.
+- **Concurrence** : 20 subagents au maximum en même temps par défaut.
+- **Isolation Git** : `isolation: worktree` donne au subagent une copie isolée du dépôt.
 
 ## Cas d'usage typiques
 
-Quelques scénarios où un subagent est presque toujours la bonne réponse :
+- **Découvrir un dépôt inconnu** : Claude délègue la cartographie à l'agent intégré Explore.
+- **Lancer la suite de tests** : « Utilisez un subagent pour lancer les tests et ne me rapporter que les échecs avec leur message d'erreur ».
+- **Recherches parallèles** : authentification, base de données et API étudiées par trois subagents distincts.
+- **Revue de code** : un `code-reviewer` en lecture seule relit le diff sans connaître vos compromis.
+- **Enchaînement** : un subagent trouve les problèmes de performance, un second les corrige.
 
-- **Onboarding sur un repo inconnu** : déléguer à un agent Explore la cartographie du projet
-- **Recherche multi-fichiers** : « trouve tous les endroits où on appelle `supabase.auth` » via Explore
-- **Architecture d'une nouvelle feature** : un agent Plan produit un plan détaillé avant écriture
-- **Audit de sécurité** : un agent dédié relit les diffs d'une PR
-- **Migration** : un agent par module à migrer, exécutés en parallèle
+```text
+Utilisez des subagents séparés pour étudier en parallèle
+les modules d'authentification, de base de données et d'API.
+```
 
-À l'inverse, pour une petite édition ciblée (corriger une typo, modifier une ligne), le surcoût d'un subagent ne se justifie pas.
+## Quand rester dans la conversation principale
+
+La documentation recommande la conversation principale quand :
+
+- la tâche demande des allers-retours fréquents avec vous ;
+- plusieurs phases partagent beaucoup de contexte (plan, implémentation, tests) ;
+- il s'agit d'une petite modification ciblée ;
+- la latence compte : un subagent (hors fork) repart de zéro et doit d'abord rassembler son contexte.
+
+Pour une simple question sur ce qui est déjà dans la conversation, `/btw` est plus adapté : il voit tout votre contexte, sans outils, et sa réponse n'entre pas dans l'historique.
 
 ## Limites à connaître
 
-Un subagent ne voit pas la conversation principale. Il faut lui donner un brief complet et autonome — pas de « tu sais, le fichier dont on parlait tout à l'heure ». Il ne renvoie qu'un seul message final, donc impossible de dialoguer en cours de route. Enfin, ses outils sont limités à ce que vous lui autorisez (voir l'article sur le frontmatter).
+- Un subagent classique ne voit pas votre conversation. Il reçoit le message de délégation que Claude rédige, son prompt système, vos fichiers CLAUDE.md (sauf Explore et Plan) et un instantané `git status`.
+- Il consomme ses propres tokens, décomptés sur les mêmes limites d'usage que votre session.
+- Les rapports de nombreux subagents finissent tous dans la conversation principale : dix rapports détaillés pèsent lourd.
+- Pour des dizaines ou centaines d'agents, préférez les [dynamic workflows](/wiki/cli/dynamic-workflows-agents-arriere-plan).
 
 ## Pour aller plus loin
 
-- Consultez l'article sur les types de subagents fournis pour savoir lequel utiliser.
-- Apprenez à créer un subagent custom adapté à vos workflows récurrents.
-- Combinez subagents et hooks pour automatiser des revues à chaque commit.
+- [Types de subagents fournis](/wiki/subagents/types-fournis)
+- [Créer un subagent personnalisé](/wiki/subagents/creer-subagent-custom)
+- [Quand déléguer à un subagent ?](/wiki/subagents/quand-deleguer)
+- [L'outil Agent (ex-Task)](/wiki/outils/task-subagents)
+
+## Sources
+
+- https://code.claude.com/docs/en/sub-agents
+- https://code.claude.com/docs/en/agents
+- https://code.claude.com/docs/en/costs

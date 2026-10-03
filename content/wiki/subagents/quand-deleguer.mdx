@@ -1,34 +1,82 @@
 ---
 title: "Quand déléguer à un subagent ?"
-description: "Heuristiques concrètes pour décider quand lancer un subagent : tâche bornée, recherche large, économie de tokens et parallélisation."
-updatedAt: "2026-05-19"
-readingMinutes: 6
+description: "Une grille de décision pour choisir entre conversation principale, subagent, fork, /btw, workflow ou équipe d'agents dans Claude Code."
+updatedAt: "2026-10-03"
+readingMinutes: 3
 ---
 
-Déléguer une tâche à un subagent n'est pas toujours la bonne décision. Un subagent a un coût fixe (initialisation, contexte, prompt système) et introduit une couche d'indirection : vous ne voyez pas ce qu'il fait pas à pas, vous recevez seulement son résumé final. La question à se poser n'est donc jamais « est-ce que je peux déléguer ? » mais « est-ce que la délégation me fait gagner quelque chose ? ».
+Déléguer n'est pas gratuit : un subagent repart de zéro, consomme ses propres tokens et ne vous montre que son résumé. La bonne question n'est donc pas « puis-je déléguer ? » mais « qu'est-ce que la délégation me fait gagner ? ». Voici les critères issus de la documentation officielle et de la pratique.
 
-## Critère 1 : la tâche est bornée et a un livrable clair
+## Les signaux qui justifient un subagent
 
-Un bon candidat pour un subagent est une tâche qui peut être décrite en deux ou trois phrases et dont on peut décrire le résultat attendu sans ambiguïté. « Trouve toutes les routes API qui n'ont pas de vérification d'authentification et donne-moi la liste des fichiers » est borné. « Améliore le code » ne l'est pas. Si vous n'arrivez pas à écrire le prompt du subagent en une seule passe, c'est généralement le signe qu'il faut d'abord clarifier la tâche dans la conversation principale.
+### 1. La tâche produit beaucoup de sortie inutile ensuite
 
-## Critère 2 : la recherche est large et exploratoire
+C'est le cas d'usage principal : lancer une suite de tests, lire des logs, parcourir de la documentation, chercher dans 40 fichiers. La sortie volumineuse reste dans le contexte du subagent ; seule la synthèse revient.
 
-Les subagents brillent quand il faut ouvrir et lire beaucoup de fichiers pour extraire une petite information. Au lieu de charger 40 fichiers dans votre contexte principal, vous lancez un subagent qui fait le travail de lecture et vous renvoie quelques lignes de synthèse. Exemples typiques : auditer une convention de nommage, retrouver tous les usages d'une API dépréciée, lister les composants qui utilisent un certain hook.
+```text
+Utilisez un subagent pour lancer la suite de tests et ne me rapporter
+que les tests en échec avec leur message d'erreur.
+```
 
-## Critère 3 : économie de tokens dans le contexte principal
+### 2. La tâche est autonome et se résume
 
-Chaque token chargé dans la conversation principale reste là jusqu'à la fin de la session et coûte à chaque appel suivant. Un subagent isole ce coût : son contexte est jeté à la fin, seul son résumé revient. Si une tâche nécessite de lire des milliers de lignes pour produire 20 lignes de conclusion, c'est un gain net. À l'inverse, si vous savez déjà que vous allez devoir éditer les fichiers ensuite, lire dans le contexte principal est plus économique : vous évitez de payer la lecture deux fois.
+Vous pouvez la décrire en deux ou trois phrases et dire à quoi ressemble le résultat. « Listez les routes API sans vérification de jeton, avec fichier et ligne » est délégable. « Améliorez le code » ne l'est pas.
 
-## Critère 4 : parallélisation possible
+### 3. Vous voulez imposer des restrictions
 
-Si vous avez trois recherches indépendantes à faire, vous pouvez lancer trois subagents en parallèle dans un seul message. Le temps total devient celui du subagent le plus lent, pas la somme des trois. C'est particulièrement rentable pour des audits multi-fichiers, des comparaisons de plusieurs implémentations, ou des vérifications croisées entre frontend, backend et tests.
+Un agent en lecture seule, sans `Bash`, ou limité à un serveur MCP, garantit qu'une analyse ne modifiera rien.
 
-## Critère 5 : isolation d'un sujet sensible
+### 4. Plusieurs recherches sont indépendantes
 
-Parfois on veut isoler un raisonnement pour ne pas « polluer » la conversation principale avec des allers-retours, des fausses pistes ou un long debug. Le subagent renvoie une conclusion propre, et la conversation principale garde un fil lisible. Utile pour les investigations de bugs profonds, les recherches dans la documentation externe, ou les diagnostics d'erreurs Vercel.
+Trois zones du code à étudier sans lien entre elles : trois subagents en parallèle. Le temps total devient celui du plus lent.
+
+### 5. Un modèle moins cher suffit
+
+Une recherche simple peut tourner sur `haiku` pendant que votre session reste sur Opus 5.5.
+
+## Les signaux qui disent « restez dans la conversation »
+
+- Vous allez itérer avec Claude, corriger, préciser.
+- Les étapes partagent beaucoup de contexte (plan, implémentation, tests du même changement).
+- La modification est petite et ciblée.
+- Vous allez éditer les fichiers juste après les avoir lus : les relire dans la conversation principale évite de payer la lecture deux fois.
+- Un `grep` ou un `ls` donne la réponse en une commande.
+
+## Choisir le bon outil
+
+| Situation | Outil |
+| --- | --- |
+| Question sur ce qui est déjà dans la conversation | `/btw` (voit tout, sans outils, hors historique) |
+| Tâche annexe qui a besoin de tout le contexte actuel | Fork : `/subtask <tâche>` |
+| Tâche annexe autonome, sortie volumineuse | Subagent |
+| Consignes réutilisables exécutées dans la conversation | [Skill](/wiki/skills/skill-vs-agent-vs-mcp) |
+| Dizaines ou centaines d'agents, résultats recoupés | [Dynamic workflow](/wiki/cli/dynamic-workflows-agents-arriere-plan) |
+| Tâches indépendantes que vous voulez suivre vous-même | [Agent view](/wiki/cli/agent-view-sessions) (`claude agents`) |
+| Travailleurs qui doivent se parler et se répartir le travail | Équipe d'agents (expérimental, désactivé par défaut) |
+
+## Un test rapide avant de déléguer
+
+Posez-vous trois questions :
+
+1. Puis-je écrire le brief du subagent en une seule fois, sans « vous savez, le fichier de tout à l'heure » ?
+2. Le résultat attendu tient-il en quelques dizaines de lignes ?
+3. Ai-je besoin de voir le raisonnement intermédiaire ?
+
+Oui, oui, non : déléguez. Sinon, clarifiez d'abord dans la conversation principale.
+
+## Et si Claude délègue trop ou pas assez ?
+
+- Trop : refusez des types précis avec `"deny": ["Agent(Explore)"]` dans `permissions`, ou demandez-le simplement (« faites-le directement, sans subagent »).
+- Pas assez : nommez l'agent dans votre demande, ou utilisez une @-mention (`@agent-<nom>`) qui garantit son lancement. Une description d'agent contenant « use proactively » encourage aussi la délégation automatique.
 
 ## Pour aller plus loin
 
-- Article voisin : `parallelisation` pour orchestrer plusieurs subagents en simultané.
-- Article voisin : `cout-token-budgeting` pour chiffrer le coût réel d'une délégation.
-- Article voisin : `erreurs-courantes` pour éviter les délégations qui ne renvoient rien d'exploitable.
+- [Paralléliser les subagents](/wiki/subagents/parallelisation)
+- [Coût et budget de tokens](/wiki/subagents/cout-token-budgeting)
+- [Erreurs courantes](/wiki/subagents/erreurs-courantes)
+
+## Sources
+
+- https://code.claude.com/docs/en/sub-agents
+- https://code.claude.com/docs/en/agents
+- https://code.claude.com/docs/en/workflows

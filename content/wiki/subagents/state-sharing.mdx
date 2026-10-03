@@ -1,98 +1,119 @@
 ---
 title: "Partage d'état entre agents"
-description: "Transmettre résultats et fichiers entre subagents : retour de message, fichiers temporaires, sortie structurée."
-updatedAt: "2026-05-19"
-readingMinutes: 6
+description: "Faire circuler des résultats entre subagents Claude Code : rapport final, sortie structurée, fichiers, SendMessage et reprise, hooks SubagentStart/SubagentStop, mémoire persistante, équipes et workflows."
+updatedAt: "2026-10-03"
+readingMinutes: 5
 ---
 
-Les subagents Claude Code sont conçus pour être **étanches** : chacun a son propre contexte, son propre historique, ses propres tokens. C'est une force pour l'isolation, mais ça pose un problème dès qu'on veut chaîner plusieurs agents. Comment passer un résultat de A à B ? Trois mécanismes coexistent, chacun avec ses cas d'usage.
+Chaque subagent travaille dans sa propre fenêtre de contexte : c'est ce qui protège la conversation principale, mais cela pose une question dès que vous enchaînez plusieurs agents. Comment le résultat de A parvient-il à B ? Claude Code offre plusieurs mécanismes, du plus simple au plus outillé.
 
-## Mécanisme 1 — Le retour de message
+## 1. Le rapport final
 
-C'est le plus simple : le subagent termine en produisant un message texte que l'agent parent reçoit comme valeur de retour de l'appel `Task`. Ce message devient alors disponible dans le contexte du parent.
+C'est le mécanisme par défaut : le subagent termine par un message que Claude reçoit comme résultat de l'outil `Agent` (ou, pour un subagent en arrière-plan, dans une notification de fin). Claude peut ensuite en transmettre l'essentiel au subagent suivant :
 
-Avantages :
-
-- Aucun stockage externe, tout vit en mémoire.
-- Fonctionne pour des retours courts (résumé, liste, verdict).
-- Traçable directement dans le transcript.
-
-Limites :
-
-- Si le subagent a généré 50 KB de logs, vous ne voulez pas tout coller dans le parent.
-- Le format est libre — donc fragile à parser côté parent.
-- Pas adapté à transmettre des **fichiers** ou des **artefacts** binaires.
-
-Règle pratique : utilisez le retour de message pour tout résultat **synthétique** qui tient en moins de 2000 tokens (un résumé, un statut, une décision).
-
-## Mécanisme 2 — Les fichiers temporaires
-
-Quand le volume grandit, on bascule sur le disque. Le subagent écrit son résultat dans `/tmp/<nom>.json` (ou un répertoire de scratch convenu) et retourne au parent juste le chemin. Le parent lit ensuite le fichier quand il en a besoin.
-
-Pattern type :
-
-```
-parent → spawn "explorer" → écrit /tmp/exploration-42.json
-parent ← reçoit "résultats dans /tmp/exploration-42.json"
-parent → spawn "planner" avec ce chemin
-planner → lit le fichier, produit /tmp/plan-42.md
+```text
+Utilisez l'agent code-reviewer pour trouver les problèmes de performance,
+puis l'agent optimizer pour les corriger.
 ```
 
-Avantages :
+À savoir :
 
-- Pas de limite de taille pratique.
-- Le contexte parent reste léger (un chemin = 50 tokens).
-- Le fichier peut être inspecté manuellement pour debug.
+- Le rapport entre dans la conversation principale et y reste : gardez-le court (quelques centaines de tokens).
+- Claude Code analyse chaque rapport avant que Claude le lise. Les textes qui imitent des balises système sont neutralisés, et le rapport arrive sous un en-tête qui précise que les instructions qu'il contient n'ont aucune autorité de votre part.
+- Si le subagent s'arrête à sa limite `maxTurns`, la sortie revient marquée comme partielle.
 
-Précautions :
+## 2. La sortie structurée
 
-- Nommez les fichiers avec un identifiant unique (UUID, timestamp + PID) pour éviter les collisions entre runs parallèles.
-- Nettoyez à la fin de la session, ou utilisez `mktemp` qui gère ça pour vous.
-- N'écrivez **jamais** de secrets dans `/tmp` sans chiffrement.
-
-## Mécanisme 3 — La sortie structurée
-
-C'est l'évolution du retour de message : on impose au subagent un format strict (JSON Schema, XML, YAML). Le parent peut alors parser sans heuristique.
-
-Exemple de contrat avec un reviewer :
+Imposez un format strict dans le prompt de l'agent pour que le parent puisse l'exploiter sans ambiguïté :
 
 ```json
 {
-  "verdict": "approve" | "request_changes" | "block",
+  "verdict": "approve | request_changes | block",
   "findings": [
-    { "file": "...", "line": 42, "severity": "major", "message": "..." }
+    { "file": "app/api/wiki/route.ts", "line": 42, "severity": "major", "message": "..." }
   ],
   "summary": "..."
 }
 ```
 
-Combiné à une validation côté parent (Zod, JSON Schema), c'est le pattern le plus robuste pour des pipelines multi-agents. Vous obtenez du typage de fait entre maillons.
+Précisez « répondez uniquement avec ce JSON, sans bloc Markdown » et donnez un exemple. Si le résultat alimente un script (CI, mode `-p`), validez-le côté script et relancez en cas d'échec.
 
-Le piège : le subagent peut produire du JSON cassé (virgule en trop, guillemets non échappés). Prévoyez toujours :
+## 3. Les fichiers
 
-1. Un prompt qui dit "réponds **uniquement** avec le JSON, sans markdown".
-2. Une validation côté parent avec retry automatique si le parse échoue.
-3. Un fallback (re-spawn avec instruction plus stricte) après 2 échecs.
+Pour un volume important (logs, code généré, liste de 300 fichiers), le subagent écrit sur disque et ne renvoie que le chemin et un résumé :
+
+```text
+parent  → explorer : « écrivez l'inventaire dans .claude/scratch/inventaire.json »
+explorer → parent  : { "path": ".claude/scratch/inventaire.json", "summary": "312 fichiers, 14 sans test" }
+parent  → planner  : « lisez .claude/scratch/inventaire.json et proposez un plan »
+```
+
+Précautions :
+
+- Utilisez un dossier de travail ignoré par Git (par exemple `.claude/scratch/` ajouté à `.gitignore`) et des noms uniques si plusieurs agents écrivent en parallèle.
+- Un agent avec `isolation: worktree` écrit dans **son** worktree, pas dans votre copie : indiquez un chemin absolu hors du dépôt si le parent doit relire le fichier, ou faites committer le résultat.
+- N'écrivez jamais de secrets dans ces fichiers.
+
+## 4. SendMessage et la reprise d'un subagent
+
+Un subagent terminé peut être **repris** : il garde tout son historique (appels d'outils, résultats, raisonnement). Claude utilise l'outil `SendMessage` avec l'identifiant ou le nom de l'agent :
+
+```text
+Continuez cette revue et analysez maintenant la logique d'autorisation.
+```
+
+- Claude peut nommer un subagent à son lancement ; ce nom permet de le recontacter.
+- Un subagent qui possède `SendMessage` reçoit au démarrage la liste des autres agents nommés de la session (`main` compris) et peut leur écrire. La communication directe entre agents existe donc, mais reste à réserver aux cas précis.
+- Explore et Plan ne peuvent pas être repris : ils ne renvoient pas d'identifiant.
+- Un message d'un autre agent n'est jamais une approbation de votre part : il ne peut ni valider une demande de permission ni modifier la configuration d'un agent.
+
+## 5. Les hooks
+
+| Hook | Ce qu'il reçoit ou permet |
+| --- | --- |
+| `SubagentStart` | `agent_id`, `agent_type` ; peut injecter du contexte dans le subagent via `additionalContext` |
+| `SubagentStop` | `agent_id`, `agent_type`, `agent_transcript_path`, `last_assistant_message` ; `decision: "block"` relance le subagent avec une consigne |
+| `PostToolUse` sur `Agent` | Ajoute du contexte à la session parente après le retour d'un subagent |
+
+Exemple : injecter les conventions d'API dans chaque agent `api-developer` au démarrage, ou archiver chaque rapport final dans un fichier de suivi depuis `SubagentStop`.
+
+## 6. La mémoire persistante
+
+Le champ `memory` donne à un agent un dossier qui survit d'une session à l'autre (`project` : `.claude/agent-memory/<nom>/`). C'est l'outil adapté pour un savoir qui s'accumule (motifs de bugs, décisions d'architecture), pas pour passer un résultat ponctuel entre deux agents.
+
+## 7. Au-delà des subagents
+
+- **Équipes d'agents** (expérimental, `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`) : liste de tâches partagée et boîtes aux lettres entre coéquipiers.
+- **Dynamic workflows** : les résultats intermédiaires restent dans les variables du script ; la conversation ne reçoit que la réponse finale.
+- **Messagerie entre sessions** : pour faire circuler des résultats entre des sessions Claude Code que vous lancez vous-même.
 
 ## Quel mécanisme choisir
 
-| Cas | Mécanisme |
-|-----|-----------|
-| Verdict court (oui/non, statut) | Retour de message |
-| Plan de quelques étapes | Sortie structurée (JSON) |
-| Résultats volumineux (logs, code généré, dataset) | Fichier temporaire |
-| Pipeline multi-étapes avec contrat fort | Sortie structurée + fichier |
+| Besoin | Mécanisme |
+| --- | --- |
+| Verdict ou résumé court | Rapport final |
+| Résultat à exploiter par un script | Sortie structurée (JSON) |
+| Gros volume | Fichier + chemin dans le rapport |
+| Poursuivre le travail d'un agent | Reprise via `SendMessage` |
+| Contexte commun à injecter ou rapports à archiver | Hooks `SubagentStart` / `SubagentStop` |
+| Savoir qui s'accumule dans le temps | `memory` |
+| Pipeline de dizaines d'agents | Dynamic workflow |
 
-Vous pouvez bien sûr combiner : le subagent écrit le gros dans `/tmp` et retourne un JSON `{ "path": "...", "summary": "..." }`. C'est en général la formule gagnante.
+## Anti-patterns
 
-## Anti-patterns à éviter
-
-- **Variable globale partagée** : ça n'existe pas entre subagents. Toute tentative ressemblera à un fichier `/tmp` mal nommé.
-- **Communication horizontale** : un subagent B ne peut pas "demander" à un subagent C. Seul le parent orchestre.
-- **État implicite via le repo** : commiter un fichier juste pour qu'un autre agent le lise est lent, pollue l'historique git, et casse en concurrence.
+- **Committer un fichier pour qu'un autre agent le lise** : lent, pollue l'historique et casse en parallèle.
+- **Des rapports de 5 000 tokens** : ils restent dans la conversation principale et sont relus à chaque tour.
+- **Supposer qu'un subagent connaît le résultat d'un frère** : sans transmission explicite (brief, fichier ou message), il ne le connaît pas.
 
 ## Pour aller plus loin
 
-- Définir vos schémas de sortie une fois pour toutes dans `.claude/agents/<nom>.md` et les réutiliser.
-- Mettre en place un répertoire `.claude/scratch/` git-ignoré pour les artefacts inter-agents d'une même session.
-- Lire l'article sur la sous-traitance récursive pour voir comment l'état circule dans un arbre de plusieurs niveaux.
+- [Sous-traitance récursive](/wiki/subagents/sous-traitance-recursive)
+- [Le subagent code-reviewer en isolation](/wiki/subagents/code-reviewer-isolation)
+- [Dynamic workflows](/wiki/cli/dynamic-workflows-agents-arriere-plan)
+
+## Sources
+
+- https://code.claude.com/docs/en/sub-agents
+- https://code.claude.com/docs/en/hooks
+- https://code.claude.com/docs/en/agent-teams
+- https://code.claude.com/docs/en/workflows

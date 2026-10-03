@@ -1,68 +1,99 @@
 ---
-title: "Types de subagents fournis"
-description: "Inventaire des subagents disponibles par défaut dans Claude Code : Explore, Plan, general-purpose et code-reviewer."
-updatedAt: "2026-05-19"
-readingMinutes: 6
+title: "Les subagents intégrés de Claude Code"
+description: "Explore, Plan, general-purpose, claude, statusline-setup, claude-code-guide et les forks : rôle, modèle et outils de chaque subagent intégré, et comment les désactiver."
+updatedAt: "2026-10-03"
+readingMinutes: 4
 ---
 
-Claude Code embarque plusieurs subagents prêts à l'emploi. Chacun a un rôle précis, un prompt système optimisé et un jeu d'outils adapté. Bien les distinguer évite de réinventer la roue et garantit que vous déléguez la bonne tâche au bon agent.
+Claude Code fournit des subagents prêts à l'emploi que Claude utilise de lui-même quand la tâche s'y prête. Les connaître vous aide à formuler vos demandes et à savoir quand un agent personnalisé vaut la peine. Tous héritent des règles de permission de la conversation principale.
 
-## Explore — la recherche dans le code
+## Vue d'ensemble
 
-L'agent **Explore** est conçu pour fouiller un codebase. Il sait lire, grepper, lister, suivre des imports et reconstruire mentalement l'architecture d'un module sans rien modifier. Il est idéal quand vous posez des questions du type :
+| Agent | Modèle | Outils | Usage |
+| --- | --- | --- | --- |
+| Explore | Celui de la conversation (voir ci-dessous) | Lecture seule, `Write` et `Edit` refusés | Recherche et analyse de code |
+| Plan | Celui de la conversation | Lecture seule | Recherche pendant le mode plan |
+| general-purpose | Ordre de résolution standard | Tous les outils disponibles aux subagents | Tâches mêlant exploration et modification |
+| claude | Ordre de résolution standard | Tous les outils disponibles aux subagents | Tâche qui ne correspond à aucun agent spécialisé ; agent par défaut des sessions en arrière-plan |
+| statusline-setup | Sonnet | Spécifiques | Lancé par `/statusline` |
+| claude-code-guide | Haiku | Spécifiques | Questions sur les fonctionnalités de Claude Code |
 
-- « Où est définie la fonction `authenticateUser` ? »
-- « Liste tous les endroits où on lit la variable `ANTHROPIC_API_KEY`. »
-- « Comment circule la donnée entre `app/api/chat` et le client ? »
+Il n'existe pas de subagent intégré `code-reviewer` : c'est un exemple de la documentation que vous créez vous-même (voir [Le subagent code-reviewer en isolation](/wiki/subagents/code-reviewer-isolation)). Pour une revue prête à l'emploi, utilisez la commande `/code-review`.
 
-```bash
-> Utilise un subagent Explore pour cartographier toutes les routes API du dossier app/api
+## Explore
+
+Agent rapide en lecture seule pour trouver des fichiers, chercher du code et comprendre une base. Claude lui indique un niveau de profondeur : **quick** (recherche ciblée), **medium** ou **very thorough** (analyse complète).
+
+Son modèle est celui de la conversation principale. Exception : si votre session tourne sur Fable, Explore passe sur le modèle désigné par l'alias `opus` avec un abonnement Claude ou un compte Console ; il reste sur le modèle principal sur Bedrock, Google Cloud ou Microsoft Foundry.
+
+Pour faire tourner l'exploration sur un modèle moins cher, créez un agent utilisateur ou projet nommé `Explore` : il remplace l'agent intégré et garde son propre champ `model`.
+
+```markdown
+---
+name: Explore
+description: Recherche rapide en lecture seule dans la base de code.
+tools: Read, Grep, Glob
+model: haiku
+---
+
+Vous cherchez et résumez du code sans rien modifier.
 ```
 
-Explore renvoie un résumé structuré : fichiers pertinents, extraits clés, dépendances. Il ne touche jamais au disque, ce qui en fait un agent sûr et rapide.
+## Plan
 
-## Plan — l'architecture avant l'implémentation
+Utilisé en [mode plan](/wiki/cli/permissions-modes) : Claude lui confie la recherche dans le code pour que l'exploration reste dans une fenêtre séparée pendant que la conversation principale reste en lecture seule. Il ne modifie rien.
 
-L'agent **Plan** est spécialisé dans la conception. Vous lui décrivez un objectif (« ajouter un système de favoris aux leçons ») et il produit un plan détaillé : fichiers à créer, fonctions à modifier, schéma de base à étendre, points de vigilance. Il peut lire le code pour s'inspirer du style existant, mais il ne modifie rien.
+## general-purpose
 
-Plan est particulièrement précieux avant un gros changement : vous validez le plan, vous l'ajustez, puis vous demandez à l'agent principal (ou à un autre subagent) de l'exécuter. Cela évite de partir bille en tête dans une mauvaise direction.
+Agent polyvalent pour les tâches en plusieurs étapes qui demandent à la fois d'explorer, de raisonner et de modifier du code. C'est aussi le type utilisé quand Claude ne précise pas de `subagent_type` (si le fork mode est actif, Claude peut aussi demander un fork).
 
-## general-purpose — le couteau suisse
+## Les forks
 
-Le subagent **general-purpose** n'a pas de spécialité forte : il dispose de la palette complète d'outils et peut aussi bien lire que écrire, exécuter des commandes, modifier des fichiers. Vous l'utilisez pour les tâches composites qui ne rentrent dans aucune autre case :
+Un fork n'est pas un agent défini dans un fichier : c'est un subagent qui hérite de toute la conversation (prompt système, outils, modèle, historique). Seul son résultat final revient. Lancez-en un vous-même avec `/subtask` :
 
-- « Génère un script de migration, exécute-le sur la base locale et vérifie le résultat. »
-- « Crée un nouveau composant React, ajoute-le à la page, lance le build. »
-
-C'est aussi le bon choix quand vous voulez déléguer une tâche complète bout-en-bout, et pas seulement une exploration ou un plan.
-
-## code-reviewer — la relecture critique
-
-Le subagent **code-reviewer** est calibré pour relire du code avec un œil critique : bugs potentiels, problèmes de sécurité, anti-patterns, lisibilité, tests manquants. On l'invoque typiquement après une modification ou avant d'ouvrir une PR.
-
-```bash
-> Lance un code-reviewer sur les changements du dernier commit
+```text
+/subtask rédigez les tests unitaires pour les changements du parser
 ```
 
-Il renvoie un rapport structuré avec une sévérité par remarque. Couplé à un hook `PostToolUse` sur `Edit` ou à un slash command, il devient un compagnon de revue continu.
+Le fork mode est actif par défaut en session interactive (depuis la v2.1.232) et inactif en mode `-p` et dans l'Agent SDK. Un fork réutilise le cache de prompt de la session principale, ce qui le rend moins cher qu'un subagent neuf quand il a besoin du même contexte.
 
-## Comment choisir ?
+## Ce que chaque agent reçoit au démarrage
 
-Quelques règles simples :
+- Explore et Plan ignorent vos fichiers CLAUDE.md et l'instantané `git status`, pour rester rapides.
+- Les autres agents intégrés et vos agents personnalisés chargent les deux, sauf si leur définition contient `omitClaudeMd: true`.
+- Explore et Plan sont « one-shot » : ils ne renvoient pas d'identifiant et ne peuvent pas être repris. Pour un travail à poursuivre, préférez general-purpose ou un agent personnalisé.
 
-- **Lecture seule, recherche large** → Explore
-- **Conception, pas d'écriture** → Plan
-- **Exécution complète d'une tâche** → general-purpose
-- **Audit de diff** → code-reviewer
+## Désactiver des agents intégrés
 
-Si vous hésitez, Explore est souvent un bon premier réflexe : il prépare le terrain pour un agent plus actif ensuite.
+```json
+{
+  "permissions": {
+    "deny": ["Agent(Explore)", "Agent(fork)"]
+  }
+}
+```
 
-## Et les agents customs ?
+Autres options :
 
-Les quatre subagents ci-dessus couvrent l'essentiel, mais vos workflows répétitifs méritent souvent un agent dédié : un `db-migrator`, un `i18n-checker`, un `pr-summarizer`. C'est l'objet de l'article suivant.
+- refuser l'outil `Agent` tout entier pour empêcher toute délégation ;
+- `CLAUDE_CODE_DISABLE_EXPLORE_PLAN_AGENTS=1` retire seulement Explore et Plan (v2.1.198 ou plus) ;
+- en mode non interactif ou avec l'Agent SDK, `CLAUDE_AGENT_SDK_DISABLE_BUILTIN_AGENTS=1` retire tous les types intégrés.
+
+## Comment choisir
+
+- Lecture seule, recherche large : Explore (Claude le choisit souvent seul).
+- Préparer un changement : passez en mode plan, Claude utilisera Plan.
+- Tâche complète avec écriture : general-purpose.
+- Tâche qui a besoin de toute la conversation : `/subtask`.
+- Besoin récurrent et spécifique : [un agent personnalisé](/wiki/subagents/creer-subagent-custom).
 
 ## Pour aller plus loin
 
-- Apprenez à créer un subagent custom pour vos besoins spécifiques.
-- Consultez le détail des champs du frontmatter agent.
-- Combinez plusieurs subagents en parallèle pour accélérer vos sessions.
+- [Pourquoi utiliser des subagents ?](/wiki/subagents/pourquoi-subagents)
+- [Référence du frontmatter](/wiki/subagents/frontmatter-agent)
+- [Paralléliser les subagents](/wiki/subagents/parallelisation)
+
+## Sources
+
+- https://code.claude.com/docs/en/sub-agents
+- https://code.claude.com/docs/en/agents

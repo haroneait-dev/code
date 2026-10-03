@@ -1,86 +1,130 @@
 ---
-title: "Créer des subagents personnalisés"
-description: "Définir ses propres subagents dans .claude/agents : structure du fichier Markdown + YAML (name, description, tools, model, permissionMode), agents intégrés (Explore, Plan, General-purpose), résolution du modèle et coût en tokens."
-updatedAt: "2026-06-08"
-readingMinutes: 8
+title: "Créer un subagent personnalisé"
+description: "Écrire un subagent dans .claude/agents ou ~/.claude/agents : emplacements et priorités, exemple complet, description efficace, outils, modèle, flag --agents et invocation par @-mention ou --agent."
+updatedAt: "2026-10-03"
+readingMinutes: 5
 ---
 
-Un subagent, c'est **du Markdown** : le frontmatter YAML est la configuration, le corps est le prompt système. Pas de build, pas de SDK, pas de registre. Pour les fondamentaux (rôle de l'outil `Task`, parallélisme), voir l'article [Subagents](/wiki/subagents) ; ici on entre dans la définition concrète.
+Un subagent personnalisé est un simple fichier Markdown : le frontmatter YAML sert de configuration, le corps devient le prompt système. Créez-en un dès que vous relancez souvent le même type de tâche avec les mêmes consignes (revue, tests, migration, rédaction de documentation).
 
-## Les agents intégrés
+## Où placer le fichier
 
-Claude Code embarque des subagents invoqués automatiquement :
+Quand deux agents portent le même `name`, Claude Code garde celui de l'emplacement prioritaire :
 
-- **Explore** — lecture seule, tourne par défaut sur **Haiku** (rapide et économique) : cherche et comprend une base de code sans la modifier.
-- **Plan** — rassemble le contexte avant que Claude propose une stratégie en [mode plan](/wiki/cli/permissions-modes).
-- **General-purpose** — gère les tâches mêlant exploration et modification.
+| Emplacement | Portée | Priorité |
+| --- | --- | --- |
+| Paramètres gérés (managed settings) | Toute l'organisation | 1 (la plus haute) |
+| Flag `--agents` | Session en cours | 2 |
+| `.claude/agents/` | Projet courant, versionnable | 3 |
+| `~/.claude/agents/` | Tous vos projets | 4 |
+| Dossier `agents/` d'un plugin | Là où le plugin est activé | 5 |
 
-Tu n'as pas à les appeler : Claude route vers eux selon ta demande.
+Points pratiques :
 
-## Structure d'un agent personnalisé
+- Les dossiers sont lus récursivement : vous pouvez ranger vos agents dans `agents/review/` ou `agents/research/`. L'identité vient uniquement du champ `name`.
+- Les `.claude/agents/` sont cherchés en remontant depuis le dossier courant jusqu'à la racine du dépôt ; le plus proche gagne.
+- Claude Code surveille ces dossiers : une modification est prise en compte en quelques secondes, sans redémarrage. Redémarrez seulement si le dossier `agents` n'existait pas au lancement de la session.
 
-Place un fichier `.md` dans :
+## Trois façons de créer un agent
 
-- `.claude/agents/` (**projet** — priorité la plus haute, versionnable)
-- `~/.claude/agents/` (**utilisateur**)
+1. **Demander à Claude** : c'est la méthode recommandée. Depuis la v2.1.198, `/agents` n'ouvre plus d'assistant interactif ; il rappelle simplement de demander à Claude ou d'éditer les fichiers.
 
-En cas de même nom, le **projet** gagne. Si tu édites un fichier directement sur disque, **redémarre la session** ; les agents créés via l'UI [`/agents`](/wiki/slash-commands) prennent effet immédiatement.
+   ```text
+   Créez un subagent personnel code-improver dans ~/.claude/agents/
+   qui analyse les fichiers et propose des améliorations de lisibilité
+   et de performance. Il doit être en lecture seule et utiliser Sonnet.
+   ```
+
+2. **Écrire le fichier vous-même** dans `.claude/agents/` (partagé avec l'équipe via Git) ou `~/.claude/agents/`.
+3. **Le passer en JSON** avec `--agents` pour une session ou un script (voir plus bas).
+
+## Exemple complet
 
 ```markdown
 ---
-name: code-reviewer
-description: "À utiliser pour relire les changements récents : sécurité, style, bonnes pratiques. MUST BE USED après un git diff important."
-tools: Read, Grep, Glob          # optionnel ; omis → hérite des outils du thread
-model: sonnet                    # optionnel ; ou 'inherit'
-permissionMode: default
+name: api-auth-reviewer
+description: Vérifie l'authentification des routes API. À utiliser après toute modification dans app/api/.
+tools: Read, Grep, Glob, Bash
+model: sonnet
+color: orange
 ---
 
-Tu es un ingénieur sécurité applicative senior. Quand on t'invoque :
-1. Lance `git diff HEAD` pour voir les changements.
-2. Identifie les zones à risque (auth, entrées, exposition de données).
-3. Cherche : injection SQL, XSS, IDOR, contrôles d'accès manquants, secrets en clair.
-4. Rends les conclusions en CRITICAL / HIGH / MEDIUM / LOW avec numéros de ligne.
+Vous êtes un relecteur sécurité spécialisé dans les routes API Next.js.
+
+Quand vous êtes invoqué :
+1. Lancez `git diff --name-only` et ne gardez que les fichiers sous app/api/.
+2. Pour chaque route, vérifiez que le jeton est contrôlé avant tout accès aux données.
+3. Signalez les secrets en clair et les entrées non validées.
+
+Format de sortie :
+- Un tableau Fichier | Ligne | Gravité (critique, majeur, mineur) | Problème
+- « RAS » si vous ne trouvez rien.
+
+Ne modifiez aucun fichier.
 ```
 
-Le subagent ne reçoit **que** ce prompt système (plus quelques détails d'environnement comme le dossier courant), pas tout le prompt système de Claude Code, ni le `CLAUDE.md` du projet de façon implicite.
+Seuls `name` et `description` sont obligatoires. Le subagent reçoit ce prompt plus quelques détails d'environnement (dossier de travail), pas le prompt système complet de Claude Code. Il charge en revanche vos fichiers CLAUDE.md et un instantané `git status`, sauf si vous ajoutez `omitClaudeMd: true`.
 
-## Le champ `description` fait tout
+## Écrire une bonne `description`
 
-C'est lui qui décide de l'**auto-délégation**. Sois spécifique et riche en mots-clés ; les formules type « MUST BE USED for… » remontent la priorité. Une description vague est ignorée : Claude prend le premier agent dont la description matche l'intention. Un bon `description` contient un **déclencheur** (« après un commit », « quand le build casse ») et un **livrable** (« retourne un rapport », « propose un patch »).
+Claude choisit l'agent à partir de sa description. Elle doit dire **quand** l'utiliser et, si possible, ce qu'il livre.
 
-## `tools` : moindre privilège
+- Bon : « Lance les tests et rapporte uniquement les échecs. À utiliser après une modification de code. »
+- Trop vague : « Aide sur le code. »
+- Pour encourager la délégation automatique, ajoutez une formule comme « Use proactively » ou « À utiliser de façon proactive ».
 
-Si tu omets `tools`, l'agent **hérite** des [outils](/wiki/outils) du thread (y compris MCP). Restreins quand tu veux un contrôle serré :
+Restez bref : au-delà de 15 000 tokens cumulés pour les descriptions de vos agents (hors agents intégrés), Claude Code affiche un avertissement au démarrage. Mettez le détail dans le corps du fichier, qui ne se charge qu'à l'exécution.
 
-- un reviewer obtient `Read + Grep` (pas `Bash` ni `Edit`) ;
-- un rédacteur/migrateur `Read + Write + Edit` (pas `WebFetch`) ;
-- un agent de recherche externe `WebSearch + WebFetch` (surtout pas `Edit`).
+## Outils et modèle
 
-Cette allowlist sert deux objectifs : **sécurité** (limiter les dégâts) et **focus** (l'agent ne se disperse pas).
+- `tools` est une liste blanche. Sans ce champ, l'agent hérite de tous les outils disponibles aux subagents, MCP compris.
+- `disallowedTools` retire des outils de cette liste héritée.
+- `model` accepte `sonnet`, `opus`, `haiku`, `fable`, un identifiant complet comme `claude-opus-5-5`, ou `inherit`.
 
-## Résolution du modèle
+Ordre de résolution du modèle (depuis la v2.1.251) :
 
-Claude Code résout le [modèle](/wiki/modeles) de l'agent dans cet ordre : la variable `CLAUDE_CODE_SUBAGENT_MODEL` si définie, puis le champ `model` du frontmatter, etc. La valeur `inherit` reprend le modèle de la session.
+1. le paramètre `model` passé par Claude lors de l'appel ;
+2. le champ `model` du frontmatter ;
+3. la variable `CLAUDE_CODE_SUBAGENT_MODEL` ;
+4. le modèle de la conversation principale.
 
-## Coût : attention aux tokens
+Pour imposer un modèle à tous les subagents, ajoutez `CLAUDE_CODE_SUBAGENT_MODEL_FORCE=1`. Le détail de chaque champ est dans la [référence du frontmatter](/wiki/subagents/frontmatter-agent).
 
-Les subagents utilisent le **même modèle et les mêmes tokens** qu'une session normale, simplement dans leur **propre fenêtre de contexte** (pas de facturation séparée). L'intérêt : garder le thread principal propre — au lieu de lire 30 fichiers dans la conversation principale, on délègue (« trouve tous les appels à `loadUser` et résume »). Le coût : un workflow très orienté subagents peut consommer **~7× plus de tokens** qu'un thread unique, car chaque agent maintient son contexte. La compaction automatique du thread principal se déclenche d'ailleurs autour de 95 % de capacité.
+## Définir des agents en ligne de commande
 
-## Patterns d'équipe
+```bash
+claude --agents '{
+  "debugger": {
+    "description": "Spécialiste du débogage pour les erreurs et tests en échec.",
+    "prompt": "Vous analysez les erreurs, trouvez la cause racine et proposez un correctif.",
+    "tools": ["Read", "Edit", "Bash", "Grep", "Glob"],
+    "model": "sonnet"
+  }
+}'
+```
 
-Chaîne des agents spécialisés via les [hooks](/wiki/hooks) `SubagentStop`/`Stop` : PM (spec) → Architecte (validation) → Implémenteur/Testeur (build & tests) → QA. Sérialise les étapes à risque, parallélise les sûres, garde un humain dans la boucle pour approuver les transitions sensibles.
+Ces agents n'existent que pour la session. En mode `-p`, `--agents` accepte aussi le chemin d'un fichier JSON (v2.1.281 ou plus). Les champs `color` et `experimental` y sont ignorés.
 
-## Trois façons de créer un subagent
+## Invoquer votre agent
 
-1. **UI interactive** [`/agents`](/wiki/slash-commands) (la plus rapide ; Anthropic la recommande, et elle génère un premier squelette à partir d'une intention en langage naturel).
-2. **Fichiers Markdown** dans `.claude/agents/` (versionnés dans Git → `git pull` partage l'agent avec toute l'équipe).
-3. **Programmatique** via l'**Agent SDK** (paramètre `agents` de `query()`).
+- **Langage naturel** : « Utilisez l'agent api-auth-reviewer sur mes derniers changements ». Claude décide.
+- **@-mention** : tapez `@` et choisissez l'agent, ou écrivez `@agent-api-auth-reviewer`. L'agent est alors garanti.
+- **Toute la session** : `claude --agent api-auth-reviewer`, ou `"agent": "api-auth-reviewer"` dans `.claude/settings.json`. Le prompt de l'agent remplace alors le prompt système de Claude Code.
+
+## Pièges fréquents
+
+- Un champ mal orthographié (`disallowed_tools` au lieu de `disallowedTools`) est ignoré sans erreur.
+- Un fichier sans `name`, sans `description`, avec un `name` contenant `:` ou un YAML invalide est ignoré. Lancez `claude --debug` ou `claude plugin validate .claude/agents` pour comprendre.
+- Les agents fournis par un plugin ignorent `hooks`, `mcpServers` et `permissionMode` pour des raisons de sécurité. Copiez le fichier dans `.claude/agents/` si vous en avez besoin.
+- Les hooks et serveurs MCP en ligne d'un agent de projet ne s'exécutent qu'après acceptation de la confiance du dossier.
 
 ## Pour aller plus loin
 
-- [Subagents](/wiki/subagents) — fondamentaux et orchestration
-- [Outils intégrés](/wiki/outils) · [Hooks](/wiki/hooks)
-- [API Anthropic](/wiki/api) — Agent SDK
+- [Référence du frontmatter](/wiki/subagents/frontmatter-agent)
+- [Types de subagents fournis](/wiki/subagents/types-fournis)
+- [Le subagent code-reviewer en isolation](/wiki/subagents/code-reviewer-isolation)
+- [Créer un plugin](/wiki/plugins/creer-plugin) pour distribuer vos agents
 
-### Sources officielles
-- Créer des subagents : https://code.claude.com/docs/en/sub-agents
+## Sources
+
+- https://code.claude.com/docs/en/sub-agents
