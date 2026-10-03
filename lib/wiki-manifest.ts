@@ -3,6 +3,9 @@
 // Articles themselves live as MDX files in content/wiki/<cat>/<slug>.mdx
 
 export type CategoryId =
+  | "claude-bases"
+  | "claude-agents"
+  | "cas-usage"
   | "demarrer"
   | "modeles"
   | "cli"
@@ -37,8 +40,32 @@ export type CategoryIcon =
   | "lock"
   | "globe";
 
+export type SectionId = "claude" | "code" | "commun";
+
+export const SECTIONS: { id: SectionId; name: string; description: string; href: string }[] = [
+  {
+    id: "claude",
+    name: "Claude",
+    description: "L'assistant au quotidien : chat, projets, mémoire, recherche, fichiers, Cowork, extensions.",
+    href: "/claude",
+  },
+  {
+    id: "code",
+    name: "Claude Code",
+    description: "L'agent de développement : CLI, outils, hooks, skills, MCP, plugins, API.",
+    href: "/claude-code",
+  },
+  {
+    id: "commun",
+    name: "Pour les deux",
+    description: "Les modèles, l'art de bien formuler ses demandes, et l'actualité.",
+    href: "/wiki",
+  },
+];
+
 export type Category = {
   id: CategoryId;
+  section: SectionId;
   name: string;
   icon: CategoryIcon;
   description: string;
@@ -53,103 +80,141 @@ export type ArticleStub = {
 
 export const CATEGORIES: Category[] = [
   {
+    id: "claude-bases",
+    section: "claude",
+    name: "Bien démarrer avec Claude",
+    icon: "sparkles",
+    description: "Premiers pas, offres et limites, modèles, bien formuler ses demandes, confidentialité.",
+  },
+  {
     id: "demarrer",
-    name: "Démarrer",
+    section: "code",
+    name: "Démarrer avec Claude Code",
     icon: "terminal",
     description: "Installation, premiers pas, configuration de base.",
   },
   {
     id: "modeles",
+    section: "commun",
     name: "Modèles Claude",
     icon: "sparkles",
     description: "Fable, Opus, Sonnet, Haiku : capacités, prix, comparatifs, choix.",
   },
   {
     id: "cli",
+    section: "code",
     name: "CLI Claude Code",
     icon: "command",
     description: "Tout sur le CLI : sessions, settings, modes, automation.",
   },
   {
     id: "outils",
+    section: "code",
     name: "Outils intégrés",
     icon: "wrench",
     description: "Read, Write, Edit, Bash, Grep et compagnie — en détail.",
   },
   {
     id: "slash-commands",
+    section: "code",
     name: "Slash Commands",
     icon: "zap",
     description: "Commandes built-in et création de commandes custom.",
   },
   {
     id: "hooks",
+    section: "code",
     name: "Hooks",
     icon: "git",
     description: "Automatisation via PreToolUse, PostToolUse, SessionStart, etc.",
   },
   {
     id: "skills",
+    section: "code",
     name: "Skills (Agent SDK)",
     icon: "puzzle",
     description: "Système de skills réutilisables — créer, publier, composer.",
   },
   {
     id: "subagents",
+    section: "code",
     name: "Subagents",
     icon: "users",
     description: "Délégation à des agents spécialisés en parallèle.",
   },
   {
     id: "mcp",
+    section: "code",
     name: "MCP",
     icon: "plug",
     description: "Model Context Protocol — serveurs, clients, primitives.",
   },
   {
     id: "prompt-engineering",
+    section: "commun",
     name: "Prompt Engineering",
     icon: "sparkles",
     description: "Techniques avancées pour formuler des requêtes efficaces.",
   },
   {
     id: "api",
+    section: "code",
     name: "API Anthropic",
     icon: "cloud",
     description: "Utiliser l'API directement — SDK, streaming, tools, caching.",
   },
   {
     id: "workflows",
+    section: "code",
     name: "Workflows & Sécurité",
     icon: "shield",
     description: "Workflows production, sécurité, bonnes pratiques.",
   },
   {
     id: "claude-ai",
-    name: "Claude.ai (Web)",
+    section: "claude",
+    name: "Les fonctions de Claude",
     icon: "globe",
-    description: "Interface web grand public — Projects, Artifacts, abonnements.",
+    description: "Projets, mémoire, recherche, fichiers, Docs et Slides, connecteurs, skills, applications.",
   },
   {
     id: "enterprise",
+    section: "code",
     name: "Architecture & Enterprise",
     icon: "lock",
     description: "Déploiement, sécurité, conformité, multi-cloud.",
   },
   {
     id: "plugins",
+    section: "code",
     name: "Plugins & mods",
     icon: "layers",
     description: "Installer, créer et publier des plugins, et modifier l'interface avec les mods.",
   },
   {
+    id: "claude-agents",
+    section: "claude",
+    name: "Claude qui agit pour vous",
+    icon: "zap",
+    description: "Cowork, Dispatch, tâches programmées, Claude dans Chrome et dans Microsoft 365.",
+  },
+  {
+    id: "cas-usage",
+    section: "claude",
+    name: "Cas d'usage concrets",
+    icon: "users",
+    description: "Études, rédaction, données, entrepreneuriat, vie quotidienne : des méthodes prêtes à l'emploi.",
+  },
+  {
     id: "obsidian",
+    section: "claude",
     name: "Obsidian + Claude",
     icon: "layers",
     description: "Connecter ton vault Obsidian à Claude — approche fichiers et MCP.",
   },
   {
     id: "actualites",
+    section: "commun",
     name: "Actualités & ressources",
     icon: "zap",
     description: "Nouveautés Claude Code 2026 et sources externes fiables.",
@@ -368,15 +433,17 @@ export const ARTICLE_STUBS: ArticleStub[] = [
   { category: "workflows", slug: "faux-positifs-audit", title: "Faux positifs en audit de sécurité", description: "Calibrer /security-review pour éviter le bruit." },
 
   // ═══ CLAUDE.AI WEB ═══════════════════════════════════════════════
-  { category: "claude-ai", slug: "pro-team-enterprise", title: "Claude Pro vs Team vs Enterprise", description: "Plans, SLA, SSO, gouvernance, pricing." },
-  { category: "claude-ai", slug: "artifacts-architecture", title: "Les Artifacts : fonctionnement et architecture", description: "Génération, rendu live (React, HTML, SVG), sandboxing." },
-  { category: "claude-ai", slug: "projects-creation", title: "Création et optimisation de Projects", description: "Bases de connaissances, custom instructions, fichiers." },
-  { category: "claude-ai", slug: "projects-knowledge-base", title: "Project Knowledge Base : limites et partage", description: "Mémoire contextuelle, maximiser les quotas tokens." },
-  { category: "claude-ai", slug: "app-mobile", title: "L'application mobile (iOS/Android)", description: "Dictée, vision live, limitations vs desktop." },
-  { category: "claude-ai", slug: "model-selector-web", title: "Le sélecteur de modèles web", description: "Bascules automatiques en cas de quota atteint." },
-  { category: "claude-ai", slug: "historique-export", title: "Historique et export des données", description: "Procédures RGPD, rétention, export complet." },
-  { category: "claude-ai", slug: "integrations-natives", title: "Intégrations natives Claude.ai", description: "GitHub, Google Drive, Notion — sans passer par le CLI." },
-  { category: "claude-ai", slug: "shared-chats", title: "Partage de conversations", description: "Snapshots, ce qui est inclus/masqué dans un lien public." },
+  { category: "claude-ai", slug: "projects-creation", title: "Les projets : un espace par sujet", description: "Créer un projet, écrire de bonnes instructions, y ranger ses documents." },
+  { category: "claude-ai", slug: "projects-knowledge-base", title: "Bien nourrir un projet", description: "Quels documents ajouter, comment Claude les consulte, des réponses fidèles à vos sources." },
+  { category: "claude-ai", slug: "memoire", title: "La mémoire de Claude", description: "Topics, mémoire par projet, recherche dans l'historique, sujets sensibles, contrôle." },
+  { category: "claude-ai", slug: "recherche", title: "Recherche web et mode Research", description: "Des réponses à jour et sourcées, et des rapports documentés en quelques minutes." },
+  { category: "claude-ai", slug: "docs-slides-design", title: "Fichiers, Docs, Slides et Design", description: "Envoyer des fichiers, créer des Excel, Word, PowerPoint, PDF, et les nouveaux éditeurs." },
+  { category: "claude-ai", slug: "artifacts-architecture", title: "Artifacts : mini-applications et graphiques", description: "Simulateurs, quiz, tableaux de bord et pages interactives à créer et partager." },
+  { category: "claude-ai", slug: "integrations-natives", title: "Les connecteurs", description: "Relier Claude à Gmail, Agenda, Drive, Microsoft 365, Notion et vos outils." },
+  { category: "claude-ai", slug: "skills-claude", title: "Les skills dans Claude", description: "Enregistrer une méthode de travail que Claude applique tout seul." },
+  { category: "claude-ai", slug: "app-mobile", title: "L'application mobile", description: "Mode vocal, appareil photo, widgets, raccourcis et suivi des tâches." },
+  { category: "claude-ai", slug: "application-bureau", title: "L'application de bureau", description: "Accès rapide au clavier, dictée, captures, Cowork et Claude Code." },
+  { category: "claude-ai", slug: "shared-chats", title: "Partager une conversation", description: "Ce que contient un lien partagé et ce qu'il faut vérifier avant." },
 
   // ═══ ENTERPRISE ══════════════════════════════════════════════════
   { category: "enterprise", slug: "data-privacy", title: "Politique de confidentialité des données", description: "Non-utilisation des données API/Enterprise pour l'entraînement." },
@@ -396,11 +463,31 @@ export const ARTICLE_STUBS: ArticleStub[] = [
   { category: "plugins", slug: "introduction-plugins", title: "Les plugins : installer et gérer", description: "Ce qu'un plugin contient, les marketplaces, les portées, et ce qu'il coûte en contexte." },
   { category: "plugins", slug: "creer-plugin", title: "Créer et publier un plugin", description: "Du dossier vide à la marketplace : manifeste, test avec --plugin-dir, validation, evals." },
   { category: "plugins", slug: "mods", title: "Les mods", description: "Des plugins en JavaScript qui dessinent dans l'interface et interceptent les appels d'outils." },
+  // ═══ BIEN DÉMARRER AVEC CLAUDE ═══════════════════════════════════
+  { category: "claude-bases", slug: "premiers-pas", title: "Premiers pas avec Claude", description: "Où l'utiliser, l'interface « One Claude », une première conversation utile." },
+  { category: "claude-bases", slug: "offres-et-limites", title: "Offres et limites d'usage", description: "Free, Pro, Max, Team, Enterprise, et comment fonctionnent les limites de 5 heures et hebdomadaires." },
+  { category: "claude-bases", slug: "choisir-modele", title: "Choisir son modèle", description: "Opus, Sonnet, Haiku, Fable : lequel choisir et quand demander plus de réflexion." },
+  { category: "claude-bases", slug: "bien-demander", title: "Bien formuler ses demandes", description: "Contexte, objectif, contraintes, format : la méthode et des modèles à copier." },
+  { category: "claude-bases", slug: "personnaliser", title: "Personnaliser Claude", description: "Préférences de profil, styles et instructions de projet." },
+  { category: "claude-bases", slug: "confidentialite", title: "Confidentialité et données", description: "Entraînement, conservation, incognito, export, suppression, ce qu'il ne faut pas envoyer." },
+  { category: "claude-bases", slug: "verifier-reponses", title: "Vérifier les réponses", description: "Quand Claude se trompe, et une méthode simple pour vérifier ce qui compte." },
+  // ═══ CLAUDE QUI AGIT ══════════════════════════════════════════════
+  { category: "claude-agents", slug: "cowork", title: "Cowork : Claude qui travaille dans vos fichiers", description: "Dossiers, applications, navigateur intégré, tâches en plusieurs étapes." },
+  { category: "claude-agents", slug: "dispatch-taches", title: "Dispatch et tâches programmées", description: "Confier une tâche depuis le téléphone et programmer du travail récurrent." },
+  { category: "claude-agents", slug: "claude-chrome", title: "Claude dans Chrome", description: "L'extension qui lit, clique et remplit des formulaires pour vous, et ses règles de sécurité." },
+  { category: "claude-agents", slug: "claude-microsoft-365", title: "Claude dans Excel, Word, PowerPoint et Outlook", description: "Les compléments Microsoft 365 et le contexte partagé entre fichiers." },
+  // ═══ CAS D'USAGE ══════════════════════════════════════════════════
+  { category: "cas-usage", slug: "etudiants", title: "Pour les études", description: "Comprendre, réviser, préparer un examen ou un mémoire sans tricher." },
+  { category: "cas-usage", slug: "rediger", title: "Rédiger", description: "E-mails, courriers, CV, lettres de motivation, publications, textes longs." },
+  { category: "cas-usage", slug: "analyser-donnees", title: "Analyser des données", description: "Tableurs, budgets, graphiques et tableaux de bord sans formules." },
+  { category: "cas-usage", slug: "entrepreneurs", title: "Entreprendre", description: "De l'idée au marketing : étude de marché, prévisionnel, communication, gestion." },
+  { category: "cas-usage", slug: "vie-quotidienne", title: "Au quotidien", description: "Démarches, budget, repas, voyages, santé, maison." },
   { category: "obsidian", slug: "guide-complet", title: "Obsidian + Claude : le guide complet", description: "Connecter ton vault Obsidian à Claude — approche directe (fichiers) et approche MCP, cas d'usage, sécurité." },
   { category: "obsidian", slug: "serveurs-mcp", title: "Serveurs MCP Obsidian : installation & config", description: "Local REST API, mcp-obsidian, obsidian-claude-code-mcp — configuration Claude Desktop & Claude Code, dépannage." },
 
   // ═══ ACTUALITÉS & RESSOURCES ═════════════════════════════════════
-  { category: "actualites", slug: "nouveautes-2026", title: "Nouveautés Claude Code (2026)", description: "Opus 4.8 par défaut, computer use, auto mode, orchestration multi-agents, mémoire « dreaming », installeur natif." },
+  { category: "actualites", slug: "nouveautes-claude-2026", title: "Nouveautés de Claude (2026)", description: "Le journal mois par mois de l'assistant : One Claude, Docs, Cowork, mémoire, Chrome, Office." },
+  { category: "actualites", slug: "nouveautes-2026", title: "Nouveautés Claude Code (2026)", description: "Le journal mois par mois de l'outil des développeurs : modèles, auto mode, agent view, workflows, plugins, mods." },
   { category: "actualites", slug: "claude-tag-slack", title: "Claude Tag — l'IA ambiante dans Slack", description: "Le coéquipier IA persistant d'Anthropic et Salesforce : mémoire de canal, mode multi-joueurs et défis de gouvernance." },
   { category: "actualites", slug: "claude-science", title: "Claude Science — l'atelier IA pour chercheurs", description: "60+ compétences en génomique/chémoinformatique, intégration BioNeMo de NVIDIA et calcul distribué via Modal." },
   { category: "actualites", slug: "backdoor-chine-distillation", title: "Le « backdoor » chinois : traçage & distillation", description: "L'alerte NVDB de juillet 2026, la réalité du mécanisme anti-distillation, et le conflit Anthropic / Alibaba." },
@@ -416,6 +503,15 @@ export function getCategory(id: CategoryId): Category | undefined {
 
 export function stubsByCategory(id: CategoryId): ArticleStub[] {
   return ARTICLE_STUBS.filter((a) => a.category === id);
+}
+
+export function categoriesBySection(section: SectionId): Category[] {
+  return CATEGORIES.filter((c) => c.section === section);
+}
+
+export function articleCountBySection(section: SectionId): number {
+  const ids = new Set(categoriesBySection(section).map((c) => c.id));
+  return ARTICLE_STUBS.filter((a) => ids.has(a.category)).length;
 }
 
 export function articleCount(): number {

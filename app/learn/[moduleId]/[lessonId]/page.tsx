@@ -57,7 +57,7 @@ export default async function LessonPage({
 
   return (
     <div className="min-h-screen flex flex-col">
-      <SiteHeader active="formation" showSearch />
+      <SiteHeader active="code" showSearch />
 
       <div className="flex-grow w-full max-w-container-max mx-auto px-margin-mobile md:px-margin-desktop flex gap-gutter py-8 relative">
         {/* Left sidebar — module lessons */}

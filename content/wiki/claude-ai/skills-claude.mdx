@@ -1,0 +1,77 @@
+---
+title: "Les skills dans Claude : automatiser vos tâches répétitives"
+description: "Ce qu'est un skill, comment Claude les utilise, comment en créer un sans coder avec le Skill Creator, ou en important un fichier, et des idées de skills utiles."
+updatedAt: "2026-10-03"
+readingMinutes: 7
+---
+
+Un **skill** est une méthode de travail enregistrée que Claude applique de lui-même quand elle est utile. Vous écrivez une fois « comment je veux qu'on fasse mes comptes rendus », et chaque compte rendu suit cette méthode, sans le répéter.
+
+## Skill, projet ou style : la différence
+
+| | Ce que c'est | Exemple |
+|---|---|---|
+| **Style** | La forme des réponses | « Réponds de façon concise » |
+| **Projet** | Un espace avec des documents et des instructions | « Mon cours de droit des contrats » |
+| **Skill** | Une méthode pour une tâche précise, utilisable partout | « Comment rédiger un compte rendu de réunion selon nos règles » |
+
+Un skill peut aussi contenir des **modèles** (un fichier Word de référence, un logo) et même des **scripts** pour des traitements précis.
+
+## Comment Claude s'en sert
+
+Claude voit en permanence le **nom et la description** de vos skills. Quand une demande correspond, il charge le skill complet et suit ses instructions. Vous pouvez aussi l'appeler explicitement : « Utilise mon skill compte-rendu ».
+
+Anthropic fournit des skills prêts à l'emploi, notamment pour créer des fichiers Excel, Word, PowerPoint et PDF. Un annuaire en propose plus d'un millier.
+
+## Créer un skill sans coder
+
+1. Ouvrez **Customize → Skills**.
+2. Cliquez sur **+**, puis **Créer un skill → Créer avec Claude**.
+3. Le **Skill Creator** vous pose des questions : nom, quand l'utiliser, sources de données, format attendu.
+4. Testez sur un vrai cas, puis demandez des ajustements.
+
+## Importer un skill
+
+Un skill est un **dossier** qui contient au minimum un fichier `SKILL.md` :
+
+```markdown
+---
+name: compte-rendu-reunion
+description: Rédige les comptes rendus de réunion selon les règles de l'équipe. À utiliser dès qu'on me donne des notes ou une transcription de réunion.
+---
+
+1. Commence par la date, les participants et l'objectif en une phrase.
+2. Liste les décisions prises, chacune sur une ligne.
+3. Fais un tableau des actions : quoi, qui, pour quand.
+4. Termine par les points en suspens.
+5. Ton neutre, phrases courtes, pas plus d'une page.
+```
+
+Compressez le dossier en **.zip**, puis **Customize → Skills → + → Importer un skill**.
+
+Le même skill fonctionne dans Claude, dans [Claude Code](/wiki/skills/structure-skill) et via l'API.
+
+## Idées de skills utiles
+
+- **Répondre aux avis clients** selon le ton de votre marque.
+- **Corriger des copies** avec votre barème.
+- **Préparer une note de frais** à partir de photos de tickets.
+- **Rédiger des fiches produits** pour votre boutique en ligne.
+- **Résumer un article scientifique** selon une grille fixe.
+- **Préparer une réunion** : ordre du jour, documents à lire, questions à poser.
+
+## Écrire une bonne description
+
+La description est ce que Claude lit pour décider d'utiliser le skill. Elle doit dire **ce que fait le skill** et **quand l'utiliser** :
+
+- ❌ « Skill pour les e-mails. »
+- ✅ « Rédige les réponses aux réclamations clients de la boutique, avec excuses, solution et geste commercial. À utiliser dès qu'on me colle un message de client mécontent. »
+
+## Sécurité
+
+Un skill peut contenir du code. N'importez que des skills de sources de confiance, et lisez le `SKILL.md` avant. Sur Enterprise, une analyse de sécurité des skills et plugins est disponible depuis août 2026.
+
+## Pour aller plus loin
+
+- [Personnaliser Claude](/wiki/claude-bases/personnaliser)
+- Le format en détail : [Structure d'un skill](/wiki/skills/structure-skill)

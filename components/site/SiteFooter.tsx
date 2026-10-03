@@ -60,7 +60,7 @@ export function SiteFooter() {
               Claude Mastery
             </div>
             <p className="text-body-sm text-on-surface-variant max-w-sm leading-relaxed">
-              Une formation Claude Code en français, gratuite et sans inscription. Tenue à jour au fil des versions.
+              Apprendre Claude et Claude Code en français, gratuitement et sans inscription. Tenu à jour au fil des versions.
             </p>
             {SOCIAL_LINKS.some((s) => s.href) && (
               <div className="flex items-center gap-2 mt-5">
@@ -86,8 +86,18 @@ export function SiteFooter() {
             </div>
             <ul className="space-y-2 text-body-sm text-on-surface-variant">
               <li>
+                <Link href="/claude" className="hover:text-primary transition-colors">
+                  Claude
+                </Link>
+              </li>
+              <li>
+                <Link href="/claude-code" className="hover:text-primary transition-colors">
+                  Claude Code
+                </Link>
+              </li>
+              <li>
                 <Link href="/learn" className="hover:text-primary transition-colors">
-                  Formation
+                  Formation Claude Code
                 </Link>
               </li>
               <li>
@@ -98,14 +108,6 @@ export function SiteFooter() {
               <li>
                 <Link href="/fiches" className="hover:text-primary transition-colors">
                   Fiches
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/wiki/actualites/nouveautes-2026"
-                  className="hover:text-primary transition-colors"
-                >
-                  Nouveautés
                 </Link>
               </li>
             </ul>

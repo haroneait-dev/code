@@ -1,0 +1,50 @@
+---
+title: "Vérifier les réponses : quand Claude se trompe"
+description: "Pourquoi un assistant peut affirmer des choses fausses avec assurance, les situations à risque, et une méthode simple pour vérifier ce qui compte."
+updatedAt: "2026-10-03"
+readingMinutes: 6
+---
+
+Claude est très fiable sur beaucoup de sujets, mais il peut se tromper, et parfois avec beaucoup d'assurance. Savoir quand vérifier fait la différence entre un utilisateur efficace et un utilisateur piégé.
+
+## Pourquoi Claude peut se tromper
+
+Un modèle de langage produit le texte le plus plausible à partir de ce qu'il a appris. Le plus souvent, plausible et vrai coïncident. Mais quand il manque d'information, il peut **compléter** avec quelque chose qui a l'air juste : un chiffre, une date, une référence qui n'existe pas. C'est ce qu'on appelle une **hallucination**.
+
+Les modèles récents le font beaucoup moins qu'il y a deux ans, et disent plus souvent « je ne sais pas ». Le risque reste réel.
+
+## Les situations à risque
+
+| Situation | Pourquoi |
+|---|---|
+| **Chiffres précis** (statistiques, prix, dates) | Faciles à inventer, difficiles à repérer |
+| **Citations et références** (articles, livres, jurisprudence) | Titre plausible, contenu inventé |
+| **Actualité récente** | Sans recherche web, Claude ne connaît que ce qu'il a appris |
+| **Droit, santé, fiscalité** | Les règles changent et dépendent du pays |
+| **Calculs longs de tête** | Une erreur au milieu fausse tout |
+| **Sujets très pointus ou locaux** | Peu de données d'apprentissage |
+
+## La méthode de vérification
+
+1. **Demandez les sources.** Activez la [recherche web](/wiki/claude-ai/recherche) et demandez « avec les liens vers tes sources ». Ouvrez-en au moins une.
+2. **Faites calculer avec du code.** « Calcule-le dans un tableur » ou « utilise l'analyse de données » : Claude exécute un vrai calcul au lieu de l'estimer.
+3. **Demandez le niveau de certitude.** « Qu'est-ce qui est sûr et qu'est-ce qui l'est moins dans ta réponse ? »
+4. **Faites relire.** Dans une nouvelle conversation : « Voici un texte, trouve les erreurs factuelles. »
+5. **Confrontez aux documents.** Joignez le texte de loi, la notice, le contrat : Claude répond alors à partir du document, pas de sa mémoire.
+
+## Les bons réflexes selon l'enjeu
+
+- **Faible enjeu** (idée de recette, reformulation) : pas besoin de vérifier.
+- **Enjeu moyen** (exposé, article de blog, comparatif d'achat) : vérifiez les chiffres et les noms propres.
+- **Fort enjeu** (santé, argent, juridique, document officiel) : utilisez Claude pour **comprendre et préparer vos questions**, puis validez auprès d'un professionnel ou d'une source officielle (service-public.fr, impots.gouv.fr, votre médecin).
+
+## Les autres limites à connaître
+
+- **Claude peut être trop d'accord avec vous.** Demandez explicitement : « Joue l'avocat du diable » ou « Quelles sont les faiblesses de mon raisonnement ? »
+- **Il ne sait pas tout de vous** : sans contexte, il fait des hypothèses. Précisez.
+- **Il ne remplace pas votre jugement** : vous restez responsable de ce que vous envoyez, publiez ou signez.
+
+## Pour aller plus loin
+
+- [Bien formuler ses demandes](/wiki/claude-bases/bien-demander)
+- [Recherche web et mode Research](/wiki/claude-ai/recherche)

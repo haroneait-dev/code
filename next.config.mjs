@@ -9,6 +9,9 @@ const retiredArticles = [
   ["/wiki/mcp/serveur-puppeteer", "/wiki/mcp/serveurs-populaires"],
   ["/wiki/claude-ai/claude-pages", "/wiki/claude-ai/artifacts-architecture"],
   ["/wiki/claude-ai/extensions-tierces", "/wiki/claude-ai"],
+  ["/wiki/claude-ai/pro-team-enterprise", "/wiki/claude-bases/offres-et-limites"],
+  ["/wiki/claude-ai/model-selector-web", "/wiki/claude-bases/choisir-modele"],
+  ["/wiki/claude-ai/historique-export", "/wiki/claude-bases/confidentialite"],
 ];
 
 /** @type {import('next').NextConfig} */

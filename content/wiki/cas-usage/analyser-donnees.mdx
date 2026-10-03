@@ -1,0 +1,71 @@
+---
+title: "Analyser des données avec Claude : tableaux, budgets, graphiques"
+description: "Envoyer un fichier Excel ou CSV et obtenir des réponses chiffrées justes, des graphiques et des tableaux de bord, sans connaître les formules. Méthode, exemples et pièges."
+updatedAt: "2026-10-03"
+readingMinutes: 7
+---
+
+Claude sait **calculer pour de vrai** : quand vous lui envoyez un tableur, il écrit et exécute du code pour analyser les données, au lieu de deviner les chiffres. Vous obtenez des résultats justes, des graphiques et des fichiers téléchargeables. Cette fonction est disponible sur toutes les offres, gratuite comprise.
+
+## Envoyer ses données
+
+- Formats : **Excel (.xlsx), CSV**, ou un tableau copié-collé.
+- Préparez un fichier **propre** : une ligne d'en-tête, une donnée par cellule, pas de cellules fusionnées.
+- **Retirez les données personnelles** inutiles (noms, adresses) ou remplacez-les par des codes.
+
+## Commencer par comprendre
+
+> Voici l'export de mes ventes 2026. Décris le fichier : colonnes, période couverte, nombre de lignes, valeurs manquantes ou bizarres.
+
+Cette première étape évite les mauvaises surprises (dates mal lues, doublons).
+
+## Poser des questions
+
+- « Quel est le chiffre d'affaires par mois, et quel mois a le plus progressé ? »
+- « Quels sont les 10 produits qui rapportent le plus de marge ? »
+- « Y a-t-il un lien entre la météo et les ventes de glaces dans ces données ? »
+- « Quels clients n'ont rien commandé depuis 6 mois ? »
+
+Demandez toujours **comment le calcul a été fait** : Claude peut montrer la méthode.
+
+## Visualiser
+
+> Fais un graphique de l'évolution mensuelle, avec une couleur par magasin, et un deuxième graphique en barres des 5 meilleures ventes.
+
+> Crée un tableau de bord interactif : je choisis un magasin et une période, et ça affiche le chiffre d'affaires, le panier moyen et le top 5 des produits.
+
+Le tableau de bord s'affiche dans un [artifact](/wiki/claude-ai/artifacts-architecture) que vous pouvez partager.
+
+## Récupérer un fichier
+
+> Ajoute une colonne « marge en % », trie par marge décroissante, mets en rouge les marges négatives, et donne-moi le fichier Excel.
+
+## Exemples de la vie réelle
+
+**Budget familial**
+> Voici 3 mois de relevés bancaires (CSV). Classe chaque dépense par catégorie, fais le total par catégorie et par mois, et dis-moi où je pourrais économiser 200 € par mois.
+
+**Association**
+> Voici la liste des adhérents avec leur date d'adhésion et leur cotisation. Combien n'ont pas renouvelé ? Prépare la liste pour la relance.
+
+**Enseignant**
+> Voici les notes de ma classe sur le trimestre. Calcule les moyennes, repère les élèves en baisse, et fais un graphique de la répartition des notes.
+
+**Sport ou santé**
+> Voici mes temps de course des 3 derniers mois. Est-ce que je progresse ? À quel rythme ?
+
+## Les pièges
+
+- **Des données sales donnent des résultats faux** : vérifiez la description du fichier avant tout.
+- **Corrélation n'est pas causalité** : Claude peut le rappeler si vous lui demandez de critiquer ses conclusions.
+- **Vérifiez un ou deux résultats à la main** sur les chiffres qui comptent.
+- Pour les gros fichiers, demandez d'abord un échantillon de l'analyse.
+
+## Directement dans Excel
+
+Avec le complément Claude pour Excel (offres payantes), l'analyse se fait directement dans votre classeur. Voir [Claude dans Excel, Word, PowerPoint](/wiki/claude-agents/claude-microsoft-365).
+
+## Pour aller plus loin
+
+- [Fichiers, Docs, Slides et Design](/wiki/claude-ai/docs-slides-design)
+- [Vérifier les réponses](/wiki/claude-bases/verifier-reponses)

@@ -29,11 +29,11 @@ const siteUrl =
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: {
-    default: "Claude Mastery — Formation Claude Code en français",
+    default: "Claude Mastery : apprendre Claude et Claude Code en français",
     template: "%s — Claude Mastery",
   },
   description:
-    "La formation francophone de référence pour maîtriser Claude Code, le CLI d'Anthropic. Modules pratiques, wiki et fiches, en accès libre.",
+    "Apprendre Claude et Claude Code en français : guides pour l'assistant au quotidien, formation et wiki pour les développeurs. Gratuit, sans inscription.",
   keywords: [
     "Claude Code",
     "Anthropic",

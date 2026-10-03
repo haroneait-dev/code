@@ -10,6 +10,8 @@ export default function sitemap(): MetadataRoute.Sitemap {
 
   const staticPages: MetadataRoute.Sitemap = [
     { url: `${siteUrl}/`, lastModified: now, priority: 1.0 },
+    { url: `${siteUrl}/claude`, lastModified: now, priority: 0.95 },
+    { url: `${siteUrl}/claude-code`, lastModified: now, priority: 0.95 },
     { url: `${siteUrl}/learn`, lastModified: now, priority: 0.9 },
     { url: `${siteUrl}/wiki`, lastModified: now, priority: 0.8 },
     { url: `${siteUrl}/fiches`, lastModified: now, priority: 0.8 },

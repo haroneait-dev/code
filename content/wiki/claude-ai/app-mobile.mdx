@@ -1,46 +1,55 @@
 ---
-title: "L'application mobile (iOS/Android)"
-description: "Dictée vocale, vision live et limitations de l'app Claude par rapport au desktop."
-updatedAt: "2026-05-19"
+title: "L'application mobile : voix, photo, widgets et suivi des tâches"
+description: "Tout ce que l'application Claude sur iPhone et Android fait de plus que le site : mode vocal, appareil photo, widgets, raccourcis, suivi de Cowork depuis le téléphone."
+updatedAt: "2026-10-03"
 readingMinutes: 6
 ---
 
-L'application mobile Claude, disponible sur iOS (App Store) et Android (Google Play), reprend l'essentiel de l'expérience web tout en exploitant les capteurs du téléphone. Conçue pour les usages en mobilité, elle privilégie la rapidité d'entrée — vocale et visuelle — sur la profondeur des outils. Comprendre ce qu'elle fait mieux que le desktop, et ce qu'elle ne fait pas du tout, permet de l'intégrer correctement dans un flux de travail multi-appareils.
+L'application Claude (iOS et Android) reprend vos conversations, projets et réglages, et ajoute ce qu'un téléphone fait mieux qu'un ordinateur : parler, photographier, recevoir des notifications.
 
-## Dictée et entrée vocale
+## Le mode vocal
 
-La saisie vocale est l'atout numéro un de l'app. En appuyant sur l'icône micro, vous dictez votre prompt et Claude le transcrit en temps réel via le modèle de reconnaissance vocale d'Anthropic (basé sur Whisper côté serveur). La transcription gère bien le français, y compris la ponctuation parlée ("virgule", "point", "à la ligne"). Vous pouvez aussi activer le mode "conversation vocale" sur les plans Pro et Max, qui transforme l'échange en dialogue audio : Claude répond à voix haute avec une synthèse vocale naturelle, et vous pouvez l'interrompre à tout moment. Ce mode est pratique en déplacement ou en voiture, mais il consomme davantage de quota messages.
+Le mode vocal permet une vraie conversation orale avec Claude.
 
-## Vision live et capture caméra
+- **Mains libres** : Claude écoute en continu, vous parlez naturellement.
+- **Appuyer pour parler** : vous maintenez un bouton, idéal dans un lieu bruyant.
+- **Plus de 18 langues**, dont le français, avec détection automatique.
+- **Choix du modèle** (Haiku, Sonnet, Opus) : commencez léger, passez à un modèle plus fort si la question devient difficile.
+- **Les connecteurs fonctionnent à la voix** : « Qu'est-ce que j'ai à l'agenda demain ? »
+- Vous pouvez passer de l'oral à l'écrit dans la même conversation, et la reprendre sur l'ordinateur.
 
-L'app intègre un mode caméra qui envoie un flux d'images à Claude pour analyse. Trois usages dominent : photographier un document pour le résumer, scanner un objet ou une scène pour obtenir une description ou une identification, et capturer un tableau blanc ou un schéma pour qu'il soit transcrit en texte ou en code. Sur iOS, l'intégration Apple Intelligence permet d'invoquer Claude depuis l'app Caméra elle-même. Le mode "vision live" diffuse en quasi-temps réel ce que voit l'objectif, utile pour décrire un environnement à une personne malvoyante ou pour obtenir une aide contextuelle (réparation, cuisine, bricolage).
+Usages typiques : préparer un entretien en simulation, réviser à l'oral, réfléchir à voix haute en marchant, pratiquer une langue étrangère.
 
-## Synchronisation et continuité
+## L'appareil photo
 
-Toutes les conversations sont synchronisées avec votre compte Claude.ai. Une discussion commencée sur le téléphone se retrouve immédiatement sur le web, et inversement. Les Projects, instructions personnalisées et fichiers téléversés sont également partagés. Sur iPad, l'app exploite mieux l'espace écran avec une vue à deux colonnes (liste des conversations + thread actif), et supporte le multitâche Split View pour travailler en parallèle d'un autre app.
+Prenez en photo et demandez :
+- un **document** (courrier, facture, contrat) : « explique-moi ce courrier des impôts » ;
+- un **exercice** : « aide-moi à comprendre la méthode, sans me donner la réponse » ;
+- un **objet ou une plante** : « qu'est-ce que c'est et comment l'entretenir ? » ;
+- une **étiquette** : « traduis et dis-moi s'il y a des allergènes » ;
+- un **tableau blanc** après une réunion : « transforme en compte rendu ».
 
-## Ce qui manque par rapport au desktop
+## Widgets et raccourcis
 
-L'app mobile n'embarque pas toutes les fonctionnalités du web. Les principales absences à connaître :
+**Sur iPhone** : widget d'écran d'accueil, commande « Analyser une photo avec Claude », action **« Demander à Claude »** utilisable depuis Siri, Spotlight, le menu Partager et l'app Raccourcis.
 
-- **Artifacts** : on peut voir le rendu (HTML, SVG, diagrammes) mais pas éditer le code directement
-- **Pages** : lecture seule sur mobile, pas d'édition assistée
-- **Connecteurs MCP** : la plupart ne sont pas configurables depuis l'app
-- **Sélecteur de modèle avancé** : seuls quelques modèles sont accessibles, pas de bascule fine entre versions
-- **Outils développeur** (exécution de code, recherche web étendue) : présents mais avec des restrictions de durée
-- **Téléversement de fichiers volumineux** : limité à environ 30 Mo par fichier sur mobile contre 100 Mo sur le web
+**Sur Android** : widgets pour démarrer une conversation, parler, ou prendre une photo en un geste. Depuis mai 2026, Claude peut aussi s'appuyer sur les applications du téléphone (messages, e-mail, agenda, horloge, cartes).
 
-## Notifications et confidentialité
+L'application peut aussi analyser des données de santé (Apple Santé, Health Connect) si vous l'y autorisez.
 
-L'app peut envoyer des notifications push lorsqu'une tâche longue se termine (par exemple un Agent qui a achevé son traitement). Côté confidentialité, les permissions micro, caméra et photothèque sont demandées à l'usage, jamais en arrière-plan. Aucune donnée n'est captée hors d'une session active. Vous pouvez désactiver l'envoi de transcriptions vocales pour l'entraînement dans les paramètres "Confidentialité".
+## Suivre et lancer du travail depuis le téléphone
 
-## Performances et batterie
+Sur les offres payantes :
+- **Dispatch** : confiez une tâche depuis le téléphone, Claude la réalise sur votre ordinateur, et vous recevez une notification quand c'est fini. Voir [Dispatch et tâches programmées](/wiki/claude-agents/dispatch-taches).
+- **Notifications** quand une tâche longue est terminée ou attend votre accord.
+- Suivi des sessions **Claude Code** à distance.
 
-Le mode conversation vocale et la vision live sont les fonctions les plus gourmandes : comptez 10 à 15 % de batterie pour une session continue de 30 minutes. La transcription dictée et le chat texte ont un impact négligeable. L'app fonctionne hors-ligne uniquement pour consulter l'historique récent ; toute génération nécessite une connexion réseau.
+## Les petites limites
+
+- Les longs documents se travaillent plus confortablement sur grand écran.
+- Certaines fonctions de [Cowork](/wiki/claude-agents/cowork) qui agissent sur un ordinateur nécessitent que celui-ci soit allumé.
 
 ## Pour aller plus loin
 
-- Activer Claude comme assistant par défaut sur Android via les paramètres système
-- Intégration Siri sur iOS 18+ pour lancer Claude à la voix
-- Comparatif vision live Claude vs ChatGPT vs Gemini
-- Astuces pour optimiser la dictée vocale en français
+- [L'application de bureau](/wiki/claude-ai/application-bureau)
+- [Cas d'usage : la vie quotidienne](/wiki/cas-usage/vie-quotidienne)

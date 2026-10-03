@@ -1,57 +1,57 @@
 ---
-title: "Intégrations natives Claude.ai"
-description: "GitHub, Google Drive, Notion connectés directement à Claude.ai sans passer par le CLI."
-updatedAt: "2026-05-19"
-readingMinutes: 6
+title: "Les connecteurs : relier Claude à Gmail, Drive, Notion et vos outils"
+description: "Ce que sont les connecteurs, lesquels existent, comment les activer, ce qu'ils permettent concrètement, et les précautions à prendre."
+updatedAt: "2026-10-03"
+readingMinutes: 7
 ---
 
-Claude.ai propose un catalogue d'intégrations natives qui permettent de connecter vos outils du quotidien à l'assistant sans installer le moindre paquet npm ni configurer un serveur MCP localement. En quelques clics depuis les paramètres, Claude peut lire vos fichiers Google Drive, parcourir vos dépôts GitHub ou interroger vos pages Notion pour répondre dans le contexte de votre travail réel.
+Par défaut, Claude ne voit que ce que vous lui envoyez. Les **connecteurs** lui donnent accès à vos outils : lire vos e-mails, consulter votre agenda, chercher dans vos documents, créer une page Notion. Ils reposent sur un standard ouvert, **MCP** (Model Context Protocol).
 
-## À quoi servent les intégrations natives
+## Les connecteurs les plus utiles
 
-Une intégration native, c'est une connexion OAuth gérée côté Anthropic entre votre compte Claude et un service tiers. Une fois autorisée, vos conversations peuvent inclure des "outils" automatiquement disponibles pour le modèle : lire un fichier, lister un dossier, faire une recherche full-text, ouvrir une issue. Vous gardez la main : Claude ne déclenche un outil que si la requête le justifie et chaque appel reste visible dans la conversation.
+| Connecteur | Ce que Claude peut faire |
+|---|---|
+| **Gmail** | Chercher et lire des e-mails, préparer des réponses, envoyer |
+| **Google Agenda** | Consulter vos disponibilités, créer des événements |
+| **Google Drive** | Chercher et lire vos documents, enregistrer des fichiers |
+| **Microsoft 365** | Outlook, OneDrive, SharePoint, Teams ; brouillons, envois et rangement depuis juillet 2026 |
+| **Notion** | Chercher, lire, créer et mettre à jour des pages et bases |
+| **Canva** | Créer et modifier des visuels |
+| **Figma** | Lire des maquettes |
+| **Slack, Linear, Asana, HubSpot, Salesforce…** | Selon l'outil : lire, résumer, créer des tâches ou des fiches |
 
-L'avantage principal par rapport au CLI : aucun setup. Pas de `claude mcp add`, pas de tokens à coller dans un fichier de config, pas de gestion de scopes manuelle. Tout passe par l'écran de connexion du service et reste révocable depuis vos paramètres Claude.ai.
+L'annuaire complet se trouve dans **Customize → Connecteurs**.
 
-## GitHub : lecture de code et pull requests
+## Les activer
 
-L'intégration GitHub permet à Claude d'accéder à vos dépôts publics et privés (selon les permissions accordées). Cas d'usage typiques :
+1. Ouvrez **Customize → Connecteurs**, ou le bouton **+** dans une conversation.
+2. Choisissez l'outil et connectez-vous avec votre compte.
+3. Activez ou désactivez chaque connecteur par conversation, depuis le **+**.
 
-- Lui demander d'expliquer une fonction dans un fichier précis sans copier-coller.
-- Récupérer la liste des PR ouvertes sur un repo pour préparer une revue groupée.
-- Lire les issues d'un projet pour rédiger un changelog ou un rapport hebdomadaire.
+Sur l'offre gratuite, vous avez accès aux connecteurs de l'annuaire et à **un connecteur personnalisé**. Les offres payantes peuvent en ajouter davantage, y compris des serveurs MCP hébergés par des tiers.
 
-Vous pouvez restreindre l'accès à des organisations ou à des dépôts spécifiques au moment de l'installation. Pour les opérations d'écriture (commits, merge), l'intégration native reste volontairement limitée — c'est le rôle de Claude Code en local.
+## Ce que ça change au quotidien
 
-## Google Drive : documents et tableurs
+> Fais-moi un résumé des e-mails importants reçus depuis lundi et propose des réponses pour ceux qui attendent une action de ma part.
 
-Une fois Google Drive connecté, Claude peut chercher dans vos fichiers via une recherche sémantique, ouvrir un Doc, lire un Sheet ou extraire le texte d'un PDF. C'est particulièrement puissant pour :
+> Trouve un créneau d'une heure la semaine prochaine où Julie et moi sommes libres, et prépare l'invitation.
 
-- Synthétiser plusieurs comptes-rendus de réunion dispersés dans un dossier.
-- Comparer deux versions d'un même document de spec.
-- Générer un récap basé sur un tableur de suivi de tickets.
+> Dans mon Drive, retrouve le devis de la cuisine et compare-le avec celui reçu par e-mail hier.
 
-L'autorisation se fait au niveau de votre compte Google et vous pouvez la révoquer à tout moment depuis [myaccount.google.com](https://myaccount.google.com). Claude ne stocke pas les contenus lus : ils sont injectés dans le contexte de la conversation puis oubliés.
+Les connecteurs fonctionnent aussi avec le mode [Research](/wiki/claude-ai/recherche), les [projets](/wiki/claude-ai/projects-creation), le mode vocal et [Cowork](/wiki/claude-agents/cowork).
 
-## Notion : bases de connaissances et wikis
+## Les précautions
 
-L'intégration Notion donne à Claude un accès en lecture (et parfois en écriture, selon la config) aux pages que vous lui partagez explicitement via le sélecteur d'intégration Notion. Pratique pour :
+- **Claude agit avec vos droits.** S'il peut envoyer un e-mail, il peut envoyer le mauvais. Relisez avant de valider tout envoi ou toute modification.
+- **N'activez que ce dont la conversation a besoin.** Moins d'outils actifs, c'est moins de risques et moins de quota consommé.
+- **Méfiez-vous des contenus piégés.** Un e-mail ou une page web peut contenir des instructions cachées destinées à l'IA (« injection de prompt »). Si Claude propose une action inattendue après avoir lu un contenu externe, refusez et vérifiez.
+- **Au travail**, votre administrateur peut limiter les connecteurs disponibles.
 
-- Interroger un wiki interne sans changer d'onglet.
-- Générer un brouillon de page à partir d'une discussion.
-- Croiser une roadmap Notion avec des issues GitHub dans une même conversation.
+## Créer son propre connecteur
 
-Le contrôle de permissions est plus granulaire que pour Drive : vous décidez page par page (ou espace par espace) ce que l'intégration peut voir.
-
-## Bonnes pratiques
-
-- N'activez que les intégrations dont vous avez réellement besoin pour limiter la surface d'exposition.
-- Vérifiez régulièrement la liste des services connectés dans **Settings > Integrations**.
-- Pour des données ultra-sensibles, préférez le CLI avec un serveur MCP local que vous maîtrisez de bout en bout.
-- Combinez les intégrations : une même conversation peut piocher dans Drive et GitHub, ce qui ouvre des workflows transverses impossibles autrement.
+Un connecteur personnalisé se branche en indiquant l'adresse d'un serveur MCP. C'est surtout utile pour les entreprises qui veulent relier un outil interne. Côté développeurs, voir [Qu'est-ce que MCP ?](/wiki/mcp/introduction-mcp).
 
 ## Pour aller plus loin
 
-- Explorez le catalogue complet sur [claude.ai/settings/integrations](https://claude.ai/settings/integrations).
-- Pour aller au-delà des intégrations officielles, regardez le protocole **MCP** qui permet de brancher n'importe quel service custom.
-- Combinez Claude Code (en local) et les intégrations Claude.ai (en web) pour couvrir à la fois le développement et la consultation rapide depuis n'importe quel navigateur.
+- [Les skills dans Claude](/wiki/claude-ai/skills-claude)
+- [Cowork](/wiki/claude-agents/cowork)

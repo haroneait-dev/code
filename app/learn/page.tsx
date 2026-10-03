@@ -15,7 +15,7 @@ export default function LearnIndexPage() {
 
   return (
     <div className="min-h-screen flex flex-col">
-      <SiteHeader active="formation" showSearch />
+      <SiteHeader active="code" showSearch />
 
       <main className="flex-grow w-full max-w-container-max mx-auto px-margin-mobile md:px-margin-desktop py-16">
         {/* Hero */}

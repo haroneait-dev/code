@@ -159,6 +159,24 @@
   overflow-wrap: anywhere;
 }
 
+/* Rythme vertical des articles : pas de marge en trop dans les listes
+   « aérées » ni à la fin des citations */
+.prose-claude li > p {
+  margin-bottom: 0.5rem;
+}
+.prose-claude li > ul,
+.prose-claude li > ol {
+  margin-top: 0.75rem;
+  margin-bottom: 0.25rem;
+}
+.prose-claude blockquote > p:last-child {
+  margin-bottom: 0;
+}
+.prose-claude h2 + p,
+.prose-claude h3 + p {
+  margin-top: 0;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;
