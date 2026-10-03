@@ -1,0 +1,128 @@
+---
+title: "Le glossaire de l'IA et de Claude"
+description: "Les 50 mots qu'on croise en utilisant Claude et Claude Code, expliqués simplement : token, contexte, hallucination, agent, MCP, skill, hook, worktree, ultracode et les autres."
+updatedAt: "2026-10-03"
+readingMinutes: 12
+---
+
+Vous lisez « fenêtre de contexte de 1M de tokens » ou « connecteur MCP » et vous décrochez ? Ce glossaire explique chaque terme en une ou deux phrases, sans jargon. Les mots sont regroupés par thème, du plus général au plus technique.
+
+## Les bases de l'IA
+
+**IA générative.** Une intelligence artificielle qui *produit* du contenu (texte, image, code) au lieu de seulement classer ou prédire.
+
+**Modèle de langage (LLM).** Le programme entraîné sur d'immenses quantités de texte qui fait fonctionner Claude. Il prédit, mot après mot, la suite la plus pertinente.
+
+**Modèle.** Une version précise de ce programme. Chez Anthropic : Opus (le plus puissant), Sonnet (l'équilibre), Haiku (le plus rapide), et Fable et Mythos pour les cas extrêmes. Voir [Choisir son modèle](/wiki/claude-bases/choisir-modele).
+
+**Entraînement.** La phase où le modèle apprend à partir de données. Après, ses connaissances sont figées jusqu'à une date (la *date de coupure*), sauf s'il fait une recherche web.
+
+**Prompt.** Ce que vous écrivez à Claude : une question, une consigne, un document à traiter.
+
+**Hallucination.** Quand le modèle affirme quelque chose de faux avec assurance : une référence inventée, un chiffre approximatif. Voir [Vérifier les réponses](/wiki/claude-bases/verifier-reponses).
+
+**Raisonnement (ou réflexion étendue).** Le modèle « réfléchit » avant de répondre, ce qui améliore les réponses aux questions difficiles. Plus lent et plus coûteux.
+
+**Multimodal.** Capable de lire autre chose que du texte : images, PDF, captures d'écran, graphiques.
+
+## Les mesures
+
+**Token.** L'unité de base que le modèle lit et écrit. En français, un token vaut environ trois quarts de mot. 1 000 tokens ≈ 750 mots ≈ une page et demie.
+
+**Fenêtre de contexte.** Tout ce que Claude peut « avoir sous les yeux » à la fois : la conversation, les fichiers joints, les instructions. Les modèles actuels montent à 1 million de tokens, environ 2 500 pages.
+
+**Limite d'usage.** Sur les offres grand public, le volume que vous pouvez utiliser par tranche de 5 heures et par semaine. Voir [Offres et limites](/wiki/claude-bases/offres-et-limites).
+
+**Prix au million de tokens.** Sur l'API, on paie à la quantité : par exemple 2 $ par million de tokens envoyés et 10 $ par million de tokens générés pour Sonnet 5.5.
+
+**Cache de prompt.** Un mécanisme qui évite de repayer plein tarif un texte déjà envoyé récemment (un long document relu à chaque question). Jusqu'à 90 % moins cher.
+
+**Effort.** Le niveau de réflexion que Claude consacre à une tâche : `low`, `medium`, `high`, `xhigh`, `max`. Plus d'effort, meilleure qualité, plus de tokens.
+
+## L'assistant Claude
+
+**Conversation.** Un échange avec Claude. Il se souvient de tout ce qui a été dit dans la même conversation, pas des autres (sauf avec la mémoire).
+
+**Projet.** Un espace qui regroupe des conversations, des documents et des instructions sur un même sujet. Voir [Créer un projet](/wiki/claude-ai/projects-creation).
+
+**Mémoire.** La capacité de Claude à retenir des informations utiles d'une conversation à l'autre. Vous pouvez la consulter et la corriger. Voir [La mémoire](/wiki/claude-ai/memoire).
+
+**Artifact.** Un contenu que Claude crée à côté de la conversation et que vous pouvez ouvrir, modifier et partager : document, page web, petit outil, graphique.
+
+**Claude Docs, Slides, Design.** Les outils intégrés depuis septembre 2026 pour rédiger un document, une présentation ou une maquette dans Claude. Voir [Fichiers, Docs, Slides et Design](/wiki/claude-ai/docs-slides-design).
+
+**Recherche (Research).** Le mode où Claude mène une enquête sur le web pendant plusieurs minutes et rend un rapport sourcé. Voir [La recherche](/wiki/claude-ai/recherche).
+
+**Connecteur.** Un branchement entre Claude et un autre service (Gmail, Google Drive, Notion, Slack…) pour qu'il puisse y lire ou y agir. Voir [Les connecteurs](/wiki/claude-ai/integrations-natives).
+
+**Incognito.** Une conversation qui n'est pas gardée dans votre historique ni utilisée par la mémoire.
+
+## Les agents
+
+**Agent.** Une IA qui ne se contente pas de répondre : elle **agit**. Elle planifie, utilise des outils (fichiers, navigateur, terminal), vérifie le résultat et recommence si besoin.
+
+**Cowork.** Le mode agent de l'assistant Claude : il travaille dans vos fichiers et vos applications pour mener une tâche jusqu'au bout. Voir [Cowork](/wiki/claude-agents/cowork).
+
+**Claude dans Chrome.** L'extension qui permet à Claude de naviguer, cliquer et remplir des formulaires dans votre navigateur. Voir [Claude dans Chrome](/wiki/claude-agents/claude-chrome).
+
+**Computer use.** La capacité de Claude à utiliser un ordinateur comme vous : regarder l'écran, bouger la souris, taper au clavier.
+
+**Outil (tool).** Une action que le modèle peut déclencher : lire un fichier, lancer une recherche, exécuter une commande.
+
+**Prompt injection.** Une attaque où un texte piégé (dans une page web, un e-mail, un document) essaie de détourner l'agent de sa mission. Raison pour laquelle les agents demandent confirmation avant les actions sensibles.
+
+## Claude Code
+
+**Claude Code.** L'agent d'Anthropic pour les développeurs. Il lit votre code, le modifie, lance des commandes et des tests, depuis le terminal, l'éditeur, l'application de bureau ou le web.
+
+**CLI.** *Command Line Interface* : un programme qu'on utilise en tapant des commandes dans un terminal. `claude` est le CLI de Claude Code.
+
+**CLAUDE.md.** Un fichier texte à la racine d'un projet qui donne à Claude Code le contexte permanent : commandes, conventions, pièges. Voir [CLAUDE.md](/wiki/demarrer/claude-md).
+
+**AGENTS.md.** L'équivalent partagé entre plusieurs agents de code (Claude Code, Codex, Cursor…). Claude Code le lit si le projet n'a pas de CLAUDE.md.
+
+**Mode de permission.** La règle qui décide ce que Claude Code peut faire sans vous demander : `default`, `acceptEdits`, `plan`, `auto`… Voir [Les modes de permission](/wiki/cli/permissions-modes).
+
+**Mode plan.** Claude explore et propose un plan sans rien modifier. Idéal avant une grosse tâche.
+
+**Mode auto.** Un classifieur vérifie chaque action : les sûres passent, les risquées sont bloquées ou vous sont soumises. Par défaut depuis août 2026.
+
+**Slash command.** Une commande qui commence par `/` : `/clear`, `/compact`, `/model`, `/effort`…
+
+**Compaction.** Quand la conversation devient trop longue, Claude la résume pour libérer de la place dans le contexte (`/compact`).
+
+**Checkpoint / rewind.** Un point de sauvegarde automatique. `/rewind` revient à un état précédent du code et de la conversation.
+
+**Skill.** Un dossier d'instructions (et parfois de scripts) que Claude charge quand la tâche s'y prête : « comment on écrit un test ici », « comment on publie une version ». Voir [Skills](/wiki/skills/structure-skill).
+
+**Hook.** Un script lancé automatiquement à un moment précis : avant une commande, après une modification, à la fin d'un tour. Sert à formater, bloquer, vérifier. Voir [Les hooks](/wiki/hooks/introduction-hooks).
+
+**MCP (Model Context Protocol).** Le standard ouvert pour brancher un agent sur un outil externe (base de données, GitHub, Figma…). Un *serveur MCP* expose des outils que Claude peut utiliser.
+
+**Plugin.** Un paquet qui regroupe skills, hooks, sous-agents, serveurs MCP et workflows pour les installer en une commande. Voir [Les plugins](/wiki/plugins/introduction-plugins).
+
+**Mod.** Depuis octobre 2026, un plugin qui modifie l'interface et le comportement de Claude Code lui-même (panneaux, commandes instantanées). Voir [Les mods](/wiki/plugins/mods).
+
+**Sous-agent (subagent).** Un agent secondaire que Claude lance pour une tâche précise, avec son propre contexte. Il rapporte un résumé.
+
+**Agent view.** L'écran (`claude agents`) qui affiche toutes vos sessions en arrière-plan. Voir [Agent view](/wiki/cli/agent-view-sessions).
+
+**Dynamic workflow.** Un script écrit par Claude qui orchestre des dizaines d'agents. Voir [Dynamic workflows](/wiki/cli/dynamic-workflows-agents-arriere-plan).
+
+**Ultracode.** Le réglage (`/effort ultracode`) ou le mot-clé qui fait passer Claude en mode workflow pour les grosses tâches.
+
+**Worktree.** Une copie de travail Git séparée, sur sa propre branche. Permet à plusieurs sessions de travailler en même temps sans se marcher dessus.
+
+**Headless (`claude -p`).** Utiliser Claude Code sans interface, dans un script ou une CI. Voir [Mode headless](/wiki/cli/headless-mode).
+
+**Routine.** Une tâche programmée qui tourne dans le cloud à heure fixe ou sur un événement. Voir [Cloud, routines et Remote Control](/wiki/cli/cloud-routines-remote).
+
+## Côté développeurs et API
+
+**API.** L'accès programmatique à Claude : votre application envoie une requête, Claude répond. Facturé au token. Voir [l'API](/wiki/api/premier-appel-api).
+
+**Agent SDK.** La bibliothèque qui permet de construire ses propres agents avec le même moteur que Claude Code.
+
+**Batch.** Envoyer beaucoup de requêtes d'un coup, traitées dans les 24 heures, pour moitié prix.
+
+**Structured outputs.** Forcer Claude à répondre dans un format précis (JSON respectant un schéma), pour qu'un programme puisse lire la réponse sans erreur.

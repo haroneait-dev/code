@@ -1,0 +1,100 @@
+---
+title: "Les 30 astuces des utilisateurs avancés"
+description: "Ce que font les équipes d'Anthropic et les gros utilisateurs : vérification, plan d'abord, sessions parallèles, CLAUDE.md vivant, hooks, permissions, raccourcis. Classé par thème, avec les commandes."
+updatedAt: "2026-10-03"
+readingMinutes: 13
+---
+
+Ces astuces viennent du guide officiel *Claude Code power user tips* d'Anthropic, de la documentation, et des pratiques partagées par les équipes qui utilisent Claude Code tous les jours. Elles sont classées de la plus importante à la plus spécialisée.
+
+> **Si vous ne devez en retenir qu'une** : donnez à Claude **un moyen de vérifier son propre travail**. Des tests, un linter, un navigateur, une capture d'écran. C'est, selon Anthropic, l'astuce qui a le plus d'impact.
+
+## 1. Vérification : le réflexe numéro un
+
+**1. Dites comment vérifier.** Au lieu de « corrige le bug », écrivez « corrige le bug, puis lance `npm test` et montre-moi que le test `login.spec.ts` passe ». Claude itère jusqu'à ce que la vérification réussisse.
+
+**2. Pour le front, donnez-lui des yeux.** Avec [Claude dans Chrome](/wiki/claude-agents/claude-chrome) ou le navigateur intégré de l'application de bureau, Claude lance le serveur, ouvre la page, regarde le résultat et corrige jusqu'à ce que ce soit juste.
+
+**3. Demandez une preuve.** « Prouve-moi que ça marche » ou « compare le comportement de `main` et de cette branche » pousse Claude à tester plutôt qu'à affirmer.
+
+**4. Faites relire par d'autres agents.** `/simplify` lance des agents en parallèle qui relisent le code (réutilisation, qualité, efficacité, respect du CLAUDE.md). `/code-review` fait une revue de bugs en arrière-plan, et `/ultrareview` une revue approfondie dans le cloud.
+
+**5. Un hook `Stop` pour les longues tâches.** Un script lancé à chaque fin de tour (tests, typage) empêche Claude de déclarer « terminé » trop tôt. Voir [les hooks](/wiki/hooks/introduction-hooks).
+
+## 2. Planifier avant de construire
+
+**6. Le mode plan pour tout ce qui dépasse dix minutes.** `Shift+Tab` jusqu'à *plan mode* : Claude lit, explore et propose un plan sans rien modifier. Corrigez le plan, puis repassez en mode `auto` pour l'exécution. Une heure de plan bien fait économise une journée de corrections.
+
+**7. Faites critiquer le plan.** « Joue l'ingénieur senior sceptique et trouve trois failles dans ce plan » avant de valider. Pour un plan vraiment difficile, demandez un [workflow](/wiki/cli/dynamic-workflows-agents-arriere-plan) qui en rédige plusieurs versions indépendantes.
+
+**8. Réglez l'effort selon la tâche.** `/effort` : `low` pour une question rapide, `high` ou `xhigh` pour un bug coriace, `auto` pour laisser Claude choisir. Moins de corrections à faire compense souvent un modèle plus lent. Voir [Effort, fast mode et advisor](/wiki/cli/effort-fast-advisor).
+
+**9. Posez des questions annexes avec `/btw`.** Une question rapide (« c'est quoi déjà la syntaxe de ce flag ? ») sans interrompre le travail en cours ni polluer le contexte.
+
+## 3. Le contexte : CLAUDE.md et mémoire
+
+**10. Un CLAUDE.md court et vivant.** Visez moins de 200 lignes : commandes du projet, conventions, pièges connus. Chaque fois que Claude se trompe, ajoutez une ligne pour que ça ne se reproduise pas. Voir [CLAUDE.md](/wiki/demarrer/claude-md).
+
+**11. Versionnez-le.** Le CLAUDE.md du dépôt est partagé : toute l'équipe profite de chaque correction. Anthropic appelle ça l'*ingénierie qui se cumule*.
+
+**12. `@claude` dans les revues de code.** Sur GitHub, mentionnez `@claude` dans une remarque de revue pour qu'il ajoute la leçon au CLAUDE.md.
+
+**13. Une session, une tâche.** Entre deux tâches sans rapport, `/clear`. Un contexte plein d'anciens essais rend Claude moins précis. Pour revenir en arrière dans une session, `/rewind` (ou `Échap` deux fois).
+
+**14. `/compact` avec une consigne.** `/compact garde les décisions d'architecture et la liste des fichiers modifiés` résume la conversation en gardant ce qui compte.
+
+**15. `/doctor prompt-audit`.** Depuis la 2.1.283, cette commande repère dans vos CLAUDE.md et vos skills les consignes écrites pour d'anciens modèles et devenues inutiles (« réfléchis étape par étape », majuscules insistantes…).
+
+## 4. Travailler en parallèle
+
+**16. Plusieurs sessions dans des worktrees.** `claude --worktree` crée une copie de travail Git isolée. Les équipes d'Anthropic font tourner 3 à 5 sessions en même temps, chacune sur sa branche.
+
+**17. Agent view pour les suivre.** `claude --bg "tâche"` lance une session en arrière-plan, `claude agents` les affiche toutes. `Ctrl+F` cherche une session, `n:texte` filtre par nom. Voir [Agent view](/wiki/cli/agent-view-sessions).
+
+**18. `/batch` pour les migrations.** Il répartit une migration sur des dizaines d'agents en worktrees, qui testent chacun leur part et ouvrent leur pull request.
+
+**19. Sous-agents isolés.** Ajoutez `isolation: worktree` dans l'en-tête d'un sous-agent pour qu'il travaille sur sa propre copie. Voir [les sous-agents](/wiki/subagents/pourquoi-subagents).
+
+## 5. Automatiser ce qui revient
+
+**20. Une skill pour chaque routine quotidienne.** Ce que vous expliquez plus de deux fois mérite un `.claude/skills/<nom>/SKILL.md`. Voir [Structure d'une skill](/wiki/skills/structure-skill).
+
+**21. Des sous-agents spécialisés.** Dans `.claude/agents/`, un agent « relecteur sécurité » ou « testeur » avec ses propres outils. `claude --agent=nom` lance une session entière avec cet agent.
+
+**22. Formatage automatique.** Un hook `PostToolUse` qui lance Prettier ou Ruff après chaque modification évite les échecs de CI sur le style.
+
+**23. `/loop` et `/schedule`.** `/loop 5m /babysit` répète une tâche en local (jusqu'à 3 jours). `/schedule` crée une routine dans le cloud qui tourne même ordinateur fermé. Voir [Cloud, routines et Remote Control](/wiki/cli/cloud-routines-remote).
+
+## 6. Permissions sans friction
+
+**24. Pré-autorisez les commandes sûres.** `/permissions` puis ajoutez `Bash(npm test:*)`, `Bash(git status)`… Fini les validations répétitives.
+
+**25. Le mode auto pour le quotidien.** Un classifieur laisse passer les actions sûres et vous arrête sur les risquées. C'est le mode par défaut depuis août 2026. Voir [Les modes de permission](/wiki/cli/permissions-modes).
+
+**26. `/sandbox` pour les tâches longues sans surveillance.** Isolation des fichiers et du réseau : Claude peut travailler librement sans risque pour le reste de votre machine.
+
+## 7. Confort et productivité
+
+**27. Reprenez depuis votre téléphone.** `/remote-control` pilote votre session locale depuis l'app mobile. `/teleport` déplace une session entre terminal, web, bureau et mobile.
+
+**28. Parlez au lieu de taper.** Maintenez `Espace` dans le CLI pour la dictée vocale, ou le bouton micro dans l'application de bureau. On décrit beaucoup mieux un problème à l'oral.
+
+**29. Une barre d'état utile.** `/statusline` génère une ligne qui affiche le modèle, le dossier, le contexte restant et le coût. `/color` change la couleur de l'invite pour distinguer vos sessions.
+
+**30. Apprenez en même temps.** Le style de sortie *Explanatory* (dans `/config`) fait expliquer chaque choix. Demandez aussi des schémas ASCII ou une page HTML qui résume une architecture inconnue.
+
+## Le résumé en une liste
+
+1. Toujours un moyen de vérifier.
+2. Plan d'abord, exécution ensuite.
+3. CLAUDE.md court, corrigé à chaque erreur.
+4. Une session par tâche, `/clear` entre les deux.
+5. Plusieurs sessions en parallèle dans des worktrees.
+6. Une skill pour tout ce qui se répète.
+7. Des permissions pré-autorisées plutôt que des validations à la main.
+
+## Sources
+
+- [Claude Code power user tips, Centre d'aide Claude](https://support.claude.com/en/articles/14554000-claude-code-power-user-tips)
+- [Best practices, documentation Claude Code](https://code.claude.com/docs/en/best-practices)
+- [Changelog Claude Code](https://code.claude.com/docs/en/changelog)

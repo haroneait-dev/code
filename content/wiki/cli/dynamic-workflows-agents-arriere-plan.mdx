@@ -1,68 +1,215 @@
 ---
-title: "Dynamic workflows & agents en arrière-plan"
-description: "Les mises à jour Claude Code de juillet 2026 : workflows dynamiques à sous-agents parallèles, agents en arrière-plan qui commit/push/PR seuls, résilience réseau et notifications."
-updatedAt: "2026-07-08"
-readingMinutes: 7
+title: "Dynamic workflows : des dizaines d'agents pilotés par un script"
+description: "Le guide complet des workflows dynamiques de Claude Code : quand s'en servir, ultracode, /deep-research, suivre un run avec /workflows, sauvegarder un workflow, reprendre après une pause, limites et coût."
+updatedAt: "2026-10-03"
+readingMinutes: 12
 ---
 
-Les versions de Claude Code de juillet 2026 (série 2.1.x) consolident l'expérience agentique : l'agent reste actif plus longtemps, touche davantage du cycle de vie logiciel, et interrompt moins souvent le développeur. Voici les évolutions à connaître.
+Un **dynamic workflow** est un petit script JavaScript, écrit par Claude, qui lance et coordonne de nombreux sous-agents. Le script tourne en arrière-plan pendant que votre session reste disponible. À la fin, vous recevez un seul rapport au lieu d'un long fil de conversation.
 
-## Dynamic workflows
+C'est l'outil des gros chantiers : auditer tout un dépôt, migrer 500 fichiers, croiser des dizaines de sources sur une question de recherche, ou faire rédiger un plan difficile sous plusieurs angles avant de choisir.
 
-Les **workflows dynamiques** permettent à Claude de prendre en charge un problème à l'échelle d'une **base de code entière** :
+> **Disponibilité (octobre 2026).** Toutes les offres payantes, l'API Anthropic, Amazon Bedrock, Google Cloud et Microsoft Foundry. Sur l'offre **Pro**, il faut d'abord les activer dans `/config` (ligne *Dynamic workflows*).
 
-1. L'agent **planifie** le travail.
-2. Il exécute **des centaines de sous-agents en parallèle** dans une seule session.
-3. Il **vérifie ses résultats** de façon autonome contre la suite de tests existante.
-4. Il **rapporte** à l'utilisateur.
+## Workflow, sous-agents, skills, agent teams : la différence
 
-C'est ce qui rend possibles des migrations de centaines de milliers de lignes sans supervision humaine continue. Un réglage **« Dynamic workflow size »** a été ajouté dans `/config` pour indiquer la taille que Claude donne généralement à ses workflows (nombre d'agents : small / medium / large). C'est une **directive indicative**, pas un plafond strict.
+Tous ces outils savent exécuter une tâche en plusieurs étapes. Ce qui change, c'est **qui tient le plan**.
 
-Côté observabilité, les agents issus d'un workflow émettent désormais les attributs OpenTelemetry `workflow.run_id` et `workflow.name` : on peut reconstruire l'activité d'un run complet depuis les données OTel.
+| | Sous-agents | Skills | Agent teams | Workflows |
+| :- | :- | :- | :- | :- |
+| Qui décide de la suite | Claude, tour par tour | Claude, en suivant les consignes | L'agent principal | **Le script** |
+| Où vivent les résultats intermédiaires | Le contexte de Claude | Le contexte de Claude | Une liste de tâches partagée | **Des variables du script** |
+| Échelle | Quelques tâches par tour | Pareil | Une poignée de pairs | **Des dizaines à des centaines d'agents** |
+| Après une interruption | Le tour redémarre | Le tour redémarre | Les coéquipiers continuent | **Reprise possible dans la session** |
 
-## Agents en arrière-plan par défaut
+L'intérêt majeur : les résultats intermédiaires restent dans le script. Le contexte de Claude ne reçoit que la réponse finale, il ne sature donc pas. Et comme l'orchestration est du code, elle peut appliquer des **méthodes de qualité** : faire vérifier chaque trouvaille par un agent indépendant chargé de la contredire, ou comparer plusieurs plans rédigés séparément.
 
-Les **sous-agents tournent désormais en arrière-plan par défaut** : Claude continue de travailler pendant leur exécution et est notifié à leur fin (auparavant en déploiement progressif).
+## Premier essai : /deep-research
 
-Surtout, les agents lancés depuis `claude agents` **ne s'arrêtent plus pour demander des instructions** une fois leur tâche de code terminée dans un worktree isolé. Ils enchaînent automatiquement :
+La façon la plus simple de voir un workflow tourner est la commande intégrée `/deep-research` :
 
-- **commit** → **push** → ouverture d'une **pull request (en draft)**.
+```text
+/deep-research Qu'est-ce qui a changé dans le modèle de permissions de Node.js entre la v20 et la v22 ?
+```
 
-L'agent va donc jusqu'au bout du cycle sans intervention, dans un espace de travail Git isolé.
+1. Claude Code vous demande d'autoriser le workflow. Répondez **Yes**.
+2. Le run démarre en arrière-plan. Une ligne de progression apparaît sous la zone de saisie.
+3. Le workflow lance des recherches sous plusieurs angles, lit les sources, les **recoupe**, fait voter des agents sur chaque affirmation, et écarte ce qui ne tient pas.
+4. Vous recevez un rapport avec ses sources. Une affirmation que les vérificateurs n'ont pas pu contrôler (limite de débit, erreur d'API) est marquée **non vérifiée**, pas réfutée.
 
-## Notifications en arrière-plan
+## Lancer un workflow pour votre tâche
 
-Pour ne pas bloquer l'attention du développeur, deux événements de hook `Notification` ont été ajoutés :
+### Le mot-clé `ultracode`
 
-- `agent_needs_input` — une session attend une décision humaine.
-- `agent_completed` — une session a terminé son exécution.
+Ajoutez `ultracode` dans votre message, ou demandez simplement « utilise un workflow » :
 
-Tu peux les brancher sur une notification système, un message Slack, etc. Voir [les hooks de notification](/wiki/hooks/notification).
+```text
+ultracode: vérifie chaque route sous src/routes/ pour des contrôles d'authentification manquants
+```
 
-## Résilience réseau et télémétrie
+Le mot-clé est surligné dans la zone de saisie. Il ne change que la **façon d'organiser le travail** : chaque action des agents passe par les mêmes permissions et le même bac à sable que d'habitude.
 
-Les workflows longs deviennent plus robustes :
+- Pour l'annuler sur ce message : `Option+W` (macOS) ou `Alt+W` (Windows, Linux), ou Retour arrière juste après le mot.
+- Pour le désactiver complètement : *Ultracode keyword trigger* dans `/config`.
+- Par sécurité, depuis la 2.1.210, le mot-clé ne déclenche **rien** s'il arrive par `claude -p`, une tâche planifiée, un webhook ou un commentaire de pull request. Seul un message tapé par un humain compte.
 
-- Une **brève coupure réseau** en plein milieu d'une réponse **n'avorte plus** le cycle de travail.
-- Les erreurs transitoires (ex. `ECONNRESET`) déclenchent un **retry avec backoff exponentiel**.
-- Le watchdog de relance porte le nombre de tentatives par défaut à **300** pour les erreurs transitoires non liées à la capacité.
+### Le mode ultracode pour toute la session
 
-## Compétence /dataviz
+```text
+/effort ultracode
+```
 
-La compétence **`/dataviz`** fournit des conseils architecturaux sur la conception de tableaux de bord interactifs et inclut un **validateur de palette de couleurs exécutable** — utile pour produire des visualisations cohérentes (light/dark, accessibles) plutôt que du texte brut.
+Claude prévoit alors un workflow pour **chaque tâche substantielle**, parfois plusieurs d'affilée : un pour comprendre le code, un pour le modifier, un pour vérifier. C'est puissant mais coûteux : chaque demande consomme plus de tokens et votre limite de 5 heures ou hebdomadaire arrive plus vite.
 
-## Comment en profiter
+- Lancer une session directement en ultracode : `claude --effort ultracode` (règle aussi l'effort sur `xhigh`).
+- Depuis le curseur `/effort` : `Tab` pour basculer *Ultracode*, puis `Entrée`. Depuis la 2.1.284, ultracode est un interrupteur séparé qui ne force plus `xhigh`.
+- Revenir à la normale : `/effort ultracode off`.
 
-1. **Lance les gros chantiers en dynamic workflow** : décris l'objectif de haut niveau et laisse l'agent planifier/paralléliser/vérifier. Une **suite de tests solide** est ton garde-fou : c'est elle que l'agent utilise pour s'auto-vérifier.
-2. **Utilise les agents en arrière-plan** pour les tâches longues, et branche `agent_needs_input`/`agent_completed` sur tes notifications pour être rappelé au bon moment.
-3. **Attends-toi à des PR en draft** ouvertes automatiquement : adapte ta politique de revue en conséquence.
+### Valider le plan avant le lancement
+
+Avant chaque run, Claude Code affiche les phases prévues et propose :
+
+- **Yes, run it** : lancer.
+- **Yes, and don't ask again** : seulement pour un workflow sauvegardé, intégré ou issu d'un plugin.
+- **View raw script** : lire le script d'abord (ou `Ctrl+G` pour l'ouvrir dans votre éditeur).
+- **No** : annuler.
+
+En mode `auto`, la question n'est posée qu'au premier lancement. En mode manuel, à chaque run. En `claude -p` ou avec l'Agent SDK, il faut une règle d'autorisation `Workflow` (ou `Workflow(nom)`) dans vos permissions.
+
+> **Conseil.** Les agents utilisent vos règles de permission. Pour un long run, ajoutez avant de lancer les outils dont ils auront besoin (tests, linter…) à vos règles `allow`, sinon le run se met en pause à chaque demande.
+
+## Suivre un run avec /workflows
+
+```text
+/workflows
+```
+
+La liste montre les runs en cours et terminés. Sélectionnez-en un et appuyez sur `Entrée` : chaque phase s'affiche avec son nombre d'agents, ses tokens et son temps écoulé.
+
+| Touche | Action |
+| :- | :- |
+| `↑` / `↓` | Choisir une phase ou un agent |
+| `Entrée` ou `→` | Entrer dans la phase, puis dans le détail d'un agent |
+| `Échap` ou `←` | Revenir d'un niveau |
+| `f` | Filtrer les agents par statut |
+| `p` | Mettre en pause ou reprendre le run |
+| `x` | Arrêter l'agent sélectionné, ou tout le run |
+| `r` | Relancer l'agent sélectionné |
+| `s` | Sauvegarder le script comme commande |
+
+Le détail d'un agent montre sa consigne, ses derniers appels d'outils et son résultat. Dans l'application de bureau, le suivi apparaît dans le panneau *Background tasks*.
+
+## Des exemples de demandes qui marchent bien
+
+Un workflow vaut le coup quand la tâche dépasse ce qu'un seul agent peut garder en tête, ou quand la même étape se répète sur beaucoup d'éléments.
+
+**Auditer beaucoup de fichiers**
+```text
+utilise un workflow pour auditer chaque route sous src/routes/ à la recherche de contrôles d'auth manquants, et fais vérifier chaque trouvaille par un agent qui essaie de la contredire
+```
+
+**Corriger jusqu'à ce qu'une vérification passe**
+```text
+utilise un workflow pour lancer npx tsc --noEmit et corriger les erreurs jusqu'à ce que le typage passe, ou que deux tours de suite ne progressent plus
+```
+
+**Migrer en parallèle sans conflits**
+```text
+utilise un workflow pour migrer chaque composant de src/components/ de JavaScript vers TypeScript, chaque fichier dans sa propre copie isolée
+```
+
+**Relire une pull request**
+```text
+utilise un workflow pour relire chaque fichier modifié dans cette PR, puis fusionne les remarques en un seul résumé classé par gravité
+```
+
+**Chercher jusqu'à épuisement**
+```text
+utilise un workflow pour trouver les tests instables : lance la suite plusieurs fois, note les échecs intermittents, et arrête quand deux tours de suite ne trouvent rien de nouveau
+```
+
+## Sauvegarder un workflow pour le réutiliser
+
+Quand un run fait exactement ce que vous vouliez, gardez-le : `/workflows`, sélectionnez le run, touche `s`. `Tab` choisit l'emplacement :
+
+- `.claude/workflows/` dans le projet : partagé avec toute l'équipe via Git ;
+- `~/.claude/workflows/` : pour vous seul, dans tous vos projets.
+
+Il devient alors une commande `/<nom>`. Un workflow sauvegardé peut recevoir des paramètres :
+
+```text
+Lance /triage-issues sur les issues 1024, 1025 et 1030
+```
+
+Pour le partager plus largement, placez-le dans le dossier `workflows/` d'un [plugin](/wiki/plugins/introduction-plugins) : il s'appellera `/nom-du-plugin:nom-du-workflow`.
+
+### À quoi ressemble le script
+
+Vous n'avez pas à l'écrire, mais savoir le lire aide à le valider :
+
+```javascript
+export const meta = {
+  name: 'audit-routes',
+  description: "Vérifie chaque route pour des contrôles d'auth manquants",
+}
+
+const found = await agent('Liste chaque fichier .ts sous src/routes/.', {
+  schema: { type: 'object', required: ['files'],
+            properties: { files: { type: 'array', items: { type: 'string' } } } },
+})
+
+const audits = await pipeline(found.files, file =>
+  agent(`Vérifie l'authentification dans ${file}.`, { label: file }),
+)
+
+return audits.filter(Boolean)
+```
+
+- `agent()` lance un sous-agent. Avec un `schema`, il répond en JSON structuré.
+- `pipeline()` lance un agent par élément d'une liste.
+- `parallel()` lance plusieurs tâches en même temps et attend qu'elles finissent.
+- `phase()` regroupe les agents sous un titre dans le suivi, `log()` affiche un message.
+
+Pour modifier un workflow sauvegardé, chargez d'abord la skill `/workflow-authoring`, puis `/reload-skills` pour relire les dossiers.
+
+## Pause, arrêt et reprise
+
+- **Pause** : `p` dans `/workflows`, puis `p` à nouveau pour reprendre.
+- **Arrêt puis relance** : demandez à Claude de relancer le workflow avec le même script. Les agents déjà terminés **renvoient leur résultat sauvegardé** sans recoûter. Attention : si un agent a échoué au milieu, lui **et tous ceux lancés après** sont refaits.
+- **Quitter la session** : avec agent view actif, choisissez *Move to background and exit* pour que le run continue. Sinon, il s'arrête, mais `claude --resume` permet de le relancer plus tard en réutilisant les résultats sauvegardés.
+- **Limite d'usage atteinte** (abonnement claude.ai, 2.1.271+) : le run se met en pause et repart tout seul après la réinitialisation, si elle a lieu dans les 24 heures.
+
+## Limites et coût
+
+| Limite | Valeur |
+| :- | :- |
+| Agents en même temps | 16 par défaut (`CLAUDE_CODE_WORKFLOW_MAX_CONCURRENT_AGENTS`, de 1 à 256) |
+| Éléments dans un `parallel()` ou `pipeline()` | 4 096 |
+| Agents au total par run | 1 000 |
+| Question en cours de run | Impossible : pour valider entre deux étapes, faites deux workflows |
+
+**Le coût est le vrai sujet.** Un run peut consommer beaucoup plus de tokens que la même tâche menée en conversation, et il compte dans vos limites. Quelques réflexes :
+
+1. **Testez sur une petite tranche** : un dossier au lieu du dépôt entier.
+2. **Réglez la taille visée** dans `/config` (*Dynamic workflow size*) ou avec `/config workflowSizeGuideline=small` :
+   - `small` : moins de 5 agents (par défaut sur Pro) ;
+   - `medium` : moins de 10 (par défaut ailleurs) ;
+   - `large` : moins de 50 ;
+   - `unrestricted` : Claude dimensionne librement.
+3. **Surveillez l'alerte « Large workflow »** : elle apparaît au-delà de 25 agents ou 1,5 million de tokens prévus. Elle ne bloque rien, mais c'est le moment de regarder `/workflows`.
+4. **Demandez un modèle plus léger** pour les étapes simples (« utilise Sonnet pour la lecture, Opus pour la synthèse »).
+
+## Désactiver les workflows
+
+- Pour vous : interrupteur *Dynamic workflows* dans `/config`, `"disableWorkflows": true` dans `~/.claude/settings.json`, ou la variable `CLAUDE_CODE_DISABLE_WORKFLOWS=1`.
+- Pour toute une organisation : `"disableWorkflows": true` dans les réglages gérés, ou la page d'administration Claude Code.
+
+## Et les agents en arrière-plan ?
+
+Depuis juillet 2026, les **sous-agents tournent en arrière-plan par défaut** : Claude continue à travailler pendant qu'ils s'exécutent. Les sessions lancées avec `claude --bg` depuis [agent view](/wiki/cli/agent-view-sessions) vont jusqu'au bout seules dans un worktree isolé : commit, push, puis pull request en brouillon. Les hooks `Notification` `agent_needs_input` et `agent_completed` permettent d'être prévenu au bon moment. Voir [les hooks de notification](/wiki/hooks/notification).
 
 ## Sources
 
-- [Claude Code changelog — Claude Code Docs](https://code.claude.com/docs/en/changelog)
-- [Claude Code Updates by Anthropic — July 2026, Releasebot](https://releasebot.io/updates/anthropic/claude-code)
-- [Claude Code Dynamic Workflows: The Complete Guide — Developers Digest](https://www.developersdigest.tech/blog/claude-code-dynamic-workflows-guide)
-
----
-
-*Cet article fait partie du wiki Claude Mastery. Non affilié à Anthropic. Claude™ est une marque d'Anthropic, PBC.*
+- [Orchestrate subagents at scale with dynamic workflows, documentation Claude Code](https://code.claude.com/docs/en/workflows)
+- [Changelog Claude Code](https://code.claude.com/docs/en/changelog)
+- [Run agents in parallel, documentation Claude Code](https://code.claude.com/docs/en/agents)

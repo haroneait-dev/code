@@ -16,17 +16,25 @@ Claude Code sort une nouvelle version presque chaque jour (la 2.1.288 est sortie
 
 ## Octobre 2026
 
-- **Mods (2.1.287, 1er octobre).** Des plugins en JavaScript qui dessinent des panneaux, ajoutent des commandes instantanées et interceptent les appels d'outils. Le mod intégré « You should know » (désactivé par défaut) surveille les longues tâches et signale ce que vous pourriez rater. Voir [Les mods](/wiki/plugins/mods).
+- **Mods (2.1.287, 1er octobre).** Des plugins en JavaScript qui dessinent des panneaux, ajoutent des commandes instantanées et interceptent les appels d'outils. Le mod intégré « You should know » surveille les longues tâches et signale ce que vous pourriez rater ; il est désactivé par défaut (`/plugin enable cc-plugin-you-should-know@builtin`). Voir [Les mods](/wiki/plugins/mods).
+- **Retrouver une session (2.1.288, 2 octobre).** Dans `claude agents`, `Ctrl+F` cherche une session et `n:texte` filtre par nom. `Alt+↑/↓` passe d'un groupe à l'autre.
 - **`/code-review --max-findings`** pour régler le nombre de remarques remontées.
+- **Moins de travail perdu.** Une coupure d'API en pleine réponse reprend à partir de la réponse partielle, et une conversation trop longue est compactée au lieu d'échouer sur « Prompt too long ».
+- **Connexion MCP plus simple** : les serveurs MCP peuvent ouvrir une page de connexion (protocole 2025-11-25).
 
 ## Septembre 2026
 
-- **Sonnet 5.5 (sorti le 28 septembre, adopté le 29)** : cible de l'alias `sonnet`, 1M de contexte, 2 $ / 10 $. `claude --desktop` ouvre l'application de bureau sur le dossier courant.
+- **Claude Code pour les administrations (30 septembre).** Claude for Government passe en disponibilité générale, avec une autorisation FedRAMP High. Le CLI Claude Code y arrive en accès anticipé.
+- **Invites de permission empilées (2.1.286).** Un compteur « 2 sur 5 » quand plusieurs demandes attendent, affichées de la plus ancienne à la plus récente.
+- **`claude --desktop` (2.1.285)** ouvre l'application de bureau sur le dossier courant. `claude plugin configure <plugin>` règle les options d'un plugin sans éditer de fichier.
+- **Sonnet 5.5 (2.1.284, 28 septembre)** : cible de l'alias `sonnet`, 1M de contexte, 2 $ / 10 $. Dans la même version : ultracode devient un interrupteur séparé du curseur `/effort` (il ne force plus `xhigh`), `/mcp reconnect all` relance tous les serveurs MCP d'un coup, et `/rate-limit-options` montre vos options quand vous atteignez une limite.
+- **`/doctor prompt-audit` (2.1.283).** Repère dans vos CLAUDE.md et vos skills les consignes écrites pour d'anciens modèles et devenues inutiles. Les entreprises peuvent bloquer des modèles précis avec `deniedModels`.
+- **`maxProseWidth` (2.1.282).** Limite la largeur du texte dans le terminal tout en laissant le code et les tableaux pleine largeur.
 - **Opus 5.5 (22 septembre)** : devient le modèle par défaut. Niveau de Fable 5.1 sur la plupart des tâches, 4 $ / 20 $.
 - **AGENTS.md (18 septembre)** : un projet sans CLAUDE.md peut utiliser son fichier `AGENTS.md`, partagé avec d'autres agents de code. Voir [CLAUDE.md](/wiki/demarrer/claude-md).
-- **`claude plugin eval`** : tester un plugin sur des cas concrets et le comparer à une session sans plugin.
+- **`claude plugin eval`** : tester un plugin sur des cas concrets et le comparer à une session sans plugin. **`/skill-doctor`** diagnostique une skill qui ne se déclenche pas.
 - **Fable 5.1 et Mythos 5.1 (1er septembre)** : environ 25 % moins chers à l'usage que la version 5. Voir [Fable 5.1 et Mythos 5.1](/wiki/modeles/fable-5-mythos-5).
-- **Panneau `/diff` en direct** pour suivre les modifications de Claude pendant qu'il travaille.
+- **Panneau `/diff` en direct** pour suivre les modifications de Claude pendant qu'il travaille, et **computer use en arrière-plan** dans l'application de bureau (Pro et Max, macOS).
 
 ## Août 2026
 

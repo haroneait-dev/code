@@ -228,6 +228,7 @@ export const ARTICLE_STUBS: ArticleStub[] = [
   // ═══ DÉMARRER ════════════════════════════════════════════════════
   { category: "demarrer", slug: "installation", title: "Installation de Claude Code", description: "Installer le CLI sur macOS, Linux, Windows." },
   { category: "demarrer", slug: "premier-prompt", title: "Votre premier prompt", description: "Lancer Claude Code et formuler une première requête." },
+  { category: "demarrer", slug: "astuces-avancees", title: "Les 30 astuces des utilisateurs avancés", description: "Vérification, plan d'abord, sessions parallèles, CLAUDE.md vivant, hooks et permissions : ce que font les pros." },
   { category: "demarrer", slug: "modes-interactif-one-shot", title: "Modes interactif vs one-shot", description: "Quand utiliser le mode interactif et quand préférer l'exécution one-shot." },
   { category: "demarrer", slug: "authentification", title: "Authentification et clés API", description: "Configurer son compte, gérer les clés API Anthropic." },
   { category: "demarrer", slug: "configurer-projet", title: "Configurer un projet pour Claude Code", description: "Préparer un repo pour tirer le meilleur de Claude Code." },
@@ -276,7 +277,7 @@ export const ARTICLE_STUBS: ArticleStub[] = [
   { category: "cli", slug: "cicd-execution", title: "Mode non-interactif et CI/CD", description: "Automatiser des refactors via GitHub Actions, GitLab CI." },
   { category: "cli", slug: "multi-projet-context-switching", title: "Multi-projet et context switching", description: "Comment le CLI gère le passage entre repos Git." },
   { category: "cli", slug: "themes-accessibilite", title: "Thèmes et accessibilité", description: "Couleurs, contraste, mode compact, lecteurs d'écran." },
-  { category: "cli", slug: "dynamic-workflows-agents-arriere-plan", title: "Dynamic workflows & agents en arrière-plan", description: "Workflows dynamiques à sous-agents parallèles, agents qui commit/push/PR seuls, résilience réseau et notifications (juillet 2026)." },
+  { category: "cli", slug: "dynamic-workflows-agents-arriere-plan", title: "Dynamic workflows : des dizaines d'agents", description: "Ultracode, /deep-research, suivre un run avec /workflows, sauvegarder, reprendre, limites et coût." },
   { category: "cli", slug: "effort-fast-advisor", title: "Effort, fast mode et advisor", description: "Régler la puissance de Claude : niveaux d'effort jusqu'à ultracode, fast mode d'Opus, advisor." },
   { category: "cli", slug: "agent-view-sessions", title: "Agent view : sessions en parallèle", description: "Lancer des sessions avec claude --bg, les suivre et leur répondre depuis claude agents." },
   { category: "cli", slug: "cloud-routines-remote", title: "Cloud, routines et Remote Control", description: "Suivre une session depuis son téléphone, lancer Claude dans le cloud, programmer des routines." },
@@ -471,6 +472,8 @@ export const ARTICLE_STUBS: ArticleStub[] = [
   { category: "claude-bases", slug: "personnaliser", title: "Personnaliser Claude", description: "Préférences de profil, styles et instructions de projet." },
   { category: "claude-bases", slug: "confidentialite", title: "Confidentialité et données", description: "Entraînement, conservation, incognito, export, suppression, ce qu'il ne faut pas envoyer." },
   { category: "claude-bases", slug: "verifier-reponses", title: "Vérifier les réponses", description: "Quand Claude se trompe, et une méthode simple pour vérifier ce qui compte." },
+  { category: "claude-bases", slug: "erreurs-debutant", title: "Les 12 erreurs de débutant", description: "Demandes vagues, conversations sans fin, confiance aveugle : les pièges et les bons réflexes." },
+  { category: "claude-bases", slug: "glossaire", title: "Le glossaire de l'IA et de Claude", description: "Token, contexte, agent, MCP, skill, hook, worktree : 50 mots expliqués simplement." },
   // ═══ CLAUDE QUI AGIT ══════════════════════════════════════════════
   { category: "claude-agents", slug: "cowork", title: "Cowork : Claude qui travaille dans vos fichiers", description: "Dossiers, applications, navigateur intégré, tâches en plusieurs étapes." },
   { category: "claude-agents", slug: "dispatch-taches", title: "Dispatch et tâches programmées", description: "Confier une tâche depuis le téléphone et programmer du travail récurrent." },
