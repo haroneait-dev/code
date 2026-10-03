@@ -17,7 +17,7 @@ C'est exactement le même pattern que `metadata.user` chez OpenAI ou les claims 
 
 ```ts
 await client.messages.create({
-  model: "claude-sonnet-4-6",
+  model: "claude-sonnet-5-5",
   max_tokens: 1024,
   metadata: {
     user_id: "usr_a8f3b91c-2d4e-4f8a-9c1d-7e5b3a2f1c8d"
@@ -41,7 +41,7 @@ Dans une stack Next.js + Supabase comme la nôtre, le `user.id` Supabase est un 
 const { data: { user } } = await supabase.auth.getUser(token);
 
 const response = await anthropic.messages.create({
-  model: "claude-sonnet-4-6",
+  model: "claude-sonnet-5-5",
   max_tokens: 2048,
   metadata: { user_id: user.id },
   messages

@@ -1,7 +1,7 @@
 ---
 title: "Qu'est-ce qu'un hook ?"
 description: "Comprendre le concept des hooks dans Claude Code, leurs cas d'usage et leur philosophie."
-updatedAt: "2026-05-19"
+updatedAt: "2026-10-03"
 readingMinutes: 6
 ---
 
@@ -26,19 +26,25 @@ Les cas d'usage les plus fréquents :
 
 ## Les événements disponibles
 
-Claude Code expose plusieurs événements de cycle de vie. Les principaux :
+En octobre 2026, Claude Code expose une trentaine d'événements. Les plus utilisés sont en gras.
 
-- `PreToolUse` — avant l'exécution d'un outil
-- `PostToolUse` — après l'exécution d'un outil
-- `UserPromptSubmit` — quand l'utilisateur soumet un prompt
-- `Notification` — quand le harness veut notifier l'utilisateur
-- `Stop` — quand l'agent termine sa réponse
-- `SubagentStop` — quand un sous-agent termine
-- `PreCompact` — avant la compaction du contexte
-- `SessionStart` — au démarrage d'une session
-- `SessionEnd` — à la fin d'une session
+| Famille | Événements |
+|---|---|
+| Session | **`SessionStart`**, **`SessionEnd`**, `Setup` |
+| Prompt | **`UserPromptSubmit`**, `UserPromptExpansion` |
+| Outils | **`PreToolUse`**, **`PostToolUse`**, `PostToolUseFailure`, `PostToolBatch` |
+| Permissions | `PermissionRequest`, `PermissionDenied` |
+| Fin de tour | **`Stop`**, `StopFailure` |
+| Sous-agents et tâches | `SubagentStart`, **`SubagentStop`**, `TaskCreated`, `TaskCompleted`, `TeammateIdle` |
+| Contexte | **`PreCompact`**, `PostCompact`, `InstructionsLoaded` |
+| Environnement | `FileChanged`, `CwdChanged`, `ConfigChange` |
+| Worktrees | `WorktreeCreate`, `WorktreeRemove` |
+| Interface | **`Notification`**, `MessageDisplay` |
+| MCP | `Elicitation`, `ElicitationResult` |
 
-Chaque événement reçoit un payload JSON différent. Reportez-vous à la [documentation officielle](https://docs.claude.com/en/docs/claude-code/hooks) pour le détail.
+Chaque événement reçoit un payload JSON différent sur l'entrée standard. Un hook peut être une commande shell (`"type": "command"`), une requête HTTP, ou un prompt évalué par un modèle. Pour réagir aux erreurs, voir [StopFailure et PostToolUseFailure](/wiki/hooks/erreurs-stopfailure). Pour du code qui tourne dans Claude Code et dessine dans l'interface, voir [les mods](/wiki/plugins/mods).
+
+Référence complète : https://code.claude.com/docs/en/hooks
 
 ## Structure d'un hook dans `settings.json`
 
@@ -53,7 +59,7 @@ Voici la forme canonique d'un hook :
         "hooks": [
           {
             "type": "command",
-            "command": "prettier --write \"$CLAUDE_FILE_PATHS\""
+            "command": "jq -r '.tool_input.file_path' | xargs npx prettier --write"
           }
         ]
       }
@@ -62,7 +68,7 @@ Voici la forme canonique d'un hook :
 }
 ```
 
-Le `matcher` filtre les outils concernés (regex sur le nom de l'outil). Le `command` est exécuté avec le payload JSON sur `stdin`.
+Le `matcher` filtre les outils concernés (regex sur le nom de l'outil). Le `command` reçoit le payload JSON sur `stdin` : ici, `jq` en extrait le chemin du fichier modifié.
 
 ## Un premier exemple concret
 

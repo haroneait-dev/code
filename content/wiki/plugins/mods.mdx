@@ -1,0 +1,108 @@
+---
+title: "Les mods : modifier l'interface et le comportement de Claude Code"
+description: "Les mods (octobre 2026) sont des plugins en JavaScript qui dessinent des panneaux, ajoutent des commandes et interceptent les appels d'outils. Fonctionnement, exemple, sécurité."
+updatedAt: "2026-10-03"
+readingMinutes: 7
+---
+
+Arrivés avec Claude Code **2.1.287 (1er octobre 2026)**, les **mods** sont des plugins dont le code tourne **à l'intérieur** de Claude Code. Là où un hook classique lance un script externe, un mod enregistre des fonctions JavaScript ou TypeScript appelées à chaque événement : un appel d'outil, un prompt envoyé, une partie de l'interface à dessiner.
+
+## Ce qu'un mod peut faire
+
+- **Dessiner une interface** : un panneau à côté de la conversation, un bandeau au-dessus du prompt, avec onglets, boutons et champs.
+- **Redessiner l'interface existante** : changer l'affichage d'un appel d'outil, du spinner, de la boîte de questions.
+- **Intervenir sur un appel d'outil** : le mettre en attente pour vous poser une question, y répondre sans exécuter l'outil, ou envoyer une requête à un autre modèle.
+- **Ajouter une commande** `/xxx` qui exécute votre code immédiatement, sans tour de Claude, même pendant qu'il travaille.
+- **Partager des données entre événements** : compter les appels d'outils et afficher le total à côté du spinner, ou tracer le remplissage du contexte.
+
+Les mods fonctionnent dans le terminal et dans l'onglet Code de l'application de bureau. Dans l'extension VS Code, `claude -p` et les sessions cloud, leurs hooks tournent mais rien ne s'affiche.
+
+## Mod, hook, skill ou MCP ?
+
+| | Mod | Hook (settings) | Skill | Serveur MCP |
+|---|---|---|---|---|
+| C'est quoi | Des fonctions JS dans Claude Code | Une commande shell, HTTP ou un prompt | Un fichier `SKILL.md` | Un processus externe qui fournit des outils |
+| Dessine dans l'interface | Oui | Non | Non | Non |
+| À choisir quand | Vous voulez un panneau, une commande instantanée ou réécrire un événement | Vous voulez bloquer, autoriser ou journaliser avec un script existant | Vous recopiez souvent les mêmes consignes | Claude doit joindre un système externe |
+
+## À quoi ressemble un mod
+
+```text
+compteur-outils/
+├── .claude-plugin/
+│   └── plugin.json
+└── hooks/
+    ├── hooks.json
+    └── register.js
+```
+
+```javascript
+// hooks/register.js
+let appels = 0
+
+export function register(on) {
+  // Avant chaque utilisation d'un outil
+  on('tool.call', async ($, e, next) => {
+    appels += 1
+    $.ui.invalidate('ui.render')   // redessiner pour afficher le nouveau total
+    return next(e)                 // laisser l'outil s'exécuter normalement
+  })
+
+  // À chaque affichage du spinner
+  on('ui.render', { component: 'Spinner' }, async ($, e, next) => {
+    return next({ ...e, props: { ...e.props, suffix: ' · outils : ' + appels + '…' } })
+  })
+}
+```
+
+Chaque fonction peut **observer** l'événement, le **réécrire** ou y **répondre** elle-même. Pour lire un fichier, appeler le réseau ou un modèle, elle passe obligatoirement par l'API des mods (`$`). C'est ce qui permet à Claude Code de lister ce qu'un mod fait avant de l'installer.
+
+## Créer le sien
+
+Le plus simple : décrivez ce que vous voulez dans une session, par exemple « fais-moi un mod qui affiche le remplissage du contexte dans un bandeau ». Claude Code embarque un skill dédié à l'écriture de mods. Pour charger le résultat pendant le développement :
+
+```bash
+claude --plugin-dir ./mon-mod
+```
+
+Puis `/reload-plugins` après chaque modification.
+
+Anthropic publie des exemples dans le dépôt `anthropics/claude-code-playground` : `token-weather` (prévisions du contexte au-dessus du prompt), `blast-radius` (met en pause un `rm -rf` ou un force push et montre ce qui serait touché) et `replay-theater` (rejoue les modifications du dernier tour).
+
+## Sécurité : un mod, c'est votre compte
+
+Un mod n'est **pas isolé**. Une fois chargé, il peut :
+
+- lire et écrire vos fichiers, lancer des programmes, appeler le réseau ;
+- lire vos variables d'environnement, donc vos clés d'API ;
+- voir chaque prompt et chaque appel d'outil, et les modifier ;
+- approuver un appel d'outil à votre place ;
+- consommer votre quota en appelant un modèle.
+
+Seule limite : il ne peut pas modifier ce qu'affiche une demande de permission. Avant d'installer un mod que vous n'avez pas écrit :
+
+```bash
+claude plugin validate ./le-mod
+```
+
+Les lignes `hooks:` et `calls:` listent les événements écoutés et ce que le mod demande à faire.
+
+### Couper les mods
+
+- **Un mod** : le désactiver dans `/plugin`.
+- **Tous, pour une session** : `claude --safe-mode`.
+- **Tous, partout** : `"disableAllHooks": true` dans `~/.claude/settings.json` (coupe aussi vos hooks et votre status line).
+
+## Les mods intégrés
+
+Certaines fonctions de Claude Code sont elles-mêmes des mods, visibles dans `/plugin` sous **Built-in** : le panneau `/diff`, le chargement de `AGENTS.md`, la télémétrie. Le mod **« You should know »** est désactivé par défaut : un agent secondaire surveille les longues tâches et vous signale ce que vous pourriez rater.
+
+```text
+/plugin enable cc-plugin-you-should-know@builtin
+```
+
+## Pour aller plus loin
+
+- [Les plugins : installer et gérer](/wiki/plugins/introduction-plugins)
+- [Qu'est-ce qu'un hook ?](/wiki/hooks/introduction-hooks)
+- Documentation : https://code.claude.com/docs/en/plugins/mods/overview

@@ -56,7 +56,7 @@ clients = [
     ("vertex",    AnthropicVertex(region="europe-west1", project_id="prod")),
 ]
 
-def call_with_failover(messages, model="claude-sonnet-4-6"):
+def call_with_failover(messages, model="claude-sonnet-5-5"):
     last_err = None
     for name, client in clients:
         try:
@@ -82,7 +82,7 @@ curl -s -o /dev/null -w "%{http_code} %{time_total}\n" \
   -H "x-api-key: $ANTHROPIC_API_KEY" \
   -H "anthropic-version: 2023-06-01" \
   -H "content-type: application/json" \
-  -d '{"model":"claude-haiku-4-6","max_tokens":1,"messages":[{"role":"user","content":"ping"}]}'
+  -d '{"model":"claude-haiku-4-5","max_tokens":1,"messages":[{"role":"user","content":"ping"}]}'
 ```
 
 Au-delà de N erreurs consécutives, ouvrir le circuit pendant 30 secondes avant un *half-open retry*.

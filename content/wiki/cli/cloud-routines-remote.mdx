@@ -1,0 +1,104 @@
+---
+title: "Claude Code hors du terminal : cloud, routines et Remote Control"
+description: "Continuer une session locale depuis son téléphone, lancer des sessions dans le cloud, et programmer des routines qui tournent sur un planning, un appel d'API ou un événement GitHub."
+updatedAt: "2026-10-03"
+readingMinutes: 8
+---
+
+Claude Code n'a plus besoin que vous restiez devant votre terminal. Trois fonctions, souvent confondues, couvrent des besoins différents :
+
+| | Remote Control | Session cloud | Routine |
+|---|---|---|---|
+| Où tourne Claude | Sur **votre machine** | Chez Anthropic | Chez Anthropic |
+| Machine allumée ? | Oui | Non | Non |
+| Accès à vos fichiers locaux | Oui | Non (clone du dépôt) | Non (clone du dépôt) |
+| Qui la lance | Vous, puis vous la suivez ailleurs | Vous | Un planning, une API ou GitHub |
+| Offres | Pro, Max, Team, Enterprise | Pro, Max, Team, Enterprise | Pro, Max, Team, Enterprise |
+
+## Remote Control : votre session locale, depuis le téléphone
+
+Remote Control relie une session qui tourne sur votre ordinateur à [claude.ai/code](https://claude.ai/code) ou à l'application Claude (iOS, Android). Claude continue d'exécuter le code chez vous, avec vos fichiers, vos serveurs MCP et votre configuration. Vous suivez et répondez depuis n'importe quel appareil.
+
+Trois façons de l'activer :
+
+```bash
+claude remote-control          # mode serveur : attend les connexions, affiche une URL et un QR code (barre d'espace)
+claude --remote-control "Mon projet"   # session interactive normale, pilotable aussi à distance (alias --rc)
+```
+
+```text
+/remote-control                # depuis une session déjà ouverte (alias /rc)
+```
+
+Points pratiques :
+
+- il faut être connecté avec un compte claude.ai (`/login`) ; une clé API ne suffit pas ;
+- sur Team et Enterprise, un propriétaire doit d'abord activer Remote Control dans les réglages d'administration ;
+- si l'ordinateur se met en veille ou perd le réseau, la session se reconnecte toute seule ;
+- vous pouvez envoyer des photos et des fichiers depuis le téléphone : ils arrivent dans le projet comme références `@`.
+
+## Sessions cloud : Claude sans votre ordinateur
+
+Une session cloud tourne sur l'infrastructure d'Anthropic, dans un conteneur qui clone votre dépôt GitHub. Vous la lancez depuis le navigateur, l'application mobile, l'application de bureau ou le terminal, et vous récupérez une branche ou une pull request à la fin.
+
+Ce qui définit une session cloud, c'est son **environnement** :
+
+- **accès réseau** : aucun, « Trusted » (liste de domaines courants : registres de paquets, API cloud) ou personnalisé ;
+- **variables d'environnement** et **identifiants d'API** pour les services que Claude doit appeler ;
+- **script d'installation** pour les dépendances, mis en cache entre deux sessions.
+
+Les sessions cloud ne chargent pas les plugins de votre configuration locale : ce qui doit suivre doit être commité dans le dépôt (`.claude/`, `.mcp.json`, skills du projet).
+
+## Routines : Claude en pilote automatique
+
+Une routine est une configuration enregistrée (un prompt, un ou plusieurs dépôts, des connecteurs) qui se lance toute seule dans le cloud. Elle peut avoir plusieurs déclencheurs :
+
+- **planning** : toutes les heures, tous les jours, en semaine, une fois à une date donnée (intervalle minimum : une heure) ;
+- **API** : un `POST` sur une URL propre à la routine, avec un jeton ;
+- **GitHub** : ouverture ou mise à jour d'une pull request, publication d'une release, avec filtres (branche, labels, brouillon…).
+
+### Créer une routine
+
+Sur le web à [claude.ai/code/routines](https://claude.ai/code/routines), dans l'application de bureau, ou depuis le terminal :
+
+```text
+/schedule tous les jours à 9h07, relis les PR ouvertes et commente celles qui cassent nos conventions
+/schedule dans 2 semaines, ouvre une PR qui retire le feature flag new-checkout
+/schedule list
+/schedule run
+```
+
+Astuce : évitez l'heure pile (9h00). Les lancements à l'heure ronde peuvent démarrer avec quelques minutes de retard ; 9h07 part à l'heure.
+
+### Déclencher par API
+
+```bash
+curl -X POST https://api.anthropic.com/v1/claude_code/routines/<ID_ROUTINE>/fire \
+  -H "Authorization: Bearer <JETON>" \
+  -H "anthropic-beta: experimental-cc-routine-2026-04-01" \
+  -H "anthropic-version: 2023-06-01" \
+  -H "Content-Type: application/json" \
+  -d '{"text": "Alerte Sentry SEN-4521 en production"}'
+```
+
+Le champ `text` arrive dans un bloc marqué comme **données non fiables**. Le prompt de la routine doit dire explicitement quoi en faire, par exemple « Analyse l'alerte décrite dans le bloc routine-fire-payload ».
+
+### Ce qu'il faut savoir avant de s'y fier
+
+- **Une routine agit en votre nom.** Ses commits, commentaires et messages Slack portent votre identité.
+- **Elle n'attend aucune validation.** Retirez les connecteurs dont elle n'a pas besoin : elle peut utiliser tous leurs outils, écriture comprise.
+- **Un statut vert ne veut pas dire « réussi ».** Il indique seulement que la session a démarré et s'est terminée sans erreur technique. Ouvrez le transcript pour vérifier le résultat.
+- **Elle consomme votre quota** comme une session normale, avec des limites horaires en plus (100 lancements programmés par heure et par compte).
+
+## Exemples qui marchent bien
+
+- **Tri du backlog** chaque soir : étiqueter les nouveaux tickets et poster un résumé dans Slack.
+- **Revue maison** à chaque PR ouverte, avec votre propre checklist.
+- **Vérification après déploiement** déclenchée par la CI via l'API.
+- **Dérive de la documentation** chaque semaine : repérer la doc qui cite des API modifiées et proposer une PR.
+
+## Pour aller plus loin
+
+- [/goal, /loop et Monitor](/wiki/cli/goal-loop-monitor) pour faire tourner une session ouverte dans la durée
+- [Agent view](/wiki/cli/agent-view-sessions) pour plusieurs sessions locales
+- Documentation : https://code.claude.com/docs/en/routines et https://code.claude.com/docs/en/remote-control

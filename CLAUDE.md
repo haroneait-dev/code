@@ -74,10 +74,11 @@ lib/
 - `"lesson"` → LessonView
 - `"wiki"` → WikiView
 
-### Auth gate
-- Utilisateurs non connectés : accès uniquement au module `"intro"`
-- Cliquer sur un module verrouillé → ouvre `AuthModal`
-- `isAdmin` = `user.email === process.env.NEXT_PUBLIC_ADMIN_EMAIL`
+### Accès libre (depuis octobre 2026)
+- Aucune connexion : formation, wiki et fiches sont accessibles à tous.
+- Communauté, messagerie, notifications, profils, assistant IA et admin sont désactivés.
+  Leur code est resté en place ; `proxy.ts` redirige leurs pages vers `/` et leurs API répondent 410.
+- Articles retirés : redirections permanentes dans `next.config.mjs`.
 
 ### Supabase client
 - Client lazy via Proxy dans `lib/supabase.ts`
@@ -98,11 +99,12 @@ SUPABASE_SERVICE_ROLE_KEY
 ANTHROPIC_API_KEY
 ```
 
-## Design
-- Palette sombre : `--bg-dark: #0b0a09` + tons beige
-- Animations : orbs violet/bleu en fond, gradient text, scroll reveal, 3D tilt sur hover
-- Glassmorphism sur la nav desktop
-- Chat widget flottant (bas droite) — uniquement pour utilisateurs connectés
+## Design (direction « Atelier », octobre 2026)
+- Papier chaud `#fbf6ee`, encre `#2b2119`, vert sapin `#2f5d46` pour les actions, souci `#f2b23e` / `#fbe3a8` pour surligner
+- Jetons dans `tailwind.config.ts` (noms Material conservés) et `app/globals.css`
+- Polices : Bricolage Grotesque (titres), Figtree (texte), JetBrains Mono (code)
+- Classes utiles : `.text-mark` (surligneur), `.tag-note` (étiquette post-it), `.btn-primary`, `.btn-secondary`
+- À éviter : dégradés de texte, halos flous animés, bandeaux défilants, compteurs animés, glassmorphism
 
 ## Commandes
 ```bash

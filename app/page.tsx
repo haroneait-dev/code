@@ -1,377 +1,299 @@
 import Link from "next/link";
-import {
-  ArrowRight,
-  Terminal,
-  Wrench,
-  Sparkles,
-  ShieldCheck,
-  GitBranch,
-  Zap,
-  Cpu,
-} from "lucide-react";
+import { ArrowRight, ArrowUpRight } from "lucide-react";
 import { SiteHeader } from "@/components/site/SiteHeader";
 import { SiteFooter } from "@/components/site/SiteFooter";
-import { TerminalDemo } from "@/components/site/TerminalDemo";
-import { AnimatedCounter } from "@/components/site/AnimatedCounter";
-import { ScrollReveal } from "@/components/site/ScrollReveal";
 import { curriculum, totalLessons } from "@/lib/curriculum";
-import { CATEGORIES, articleCount } from "@/lib/wiki-manifest";
+import { CATEGORIES, articleCount, stubsByCategory } from "@/lib/wiki-manifest";
 
-const FEATURES = [
+// Date de la dernière revue complète du contenu.
+const LAST_REVIEW = "3 octobre 2026";
+const CLAUDE_CODE_VERSION = "2.1.288";
+
+// Ce qui a vraiment changé ces dernières semaines, avec la page qui en parle.
+const RECENT = [
   {
-    icon: Terminal,
-    title: "Le CLI pas à pas",
-    desc: "Installation, premières commandes, slash commands, modes d'usage.",
+    date: "1 oct.",
+    title: "Les mods arrivent dans Claude Code",
+    text: "Les plugins peuvent maintenant dessiner des panneaux et réagir aux événements de la session.",
+    href: "/wiki/plugins/mods",
   },
   {
-    icon: Wrench,
-    title: "Tools & MCP",
-    desc: "Read, Edit, Bash, Grep, et l'écosystème MCP pour étendre Claude.",
+    date: "29 sept.",
+    title: "Sonnet 5.5 remplace Sonnet 5",
+    text: "1M de tokens de contexte, 2 $ / 10 $ le million de tokens : plus rapide et moins cher que Sonnet 5.",
+    href: "/wiki/modeles/opus-sonnet-5-5",
   },
   {
-    icon: GitBranch,
-    title: "Git & workflows",
-    desc: "Commits, PRs, code review et CI/CD pilotés par l'agent.",
+    date: "22 sept.",
+    title: "Opus 5.5 devient le modèle par défaut",
+    text: "Le niveau de Fable 5.1 sur la plupart des tâches, pour 4 $ / 20 $ le million de tokens.",
+    href: "/wiki/modeles/opus-sonnet-5-5",
   },
   {
-    icon: Sparkles,
-    title: "Prompt engineering",
-    desc: "Le langage qui marche vraiment avec Claude — pas la théorie.",
-  },
-  {
-    icon: ShieldCheck,
-    title: "Skills & subagents",
-    desc: "Construire ses propres skills réutilisables et déléguer en parallèle.",
-  },
-  {
-    icon: Zap,
-    title: "API & SaaS",
-    desc: "Construire un produit complet avec Claude derrière, prêt à monétiser.",
+    date: "18 sept.",
+    title: "AGENTS.md est lu par Claude Code",
+    text: "Un projet sans CLAUDE.md peut réutiliser le fichier d'instructions partagé avec d'autres agents.",
+    href: "/wiki/demarrer/claude-md",
   },
 ];
 
-const MARQUEE = [
-  "CLI",
-  "MCP",
-  "Hooks",
-  "Skills",
-  "Subagents",
-  "Slash commands",
-  "Code review",
-  "Git workflows",
-  "Tool use",
-  "Prompt caching",
-  "Streaming",
-  "API",
-  "SaaS",
-  "Sécurité",
+// Un parcours dans l'ordre : l'ordre compte, d'où la numérotation.
+const PATH = [
+  {
+    step: "1",
+    title: "Installer et lancer",
+    text: "Installer le CLI, ouvrir un projet, écrire un premier CLAUDE.md et comprendre les modes de permission.",
+    href: "/wiki/demarrer/installation",
+    cta: "Installation",
+  },
+  {
+    step: "2",
+    title: "Lui confier du vrai travail",
+    text: "Plan mode, sous-agents, gestion du contexte : déléguer une tâche de bout en bout et relire ce qui revient.",
+    href: "/learn",
+    cta: "La formation",
+  },
+  {
+    step: "3",
+    title: "L'outiller pour votre équipe",
+    text: "Skills, hooks, serveurs MCP et plugins : transformer vos habitudes en réglages partagés.",
+    href: "/wiki/plugins/introduction-plugins",
+    cta: "Plugins et skills",
+  },
 ];
-
-const CODE_REAL = `# Installer Claude Code
-$ npm install -g @anthropic-ai/claude-code
-
-# Lancer dans n'importe quel projet
-$ cd mon-projet && claude
-
-# Ou créer un skill réutilisable
-$ claude skills add ./skills/code-review
-
-# Hooks : déclencher une action après chaque edit
-.claude/settings.json
-{
-  "hooks": {
-    "PostToolUse": [
-      { "matcher": "Edit", "hooks": [
-        { "type": "command", "command": "npm run lint --silent" }
-      ]}
-    ]
-  }
-}`;
 
 export default function LandingPage() {
   const totalModules = curriculum.length;
   const wikiTotal = articleCount();
-  const wikiCats = CATEGORIES.length;
 
   return (
     <div className="min-h-screen flex flex-col bg-surface">
       <SiteHeader active="formation" />
 
       <main className="flex-grow">
-        {/* HERO */}
-        <section className="relative w-full overflow-hidden">
-          {/* Aurora background */}
-          <div
-            aria-hidden
-            className="absolute inset-0 -z-10 pointer-events-none"
-          >
-            <div className="absolute top-[-20%] left-[-10%] w-[55%] h-[80%] rounded-full blur-[120px] opacity-50 aurora-blob bg-[radial-gradient(circle,#e0c29e_0%,transparent_70%)]" />
-            <div
-              className="absolute bottom-[-30%] right-[-10%] w-[50%] h-[70%] rounded-full blur-[140px] opacity-40 aurora-blob bg-[radial-gradient(circle,#a37b5a_0%,transparent_70%)]"
-              style={{ animationDelay: "-6s" }}
-            />
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_120%,rgba(36,26,14,0.06),transparent_60%)]" />
-          </div>
-
-          <div className="w-full max-w-container-max mx-auto px-margin-mobile md:px-margin-desktop py-20 md:py-28">
-            <div className="grid grid-cols-1 lg:grid-cols-[1.1fr_1fr] gap-12 lg:gap-16 items-center">
-              {/* Left — pitch */}
-              <div className="text-center lg:text-left">
-                <div className="inline-flex items-center gap-2 border border-outline-variant bg-surface-container-lowest/70 backdrop-blur rounded-full px-4 py-1.5 mb-6">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                  <span className="text-[11px] font-bold tracking-wider uppercase text-on-surface-variant">
-                    Formation Claude Code · 100% Français
-                  </span>
-                </div>
-
-                <h1 className="font-display-xl font-extrabold tracking-tight mb-6 text-[44px] leading-[1.02] md:text-[72px] md:leading-[0.95]">
-                  <span className="text-on-surface">Maîtrise </span>
-                  <span className="text-gradient">Claude Code,</span>
-                  <br />
-                  <span className="text-on-surface">en français.</span>
-                </h1>
-
-                <p className="font-body-rt text-[17px] md:text-[20px] text-on-surface-variant max-w-xl mx-auto lg:mx-0 mb-8 leading-relaxed">
-                  La formation francophone de référence pour devenir expert du
-                  CLI d'Anthropic. {totalModules} modules pratiques,{" "}
-                  {totalLessons} leçons, un wiki de {wikiTotal} articles, et un
-                  assistant IA qui t'accompagne.
-                </p>
-
-                <div className="flex flex-col sm:flex-row items-center lg:items-start lg:justify-start justify-center gap-3 mb-10">
-                  <Link
-                    href="/learn"
-                    className="btn-primary h-12 px-7 rounded-full inline-flex items-center justify-center gap-2 font-medium text-body-sm w-full sm:w-auto group"
-                  >
-                    Commencer gratuitement
-                    <ArrowRight
-                      className="w-4 h-4 group-hover:translate-x-1 transition-transform"
-                      strokeWidth={1.75}
-                    />
-                  </Link>
-                  <Link
-                    href="/wiki"
-                    className="btn-secondary h-12 px-7 rounded-full inline-flex items-center justify-center gap-2 font-medium text-body-sm w-full sm:w-auto"
-                  >
-                    Explorer le wiki
-                  </Link>
-                </div>
-
-                {/* Stats */}
-                <div className="grid grid-cols-3 gap-3 max-w-md mx-auto lg:mx-0">
-                  <Stat
-                    value={totalModules}
-                    label="modules"
-                  />
-                  <Stat value={totalLessons} label="leçons" />
-                  <Stat value={wikiTotal} label="articles wiki" />
-                </div>
-              </div>
-
-              {/* Right — terminal */}
-              <div className="hidden lg:block">
-                <TerminalDemo />
-              </div>
-            </div>
-          </div>
-
-          {/* Marquee */}
-          <div className="relative border-y border-outline-variant bg-surface-container-lowest/60 overflow-hidden">
-            <div className="flex animate-marquee whitespace-nowrap py-3">
-              {[...MARQUEE, ...MARQUEE].map((word, i) => (
-                <span
-                  key={i}
-                  className="px-6 text-body-sm text-on-surface-variant font-medium tracking-wide"
+        {/* Ouverture */}
+        <section className="w-full px-margin-mobile md:px-margin-desktop pt-14 pb-16 md:pt-20 md:pb-24">
+          <div className="max-w-container-max mx-auto grid grid-cols-1 lg:grid-cols-[1.15fr_1fr] gap-12 lg:gap-16 items-start">
+            <div className="min-w-0">
+              <p className="tag-note mb-7">
+                Revu le {LAST_REVIEW} · Claude Code {CLAUDE_CODE_VERSION}
+              </p>
+              <h1 className="font-display-xl font-extrabold tracking-tight text-on-surface text-[42px] leading-[1.04] md:text-[68px] md:leading-[0.98] mb-6">
+                Apprendre <span className="text-mark">Claude Code</span>, en
+                français, sans détour.
+              </h1>
+              <p className="text-[18px] md:text-[20px] text-on-surface-variant leading-relaxed max-w-xl mb-8">
+                Une formation gratuite et sans inscription : {totalModules}{" "}
+                modules, {totalLessons} leçons et {wikiTotal} articles de
+                référence, relus à chaque nouvelle version.
+              </p>
+              <div className="flex flex-col sm:flex-row gap-3">
+                <Link
+                  href="/learn"
+                  className="btn-primary h-12 px-6 rounded-md inline-flex items-center justify-center gap-2 font-semibold text-[15px] group"
                 >
-                  · {word}
-                </span>
-              ))}
+                  Commencer la formation
+                  <ArrowRight
+                    className="w-4 h-4 group-hover:translate-x-0.5 transition-transform"
+                    strokeWidth={2}
+                  />
+                </Link>
+                <Link
+                  href="/wiki"
+                  className="btn-secondary h-12 px-6 rounded-md inline-flex items-center justify-center gap-2 font-semibold text-[15px]"
+                >
+                  Parcourir le wiki
+                </Link>
+              </div>
             </div>
-            <div className="absolute inset-y-0 left-0 w-24 bg-gradient-to-r from-surface to-transparent pointer-events-none" />
-            <div className="absolute inset-y-0 right-0 w-24 bg-gradient-to-l from-surface to-transparent pointer-events-none" />
+
+            {/* Carnet : une vraie première session */}
+            <figure className="min-w-0 rounded-lg border-[1.5px] border-on-surface bg-[#2b2119] text-[#f6efe3] shadow-[6px_6px_0_#f2b23e] rotate-[0.6deg]">
+              <div className="flex items-center justify-between px-4 py-2.5 border-b border-white/10 font-mono text-[12px] text-[#c9b9a6]">
+                <span>~/mon-projet</span>
+                <span>première session</span>
+              </div>
+              <pre className="px-5 py-5 font-mono text-[13px] leading-[1.75] overflow-x-auto">
+                <span className="text-[#c9b9a6]"># 1. Installer (macOS, Linux, WSL)</span>
+                {"\n"}
+                <span className="text-[#f2b23e]">$</span> curl -fsSL https://claude.ai/install.sh | bash
+                {"\n\n"}
+                <span className="text-[#c9b9a6]"># 2. Ouvrir un projet</span>
+                {"\n"}
+                <span className="text-[#f2b23e]">$</span> cd mon-projet && claude
+                {"\n\n"}
+                <span className="text-[#c9b9a6]"># 3. Lui faire lire le code</span>
+                {"\n"}
+                <span className="text-[#f2b23e]">&gt;</span> /init
+                {"\n"}
+                <span className="text-[#9fd3b4]">  ✓ CLAUDE.md créé (stack, scripts, conventions)</span>
+                {"\n\n"}
+                <span className="text-[#f2b23e]">&gt;</span> Ajoute une validation zod sur
+                {"\n"}
+                {"  "}app/api/users/route.ts et lance les tests
+              </pre>
+              <figcaption className="px-5 pb-4 text-[12px] text-[#c9b9a6]">
+                Windows : <code className="font-mono">irm https://claude.ai/install.ps1 | iex</code>
+              </figcaption>
+            </figure>
           </div>
         </section>
 
-        {/* WHAT YOU LEARN */}
-        <section
-          id="programme"
-          className="w-full px-margin-mobile md:px-margin-desktop py-24"
-        >
+        {/* Ce qui a changé */}
+        <section className="w-full px-margin-mobile md:px-margin-desktop py-16 md:py-20 bg-surface-container-low border-y border-outline-variant">
           <div className="max-w-container-max mx-auto">
-            <ScrollReveal className="max-w-2xl mb-14">
-              <div className="inline-flex items-center border border-outline-variant rounded-full px-4 py-1 mb-5">
-                <span className="text-[11px] font-bold tracking-wider uppercase text-on-surface-variant">
-                  Programme
-                </span>
+            <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-10">
+              <div className="max-w-2xl">
+                <h2 className="font-headline-lg text-[32px] md:text-[42px] leading-[1.1] font-bold tracking-tight mb-3">
+                  Ce qui a changé ces dernières semaines
+                </h2>
+                <p className="text-on-surface-variant text-[17px] leading-relaxed">
+                  Claude Code sort une version presque chaque jour. On garde ici
+                  ce qui change votre façon de travailler, le reste est dans le
+                  changelog.
+                </p>
               </div>
-              <h2 className="font-headline-lg text-[36px] md:text-[44px] leading-[1.1] font-bold tracking-tight mb-4">
-                Tout ce que Claude Code peut faire,{" "}
-                <span className="text-gradient">déconstruit</span>.
-              </h2>
-              <p className="text-body-rt text-on-surface-variant leading-relaxed">
-                Pas de théorie creuse. Chaque module est ancré dans un cas
-                d'usage réel : refactor, debug, code review, déploiement.
-              </p>
-            </ScrollReveal>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-              {FEATURES.map(({ icon: Icon, title, desc }, i) => (
-                <ScrollReveal key={title} delay={i * 60}>
-                  <div className="h-full bg-surface-container-lowest border border-outline-variant rounded-2xl p-6 soft-lift">
-                    <div className="w-11 h-11 rounded-xl bg-primary-fixed/40 flex items-center justify-center mb-4 text-primary">
-                      <Icon className="w-5 h-5" strokeWidth={1.75} />
-                    </div>
-                    <h3 className="font-semibold text-on-surface mb-2 text-[17px]">
-                      {title}
-                    </h3>
-                    <p className="text-body-sm text-on-surface-variant leading-relaxed">
-                      {desc}
-                    </p>
-                  </div>
-                </ScrollReveal>
-              ))}
+              <Link
+                href="/wiki/actualites/nouveautes-2026"
+                className="inline-flex items-center gap-1.5 font-semibold text-primary hover:underline underline-offset-4 shrink-0"
+              >
+                Toutes les nouveautés 2026
+                <ArrowUpRight className="w-4 h-4" strokeWidth={2} />
+              </Link>
             </div>
-          </div>
-        </section>
 
-        {/* CODE + ECOSYSTEM */}
-        <section className="w-full px-margin-mobile md:px-margin-desktop py-24 bg-surface-container-lowest border-y border-outline-variant">
-          <div className="max-w-container-max mx-auto grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16 items-center">
-            <ScrollReveal>
-              <div className="inline-flex items-center border border-outline-variant rounded-full px-4 py-1 mb-5">
-                <span className="text-[11px] font-bold tracking-wider uppercase text-on-surface-variant">
-                  Concret
-                </span>
-              </div>
-              <h2 className="font-headline-lg text-[36px] md:text-[44px] leading-[1.1] font-bold tracking-tight mb-5">
-                Du premier <code className="font-mono text-primary">$ claude</code> à ton premier hook.
-              </h2>
-              <p className="text-body-rt text-on-surface-variant leading-relaxed mb-6">
-                Tu apprends à configurer Claude Code, écrire des prompts qui
-                marchent, créer tes propres skills, et automatiser ton workflow
-                avec les hooks. Le tout en français, avec des exemples qui
-                tournent vraiment.
-              </p>
-              <ul className="space-y-3">
-                {[
-                  "Installation & configuration complète",
-                  "Slash commands et workflows custom",
-                  "Skills réutilisables entre projets",
-                  "Hooks pour automatiser le lint, les tests, les commits",
-                ].map((t) => (
-                  <li
-                    key={t}
-                    className="flex items-start gap-3 text-body-sm text-on-surface"
-                  >
-                    <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-primary shrink-0" />
-                    {t}
-                  </li>
-                ))}
-              </ul>
-            </ScrollReveal>
-
-            <ScrollReveal delay={120}>
-              <div className="relative rounded-2xl bg-[#1a1c1c] border border-outline-variant overflow-hidden shadow-xl">
-                <div className="flex items-center gap-2 px-4 py-3 bg-[#241a0e]/60 border-b border-white/5">
-                  <span className="w-3 h-3 rounded-full bg-[#ff5f57]" />
-                  <span className="w-3 h-3 rounded-full bg-[#febc2e]" />
-                  <span className="w-3 h-3 rounded-full bg-[#28c840]" />
-                  <span className="ml-3 text-xs font-mono text-white/40">
-                    bash
-                  </span>
-                </div>
-                <pre className="p-5 font-mono text-[12.5px] leading-relaxed text-white/85 overflow-x-auto">
-                  {CODE_REAL}
-                </pre>
-              </div>
-            </ScrollReveal>
-          </div>
-        </section>
-
-        {/* WIKI TEASER */}
-        <section className="w-full px-margin-mobile md:px-margin-desktop py-24">
-          <div className="max-w-container-max mx-auto">
-            <ScrollReveal className="text-center max-w-2xl mx-auto mb-12">
-              <div className="inline-flex items-center border border-outline-variant rounded-full px-4 py-1 mb-5">
-                <span className="text-[11px] font-bold tracking-wider uppercase text-on-surface-variant">
-                  Wiki
-                </span>
-              </div>
-              <h2 className="font-headline-lg text-[36px] md:text-[44px] leading-[1.1] font-bold tracking-tight mb-4">
-                <AnimatedCounter
-                  value={wikiTotal}
-                  className="text-gradient"
-                />{" "}
-                articles, {wikiCats} catégories.
-              </h2>
-              <p className="text-body-rt text-on-surface-variant leading-relaxed">
-                Une base de connaissances exhaustive sur Claude Code, mise à
-                jour en continu.
-              </p>
-            </ScrollReveal>
-
-            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
-              {CATEGORIES.slice(0, 14).map((cat, i) => (
-                <ScrollReveal key={cat.id} delay={i * 30}>
+            <ol className="grid grid-cols-1 md:grid-cols-2 gap-x-10">
+              {RECENT.map((item) => (
+                <li key={item.title} className="border-t border-outline-variant">
                   <Link
-                    href={`/wiki/${cat.id}`}
-                    className="block px-4 py-3 rounded-xl border border-outline-variant bg-surface-container-lowest hover:border-primary hover:bg-primary-fixed/20 transition-colors text-center"
+                    href={item.href}
+                    className="grid grid-cols-[72px_1fr] gap-4 py-5 group"
                   >
-                    <div className="text-body-sm font-medium text-on-surface truncate">
-                      {cat.name}
-                    </div>
+                    <span className="font-mono text-[13px] text-on-surface-variant pt-1 tabular-nums">
+                      {item.date}
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block font-semibold text-[17px] text-on-surface group-hover:text-primary transition-colors mb-1">
+                        {item.title}
+                      </span>
+                      <span className="block text-[15px] text-on-surface-variant leading-relaxed">
+                        {item.text}
+                      </span>
+                    </span>
                   </Link>
-                </ScrollReveal>
+                </li>
+              ))}
+            </ol>
+          </div>
+        </section>
+
+        {/* Parcours */}
+        <section className="w-full px-margin-mobile md:px-margin-desktop py-16 md:py-24">
+          <div className="max-w-container-max mx-auto">
+            <h2 className="font-headline-lg text-[32px] md:text-[42px] leading-[1.1] font-bold tracking-tight mb-3 max-w-2xl">
+              Par où commencer
+            </h2>
+            <p className="text-on-surface-variant text-[17px] leading-relaxed mb-10 max-w-2xl">
+              Trois étapes, dans cet ordre. Chacune tient en une soirée si vous
+              avez un projet sous la main pour pratiquer.
+            </p>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+              {PATH.map((p) => (
+                <Link
+                  key={p.step}
+                  href={p.href}
+                  className="group flex flex-col bg-surface-container-lowest border border-outline-variant rounded-lg p-6 soft-lift"
+                >
+                  <span className="font-display-xl text-[44px] leading-none font-extrabold text-primary-fixed-dim mb-4">
+                    {p.step}
+                  </span>
+                  <span className="font-semibold text-[19px] text-on-surface mb-2">
+                    {p.title}
+                  </span>
+                  <span className="text-[15px] text-on-surface-variant leading-relaxed mb-5 flex-grow">
+                    {p.text}
+                  </span>
+                  <span className="inline-flex items-center gap-1.5 text-[14px] font-semibold text-primary">
+                    {p.cta}
+                    <ArrowRight
+                      className="w-4 h-4 group-hover:translate-x-0.5 transition-transform"
+                      strokeWidth={2}
+                    />
+                  </span>
+                </Link>
               ))}
             </div>
           </div>
         </section>
 
-        {/* FINAL CTA */}
-        <section className="w-full px-margin-mobile md:px-margin-desktop py-28 bg-surface-container-lowest border-t border-outline-variant">
-          <div className="max-w-2xl mx-auto text-center">
-            <ScrollReveal>
-              <Cpu
-                className="w-10 h-10 mx-auto mb-6 text-primary"
-                strokeWidth={1.5}
-              />
-              <h2 className="font-display-xl font-bold tracking-tight mb-5 text-[36px] md:text-[52px] leading-[1.05]">
-                Prêt à coder avec Claude ?
+        {/* Sommaire du wiki */}
+        <section className="w-full px-margin-mobile md:px-margin-desktop py-16 md:py-20 bg-surface-container-lowest border-t border-outline-variant">
+          <div className="max-w-container-max mx-auto grid grid-cols-1 lg:grid-cols-[1fr_2fr] gap-10">
+            <div>
+              <h2 className="font-headline-lg text-[32px] md:text-[42px] leading-[1.1] font-bold tracking-tight mb-3">
+                Le wiki, rangé comme un sommaire
               </h2>
-              <p className="text-body-rt text-on-surface-variant mb-8 leading-relaxed">
-                Inscription gratuite. Le premier module est offert. Le reste
-                arrive très bientôt.
+              <p className="text-on-surface-variant text-[17px] leading-relaxed mb-6">
+                {wikiTotal} articles en {CATEGORIES.length} rubriques. Chaque
+                article indique sa date de dernière mise à jour.
               </p>
               <Link
-                href="/learn"
-                className="btn-primary h-12 px-8 rounded-full inline-flex items-center justify-center gap-2 font-medium text-body-sm group"
+                href="/wiki"
+                className="btn-secondary h-11 px-5 rounded-md inline-flex items-center gap-2 font-semibold text-[15px]"
               >
-                Accéder à la formation
-                <ArrowRight
-                  className="w-4 h-4 group-hover:translate-x-1 transition-transform"
-                  strokeWidth={1.75}
-                />
+                Ouvrir le wiki
               </Link>
-            </ScrollReveal>
+            </div>
+
+            <ul className="grid grid-cols-1 sm:grid-cols-2 gap-x-10">
+              {CATEGORIES.map((cat) => (
+                <li key={cat.id} className="border-b border-dotted border-outline">
+                  <Link
+                    href={`/wiki/${cat.id}`}
+                    className="flex items-baseline gap-3 py-3 group"
+                  >
+                    <span className="font-medium text-on-surface group-hover:text-primary transition-colors min-w-0 truncate">
+                      {cat.name}
+                    </span>
+                    <span className="flex-grow" aria-hidden />
+                    <span className="font-mono text-[13px] text-on-surface-variant tabular-nums">
+                      {stubsByCategory(cat.id).length}
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </section>
+
+        {/* Clôture */}
+        <section className="w-full px-margin-mobile md:px-margin-desktop py-16 md:py-20 border-t border-outline-variant">
+          <div className="max-w-container-max mx-auto flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+            <div className="max-w-2xl">
+              <h2 className="font-headline-lg text-[28px] md:text-[34px] leading-[1.15] font-bold tracking-tight mb-2">
+                Pas de compte, pas de paywall.
+              </h2>
+              <p className="text-on-surface-variant text-[17px] leading-relaxed">
+                Tout le contenu est ouvert. Ouvrez une leçon, gardez un terminal
+                à côté, et pratiquez sur votre propre code.
+              </p>
+            </div>
+            <Link
+              href="/learn"
+              className="btn-primary h-12 px-6 rounded-md inline-flex items-center justify-center gap-2 font-semibold text-[15px] group shrink-0"
+            >
+              Première leçon
+              <ArrowRight
+                className="w-4 h-4 group-hover:translate-x-0.5 transition-transform"
+                strokeWidth={2}
+              />
+            </Link>
           </div>
         </section>
       </main>
 
       <SiteFooter />
-    </div>
-  );
-}
-
-function Stat({ value, label }: { value: number; label: string }) {
-  return (
-    <div className="flex flex-col items-center lg:items-start">
-      <AnimatedCounter
-        value={value}
-        className="text-[32px] md:text-[40px] font-bold tracking-tight text-on-surface"
-      />
-      <span className="text-xs uppercase tracking-wider text-on-surface-variant mt-0.5">
-        {label}
-      </span>
     </div>
   );
 }

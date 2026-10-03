@@ -1,9 +1,11 @@
 ---
 title: "Claude sur Bedrock, Vertex & Foundry"
 description: "Déployer Claude et Claude Code via les fournisseurs cloud : Amazon Bedrock, Google Cloud Vertex AI et Microsoft Foundry. Prérequis (accès modèle, IAM, réseau, garde-fous), réglages gérés, IDs de modèles et limites de fonctionnalités."
-updatedAt: "2026-06-08"
+updatedAt: "2026-10-03"
 readingMinutes: 8
 ---
+
+> **Changement de nom (2026).** Google a renommé Vertex AI en **Agent Platform** (« Google Cloud's Agent Platform »). Les API, les ID de modèles et la configuration décrits ici restent les mêmes ; seuls les noms dans la console changent. Anthropic propose aussi désormais **Claude Platform on AWS**, l'API d'Anthropic facturée via AWS Marketplace avec une authentification IAM.
 
 Pour rester dans ta gouvernance, ta région et ta facturation existantes, tu peux consommer les [modèles](/wiki/modeles) Claude via **Amazon Bedrock**, **Google Cloud Vertex AI** ou **Microsoft Foundry**, plutôt que par l'[API Anthropic](/wiki/api) directe. Claude Code fonctionne avec ces fournisseurs (`CLAUDE_CODE_USE_BEDROCK=1`, `CLAUDE_CODE_USE_VERTEX=1`, etc.).
 

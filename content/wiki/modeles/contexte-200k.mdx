@@ -1,11 +1,18 @@
 ---
-title: "Contexte 200K tokens"
-description: "Comment exploiter au mieux la fenêtre de contexte 200K de Claude : structure de prompt, lost in the middle, stratégies de chunking."
-updatedAt: "2026-05-19"
+title: "Fenêtre de contexte : 200K, 1M et compaction"
+description: "Exploiter une fenêtre de 200K ou 1M tokens : ce qu'elle représente, structure du prompt, lost in the middle, chunking et auto-compaction dans Claude Code."
+updatedAt: "2026-10-03"
 readingMinutes: 6
 ---
 
-Toute la famille Claude 4.x (Opus 4.7, Sonnet 4.6, Haiku 4.5) propose une fenêtre de contexte de 200 000 tokens — soit environ 500 pages de texte ou un repo de taille moyenne. C'est l'un des plus larges du marché, mais le simple fait d'avoir la place ne garantit pas que le modèle s'en serve bien. Voici les bonnes pratiques pour tirer parti d'un contexte long sans tomber dans les pièges classiques.
+En octobre 2026, deux tailles de fenêtre coexistent :
+
+- **1 million de tokens** pour Opus 5.5, Sonnet 5.5, Fable 5.1 (et Sonnet 5, Opus 4.7 et suivants) ;
+- **200 000 tokens** pour Haiku 4.5 et les modèles plus anciens (Opus 4.6 et Sonnet 4.6 ont une variante `[1m]`).
+
+Dans Claude Code, Claude **compacte** automatiquement la conversation à l'approche de la limite. Réglez le seuil avec `/autocompact 500k` (par modèle) ou `"autoCompactWindow"` dans les réglages ; `CLAUDE_CODE_DISABLE_1M_CONTEXT=1` ramène tous les modèles à 200K.
+
+Avoir la place ne garantit pas que le modèle s'en serve bien. Voici les bonnes pratiques pour tirer parti d'un contexte long sans tomber dans les pièges classiques.
 
 ## Ce que 200K tokens représente vraiment
 
@@ -16,7 +23,7 @@ Un token correspond grosso modo à 4 caractères ou ~0,75 mot en anglais (un peu
 - **~20 000 lignes** de code TypeScript
 - **~50 PDF** d'une dizaine de pages
 
-Concrètement, vous pouvez injecter une base de connaissances complète, le code source d'un module entier, ou plusieurs heures de transcription audio. Le coût grimpe vite cependant : un appel à pleine charge sur Sonnet 4.6 coûte environ 0,60 $ en input seul.
+Concrètement, vous pouvez injecter une base de connaissances complète, le code source d'un module entier, ou plusieurs heures de transcription audio. Le coût grimpe vite cependant : 200K tokens d'entrée coûtent environ 0,40 $ sur Sonnet 5.5, et un appel à 1M environ 2 $. D'où l'intérêt du [prompt caching](/wiki/api/prompt-caching-implementation).
 
 ## Le phénomène lost in the middle
 

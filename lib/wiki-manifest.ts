@@ -17,6 +17,7 @@ export type CategoryId =
   | "workflows"
   | "claude-ai"
   | "enterprise"
+  | "plugins"
   | "obsidian"
   | "actualites";
 
@@ -61,7 +62,7 @@ export const CATEGORIES: Category[] = [
     id: "modeles",
     name: "Modèles Claude",
     icon: "sparkles",
-    description: "Opus, Sonnet, Haiku — capacités, comparatifs, choix.",
+    description: "Fable, Opus, Sonnet, Haiku : capacités, prix, comparatifs, choix.",
   },
   {
     id: "cli",
@@ -136,6 +137,12 @@ export const CATEGORIES: Category[] = [
     description: "Déploiement, sécurité, conformité, multi-cloud.",
   },
   {
+    id: "plugins",
+    name: "Plugins & mods",
+    icon: "layers",
+    description: "Installer, créer et publier des plugins, et modifier l'interface avec les mods.",
+  },
+  {
     id: "obsidian",
     name: "Obsidian + Claude",
     icon: "layers",
@@ -167,26 +174,23 @@ export const ARTICLE_STUBS: ArticleStub[] = [
   { category: "demarrer", slug: "config-globale", title: "Le fichier de config globale", description: "Anatomie de la config user en dehors de CLAUDE.md." },
   { category: "demarrer", slug: "anthropic-quickstarts", title: "Anthropic Quickstarts", description: "Architectures de référence officielles (AWS, GCP, Vercel templates)." },
   { category: "demarrer", slug: "meta-prompt-tool", title: "Le Meta-Prompt Tool d'Anthropic", description: "Outil officiel pour générer des prompts parfaits." },
-  { category: "demarrer", slug: "migration-openai", title: "Migrer de GPT-4o à Claude Sonnet", description: "Correspondance des concepts pour passer d'OpenAI à Anthropic." },
 
   // ═══ MODÈLES CLAUDE ══════════════════════════════════════════════
-  { category: "modeles", slug: "sonnet-5", title: "Claude Sonnet 5 — l'agentique à grande échelle", description: "Contexte 1M par défaut, raisonnement adaptatif, nouveau tokenizer (+30 %), breaking changes API et guide de migration." },
-  { category: "modeles", slug: "opus-4-8", title: "Claude Opus 4.8 — le modèle frontière au quotidien", description: "Fast mode 2,5× plus rapide et 3× moins cher, record sur le benchmark Legal Agent, corrections des défauts d'Opus 4.7." },
+  { category: "modeles", slug: "opus-sonnet-5-5", title: "Claude Opus 5.5 et Sonnet 5.5", description: "La génération 5.5 (septembre 2026) : prix, contexte 1M, ce qui change dans Claude Code et en API." },
+  { category: "modeles", slug: "sonnet-5", title: "Claude Sonnet 5 : l'agentique à grande échelle", description: "Contexte 1M par défaut, raisonnement adaptatif, nouveau tokenizer (+30 %), breaking changes API et guide de migration." },
   { category: "modeles", slug: "adaptive-thinking-effort", title: "Raisonnement adaptatif & paramètre effort", description: "La fin de budget_tokens : thinking adaptatif, les 5 niveaux d'effort (low → max, dont xhigh) et la migration API." },
-  { category: "modeles", slug: "fable-5-mythos-5", title: "Claude Fable 5 & Mythos 5 — les modèles frontière", description: "Fable 5 public, Mythos 5 réservé : lancement, suspension par contrôle des exportations, retour le 30 juin 2026." },
+  { category: "modeles", slug: "fable-5-mythos-5", title: "Claude Fable 5.1 et Mythos 5.1", description: "Fable 5.1 pour tous, Mythos 5.1 pour les professionnels vérifiés, et l'histoire de la suspension de juin 2026." },
   { category: "modeles", slug: "j-space-interpretabilite", title: "J-space : l'espace de travail interne de Claude", description: "La recherche de juillet 2026 sur le J-space et la J-lens, et ce que ça change pour la sécurité de l'IA." },
-  { category: "modeles", slug: "opus-4-7", title: "Claude Opus 4.7 — haute réflexion", description: "Le modèle premium d'Anthropic : capacités, benchmarks, cas d'usage." },
-  { category: "modeles", slug: "sonnet-4-6", title: "Claude Sonnet 4.6 — standard industrie pour le code", description: "Le workhorse pour le développement : équilibre vitesse/qualité." },
-  { category: "modeles", slug: "haiku-4-5", title: "Claude Haiku 4.5 — vitesse et coût", description: "Le modèle rapide pour les tâches simples et le grand volume." },
-  { category: "modeles", slug: "comparatif-modeles", title: "Comparatif des modèles Claude", description: "Tableau récapitulatif Opus / Sonnet / Haiku — quand choisir lequel." },
+  { category: "modeles", slug: "haiku-4-5", title: "Claude Haiku 4.5 : vitesse et coût", description: "Le modèle rapide pour les tâches simples et le grand volume." },
+  { category: "modeles", slug: "comparatif-modeles", title: "Comparatif des modèles Claude", description: "Fable 5.1, Opus 5.5, Sonnet 5.5, Haiku 4.5 : prix, contexte et usages en un tableau." },
   { category: "modeles", slug: "extended-thinking-mecanismes", title: "La réflexion étendue (extended thinking)", description: "Réflexion adaptative vs budget_tokens, paramètre effort, limites de sortie et Task Budgets." },
   { category: "modeles", slug: "extended-thinking-software", title: "Extended Thinking : impact sur l'ingénierie logicielle", description: "Pourquoi le thinking améliore la résolution de bugs complexes (SWE-bench)." },
   { category: "modeles", slug: "vision-capacites", title: "Claude Vision : capacités de lecture graphique", description: "Limites de résolution, formats supportés, cas d'usage UI/UX." },
-  { category: "modeles", slug: "contexte-200k", title: "Contexte 200K tokens", description: "Gérer un contexte long, prompt structure, lost in the middle." },
+  { category: "modeles", slug: "contexte-200k", title: "Fenêtre de contexte : 200K, 1M et compaction", description: "Gérer un contexte long, structurer le prompt, lost in the middle, auto-compaction." },
   { category: "modeles", slug: "pricing-tokens", title: "Tarification & optimisation des coûts", description: "Facturation par tokens, ordres de grandeur par modèle, et leviers cumulables (Batch, caching)." },
   { category: "modeles", slug: "choisir-bon-modele", title: "Choisir le bon modèle", description: "Décisionnel : Opus vs Sonnet vs Haiku selon ton cas." },
   { category: "modeles", slug: "limites-quotas", title: "Limites et quotas", description: "Rate limits, quotas par tier, comment monter en tier." },
-  { category: "modeles", slug: "evolution-claude", title: "Claude 3 → 3.5 → 4 → 4.5 → 4.6 → 4.7", description: "Historique technique de l'évolution des modèles Anthropic." },
+  { category: "modeles", slug: "evolution-claude", title: "L'évolution des modèles Claude", description: "Chronologie de Claude 3 à Claude 5.5, et quels modèles sont encore disponibles." },
   { category: "modeles", slug: "benchmark-interne", title: "Benchmarks internes & évaluation de performance", description: "Lire et reproduire MMLU, HumanEval, SWE-bench sur tes propres cas." },
   { category: "modeles", slug: "model-drift", title: "Model Drift et mises à jour silencieuses", description: "Détecter et gérer les changements de comportement (claude-X-latest)." },
 
@@ -197,7 +201,7 @@ export const ARTICLE_STUBS: ArticleStub[] = [
   { category: "cli", slug: "variables-env", title: "Les variables d'environnement", description: "Modèle, désactivation de comportements, proxy d'entreprise, OpenTelemetry et ordre de lecture." },
   { category: "cli", slug: "continue-checkpoints", title: "--continue et checkpoints", description: "Reprendre une session interrompue, restaurer un checkpoint." },
   { category: "cli", slug: "clear-resume-cost", title: "/clear, /resume, /cost", description: "Commandes de gestion de session essentielles." },
-  { category: "cli", slug: "permissions-modes", title: "Les modes de permission", description: "Les 6 modes (default, acceptEdits, plan, auto, dontAsk, bypassPermissions) et lequel choisir." },
+  { category: "cli", slug: "permissions-modes", title: "Les modes de permission", description: "Les 6 modes, auto par défaut depuis août 2026, et lequel choisir selon le contexte." },
   { category: "cli", slug: "output-styles", title: "Output styles", description: "Personnaliser le format de sortie de Claude." },
   { category: "cli", slug: "status-line-custom", title: "Status line custom", description: "Configurer une status line personnalisée via hook." },
   { category: "cli", slug: "headless-mode", title: "Mode headless (claude -p)", description: "Exécuter Claude Code sans interface interactive, parfait pour CI." },
@@ -208,6 +212,11 @@ export const ARTICLE_STUBS: ArticleStub[] = [
   { category: "cli", slug: "multi-projet-context-switching", title: "Multi-projet et context switching", description: "Comment le CLI gère le passage entre repos Git." },
   { category: "cli", slug: "themes-accessibilite", title: "Thèmes et accessibilité", description: "Couleurs, contraste, mode compact, lecteurs d'écran." },
   { category: "cli", slug: "dynamic-workflows-agents-arriere-plan", title: "Dynamic workflows & agents en arrière-plan", description: "Workflows dynamiques à sous-agents parallèles, agents qui commit/push/PR seuls, résilience réseau et notifications (juillet 2026)." },
+  { category: "cli", slug: "effort-fast-advisor", title: "Effort, fast mode et advisor", description: "Régler la puissance de Claude : niveaux d'effort jusqu'à ultracode, fast mode d'Opus, advisor." },
+  { category: "cli", slug: "agent-view-sessions", title: "Agent view : sessions en parallèle", description: "Lancer des sessions avec claude --bg, les suivre et leur répondre depuis claude agents." },
+  { category: "cli", slug: "cloud-routines-remote", title: "Cloud, routines et Remote Control", description: "Suivre une session depuis son téléphone, lancer Claude dans le cloud, programmer des routines." },
+  { category: "cli", slug: "goal-loop-monitor", title: "/goal, /loop et Monitor", description: "Faire travailler Claude jusqu'à une condition, à intervalle régulier, ou en réaction à une sortie." },
+  { category: "cli", slug: "artifacts", title: "Artifacts : publier une page", description: "Transformer le travail d'une session en page interactive partageable sur claude.ai." },
 
   // ═══ OUTILS INTÉGRÉS ═════════════════════════════════════════════
   { category: "outils", slug: "read", title: "L'outil Read", description: "Lire des fichiers, images, PDF, notebooks — toutes les options." },
@@ -255,7 +264,7 @@ export const ARTICLE_STUBS: ArticleStub[] = [
   { category: "hooks", slug: "environnement", title: "Hooks et environnement", description: "Variables disponibles dans un hook, contexte d'exécution." },
   { category: "hooks", slug: "exemples-pratiques", title: "Exemples pratiques : auto-format, anti-secrets, audit log", description: "Recettes prêtes à copier-coller." },
   { category: "hooks", slug: "debugging-hooks", title: "Debugging hooks", description: "Diagnostiquer un hook qui ne se déclenche pas." },
-  { category: "hooks", slug: "on-model-error", title: "Le hook OnModelError", description: "Intercepter rate limits, overloaded, timeouts pour retry/notify." },
+  { category: "hooks", slug: "erreurs-stopfailure", title: "Réagir aux erreurs : StopFailure et PostToolUseFailure", description: "Les hooks officiels pour être prévenu d'une erreur d'API ou d'un outil qui échoue." },
   { category: "hooks", slug: "observabilite-otel", title: "Hooks pour l'observabilité", description: "Envoyer traces vers OpenTelemetry, Langfuse, Phoenix." },
   { category: "hooks", slug: "chainage-hooks", title: "Chaînage de hooks (pipeline)", description: "Ordre d'exécution quand plusieurs scripts écoutent le même event." },
 
@@ -304,7 +313,6 @@ export const ARTICLE_STUBS: ArticleStub[] = [
   { category: "mcp", slug: "primitives-resources-tools-prompts", title: "Resources, Tools, Prompts — les primitives MCP", description: "Différences et quand utiliser l'une plutôt que l'autre." },
   { category: "mcp", slug: "transports-stdio-sse", title: "Transports MCP : Stdio vs SSE", description: "Choisir le bon mode selon local vs distant." },
   { category: "mcp", slug: "serveur-memory", title: "Le serveur MCP Memory (Knowledge Graph)", description: "Construire un graphe de connaissances persistant pour Claude." },
-  { category: "mcp", slug: "serveur-puppeteer", title: "Le serveur MCP Puppeteer", description: "Automatisation web headless via Claude." },
   { category: "mcp", slug: "routing-aggregation", title: "Routing et agrégation de serveurs MCP", description: "Proxys MCP pour exposer plusieurs serveurs via un point d'entrée." },
   { category: "mcp", slug: "evolution-2026-apps-elicitation", title: "MCP en 2026 : Apps, élicitation, sampling & Streamable HTTP", description: "Don à l'Agentic AI Foundation, MCP Apps (UI interactives), élicitation, sampling et transport sans état." },
 
@@ -364,13 +372,11 @@ export const ARTICLE_STUBS: ArticleStub[] = [
   { category: "claude-ai", slug: "artifacts-architecture", title: "Les Artifacts : fonctionnement et architecture", description: "Génération, rendu live (React, HTML, SVG), sandboxing." },
   { category: "claude-ai", slug: "projects-creation", title: "Création et optimisation de Projects", description: "Bases de connaissances, custom instructions, fichiers." },
   { category: "claude-ai", slug: "projects-knowledge-base", title: "Project Knowledge Base : limites et partage", description: "Mémoire contextuelle, maximiser les quotas tokens." },
-  { category: "claude-ai", slug: "claude-pages", title: "Claude Pages", description: "L'espace d'édition collaborative pour documents longs." },
   { category: "claude-ai", slug: "app-mobile", title: "L'application mobile (iOS/Android)", description: "Dictée, vision live, limitations vs desktop." },
   { category: "claude-ai", slug: "model-selector-web", title: "Le sélecteur de modèles web", description: "Bascules automatiques en cas de quota atteint." },
   { category: "claude-ai", slug: "historique-export", title: "Historique et export des données", description: "Procédures RGPD, rétention, export complet." },
   { category: "claude-ai", slug: "integrations-natives", title: "Intégrations natives Claude.ai", description: "GitHub, Google Drive, Notion — sans passer par le CLI." },
   { category: "claude-ai", slug: "shared-chats", title: "Partage de conversations", description: "Snapshots, ce qui est inclus/masqué dans un lien public." },
-  { category: "claude-ai", slug: "extensions-tierces", title: "Extensions navigateur non officielles", description: "Outils tiers pour améliorer l'UI/UX web." },
 
   // ═══ ENTERPRISE ══════════════════════════════════════════════════
   { category: "enterprise", slug: "data-privacy", title: "Politique de confidentialité des données", description: "Non-utilisation des données API/Enterprise pour l'entraînement." },
@@ -386,6 +392,10 @@ export const ARTICLE_STUBS: ArticleStub[] = [
   { category: "enterprise", slug: "vercel-plugin-ai-sdk", title: "Claude Code × Vercel : plugin, AI SDK & Gateway", description: "Le plugin Vercel pour agents (47+ skills, validation PostToolUse), l'AI SDK 7 avec HarnessAgent en sandbox, et le routage via AI Gateway." },
 
   // ═══ OBSIDIAN + CLAUDE ═══════════════════════════════════════════
+  // ═══ PLUGINS ═════════════════════════════════════════════════════
+  { category: "plugins", slug: "introduction-plugins", title: "Les plugins : installer et gérer", description: "Ce qu'un plugin contient, les marketplaces, les portées, et ce qu'il coûte en contexte." },
+  { category: "plugins", slug: "creer-plugin", title: "Créer et publier un plugin", description: "Du dossier vide à la marketplace : manifeste, test avec --plugin-dir, validation, evals." },
+  { category: "plugins", slug: "mods", title: "Les mods", description: "Des plugins en JavaScript qui dessinent dans l'interface et interceptent les appels d'outils." },
   { category: "obsidian", slug: "guide-complet", title: "Obsidian + Claude : le guide complet", description: "Connecter ton vault Obsidian à Claude — approche directe (fichiers) et approche MCP, cas d'usage, sécurité." },
   { category: "obsidian", slug: "serveurs-mcp", title: "Serveurs MCP Obsidian : installation & config", description: "Local REST API, mcp-obsidian, obsidian-claude-code-mcp — configuration Claude Desktop & Claude Code, dépannage." },
 

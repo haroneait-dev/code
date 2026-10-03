@@ -24,7 +24,7 @@ Les niveaux suivants surchargent les précédents clé par clé. Une permission 
 
 ```json
 {
-  "model": "claude-sonnet-4-6",
+  "model": "claude-sonnet-5-5",
   "theme": "dark",
   "env": {
     "EDITOR": "code --wait",
@@ -75,7 +75,7 @@ Les hooks sont des commandes shell déclenchées par le harness à des évèneme
     "PostToolUse": [
       {
         "matcher": "Edit|Write",
-        "command": "prettier --write $CLAUDE_FILE_PATHS"
+        "command": "jq -r '.tool_input.file_path' | xargs npx prettier --write"
       }
     ]
   }

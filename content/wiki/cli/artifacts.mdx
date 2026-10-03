@@ -1,0 +1,68 @@
+---
+title: "Artifacts : publier une page web depuis une session"
+description: "Transformer le travail de Claude Code en page interactive sur claude.ai : diff annoté, tableau de bord, comparatif. Partage, mises à jour, données en direct et limites."
+updatedAt: "2026-10-03"
+readingMinutes: 6
+---
+
+Depuis juin 2026, Claude Code peut publier un **artifact** : une page web interactive hébergée sur claude.ai, privée par défaut, que Claude met à jour au fil de la session. C'est la bonne forme quand le texte du terminal ne suffit pas : un diff à commenter, un graphique, plusieurs options à comparer.
+
+## Demander un artifact
+
+Il suffit de le demander en langage courant :
+
+```text
+Fais un artifact qui présente cette PR avec le diff annoté et les remarques classées par gravité.
+```
+
+```text
+Construis un tableau de bord des échecs de déploiement de la semaine par service, et mets-le à jour pendant ton enquête.
+```
+
+Claude écrit la page, la publie et ouvre votre navigateur dessus. `Ctrl+]` rouvre le dernier artifact de la session, et `/artifacts` liste tous les vôtres (`o` pour ouvrir, `c` pour copier le lien, `Entrée` pour l'attacher à la session).
+
+## Mettre à jour
+
+Demandez simplement une modification : « ajoute une ventilation par région sous le graphique et republie ». Claude republie à la même adresse, et ceux qui ont la page ouverte voient la nouvelle version. Chaque publication est une version, et vous choisissez celle que voient les lecteurs depuis le bouton **Share**.
+
+Depuis une autre session, donnez l'URL de l'artifact à Claude pour qu'il le mette à jour au lieu d'en créer un nouveau.
+
+## Partager
+
+Un artifact est **privé** jusqu'à ce que vous le partagiez depuis l'en-tête de la page :
+
+- **dans votre organisation** (Team, Enterprise) : avec des personnes précises ou tout le monde, en lecture ou en édition ;
+- **publiquement** : un lien que n'importe qui peut ouvrir sans compte. Sur Team et Enterprise, un propriétaire doit d'abord l'autoriser.
+
+Les membres de l'organisation peuvent commenter la page et envoyer un commentaire à Claude, qui peut y répondre ou modifier la page.
+
+## Des données en direct
+
+Un artifact peut appeler vos **connecteurs claude.ai** (GitHub, Linear, Slack…) à chaque ouverture, pour afficher des données fraîches plutôt qu'une photo figée :
+
+```text
+Construis un tableau de bord de nos PR ouvertes qui charge la liste en direct via mon connecteur GitHub.
+```
+
+Chaque lecteur passe par **ses propres** connecteurs : deux personnes peuvent donc voir des données différentes, et chacune doit autoriser l'accès la première fois.
+
+## Ce qu'un artifact ne peut pas faire
+
+- **Pas de backend** : c'est une page statique unique, sans routes ni authentification propre.
+- **Ressources externes limitées** : Google Fonts et quelques CDN de scripts (cdnjs, unpkg, jsDelivr, Tailwind, jQuery). Le reste (images, CSS) doit être intégré à la page.
+- **16 Mio maximum** une fois rendue.
+- **Disponibilité** : offres Pro, Max, Team et Enterprise, avec une connexion claude.ai (`/login`). Pas avec une clé API ni sur Bedrock, Google Cloud ou Foundry.
+
+Pour les couper : `/config`, réglage `"enableArtifact": false`, ou variable `CLAUDE_CODE_DISABLE_ARTIFACT=1`.
+
+## Diaporamas et maquettes
+
+Deux commandes partent de modèles prêts à l'emploi :
+
+- `/slides <sujet>` crée une présentation exportable en PowerPoint ou PDF ;
+- `/design <brief>` dessine des maquettes d'écran sur un canevas éditable.
+
+## Pour aller plus loin
+
+- [Les Artifacts sur claude.ai](/wiki/claude-ai/artifacts-architecture)
+- Documentation : https://code.claude.com/docs/en/artifacts

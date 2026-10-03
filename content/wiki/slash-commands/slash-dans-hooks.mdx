@@ -46,7 +46,7 @@ Chaque hook reçoit des données contextuelles (nom du tool, arguments, etc.) su
     "PostToolUse": [
       {
         "matcher": "Bash",
-        "command": "if echo \"$CLAUDE_TOOL_INPUT\" | grep -q 'git commit'; then claude -p '/security-review' --output-format text; fi"
+        "command": "if jq -r '.tool_input.command' | grep -q 'git commit'; then claude -p '/security-review' --output-format text; fi"
       }
     ]
   }
@@ -133,7 +133,7 @@ nohup claude -p '/security-review' > .claude/last-audit.md 2>&1 &
     "PostToolUse": [
       {
         "matcher": "Bash",
-        "command": "if echo \"$CLAUDE_TOOL_INPUT\" | grep -qE 'git (commit|push)'; then (claude -p '/review' > .claude/review-$(date +%s).md &); fi"
+        "command": "if jq -r '.tool_input.command' | grep -qE 'git (commit|push)'; then (claude -p '/review' > .claude/review-$(date +%s).md &); fi"
       }
     ],
     "Stop": [

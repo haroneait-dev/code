@@ -51,13 +51,13 @@ export default function WikiIndexPage() {
       <main className="flex-grow w-full max-w-container-max mx-auto px-margin-mobile md:px-margin-desktop py-16">
         {/* Hero */}
         <section className="mb-16 max-w-3xl">
-          <div className="inline-flex items-center border border-outline-variant rounded-full px-4 py-1 mb-6">
-            <span className="text-[11px] font-bold tracking-wider uppercase text-on-surface-variant">
+          <div className="mb-6">
+            <span className="tag-note">
               Wiki Claude · {articleCount()} articles
             </span>
           </div>
           <h1 className="font-display-xl text-display-xl md:text-[64px] md:leading-[1] font-extrabold tracking-tight mb-6 text-on-surface">
-            La <span className="text-gradient">référence</span> francophone.
+            La <span className="text-mark">référence</span> francophone.
           </h1>
           <p className="font-body-rt text-body-rt md:text-[19px] text-on-surface-variant leading-relaxed">
             Tout ce qu'il faut savoir sur Claude Code, l'API Anthropic, MCP,

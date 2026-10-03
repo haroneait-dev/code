@@ -1,19 +1,18 @@
 import type { Metadata } from "next";
-import { Hanken_Grotesk, Inter, JetBrains_Mono } from "next/font/google";
+import { Bricolage_Grotesque, Figtree, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
-import { ChatWidget } from "@/components/site/ChatWidget";
 
-const hanken = Hanken_Grotesk({
+const display = Bricolage_Grotesque({
   subsets: ["latin"],
-  weight: ["400", "600", "700", "800"],
-  variable: "--font-hanken",
+  weight: ["500", "600", "700", "800"],
+  variable: "--font-display",
   display: "swap",
 });
 
-const inter = Inter({
+const body = Figtree({
   subsets: ["latin"],
-  weight: ["400", "500", "600"],
-  variable: "--font-inter",
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-body",
   display: "swap",
 });
 
@@ -34,7 +33,7 @@ export const metadata: Metadata = {
     template: "%s — Claude Mastery",
   },
   description:
-    "La formation francophone de référence pour maîtriser Claude Code, le CLI d'Anthropic. Modules pratiques, wiki et communauté.",
+    "La formation francophone de référence pour maîtriser Claude Code, le CLI d'Anthropic. Modules pratiques, wiki et fiches, en accès libre.",
   keywords: [
     "Claude Code",
     "Anthropic",
@@ -53,7 +52,7 @@ export const metadata: Metadata = {
     siteName: "Claude Mastery",
     title: "Claude Mastery — Formation Claude Code en français",
     description:
-      "Maîtrise Claude Code avec la formation francophone de référence. Modules pratiques, wiki et communauté.",
+      "Maîtrise Claude Code avec la formation francophone de référence. Modules pratiques, wiki et fiches, en accès libre.",
   },
   twitter: {
     card: "summary_large_image",
@@ -84,11 +83,10 @@ export default function RootLayout({
   return (
     <html
       lang="fr"
-      className={`${hanken.variable} ${inter.variable} ${jbm.variable}`}
+      className={`${display.variable} ${body.variable} ${jbm.variable}`}
     >
       <body className="font-body-rt antialiased">
         {children}
-        <ChatWidget />
       </body>
     </html>
   );

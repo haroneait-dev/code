@@ -1,20 +1,22 @@
 ---
 title: "Les modes de permission"
 description: "Les 6 modes de permission de Claude Code (default, acceptEdits, plan, auto, dontAsk, bypassPermissions) : ce que chacun autorise, comment changer de mode, et lequel choisir selon le contexte (local, CI, conteneur)."
-updatedAt: "2026-06-08"
+updatedAt: "2026-10-03"
 readingMinutes: 7
 ---
 
-Le mode de permission fixe le **comportement de base** de Claude Code face aux actions : qu'est-ce qui passe sans confirmation, qu'est-ce qui demande validation. On **superpose** ensuite des règles `allow`/`deny` ([settings.json](/wiki/cli/settings-json)) par-dessus ce baseline (sauf en `bypassPermissions`).
+Le mode de permission fixe le **comportement de base** de Claude Code face aux actions : ce qui passe sans confirmation, ce qui demande validation. On **superpose** ensuite des règles `allow`, `ask` et `deny` ([settings.json](/wiki/cli/settings-json)). Les règles `deny` s'appliquent dans tous les modes, y compris `bypassPermissions`.
+
+> **Changement important (août 2026).** Depuis la version 2.1.283, les sessions interactives (terminal et VS Code) **démarrent en mode `auto`** par défaut. Un second modèle, le classifieur, vérifie chaque action à votre place. Si vous préférez valider vous-même, repassez en mode Manuel (voir plus bas).
 
 ## Les 6 modes
 
 | Mode | Comportement |
 |---|---|
-| **default** | Lit librement, mais demande confirmation pour les actions au-delà (écritures, commandes). |
+| **default** (affiché « Manual ») | Lit librement, mais demande confirmation pour le reste (écritures, commandes, réseau). |
 | **acceptEdits** | Auto-approuve les **éditions de fichiers** pour la session ; tu ne valides que les commandes shell. Idéal pour itérer en relisant les diffs. |
-| **plan** | Mode **recherche/planification** : Claude lit, analyse et propose un plan, **sans rien modifier**. |
-| **auto** | Utilise un **classifieur de sécurité** : approuve les actions sûres, bloque les risquées. *Research preview.* |
+| **plan** | Mode **recherche/planification** : Claude lit, analyse et propose un plan, **sans rien modifier** tant que vous n'avez pas approuvé le plan. |
+| **auto** | Mode par défaut depuis la 2.1.283. Tout passe, mais un **classifieur** vérifie chaque action en arrière-plan et bloque les risquées. |
 | **dontAsk** | N'exécute **que** les outils pré-approuvés (allowlist) et refuse tout le reste. Bon pour l'automatisation « mains libres » plus sûre que bypass. |
 | **bypassPermissions** | **Saute la couche de permission** (sauf écritures sur chemins protégés). À réserver aux environnements isolés. |
 
@@ -22,31 +24,42 @@ Le mode de permission fixe le **comportement de base** de Claude Code face aux a
 
 ## Changer de mode
 
-- **En session** : `Shift+Tab` fait défiler `default → acceptEdits → plan` (le mode courant s'affiche dans la barre d'état). `auto` apparaît dans le cycle si ton compte y est éligible.
-- **Au lancement** : `claude --permission-mode <mode>` (accepte `default`, `acceptEdits`, `plan`, `auto`, `dontAsk`, `bypassPermissions`) et l'emporte sur le `defaultMode` de tes [réglages](/wiki/cli/settings-json) pour ce run.
-- **Persistant** : `"defaultMode": "acceptEdits"` dans `settings.json`.
+- **En session** : `Shift+Tab` fait défiler les modes. Depuis `auto`, le premier appui passe en Manuel, puis le cycle continue `default → acceptEdits → plan → auto`. La barre d'état affiche `⏵⏵ auto mode on`, `⏸ manual mode on`, `⏵⏵ accept edits on` ou `⏸ plan mode on`.
+- **Depuis une demande de permission** : en Manuel ou `acceptEdits`, la question « Yes, and switch to auto mode » valide la commande et bascule la session en `auto`.
+- **Au lancement** : `claude --permission-mode <mode>` (accepte `default` ou son alias `manual`, `acceptEdits`, `plan`, `auto`, `dontAsk`, `bypassPermissions`). Le flag l'emporte sur tes [réglages](/wiki/cli/settings-json) pour cette session.
+- **Persistant** : `permissions.defaultMode` dans `~/.claude/settings.json`. Pour revenir à l'ancien comportement :
+
+```json
+{
+  "permissions": {
+    "defaultMode": "default"
+  }
+}
+```
+
+Attention : `"auto"` et `"bypassPermissions"` sont ignorés s'ils sont posés dans le `.claude/settings.json` **d'un projet**. Un dépôt cloné ne peut pas te faire passer en mode autonome à ton insu.
 
 `--dangerously-skip-permissions` est un raccourci pour `--permission-mode bypassPermissions` : le nom volontairement alarmant rend le compromis de sécurité explicite. À réserver aux pipelines CI/CD de confiance, en conteneur.
 
 ## Conditions du mode `auto`
 
-`auto` n'est pas universel :
+`auto` est disponible sur tous les plans (Pro compris depuis mai 2026) et sur Bedrock, Google Cloud et Foundry depuis juin 2026, avec quelques limites :
 
-- **Plans** : Max, Team, Enterprise, API. **Pas** sur Claude Pro.
-- **Modèle** : sur l'API Anthropic, Opus 4.6+ ou Sonnet 4.6 (pas Haiku ni claude-3).
-- **Providers tiers** : sur [Bedrock, Vertex, Foundry](/wiki/enterprise/clouds), `auto` est désactivé tant que `CLAUDE_CODE_ENABLE_AUTO_MODE` n'est pas posé, et seul Opus 4.7/4.8 est pris en charge.
-- **Team/Enterprise** : un admin doit l'activer.
-- **En headless (`-p`)** : la session **avorte** après 3 blocages consécutifs ou 20 au total (pas d'humain pour valider) — `auto` est donc fragile face à du contenu adverse.
+- **Modèle compatible requis** : les modèles récents (Sonnet 4.6 et plus, Opus 4.6 et plus, toute la génération 5). Avec un modèle non compatible, la session démarre en Manuel.
+- **Organisations** : un admin peut le retirer pour tout le monde avec `permissions.disableAutoMode: "disable"` dans les réglages gérés.
+- **En headless (`claude -p`)** : le défaut reste Manuel dans la plupart des cas. Sans humain pour trancher, une série de blocages fait échouer la session.
+- **Ce qu'aucun mode n'approuve** : les règles `ask` explicites, les questions posées par Claude (`AskUserQuestion`), les suppressions `rm` sur des chemins critiques.
 
-Les organisations peuvent ajuster ce qu'`auto` considère comme « infrastructure de confiance » via le bloc `autoMode` des réglages.
+Les organisations peuvent indiquer au classifieur quels dépôts, buckets et domaines sont de confiance (bloc `autoMode` des réglages, sous-commandes `claude auto-mode`), et ajouter des règles de blocage inconditionnel (« hard deny »).
 
 ## Quel mode choisir ?
 
-- **Pairing humain, session longue, relecture des diffs en fin** → `acceptEdits`.
+- **Usage courant sur ta machine** → `auto` (le défaut), complété par le sandbox Bash.
+- **Pairing humain, relecture des diffs en fin** → `acceptEdits`.
 - **Explorer/auditer sans rien casser** → `plan`.
-- **Agent d'arrière-plan / CI fiable** → `dontAsk` + allowlist étroite (plus sûr qu'`auto` pour la prod).
+- **CI fiable** → `dontAsk` + allowlist étroite, par exemple `claude -p "lance les tests" --permission-mode dontAsk --allowedTools "Bash(npm test)" "Read"`.
 - **Tâche jetable en conteneur isolé** → `bypassPermissions` (jamais sur ta machine principale).
-- **Doute** → reste en `default`.
+- **Code sensible ou inconnu** → Manuel (`default`).
 
 Complète toujours par le **sandbox** et des [hooks](/wiki/hooks) `PreToolUse` (qui s'exécutent **avant** la couche de permission et peuvent approuver/refuser/modifier un appel). Voir [Workflows & Sécurité](/wiki/workflows).
 

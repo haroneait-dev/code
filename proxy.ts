@@ -1,101 +1,75 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { createServerClient } from "@supabase/ssr";
-import { isAdminEmail } from "@/lib/admin";
 
-const PROTECTED_PREFIXES = ["/learn", "/wiki", "/communaute"];
-const COMMUNITY_USERNAME_PREFIXES = ["/communaute", "/messages", "/profil"];
-const ADMIN_PREFIXES = ["/admin"];
-const ONBOARDING_PATH = "/onboarding";
+// Le site est en accès libre : aucune connexion n'est demandée.
+// Les fonctions qui exigeaient un compte (communauté, messagerie,
+// notifications, profils, assistant IA, administration) sont désactivées.
+// Leurs pages renvoient vers l'accueil et leurs API répondent 410.
+const DISABLED_PAGES = [
+  "/communaute",
+  "/messages",
+  "/profil",
+  "/u",
+  "/onboarding",
+  "/admin",
+  "/auth",
+  "/experience",
+];
 
-export async function proxy(req: NextRequest) {
-  const res = NextResponse.next({ request: { headers: req.headers } });
+const DISABLED_APIS = [
+  "/api/admin",
+  "/api/chat",
+  "/api/community",
+  "/api/cron",
+  "/api/messages",
+  "/api/notifications",
+  "/api/profile",
+  "/api/whoami",
+  "/api/wiki",
+  "/api/skills",
+];
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll: () => req.cookies.getAll(),
-        setAll: (cookies) =>
-          cookies.forEach(({ name, value, options }) =>
-            res.cookies.set(name, value, options)
-          ),
-      },
-    }
-  );
+const matches = (path: string, prefixes: string[]) =>
+  prefixes.some((p) => path === p || path.startsWith(`${p}/`));
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
+export function proxy(req: NextRequest) {
   const path = req.nextUrl.pathname;
-  const isProtected = PROTECTED_PREFIXES.some(
-    (p) => path === p || path.startsWith(`${p}/`)
-  );
-  const isAdminRoute = ADMIN_PREFIXES.some(
-    (p) => path === p || path.startsWith(`${p}/`)
-  );
 
-  // Not logged in: bounce to home with login modal
-  if ((isProtected || isAdminRoute) && !user) {
+  if (matches(path, DISABLED_APIS)) {
+    return NextResponse.json(
+      { error: "Cette fonctionnalité a été retirée." },
+      { status: 410 }
+    );
+  }
+
+  if (matches(path, DISABLED_PAGES)) {
     const url = req.nextUrl.clone();
     url.pathname = "/";
-    url.searchParams.set("login", "1");
-    url.searchParams.set("from", path);
-    return NextResponse.redirect(url);
+    url.search = "";
+    return NextResponse.redirect(url, 308);
   }
 
-  // Admin route: must be on the allowlist
-  if (isAdminRoute && user) {
-    if (!isAdminEmail(user.email)) {
-      const url = req.nextUrl.clone();
-      url.pathname = "/";
-      return NextResponse.redirect(url);
-    }
-    return res; // admins bypass the username check
-  }
-
-  const needsUsername = COMMUNITY_USERNAME_PREFIXES.some(
-    (p) => path === p || path.startsWith(`${p}/`)
-  );
-
-  // Community route + logged in: make sure a username is set (self-service onboarding)
-  if (needsUsername && user) {
-    // Admins always have access
-    if (isAdminEmail(user.email)) return res;
-
-    // Look up profile (RLS lets users read their own row)
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("username")
-      .eq("user_id", user.id)
-      .maybeSingle();
-
-    const p = profile as { username?: string | null } | null;
-
-    if (!p?.username) {
-      const url = req.nextUrl.clone();
-      url.pathname = ONBOARDING_PATH;
-      return NextResponse.redirect(url);
-    }
-  }
-
-  return res;
+  return NextResponse.next();
 }
 
 export const config = {
   matcher: [
-    "/learn/:path*",
-    "/wiki/:path*",
     "/communaute/:path*",
     "/messages/:path*",
     "/profil/:path*",
+    "/u/:path*",
+    "/onboarding/:path*",
     "/admin/:path*",
-    "/learn",
-    "/wiki",
-    "/communaute",
-    "/messages",
-    "/profil",
-    "/admin",
+    "/auth/:path*",
+    "/experience/:path*",
+    "/api/admin/:path*",
+    "/api/chat/:path*",
+    "/api/community/:path*",
+    "/api/cron/:path*",
+    "/api/messages/:path*",
+    "/api/notifications/:path*",
+    "/api/profile/:path*",
+    "/api/whoami/:path*",
+    "/api/wiki/:path*",
+    "/api/skills/:path*",
   ],
 };

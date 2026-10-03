@@ -20,13 +20,13 @@ export default function LearnIndexPage() {
       <main className="flex-grow w-full max-w-container-max mx-auto px-margin-mobile md:px-margin-desktop py-16">
         {/* Hero */}
         <section className="mb-16 max-w-3xl">
-          <div className="inline-flex items-center border border-outline-variant rounded-full px-4 py-1 mb-6">
-            <span className="text-[11px] font-bold tracking-wider uppercase text-on-surface-variant">
+          <div className="mb-6">
+            <span className="tag-note">
               Formation Claude Code
             </span>
           </div>
           <h1 className="font-display-xl text-display-xl md:text-[64px] md:leading-[1] font-extrabold tracking-tight mb-6 text-on-surface">
-            De zéro à <span className="text-gradient">expert</span> Claude Code.
+            De zéro à <span className="text-mark">expert</span> Claude Code.
           </h1>
           <p className="font-body-rt text-body-rt md:text-[19px] text-on-surface-variant leading-relaxed mb-8">
             Une formation structurée en {totalModules} modules et{" "}

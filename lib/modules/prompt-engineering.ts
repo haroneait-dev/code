@@ -280,7 +280,7 @@ Pas de markdown, pas de texte avant ou après le JSON.`,
             lang: "ts",
             label: "Prefilling via SDK",
             code: `const response = await anthropic.messages.create({
-  model: "claude-sonnet-4-6",
+  model: "claude-sonnet-5-5",
   max_tokens: 1024,
   messages: [
     { role: "user", content: prompt },
@@ -323,7 +323,7 @@ const json = JSON.parse("{" + response.content[0].text);`,
 }];
 
 const res = await anthropic.messages.create({
-  model: "claude-sonnet-4-6",
+  model: "claude-sonnet-5-5",
   max_tokens: 1024,
   tools,
   tool_choice: { type: "tool", name: "save_article" },

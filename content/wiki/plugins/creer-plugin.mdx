@@ -1,0 +1,135 @@
+---
+title: "Créer et publier un plugin"
+description: "Construire un plugin à partir d'un dossier vide, le tester sans marketplace, valider son contenu, l'évaluer, puis le distribuer via sa propre marketplace."
+updatedAt: "2026-10-03"
+readingMinutes: 8
+---
+
+Vous avez un skill de revue de code, un hook qui lance le linter et un serveur MCP pour votre outil de tickets ? Un plugin les emballe ensemble pour que toute l'équipe les installe en une commande.
+
+## La structure minimale
+
+```text
+revue-equipe/
+├── .claude-plugin/
+│   └── plugin.json
+├── skills/
+│   └── revue/
+│       └── SKILL.md
+├── agents/
+│   └── relecteur.md
+├── hooks/
+│   └── hooks.json
+└── .mcp.json
+```
+
+Seul le manifeste est indispensable. Ajoutez les dossiers dont vous avez besoin.
+
+### Le manifeste
+
+```json
+{
+  "name": "revue-equipe",
+  "version": "1.0.0",
+  "description": "Revue de code selon les conventions de l'équipe, avec lint automatique."
+}
+```
+
+Le nom sert d'espace de noms : le skill `skills/revue/SKILL.md` devient la commande `/revue-equipe:revue`.
+
+### Un skill
+
+```markdown
+---
+name: revue
+description: Relit le diff courant selon les conventions de l'équipe. À utiliser avant chaque PR.
+---
+
+1. Lis `git diff main...HEAD`.
+2. Vérifie les points de CONTRIBUTING.md : nommage, tests, gestion d'erreurs.
+3. Classe chaque remarque : bloquant, à corriger, suggestion.
+```
+
+### Un hook
+
+```json
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [{ "type": "command", "command": "npm run lint --silent" }]
+      }
+    ]
+  }
+}
+```
+
+## Tester sans marketplace
+
+Pendant le développement, chargez le dossier directement pour une session :
+
+```bash
+claude --plugin-dir ./revue-equipe
+```
+
+Après chaque modification, `/reload-plugins` recharge sans redémarrer. Pour vérifier la structure et lister ce que le plugin fait (événements écoutés, appels réseau ou fichiers pour un mod) :
+
+```bash
+claude plugin validate ./revue-equipe
+```
+
+Vous pouvez aussi convertir une configuration `.claude/` existante en plugin : déplacez les skills, agents et hooks dans la structure ci-dessus et ajoutez le manifeste.
+
+## Mesurer avant de distribuer
+
+Deux outils évitent de publier un plugin qui coûte cher pour rien :
+
+- **`claude plugin eval`** lance des cas de test, note les résultats et les compare à une session **sans** le plugin. Vous pouvez faire échouer la CI si le score baisse.
+- **La mesure du coût** : chaque skill invocable ajoute sa description au contexte de chaque tour. Une description de 3 lignes multipliée par 15 skills se paie dans toutes les sessions.
+
+## Publier via une marketplace
+
+Une marketplace est un dépôt Git qui contient `.claude-plugin/marketplace.json` :
+
+```json
+{
+  "name": "mon-org",
+  "owner": { "name": "Équipe plateforme" },
+  "plugins": [
+    {
+      "name": "revue-equipe",
+      "source": "./plugins/revue-equipe",
+      "description": "Revue de code selon nos conventions"
+    }
+  ]
+}
+```
+
+Vos collègues l'ajoutent puis installent :
+
+```text
+/plugin marketplace add mon-org/plugins-claude
+/plugin install revue-equipe@mon-org
+```
+
+Pour pousser un plugin à toute l'équipe, ajoutez-le aux réglages du projet (`.claude/settings.json`, portée projet). Pour toucher un public plus large, vous pouvez le soumettre au répertoire d'Anthropic.
+
+### Versions et dépendances
+
+- Augmentez `version` à chaque publication : c'est ce qui déclenche la mise à jour chez les utilisateurs.
+- Un plugin peut déclarer des dépendances vers d'autres plugins avec des plages de versions (`^1.2`). Claude Code les installe et les résout.
+
+## Bonnes pratiques
+
+- **Un plugin, un usage.** Mieux vaut trois petits plugins qu'un gros que personne n'ose désactiver.
+- **Des descriptions courtes et précises**, qui disent *quand* utiliser le skill : c'est ce que Claude lit pour décider.
+- **Pas de secret dans le dépôt.** Utilisez les options de configuration utilisateur du manifeste ou des variables d'environnement.
+- **Un README** qui liste ce que le plugin installe, en particulier les hooks et serveurs MCP.
+
+## Pour aller plus loin
+
+- [Les plugins : installer et gérer](/wiki/plugins/introduction-plugins)
+- [Les mods](/wiki/plugins/mods)
+- [Structure d'un skill](/wiki/skills/structure-skill)
+- Documentation : https://code.claude.com/docs/en/plugins/create

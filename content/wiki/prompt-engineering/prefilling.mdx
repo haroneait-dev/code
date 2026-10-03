@@ -15,7 +15,7 @@ Un appel API classique contient un message `user`. Pour faire du prefilling, vou
 
 ```ts
 const response = await anthropic.messages.create({
-  model: "claude-sonnet-4-6",
+  model: "claude-sonnet-5-5",
   max_tokens: 1024,
   messages: [
     { role: "user", content: "Donne-moi 3 ingrédients pour une pizza." },

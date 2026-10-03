@@ -29,7 +29,7 @@ curl https://api.anthropic.com/v1/messages \
   -H "anthropic-version: 2023-06-01" \
   -H "content-type: application/json" \
   -d '{
-    "model": "claude-sonnet-4-6",
+    "model": "claude-sonnet-5-5",
     "max_tokens": 1024,
     "messages": [
       {"role": "user", "content": "Dis bonjour en français."}
@@ -55,7 +55,7 @@ response = requests.post(
         "content-type": "application/json",
     },
     json={
-        "model": "claude-sonnet-4-6",
+        "model": "claude-sonnet-5-5",
         "max_tokens": 1024,
         "messages": [
             {"role": "user", "content": "Dis bonjour en français."}
@@ -82,7 +82,7 @@ const response = await fetch("https://api.anthropic.com/v1/messages", {
     "content-type": "application/json",
   },
   body: JSON.stringify({
-    model: "claude-sonnet-4-6",
+    model: "claude-sonnet-5-5",
     max_tokens: 1024,
     messages: [
       { role: "user", content: "Dis bonjour en français." },
@@ -103,7 +103,7 @@ Une réponse typique ressemble à ceci :
   "id": "msg_01ABC...",
   "type": "message",
   "role": "assistant",
-  "model": "claude-sonnet-4-6",
+  "model": "claude-sonnet-5-5",
   "content": [
     { "type": "text", "text": "Bonjour !" }
   ],

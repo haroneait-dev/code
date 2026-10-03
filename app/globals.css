@@ -4,6 +4,10 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Direction artistique « Atelier » : un carnet de travail plutôt qu'une
+   landing page. Papier chaud, encre brun-noir, vert sapin pour les actions,
+   souci (jaune-orangé) pour surligner ce qui compte. */
+
 @layer base {
   * {
     box-sizing: border-box;
@@ -17,72 +21,105 @@
     text-rendering: optimizeLegibility;
   }
 
-  /* Legacy tokens — used by /learn page (kept for compat) */
+  /* Jetons hérités, utilisés par certaines pages de la formation */
   :root {
-    --bg-dark: #faf8f4;
-    --bg-surface: #f5f1eb;
-    --bg-card: #ffffff;
-    --bg-panel: #f3f3f4;
-    --bg-hover: #ede8e0;
-    --border: #d1c4b8;
-    --beige: #241a0e;
-    --beige-light: #1a1c1c;
-    --beige-dim: #4e453c;
-    --beige-muted: #7f756b;
-    --purple: #6f583b;
-    --purple-light: #897051;
-    --text-muted: #7f756b;
+    --bg-dark: #fbf6ee;
+    --bg-surface: #f6efe3;
+    --bg-card: #fffcf7;
+    --bg-panel: #f0e6d6;
+    --bg-hover: #e9ddca;
+    --border: #e4d7c4;
+    --beige: #2b2119;
+    --beige-light: #2b2119;
+    --beige-dim: #66574a;
+    --beige-muted: #9a8774;
+    --purple: #2f5d46;
+    --purple-light: #3f7a5c;
+    --text-muted: #8a7766;
+    --marigold: #f2b23e;
+    --marigold-soft: #fbe3a8;
   }
 
   body {
-    background-color: #f5f1eb;
-    color: #1a1c1c;
-    font-family: var(--font-inter), Inter, system-ui, sans-serif;
+    background-color: #fbf6ee;
+    color: #2b2119;
+    font-family: var(--font-body), Figtree, system-ui, sans-serif;
+  }
+
+  h1, h2, h3 {
+    text-wrap: balance;
   }
 
   ::selection {
-    background: #e0c29e;
-    color: #1a1c1c;
+    background: #fbe3a8;
+    color: #2b2119;
+  }
+
+  :focus-visible {
+    outline: 2px solid #2f5d46;
+    outline-offset: 2px;
   }
 }
 
 @layer components {
-  .text-gradient {
-    background: linear-gradient(to right, #241a0e, #897051);
-    -webkit-background-clip: text;
-    background-clip: text;
-    -webkit-text-fill-color: transparent;
-    color: transparent;
+  /* Surligneur : remplace l'ancien texte en dégradé */
+  .text-mark {
+    background-image: linear-gradient(
+      transparent 58%,
+      var(--marigold-soft) 58%,
+      var(--marigold-soft) 92%,
+      transparent 92%
+    );
+    padding: 0 0.08em;
+    -webkit-box-decoration-break: clone;
+    box-decoration-break: clone;
   }
 
+  /* Carte : bordure qui se réchauffe au survol, sans effet de lévitation */
   .soft-lift {
-    transition: transform 0.3s ease, box-shadow 0.3s ease;
-    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.05);
+    transition: border-color 0.2s ease, background-color 0.2s ease;
   }
   .soft-lift:hover {
-    transform: translateY(-4px);
-    box-shadow:
-      0 12px 24px -8px rgba(0, 0, 0, 0.1),
-      0 0 0 1px rgba(0, 0, 0, 0.05);
+    border-color: #9a8774;
+    background-color: #fffcf7;
   }
 
   .btn-primary {
-    background-color: #241a0e;
-    color: #ffffff;
-    transition: background-color 0.2s ease, opacity 0.2s ease;
+    background-color: #2f5d46;
+    color: #fffcf7;
+    box-shadow: 0 2px 0 #1f3f2f;
+    transition: background-color 0.15s ease, transform 0.15s ease,
+      box-shadow 0.15s ease;
   }
   .btn-primary:hover {
-    background-color: #1a1c1c;
+    background-color: #284f3c;
+  }
+  .btn-primary:active {
+    transform: translateY(2px);
+    box-shadow: 0 0 0 #1f3f2f;
   }
 
   .btn-secondary {
-    background-color: transparent;
-    border: 1px solid #d1c4b8;
-    color: #241a0e;
-    transition: background-color 0.2s ease;
+    background-color: #fffcf7;
+    border: 1.5px solid #2b2119;
+    color: #2b2119;
+    transition: background-color 0.15s ease;
   }
   .btn-secondary:hover {
-    background-color: rgba(0, 0, 0, 0.02);
+    background-color: #fbe3a8;
+  }
+
+  /* Étiquette façon post-it, légèrement de travers */
+  .tag-note {
+    display: inline-block;
+    background: #fbe3a8;
+    color: #3a2a05;
+    font-family: var(--font-jbm), ui-monospace, monospace;
+    font-size: 12px;
+    letter-spacing: 0.02em;
+    padding: 4px 10px;
+    border-radius: 3px;
+    transform: rotate(-1.5deg);
   }
 }
 
@@ -108,18 +145,23 @@
   .animate-caret {
     animation: caret 1s steps(1) infinite;
   }
-  @keyframes aurora-shift {
-    0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
-    50% { transform: translate3d(2%, -3%, 0) scale(1.08); }
+
+  .paper-grid {
+    background-image: radial-gradient(#e4d7c4 1px, transparent 1px);
+    background-size: 22px 22px;
   }
-  .aurora-blob {
-    animation: aurora-shift 16s ease-in-out infinite;
-  }
-  @keyframes marquee {
-    from { transform: translateX(0); }
-    to { transform: translateX(-50%); }
-  }
-  .animate-marquee {
-    animation: marquee 30s linear infinite;
+}
+
+/* Les longues URL des articles se coupent au lieu d'élargir la page sur mobile */
+.prose-claude a,
+.prose-claude p,
+.prose-claude li {
+  overflow-wrap: anywhere;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
   }
 }

@@ -45,19 +45,19 @@ const client = new Anthropic({
 
 // Par requête, vous pouvez surcharger
 const resp = await client.messages.create(
-  { model: "claude-sonnet-4-6", max_tokens: 4096, messages },
+  { model: "claude-sonnet-5-5", max_tokens: 4096, messages },
   { timeout: 180_000 }
 );
 ```
 
 ## Fallbacks multi-modèles
 
-Quand `claude-sonnet-4-6` est overloaded (status 529), basculer automatiquement sur Haiku ou sur une version précédente évite l'incident utilisateur. Implémentez une **cascade** :
+Quand `claude-sonnet-5-5` est overloaded (status 529), basculer automatiquement sur Haiku ou sur une version précédente évite l'incident utilisateur. Implémentez une **cascade** :
 
 ```python
 MODEL_CASCADE = [
-    "claude-sonnet-4-6",
-    "claude-sonnet-4-5",
+    "claude-sonnet-5-5",
+    "claude-sonnet-5",
     "claude-haiku-4-5",
 ]
 
