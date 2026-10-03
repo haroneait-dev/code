@@ -1,0 +1,79 @@
+---
+title: "Réagir aux erreurs : StopFailure et PostToolUseFailure"
+description: "Les deux hooks officiels pour détecter une erreur d'API (rate limit, surcharge) ou un outil qui échoue, et déclencher une notification, un journal ou une relance."
+updatedAt: "2026-10-03"
+readingMinutes: 5
+---
+
+Quand l'API renvoie une limite de débit, une surcharge ou une coupure réseau, ou quand un outil échoue, vous voulez souvent réagir : prévenir l'équipe, journaliser, relancer plus tard. Claude Code propose deux événements de hook officiels pour ça.
+
+> Vous avez peut-être vu passer un hook « OnModelError ». **Il n'existe pas** dans Claude Code : c'était un nom inventé par la communauté. Utilisez les événements ci-dessous.
+
+## StopFailure : le tour s'est terminé sur une erreur
+
+`StopFailure` se déclenche quand un tour de Claude se termine par une erreur au lieu d'une réponse normale : limite de débit, serveur surchargé, erreur d'authentification, crédit épuisé, contexte trop plein.
+
+```json
+{
+  "hooks": {
+    "StopFailure": [
+      {
+        "hooks": [
+          { "type": "command", "command": "~/.claude/hooks/alerte-erreur.sh" }
+        ]
+      }
+    ]
+  }
+}
+```
+
+```bash
+#!/usr/bin/env bash
+# ~/.claude/hooks/alerte-erreur.sh
+input=$(cat)
+session=$(echo "$input" | jq -r '.session_id')
+cwd=$(echo "$input" | jq -r '.cwd')
+
+curl -s -X POST "$SLACK_WEBHOOK_URL" \
+  -H 'Content-Type: application/json' \
+  -d "{\"text\": \"Claude Code s'est arrêté sur une erreur ($cwd, session $session)\"}"
+```
+
+Le hook reçoit en JSON sur son entrée standard les informations de la session et de l'erreur. Affichez une fois l'entrée complète (`cat > /tmp/stopfailure.json`) pour voir les champs disponibles dans votre version.
+
+## PostToolUseFailure : un outil a échoué
+
+`PostToolUseFailure` se déclenche après un appel d'outil qui a échoué : une commande Bash en erreur, un fichier introuvable, un outil MCP qui répond une erreur. Comme `PostToolUse`, il accepte un `matcher` pour cibler certains outils.
+
+```json
+{
+  "hooks": {
+    "PostToolUseFailure": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          { "type": "command", "command": "jq -c '{t: now, tool: .tool_name}' >> ~/.claude/echecs-outils.jsonl" }
+        ]
+      }
+    ]
+  }
+}
+```
+
+Utile pour repérer un outil MCP instable ou une commande qui échoue en boucle.
+
+## Ce que Claude Code fait déjà tout seul
+
+Avant d'écrire un hook de relance, sachez que Claude Code :
+
+- **relance automatiquement** les requêtes en échec temporaire (jusqu'à 14 requêtes par appel de modèle) ;
+- **bascule sur un modèle de repli** quand le modèle configuré est refusé, avec un avertissement ;
+- avec **[/goal](/wiki/cli/goal-loop-monitor)**, met l'objectif en pause sur une limite de débit et le reprend quand c'est possible.
+
+Votre hook sert donc surtout à **prévenir** et à **journaliser**, pas à réimplémenter les relances.
+
+## Pour aller plus loin
+
+- [Qu'est-ce qu'un hook ?](/wiki/hooks/introduction-hooks)
+- [Notification hook](/wiki/hooks/notification)
+- Référence des hooks : https://code.claude.com/docs/en/hooks

@@ -226,10 +226,9 @@ export const curriculum: Module[] = [
           {
             heading: "Prérequis",
             bullets: [
-              "Node.js version 20 ou supérieure (24 LTS recommandée)",
-              "npm ou yarn",
-              "Un compte Anthropic avec accès API",
-              "Une clé API Anthropic (console.anthropic.com)",
+              "macOS, Linux (ou WSL), ou Windows 10/11",
+              "Un abonnement Claude Pro, Max, Team ou Enterprise, ou un compte Console (API)",
+              "Node.js n'est plus nécessaire avec l'installeur natif",
             ],
           },
           {
@@ -237,27 +236,31 @@ export const curriculum: Module[] = [
             code: {
               lang: "bash",
               label: "Terminal",
-              code: `# Installation via npm (recommandé)
-npm install -g @anthropic-ai/claude-code
+              code: `# macOS, Linux, WSL : installeur natif (recommandé)
+curl -fsSL https://claude.ai/install.sh | bash
 
-# Vérifier la version installée
+# Windows (PowerShell)
+irm https://claude.ai/install.ps1 | iex
+
+# Vérifier l'installation
 claude --version
+claude doctor
 
-# Lancer Claude Code pour la première fois
-claude`,
+# Lancer Claude Code dans un projet
+cd mon-projet && claude`,
             },
           },
           {
-            heading: "Configuration de la clé API",
-            body: "Lors du premier lancement, Claude Code vous demandera votre clé API. Elle est stockée de façon sécurisée dans votre keychain système. Vous pouvez aussi la passer via une variable d'environnement.",
+            heading: "Se connecter",
+            body: "Au premier lancement, Claude Code ouvre votre navigateur pour vous connecter à votre compte claude.ai (abonnement) ou Console (API). Les identifiants sont stockés dans le trousseau du système. Avec un compte Console, vous pouvez aussi fournir une clé API par variable d'environnement.",
             code: {
               lang: "bash",
               label: "~/.zshrc ou ~/.bashrc",
-              code: `# Option 1 : variable d'environnement (dans votre shell config)
-export ANTHROPIC_API_KEY="sk-ant-api03-..."
+              code: `# Option 1 : connexion par le navigateur (abonnement ou Console)
+claude        # puis suivez les instructions, ou /login dans une session
 
-# Option 2 : lors du premier lancement interactif
-# Claude Code vous guidera dans la configuration`,
+# Option 2 : clé API Console en variable d'environnement
+export ANTHROPIC_API_KEY="sk-ant-api03-..."`,
             },
           },
           {
@@ -799,7 +802,7 @@ git commit -m "feat(auth): add JWT refresh token support
 - Add /auth/refresh endpoint
 - Store refresh tokens in Redis with TTL
 
-Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>"`,
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"`,
             },
           },
           {
@@ -992,7 +995,7 @@ kill $(lsof -t -i:3000)`,
               label: "~/.claude/settings.json",
               code: `{
   // Modèle Claude à utiliser
-  "model": "claude-opus-4-7",
+  "model": "opus",
 
   // Outils explicitement autorisés (sans demander)
   "allowedTools": ["Read", "Edit", "Bash(git *)"],
@@ -1185,6 +1188,8 @@ server.setRequestHandler("tools/call", async (req) => {
                 ["PreToolUse", "Avant chaque appel d'outil", "Validation, logging"],
                 ["PostToolUse", "Après chaque appel d'outil", "Linting, formatage"],
                 ["Notification", "Quand Claude envoie une notif", "Alertes custom"],
+                ["Stop", "Quand Claude termine sa réponse", "Vérification finale, notification"],
+                ["SessionStart", "Au démarrage d'une session", "Charger du contexte"],
                 [
                   "UserPromptSubmit",
                   "À chaque prompt utilisateur",
@@ -1206,7 +1211,7 @@ server.setRequestHandler("tools/call", async (req) => {
         "hooks": [
           {
             "type": "command",
-            "command": "prettier --write \"$CLAUDE_TOOL_INPUT_FILE_PATH\""
+            "command": "jq -r '.tool_input.file_path' | xargs npx prettier --write"
           }
         ]
       }
@@ -1217,7 +1222,7 @@ server.setRequestHandler("tools/call", async (req) => {
         "hooks": [
           {
             "type": "command",
-            "command": "echo \"[AUDIT] Claude exécute: $CLAUDE_TOOL_INPUT_COMMAND\""
+            "command": "jq -r .tool_input.command >> ~/.claude/audit.log"
           }
         ]
       }
@@ -1227,14 +1232,14 @@ server.setRequestHandler("tools/call", async (req) => {
             },
           },
           {
-            heading: "Variables d'environnement dans les hooks",
+            heading: "Ce que reçoit un hook",
             table: {
-              headers: ["Variable", "Contenu"],
+              headers: ["Donnée", "Où la trouver"],
               rows: [
-                ["CLAUDE_TOOL_NAME", "Nom de l'outil (Edit, Bash, etc.)"],
-                ["CLAUDE_TOOL_INPUT_FILE_PATH", "Chemin du fichier (pour Edit/Write)"],
-                ["CLAUDE_TOOL_INPUT_COMMAND", "Commande bash (pour Bash)"],
-                ["CLAUDE_FILE_PATHS", "Fichiers modifiés (liste)"],
+                ["Nom de l'outil (Edit, Bash…)", "JSON sur stdin : .tool_name"],
+                ["Chemin du fichier (Edit, Write)", "JSON sur stdin : .tool_input.file_path"],
+                ["Commande lancée (Bash)", "JSON sur stdin : .tool_input.command"],
+                ["Dossier du projet", "Variable d'environnement CLAUDE_PROJECT_DIR"],
               ],
             },
           },
@@ -1250,7 +1255,7 @@ server.setRequestHandler("tools/call", async (req) => {
         "matcher": "Edit|Write",
         "hooks": [{
           "type": "command",
-          "command": "npx eslint --fix \"$CLAUDE_TOOL_INPUT_FILE_PATH\" 2>/dev/null || true"
+          "command": "jq -r '.tool_input.file_path' | xargs npx eslint --fix 2>/dev/null || true"
         }]
       }
     ],
@@ -1573,29 +1578,23 @@ Créer un commit Git propre avec ces étapes :
                 ["Ctrl+A", "Aller au début de la ligne"],
                 ["Ctrl+E", "Aller à la fin de la ligne"],
                 ["Shift+Enter", "Nouvelle ligne sans envoyer"],
+                ["Shift+Tab", "Changer de mode de permission (auto, manuel, édition, plan)"],
+                ["Échap Échap", "Revenir à un message précédent (/rewind)"],
+                ["Ctrl+O", "Afficher le détail : réflexion, sorties d'outils"],
+                ["Option+T / Alt+T", "Activer ou couper la réflexion (selon le modèle)"],
+                ["Ctrl+G", "Écrire le prompt dans votre éditeur externe"],
+                ["← (prompt vide)", "Passer la session en arrière-plan et ouvrir l'agent view"],
+                ["Ctrl+]", "Rouvrir le dernier artifact publié"],
               ],
             },
           },
           {
             heading: "Mode Fast",
-            body: "Le mode Fast active un output plus rapide pour le même modèle Claude. Idéal pour les tâches simples ou répétitives. Activez-le avec /fast ou Ctrl+F selon la configuration.",
+            body: "La commande /fast sert Opus plus rapidement, au double du tarif (8 $ / 40 $ par million de tokens sur Opus 5.5). À réserver aux moments où vous attendez la réponse devant l'écran. Pour aller plus vite à moindre coût, baissez plutôt l'effort avec /effort.",
           },
           {
             heading: "Personnaliser les raccourcis",
-            code: {
-              lang: "json",
-              label: "~/.claude/keybindings.json",
-              code: `[
-  {
-    "key": "ctrl+shift+c",
-    "command": "claude.openInTerminal"
-  },
-  {
-    "key": "ctrl+shift+k",
-    "command": "claude.clearConversation"
-  }
-]`,
-            },
+            body: "Les raccourcis se règlent dans ~/.claude/keybindings.json. Le plus simple est de demander à Claude : « change le raccourci de l'éditeur externe en Ctrl+E ». Il écrit le fichier au bon format et vous montre la modification.",
           },
           {
             callout: {
@@ -1746,7 +1745,7 @@ console.log(parsed.result);`,
           },
           {
             heading: "La fenêtre de contexte",
-            body: "Le modèle a une limite de tokens qu'il peut traiter en une fois — c'est la fenêtre de contexte. Claude Sonnet 4.6 et Opus 4.7 ont une fenêtre de 200 000 tokens (~150 000 mots). Tout ce que Claude peut \"voir\" à un instant T (historique, fichiers lus, instructions) doit tenir dans cette fenêtre.",
+            body: "Le modèle a une limite de tokens qu'il peut traiter en une fois — c'est la fenêtre de contexte. Dans Claude Code, Opus 5.5, Sonnet 5.5 et Fable 5.1 ont une fenêtre de 1 million de tokens (environ 750 000 mots) ; Haiku 4.5 reste à 200 000. Tout ce que Claude peut \"voir\" à un instant T (historique, fichiers lus, instructions) doit tenir dans cette fenêtre.",
           },
           {
             heading: "Le mécanisme d'attention",
@@ -1780,16 +1779,17 @@ console.log(parsed.result);`,
         duration: "7 min",
         tag: "Pratique",
         intro:
-          "Claude Code se paie à l'usage via l'API Anthropic. Comprendre la tarification vous permet d'optimiser vos coûts sans sacrifier la qualité.",
+          "Claude Code se paie soit par abonnement (Pro, Max, Team, Enterprise), soit à l'usage via l'API. Comprendre la tarification vous permet d'optimiser vos coûts sans sacrifier la qualité.",
         sections: [
           {
             heading: "Modèles disponibles et prix",
             table: {
               headers: ["Modèle", "Input (MTok)", "Output (MTok)", "Usage idéal"],
               rows: [
-                ["claude-opus-4-7", "~$15", "~$75", "Tâches complexes, architecture"],
-                ["claude-sonnet-4-6", "~$3", "~$15", "Usage quotidien équilibré"],
-                ["claude-haiku-4-5", "~$0.25", "~$1.25", "Tâches simples, CI/CD"],
+                ["claude-fable-5-1", "$10", "$50", "Problèmes où Opus bute"],
+                ["claude-opus-5-5", "$4", "$20", "Défaut de Claude Code : architecture, bugs difficiles"],
+                ["claude-sonnet-5-5", "$2", "$10", "Usage quotidien équilibré"],
+                ["claude-haiku-4-5", "$1", "$5", "Tâches simples, sous-agents, CI/CD"],
               ],
             },
           },
@@ -1797,7 +1797,7 @@ console.log(parsed.result);`,
             callout: {
               type: "info",
               icon: "💰",
-              text: "<strong>Prix avec cache :</strong> Les tokens en cache coûtent ~90% moins cher. Sur une longue session Claude Code, le cache peut réduire la facture de 50-70%. Les prix varient, vérifiez <code>anthropic.com/pricing</code> pour les tarifs actuels.",
+              text: "<strong>Prix avec cache :</strong> Les tokens en cache coûtent ~90% moins cher. Sur une longue session Claude Code, le cache peut réduire la facture de 50-70%. Prix relevés le 3 octobre 2026 ; vérifiez <code>anthropic.com/pricing</code> pour les tarifs actuels. Avec un abonnement Pro ou Max, vous ne payez pas au token : Opus consomme simplement votre quota plus vite que Sonnet.",
             },
           },
           {
@@ -1820,9 +1820,10 @@ Session cost: $0.23
             bullets: [
               "Utiliser /compact régulièrement pour réduire les tokens input",
               "Écrire des CLAUDE.md précis pour éviter les re-explications",
-              "Utiliser claude-haiku pour les tâches répétitives (linting, formatage)",
+              "Passer en Sonnet 5.5 (/model sonnet) pour le travail courant, et Haiku pour les sous-agents d'exploration",
+              "Baisser l'effort (/effort low ou medium) pour les tâches simples",
               "Éviter de coller de gros logs ou fichiers inutiles dans le contexte",
-              "Utiliser le mode --print pour les scripts (pas de contexte interactif)",
+              "Utiliser claude -p pour les scripts (pas de contexte interactif)",
               "Limiter le nombre de fichiers lus au strict nécessaire",
             ],
           },
@@ -1843,7 +1844,7 @@ Session cost: $0.23
             callout: {
               type: "tip",
               icon: "🎯",
-              text: "<strong>Rapport qualité/prix :</strong> Sonnet est le sweet spot pour 95% des usages. Réservez Opus pour les tâches d'architecture complexe où vous avez vraiment besoin du maximum de raisonnement.",
+              text: "<strong>Rapport qualité/prix :</strong> Sonnet 5.5 suffit pour l'essentiel du travail courant. Gardez Opus 5.5 (ou l'advisor Opus) pour l'architecture et les bugs qui résistent.",
             },
           },
         ],

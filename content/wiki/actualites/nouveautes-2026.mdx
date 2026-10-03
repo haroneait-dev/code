@@ -1,116 +1,117 @@
 ---
 title: "Nouveautés Claude Code (2026)"
-description: "Opus 4.8 par défaut, computer use, auto mode, orchestration multi-agents, mémoire « dreaming », visualisations et installeur natif."
-updatedAt: "2026-06-05"
-readingMinutes: 8
+description: "Le journal des changements qui comptent, mois par mois : modèles, auto mode, agent view, workflows, artifacts, routines, plugins et mods. Mis à jour le 3 octobre 2026."
+updatedAt: "2026-10-03"
+readingMinutes: 10
 ---
 
-Cette page résume les évolutions marquantes de Claude Code et de l'écosystème Claude au premier semestre 2026. L'orientation générale est claire : Claude Code passe d'un outil que l'on **ouvre, supervise et referme** à un agent capable de **rester actif plus longtemps**, de **toucher davantage du cycle de vie logiciel**, et de **présenter son travail** sous une forme inspectable (graphiques, diagrammes, apps).
+Claude Code sort une nouvelle version presque chaque jour (la 2.1.288 est sortie le 2 octobre 2026). Cette page garde seulement ce qui change votre façon de travailler, du plus récent au plus ancien. Pour le détail ligne par ligne, voir le [changelog officiel](https://code.claude.com/docs/en/changelog).
 
-> Les notes de version évoluent quasi quotidiennement. Pour la version à jour, voir [Sources & ressources externes](/wiki/actualites/sources-ressources).
+## En résumé : où en est-on en octobre 2026 ?
 
-## Le modèle par défaut : Claude Opus 4.8
+- **Modèle par défaut** : Opus 5.5. Alias `sonnet` → Sonnet 5.5. Haiku 4.5 reste le petit modèle. Voir [Opus 5.5 et Sonnet 5.5](/wiki/modeles/opus-sonnet-5-5).
+- **Mode de permission par défaut** : `auto`, avec un classifieur qui vérifie chaque action. Voir [Les modes de permission](/wiki/cli/permissions-modes).
+- **Plusieurs agents à la fois** : agent view en local, dynamic workflows dans une session, routines et sessions dans le cloud.
+- **Extension** : skills, hooks, MCP, regroupés dans des **plugins**, et depuis le 1er octobre des **mods** qui modifient l'interface.
 
-**Claude Opus 4.8** est devenu le modèle le plus avancé disponible publiquement et le **modèle par défaut** de Claude Code (déployé notamment pour les comptes Max, Team Premium, Enterprise pay-as-you-go et API).
+## Octobre 2026
 
-À retenir côté modèles : Opus 4.8 est accompagné d'un **« fast mode »** plus rapide et à tarif plus compétitif, pensé pour les itérations rapides où la latence compte. La famille de modèles récents inclut aussi Opus 4.7, Opus 4.6, Sonnet 4.6 et Haiku 4.5.
+- **Mods (2.1.287, 1er octobre).** Des plugins en JavaScript qui dessinent des panneaux, ajoutent des commandes instantanées et interceptent les appels d'outils. Le mod intégré « You should know » (désactivé par défaut) surveille les longues tâches et signale ce que vous pourriez rater. Voir [Les mods](/wiki/plugins/mods).
+- **`/code-review --max-findings`** pour régler le nombre de remarques remontées.
 
-## Les grandes capacités agentiques
+## Septembre 2026
 
-### Computer use depuis le CLI
-Claude peut lancer des applications natives et naviguer dans des interfaces graphiques directement depuis le terminal. Cela élargit nettement ce que l'agent peut « toucher » au-delà du seul code.
+- **Sonnet 5.5 (29 septembre)** : cible de l'alias `sonnet`, 1M de contexte, 2 $ / 10 $. `claude --desktop` ouvre l'application de bureau sur le dossier courant.
+- **Opus 5.5 (22 septembre)** : devient le modèle par défaut. Niveau de Fable 5.1 sur la plupart des tâches, 4 $ / 20 $.
+- **AGENTS.md (18 septembre)** : un projet sans CLAUDE.md peut utiliser son fichier `AGENTS.md`, partagé avec d'autres agents de code. Voir [CLAUDE.md](/wiki/demarrer/claude-md).
+- **`claude plugin eval`** : tester un plugin sur des cas concrets et le comparer à une session sans plugin.
+- **Fable 5.1 et Mythos 5.1 (1er septembre)** : environ 25 % moins chers à l'usage que la version 5. Voir [Fable 5.1 et Mythos 5.1](/wiki/modeles/fable-5-mythos-5).
+- **Panneau `/diff` en direct** pour suivre les modifications de Claude pendant qu'il travaille.
 
-### Auto mode
-Un mode qui automatise les demandes de permission pour les actions jugées sûres tout en bloquant les actions risquées. Objectif : réduire la supervision constante sans sacrifier la sécurité. (Disponible en aperçu, y compris dans l'extension VS Code.)
+## Août 2026
 
-### Remote control / continuité à distance
-La possibilité de garder la main sur des sessions à distance, dans la logique d'agents qui tournent en continu et que l'on rejoint seulement quand une décision humaine est nécessaire.
+- **Auto mode par défaut** pour les sessions interactives, et sessions qui s'envoient des messages entre elles.
+- **Environnements auto-hébergés** : les sessions cloud peuvent tourner sur votre propre infrastructure.
+- **Skill `/design`** pour dessiner des maquettes d'écran, et style de sortie **Concise**.
+- **Lancer une session sur votre ordinateur depuis votre téléphone.**
+- **Fork mode** activé par défaut, merge requests GitLab prises en charge.
 
-### Scheduled tasks (tâches planifiées)
-Claude Code peut exécuter des travaux logiciels **récurrents** de façon planifiée. Couplé à l'auto mode et au remote control, cela transforme l'outil pour la maintenance régulière (revue, mises à jour, vérifications).
+## Juillet 2026
 
-### Cloud auto-fix
-Claude prolonge son rôle **après l'ouverture d'une pull request** : il peut corriger automatiquement certains problèmes côté cloud, étendant l'agent au-delà de la simple génération de code.
+- **Opus 5 (24 juillet)** devient le modèle Opus par défaut.
+- **Plugin Claude Security** : scanner le code à la recherche de vulnérabilités et proposer des correctifs.
+- **Simulateur iOS** dans l'application de bureau.
+- **Artifacts avec données en direct** via les connecteurs MCP, et **mode lecteur d'écran**.
+- **`/doctor`** fait un bilan complet de la configuration.
 
-## Orchestration multi-agents & workflows
+## Juin 2026
 
-### Dynamic workflows
-On peut **orchestrer plusieurs sous-agents depuis un seul script**. Un agent « chef » délègue à des sous-agents spécialisés, chacun avec son propre modèle, son prompt et ses outils.
+- **Sonnet 5 (30 juin)** devient le modèle par défaut. **Claude in Chrome** sort de bêta. Les **sous-agents tournent en arrière-plan** par défaut. Application de bureau **Linux** en bêta.
+- **Fable 5 et Mythos 5 (9 juin)**, suspendus du 12 au 30 juin sur ordre du gouvernement américain.
+- **Artifacts** : publier une page web interactive depuis une session. Voir [Artifacts](/wiki/cli/artifacts).
+- **`/config`** permet de modifier n'importe quel réglage depuis le prompt.
+- **`/cd`** déplace une session dans un autre dossier ; les sous-agents peuvent lancer leurs propres sous-agents ; **safe mode** pour dépanner une configuration cassée.
+- **`claude mcp login`** pour authentifier un serveur MCP depuis le shell ; `/rewind` peut revenir avant un `/clear`.
 
-### Multiagent orchestration (Claude Platform)
-Sur la plateforme Claude, un agent principal peut déléguer à des sous-agents spécialisés travaillant **en parallèle sur un système de fichiers partagé**. L'ensemble du flux est traçable dans la console Claude.
+## Mai 2026
 
-### Agent view
-Une **vue unique pour gérer toutes tes sessions Claude Code** : démarrer des agents, les envoyer en arrière-plan, consulter leur statut et leur dernière réponse, et ne revenir dans une session que lorsqu'une saisie est requise.
+- **Opus 4.8** et **dynamic workflows** : Claude écrit un script qui orchestre des dizaines de sous-agents, avec reprise en cas d'interruption. Niveau d'effort `ultracode`. Voir [Dynamic workflows](/wiki/cli/dynamic-workflows-agents-arriere-plan).
+- **Agent view** (`claude agents`) pour piloter plusieurs sessions, et **`/goal`** pour travailler jusqu'à une condition. Voir [Agent view](/wiki/cli/agent-view-sessions) et [/goal et /loop](/wiki/cli/goal-loop-monitor).
+- **Auto mode** ouvert à l'offre Pro, **`/code-review`** pour relire un diff, plugin **security-guidance**.
+- Plugins installables depuis une archive `.zip` ou une URL, recherche dans l'historique de tous les projets avec `Ctrl+R`.
 
-### Le skill `/batch`
-Exemple emblématique du système de skills : il orchestre des changements à grande échelle dans une base de code **en parallèle**. Il analyse le code, découpe le travail en 5 à 30 unités indépendantes, présente un plan pour approbation, puis lance des agents en arrière-plan dans des **worktrees Git isolés**. Chaque agent implémente son unité, lance les tests et ouvre une pull request.
+## Avril 2026
 
-## Mémoire, skills, hooks
+- **Opus 4.7** et le niveau d'effort **`xhigh`**.
+- **Routines** : des sessions cloud lancées par un planning, une API ou un événement GitHub. Voir [Cloud, routines et Remote Control](/wiki/cli/cloud-routines-remote).
+- **Notifications push** sur mobile quand Claude a besoin de vous, **`/usage`** pour voir ce qui consomme votre quota.
+- **Binaires natifs** à la place du JavaScript empaqueté, Windows sans Git Bash.
+- **`/ultrareview`** (revue multi-agents dans le cloud), **Ultraplan**, outil **Monitor** et **`/loop`** auto-cadencé.
 
-### « Dreaming » (mémoire qui s'améliore entre les exécutions)
-Un processus planifié qui **revoit les sessions passées**, repère des motifs et **organise la mémoire** : erreurs récurrentes, workflows partagés et préférences d'équipe sont intégrés à un magasin de mémoire plus utile. Les agents s'améliorent ainsi d'une exécution à l'autre.
+## Mars 2026
 
-### Skills
-Le framework de skills permet d'étendre Claude Code avec des commandes et capacités personnalisées. La bibliothèque de skills fournie a été enrichie, et la **découverte automatique** depuis des dossiers imbriqués améliorée. Les skills supportent la substitution de variables (`$ARGUMENTS`, `$ARGUMENTS[N]`, `${CLAUDE_SESSION_ID}`) pour des comportements dynamiques par session.
+- **Auto mode** (en aperçu), **computer use** intégré au CLI, **correction automatique des PR** dans le cloud.
+- Rendu plein écran sans scintillement, outil PowerShell pour Windows.
 
-### Hooks & contexte
-Améliorations sur les hooks, la mémoire et le contexte, ainsi que sur les limites de sortie et l'infrastructure de plugins, pour fiabiliser les workflows longs.
+## Installer ou mettre à jour
 
-### Plugin de sécurité
-Un plugin/guidage de sécurité qui **revoit le code à la recherche de vulnérabilités** de façon proactive.
-
-## Présentation du travail : visualisations
-
-Claude peut désormais produire des **graphiques interactifs, des diagrammes, des visualisations et même des interfaces mobiles interactives**. La logique de fond : les agents ont besoin d'interfaces **inspectables** plutôt que de blocs de texte. Terminer la tâche n'est qu'une partie du travail — il faut aussi **packager le résultat** dans une forme que l'on peut inspecter, partager et commenter rapidement.
-
-## Limites & échelle
-
-- **Limites de débit doublées** sur Claude Code, et limites API relevées pour Opus, pour permettre de construire de façon plus fiable à grande échelle.
-- Meilleure **visibilité des limites de débit** et statut d'usage plus clair (ex. `claude agents --json` indique ce qui bloque une session en attente).
-- De nombreux correctifs sur la connexion, la reprise de session (`resume`), les worktrees, Windows et la stabilité générale.
-
-## Installation : ce qui a changé
-
-- **Installeur natif (recommandé)** — sans dépendance, **pas besoin de Node.js**, mise à jour automatique en arrière-plan :
-  - macOS / Linux / WSL : `curl -fsSL https://claude.ai/install.sh | bash`
+- **Installeur natif (recommandé)**, sans Node.js, avec mise à jour automatique :
+  - macOS, Linux, WSL : `curl -fsSL https://claude.ai/install.sh | bash`
   - Windows (PowerShell) : `irm https://claude.ai/install.ps1 | iex`
-  - Homebrew (macOS/Linux) : `brew install --cask claude-code` (pense à `brew upgrade` pour mettre à jour)
-- **npm (toujours supporté, méthode historique)** — pour épingler une version précise. Nécessite **Node.js 18+** :
-  - `npm install -g @anthropic-ai/claude-code`
-  - Mettre à jour avec `npm install -g @anthropic-ai/claude-code@latest` (évite `npm update -g`).
-- **Compte requis** : Claude Pro, Max, Team, Enterprise ou un compte Console (API). Le plan **gratuit de Claude.ai n'inclut pas Claude Code**.
-- **Diagnostic** : `claude doctor` détecte automatiquement la plupart des problèmes de configuration.
+  - Homebrew : `brew install --cask claude-code` (puis `brew upgrade` pour mettre à jour)
+- **npm** reste possible pour épingler une version : `npm install -g @anthropic-ai/claude-code` (Node.js 18 ou plus).
+- **Compte** : Claude Pro, Max, Team, Enterprise, ou un compte Console (API). L'offre gratuite de claude.ai n'inclut pas Claude Code.
+- **Diagnostic** : `claude doctor`.
 
-## Articles approfondis (mis à jour juillet 2026)
-
-Cette page est un hub. Pour aller au fond de chaque sujet :
+## Articles approfondis
 
 **Modèles**
-- [Claude Sonnet 5 — l'agentique à grande échelle](/wiki/modeles/sonnet-5)
-- [Claude Opus 4.8 — le modèle frontière au quotidien](/wiki/modeles/opus-4-8)
-- [Raisonnement adaptatif & paramètre effort](/wiki/modeles/adaptive-thinking-effort)
-- [Claude Fable 5 & Mythos 5 — les modèles frontière](/wiki/modeles/fable-5-mythos-5)
+- [Claude Opus 5.5 et Sonnet 5.5](/wiki/modeles/opus-sonnet-5-5)
+- [Claude Fable 5.1 et Mythos 5.1](/wiki/modeles/fable-5-mythos-5)
+- [Claude Sonnet 5](/wiki/modeles/sonnet-5)
+- [Raisonnement adaptatif et paramètre effort](/wiki/modeles/adaptive-thinking-effort)
 - [J-space : l'espace de travail interne de Claude](/wiki/modeles/j-space-interpretabilite)
 
-**Produits & écosystème**
-- [Claude Tag — l'IA ambiante dans Slack](/wiki/actualites/claude-tag-slack)
-- [Claude Science — l'atelier IA pour chercheurs](/wiki/actualites/claude-science)
-- [L'auto-amélioration récursive de Claude](/wiki/actualites/auto-amelioration-recursive)
-- [Le « backdoor » chinois : traçage & distillation](/wiki/actualites/backdoor-chine-distillation)
+**Claude Code**
+- [Effort, fast mode et advisor](/wiki/cli/effort-fast-advisor)
+- [Agent view](/wiki/cli/agent-view-sessions)
+- [Cloud, routines et Remote Control](/wiki/cli/cloud-routines-remote)
+- [/goal, /loop et Monitor](/wiki/cli/goal-loop-monitor)
+- [Artifacts](/wiki/cli/artifacts)
+- [Les plugins](/wiki/plugins/introduction-plugins) et [les mods](/wiki/plugins/mods)
 
-**Outillage**
-- [Dynamic workflows & agents en arrière-plan](/wiki/cli/dynamic-workflows-agents-arriere-plan)
-- [MCP en 2026 : Apps, élicitation, sampling & Streamable HTTP](/wiki/mcp/evolution-2026-apps-elicitation)
-- [Prompter les modèles 2026 (Opus 4.6+ / Sonnet 5)](/wiki/prompt-engineering/prompting-sonnet-5)
-- [Claude Code × Vercel : plugin, AI SDK & Gateway](/wiki/enterprise/vercel-plugin-ai-sdk)
+**Écosystème**
+- [Claude Tag : Claude dans Slack](/wiki/actualites/claude-tag-slack)
+- [Claude Science](/wiki/actualites/claude-science)
+- [L'auto-amélioration récursive de Claude](/wiki/actualites/auto-amelioration-recursive)
+- [Distillation et géopolitique](/wiki/actualites/backdoor-chine-distillation)
+- [MCP en 2026](/wiki/mcp/evolution-2026-apps-elicitation)
 
 ## Suivre les nouveautés
 
-- **Notes de version officielles Anthropic** : [anthropic.com/news](https://www.anthropic.com/news)
-- **Documentation Claude Code** : [docs.claude.com](https://docs.claude.com/en/docs/claude-code/overview)
-- **Suivi des mises à jour (agrégateur)** : [releasebot.io](https://releasebot.io/updates/anthropic/claude-code)
-- **Package npm** : [npmjs.com/package/@anthropic-ai/claude-code](https://www.npmjs.com/package/@anthropic-ai/claude-code)
+- **Changelog officiel** : https://code.claude.com/docs/en/changelog
+- **Résumé hebdomadaire officiel** (« What's new ») : https://code.claude.com/docs/en/whats-new
+- **Annonces Anthropic** : https://www.anthropic.com/news
 
 ---
 

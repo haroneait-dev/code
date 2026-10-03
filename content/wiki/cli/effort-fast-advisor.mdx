@@ -1,0 +1,88 @@
+---
+title: "Effort, fast mode et advisor : régler la puissance de Claude"
+description: "Les niveaux d'effort (de low à ultracode), le fast mode d'Opus et l'advisor qui consulte un modèle plus fort aux moments clés. Quand utiliser quoi, et ce que ça coûte."
+updatedAt: "2026-10-03"
+readingMinutes: 7
+---
+
+Changer de modèle n'est plus le seul levier. Claude Code propose trois réglages qui jouent sur la qualité, la vitesse et le coût d'une session : l'**effort**, le **fast mode** et l'**advisor**. Bien les combiner évite souvent de passer sur un modèle plus cher.
+
+## L'effort : combien Claude réfléchit
+
+L'effort règle la quantité de raisonnement que le modèle s'autorise avant d'agir. Plus il est haut, plus Claude vérifie, explore et planifie, et plus il consomme de tokens.
+
+| Niveau | Pour quoi faire |
+|---|---|
+| `low` | Échanges rapides que vous relisez à chaque étape : brainstorming, esquisses |
+| `medium` | Travail courant au périmètre clair. **Défaut d'Opus 5.5 et Sonnet 5.5** |
+| `high` | Travail où la vérification compte : correction de bug, migration |
+| `xhigh` | Raisonnement plus profond, pour les problèmes qui résistent |
+| `max` | Problèmes difficiles traités en autonomie (audit de sécurité, par exemple) |
+| `ultracode` | `xhigh` + Claude peut lancer de lui-même des [dynamic workflows](/wiki/cli/dynamic-workflows-agents-arriere-plan) |
+
+Les cinq premiers niveaux existent sur Fable, Opus 4.7 et suivants, Sonnet 5 et suivants. Opus 4.6 et Sonnet 4.6 n'ont pas `xhigh`.
+
+### Changer l'effort
+
+```text
+/effort            # ouvre le curseur
+/effort high       # règle et enregistre pour ce modèle
+```
+
+Dans le curseur, `Entrée` enregistre le niveau comme défaut pour ce modèle, et `s` ne l'applique qu'à la session en cours. On peut aussi passer `claude --effort high` au lancement, la variable `CLAUDE_CODE_EFFORT_LEVEL`, ou le champ `effort:` dans le frontmatter d'un skill ou d'un sous-agent :
+
+```json
+{
+  "effortLevel": "medium",
+  "modelSettings": {
+    "claude-opus-5-5": { "effortLevel": "high" }
+  }
+}
+```
+
+> Sur Opus 5.5, Sonnet 5.5 et Fable, la réflexion ne se coupe plus (`MAX_THINKING_TOKENS=0` est ignoré). Pour aller plus vite, baissez l'effort.
+
+## Le fast mode : Opus plus rapide
+
+`/fast` bascule Opus sur un service à latence réduite. Sur Opus 5.5, la vitesse de sortie augmente nettement, mais le tarif double : **8 $ / 40 $** par million de tokens au lieu de 4 $ / 20 $. Sur un abonnement, le fast mode consomme vos limites plus vite.
+
+Utilisez-le quand vous attendez la réponse devant l'écran sur une tâche qui mérite Opus : débogage en direct, démo, revue rapide. Pour une tâche longue en arrière-plan, la vitesse importe peu et le fast mode ne vaut pas son prix.
+
+## L'advisor : un second avis aux moments clés
+
+L'advisor associe votre modèle principal à un modèle **au moins aussi fort**, que Claude consulte de lui-même : avant de choisir une approche, quand une erreur revient, avant de déclarer une tâche terminée. Le conseiller lit toute la conversation et renvoie des recommandations.
+
+```text
+/advisor opus      # Opus devient le conseiller
+/advisor off       # désactive
+```
+
+On peut aussi le fixer dans les réglages (`"advisorModel": "opus"`) ou pour une seule session (`claude --advisor opus`).
+
+| Combinaison | Intérêt |
+|---|---|
+| Sonnet 5.5 + advisor Opus | Le meilleur compromis au quotidien : Sonnet fait le travail, Opus tranche les décisions difficiles |
+| Haiku 4.5 + advisor Opus | Le moins cher avec une bonne planification |
+| Sonnet 5.5 + advisor Fable | L'avis de Fable sans payer Fable à chaque tour |
+| Opus + advisor Opus | Une relecture indépendante sur une tâche à fort enjeu |
+
+Règles à connaître :
+
+- le conseiller doit être **au moins aussi fort** que le modèle principal (Opus 5.5 n'accepte que Opus 5 ou plus, ou Fable) ;
+- Haiku peut demander conseil mais ne peut pas conseiller ;
+- l'advisor fonctionne **uniquement avec l'API Anthropic** (pas sur Bedrock, Google Cloud ou Foundry) ;
+- chaque consultation est facturée au tarif du modèle conseiller, mais activer ou couper l'advisor n'invalide pas le cache de prompt.
+
+## Quelle combinaison choisir ?
+
+- **Tous les jours** : Sonnet 5.5 en `medium`, advisor Opus.
+- **Bug qui résiste** : Opus 5.5 en `high` ou `xhigh`.
+- **Gros chantier autonome** (migration, audit) : Opus 5.5 en `ultracode`.
+- **Démo ou pair-programming en direct** : Opus 5.5 + `/fast`.
+- **Budget serré** : Haiku 4.5 + advisor Opus.
+
+## Pour aller plus loin
+
+- [Opus 5.5 et Sonnet 5.5](/wiki/modeles/opus-sonnet-5-5)
+- [Raisonnement adaptatif et paramètre effort (API)](/wiki/modeles/adaptive-thinking-effort)
+- Documentation : https://code.claude.com/docs/en/model-config et https://code.claude.com/docs/en/advisor

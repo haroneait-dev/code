@@ -1,11 +1,8 @@
 import Link from "next/link";
-import { Suspense } from "react";
-import { AuthButton } from "@/components/auth/AuthButton";
 import { MobileNav } from "@/components/site/MobileNav";
-import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { SiteSearch } from "@/components/site/SiteSearch";
+import { NAV_LINKS, type NavKey } from "@/lib/nav";
 
-type NavKey = "formation" | "wiki" | "fiches" | "communaute" | "messages" | null;
 
 export function SiteHeader({
   active = null,
@@ -16,49 +13,42 @@ export function SiteHeader({
 }) {
   const linkClass = (key: NavKey) =>
     active === key
-      ? "text-primary font-medium border-b-2 border-primary pb-1 text-body-sm"
+      ? "text-on-surface font-semibold text-body-sm text-mark"
       : "text-on-surface-variant hover:text-on-surface text-body-sm transition-colors";
 
   return (
-    <header className="bg-surface/85 backdrop-blur-xl sticky top-0 border-b border-outline-variant z-50">
+    <header className="bg-surface sticky top-0 border-b border-outline-variant z-50">
       <div className="flex justify-between items-center w-full px-margin-mobile md:px-margin-desktop max-w-container-max mx-auto h-16 gap-6">
         <div className="flex items-center gap-8 min-w-0">
           <Link
             href="/"
-            className="font-headline-lg text-headline-lg font-bold text-on-surface tracking-tight whitespace-nowrap"
+            className="flex items-center gap-2 font-headline-lg text-[21px] font-bold text-on-surface tracking-tight whitespace-nowrap"
           >
-            Claude{" "}
-            <span className="font-normal text-on-surface-variant">Mastery</span>
+            <span
+              aria-hidden
+              className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-primary text-on-primary font-mono text-[12px] -rotate-3"
+            >
+              &gt;_
+            </span>
+            Claude Mastery
           </Link>
-          <nav className="hidden md:flex items-center gap-6">
-            <Link href="/learn" className={linkClass("formation")}>
-              Formation
-            </Link>
-            <Link href="/wiki" className={linkClass("wiki")}>
-              Wiki
-            </Link>
-            <Link href="/fiches" className={linkClass("fiches")}>
-              Fiches
-            </Link>
-            <Link href="/communaute" className={linkClass("communaute")}>
-              Communauté
-            </Link>
-            <Link href="/messages" className={linkClass("messages")}>
-              Messages
-            </Link>
+          <nav className="hidden md:flex items-center gap-6" aria-label="Navigation principale">
+            {NAV_LINKS.map((l) => (
+              <Link key={l.key} href={l.href} className={linkClass(l.key)}>
+                {l.label}
+              </Link>
+            ))}
           </nav>
         </div>
 
         <div className="flex items-center gap-3">
           {showSearch && <SiteSearch />}
-          <Suspense fallback={<div className="w-9 h-9" aria-hidden />}>
-            <NotificationBell />
-          </Suspense>
-          <Suspense
-            fallback={<div className="w-[120px] h-9" aria-hidden />}
+          <Link
+            href="/learn"
+            className="hidden md:inline-flex btn-primary h-9 px-4 rounded-md items-center text-body-sm font-semibold"
           >
-            <AuthButton />
-          </Suspense>
+            Commencer
+          </Link>
           <MobileNav active={active} />
         </div>
       </div>

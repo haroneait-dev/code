@@ -48,7 +48,7 @@ import Anthropic from "@anthropic-ai/sdk";
 const client = new Anthropic();
 
 const message = await client.messages.create({
-  model: "claude-sonnet-4-6",
+  model: "claude-sonnet-5-5",
   max_tokens: 1024,
   messages: [
     { role: "user", content: "Explique le principe SOLID en 3 phrases." },
@@ -93,7 +93,7 @@ Cela vous permet de typer proprement votre historique, vos handlers, et de bén�
 
 ```ts
 const message = await client.messages.create({
-  model: "claude-sonnet-4-6",
+  model: "claude-sonnet-5-5",
   max_tokens: 2048,
   system: "Tu es un expert TypeScript. Réponds toujours en français.",
   temperature: 0.5,
@@ -150,7 +150,7 @@ const client = new Anthropic();
 export async function POST(req: Request) {
   const { prompt } = await req.json();
   const message = await client.messages.create({
-    model: "claude-sonnet-4-6",
+    model: "claude-sonnet-5-5",
     max_tokens: 1024,
     messages: [{ role: "user", content: prompt }],
   });

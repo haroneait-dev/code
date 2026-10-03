@@ -22,7 +22,7 @@ Pris en charge sur **tous les modèles Claude actifs**. **Maximum 4 breakpoints*
 
 ```python
 response = client.messages.create(
-    model="claude-opus-4-8",
+    model="claude-opus-5-5",
     max_tokens=1024,
     system=[
         {
@@ -45,7 +45,7 @@ Le cache introduit une structure de prix par rapport au prix d'entrée de base :
 | Écriture cache **1 heure** (`ttl: "1h"`) | **2×** |
 | **Lecture** depuis le cache | **0,1×** (≈ 90 % d'économie) |
 
-Ces multiplicateurs **se cumulent** avec d'autres modificateurs (remise [Batch](/wiki/batch), résidence des données).
+Ces multiplicateurs **se cumulent** avec d'autres modificateurs (remise [Batch](/wiki/api/batch-api), résidence des données).
 
 **Seuil de rentabilité.** Avec le TTL 5 min, deux requêtes suffisent à rentabiliser (1,25× + 0,1× = 1,35× contre 2× sans cache). Avec le TTL 1 h, il faut au moins trois requêtes (2× + 0,2× = 2,2× contre 3×). Le TTL 1 h garde l'entrée vivante malgré des trous dans un trafic en rafales, mais l'écriture doublée demande plus de lectures pour être amortie.
 
@@ -89,11 +89,11 @@ Si `cache_read_input_tokens` reste à **zéro** sur des requêtes répétées au
 
 ## Interaction avec l'extended thinking
 
-Les blocs de réflexion ([extended thinking](/wiki/extended-thinking)) ne peuvent **pas** porter de `cache_control` explicite, mais ils sont **mis en cache automatiquement** comme partie du contenu lors des appels suivants (typiquement quand tu renvoies les blocs de thinking avec des résultats d'outils pour continuer). Lus depuis le cache, ils comptent comme tokens d'entrée.
+Les blocs de réflexion ([extended thinking](/wiki/modeles/extended-thinking-mecanismes)) ne peuvent **pas** porter de `cache_control` explicite, mais ils sont **mis en cache automatiquement** comme partie du contenu lors des appels suivants (typiquement quand tu renvoies les blocs de thinking avec des résultats d'outils pour continuer). Lus depuis le cache, ils comptent comme tokens d'entrée.
 
 ## Interaction avec le Batch
 
-Les remises [Batch](/wiki/batch) et caching **se cumulent**. Comme les requêtes batch sont asynchrones, les hits de cache sont « best-effort ». Pour les maximiser : utilise la durée **1 heure**, garde des blocs `cache_control` **identiques** dans chaque requête, et maintiens un flux régulier de requêtes.
+Les remises [Batch](/wiki/api/batch-api) et caching **se cumulent**. Comme les requêtes batch sont asynchrones, les hits de cache sont « best-effort ». Pour les maximiser : utilise la durée **1 heure**, garde des blocs `cache_control` **identiques** dans chaque requête, et maintiens un flux régulier de requêtes.
 
 ## Bonnes pratiques
 
@@ -106,9 +106,9 @@ Les remises [Batch](/wiki/batch) et caching **se cumulent**. Comme les requêtes
 ## Pour aller plus loin
 
 - [L'API Anthropic](/wiki/api)
-- [L'API Batch](/wiki/batch)
-- [La réflexion étendue](/wiki/extended-thinking)
-- [Tarification & optimisation des coûts](/wiki/tarification)
+- [L'API Batch](/wiki/api/batch-api)
+- [La réflexion étendue](/wiki/modeles/extended-thinking-mecanismes)
+- [Tarification & optimisation des coûts](/wiki/modeles/pricing-tokens)
 
 ### Sources officielles
 - Prompt caching : https://platform.claude.com/docs/en/build-with-claude/prompt-caching

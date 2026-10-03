@@ -1,0 +1,94 @@
+---
+title: "Claude Opus 5.5 et Sonnet 5.5"
+description: "La génération 5.5 : Opus 5.5 au niveau de Fable 5.1 pour 4 $ / 20 $, Sonnet 5.5 par défaut dans Claude Code, contexte 1M, ce qui change pour vos projets."
+updatedAt: "2026-10-03"
+readingMinutes: 7
+---
+
+Fin septembre 2026, Anthropic a ouvert la famille **Claude 5.5** avec deux modèles sortis à une semaine d'écart. Ils remplacent Opus 5 et Sonnet 5 dans Claude Code, sans hausse de prix.
+
+## Les deux modèles en bref
+
+| | Opus 5.5 | Sonnet 5.5 |
+|---|---|---|
+| Sortie | 22 septembre 2026 | 29 septembre 2026 |
+| ID API | `claude-opus-5-5` | `claude-sonnet-5-5` |
+| Prix entrée / sortie (par million de tokens) | 4 $ / 20 $ | 2 $ / 10 $ |
+| Lecture du cache | 0,20 $ | 0,20 $ |
+| Contexte dans Claude Code | 1M tokens | 1M tokens |
+| Fast mode | Oui (8 $ / 40 $) | Non |
+| Rôle dans Claude Code | Modèle par défaut (`default`) et cible de l'alias `opus` depuis la 2.1.280 | Cible de l'alias `sonnet` depuis la 2.1.285 |
+| Effort par défaut | `medium` | `medium` |
+
+**Haiku 5.5** est annoncé « dans les semaines à venir ». En attendant, Haiku 4.5 (`claude-haiku-4-5-20251001`, 1 $ / 5 $) reste le petit modèle de la gamme.
+
+## Opus 5.5 : le niveau de Fable, à prix d'Opus
+
+D'après Anthropic, Opus 5.5 travaille **au niveau de Claude Fable 5.1 sur la plupart des tâches**, tout en coûtant :
+
+- **20 % de moins au token** qu'Opus 5 (4 $ / 20 $ contre 5 $ / 25 $) ;
+- environ **40 % de moins par tâche**, parce qu'il produit moins de tokens pour arriver au même résultat ;
+- **60 % de moins en lecture de cache** (0,20 $ contre 0,50 $).
+
+Il génère aussi sa sortie **plus de 30 % plus vite** qu'Opus 5. Les gains les plus nets portent sur le code agentique, le travail de connaissance et le computer use.
+
+Comme ses capacités en biologie et en cybersécurité sont proches de celles de Mythos 5.1, Opus 5.5 est déployé avec des garde-fous du même type que ceux de Fable 5.1. Concrètement, certaines demandes offensives en sécurité sont refusées alors qu'Opus 5 les acceptait. Si vous faites de la sécurité défensive, voyez le [programme de vérification](/wiki/modeles/fable-5-mythos-5).
+
+## Sonnet 5.5 : le nouveau cheval de trait
+
+Sonnet 5.5 reprend les améliorations d'Opus 5.5 au prix de Sonnet. Par rapport à Sonnet 5 :
+
+- environ **30 % plus rapide** ;
+- **moins cher** : 2 $ / 10 $, contre 3 $ / 15 $ pour Sonnet 5 depuis la fin de son prix de lancement ;
+- **1M tokens de contexte** dans Claude Code.
+
+C'est aussi le modèle proposé gratuitement sur claude.ai depuis fin septembre.
+
+## Lequel choisir dans Claude Code ?
+
+Sur les offres Pro, Max, Team, Enterprise et sur l'API, Claude Code démarre sur **Opus 5.5**. Pour changer : `/model sonnet` en session, ou `claude --model sonnet` au lancement. Les alias `opus` et `sonnet` pointent vers les versions 5.5, et `best` vers Fable si votre compte y a accès.
+
+| Situation | Choix |
+|---|---|
+| Travail quotidien : features, corrections, tests | Sonnet 5.5 |
+| Refactor large, architecture, bug subtil qui résiste | Opus 5.5 |
+| Longue session autonome, dynamic workflow | Opus 5.5 en `high` ou `xhigh` |
+| Besoin de réponses rapides sur Opus | Opus 5.5 + `/fast` |
+| Tâche très pointue où Opus 5.5 bute | Fable 5.1 |
+| Pré-tri, classification, sous-agents d'exploration | Haiku 4.5 |
+
+Sur un abonnement Pro ou Max, Opus consomme votre quota plus vite que Sonnet. Un bon réflexe : Sonnet 5.5 par défaut, et Opus 5.5 avec `/advisor` ou en sous-agent pour les décisions difficiles (voir [Effort, fast mode et advisor](/wiki/cli/effort-fast-advisor)).
+
+## Ce qui change pour les développeurs API
+
+- **Mêmes paramètres qu'en 5.0** : raisonnement adaptatif, paramètre `effort` (`low`, `medium`, `high`, `xhigh`, `max`), sortie structurée, tool use. Un code écrit pour Opus 5 ou Sonnet 5 fonctionne en changeant seulement l'ID du modèle.
+- **La réflexion ne se désactive plus.** Opus 5.5, Sonnet 5.5 et Fable réfléchissent toujours. `MAX_THINKING_TOKENS=0` n'a pas d'effet sur eux ; réglez plutôt l'effort vers `low`.
+- **Effort par défaut à `medium`** (contre `high` pour Opus 5). Si une tâche vous semble bâclée, montez l'effort avant de changer de modèle.
+- **Pensez à rejouer vos evals.** Un modèle plus concis peut casser un parseur qui attendait une formulation précise, et les nouveaux garde-fous peuvent refuser des prompts de test de sécurité.
+- **Recalculez votre budget de cache.** La baisse du prix de lecture rend le cache encore plus rentable sur les longs prompts système.
+
+```python
+import anthropic
+
+client = anthropic.Anthropic()
+
+message = client.messages.create(
+    model="claude-sonnet-5-5",
+    max_tokens=2048,
+    messages=[{"role": "user", "content": "Explique ce diff en trois phrases."}],
+)
+print(message.content[0].text)
+```
+
+## Et les anciens modèles ?
+
+- **Opus 5 et Sonnet 5** restent disponibles par leur ID complet, mais ne sont plus les défauts.
+- **Opus 4.7, Opus 4.8 et Sonnet 4.6** restent disponibles en API. Prévoyez la migration : Anthropic annonce chaque dépréciation plusieurs mois avant le retrait.
+- **Sonnet 4, Opus 4** (retirés le 15 juin 2026) et **Opus 4.1** (retiré le 5 août 2026) ne répondent plus.
+
+## Pour aller plus loin
+
+- [Comparatif des modèles Claude](/wiki/modeles/comparatif-modeles)
+- [Tarification et optimisation des coûts](/wiki/modeles/pricing-tokens)
+- [Fable 5.1 et Mythos 5.1](/wiki/modeles/fable-5-mythos-5)
+- Annonce officielle : https://www.anthropic.com/claude-opus-5-5

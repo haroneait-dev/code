@@ -1,38 +1,63 @@
 ---
-title: "Claude 3 → 3.5 → 4 → 4.5 → 4.6 → 4.7"
-description: "Historique technique de l'évolution des modèles Anthropic depuis 2024 : sauts de capacités, changements d'architecture et nouvelles fonctionnalités."
-updatedAt: "2026-05-19"
-readingMinutes: 6
+title: "L'évolution des modèles Claude, de Claude 3 à Claude 5.5"
+description: "Chronologie des modèles Anthropic depuis 2024 : ce que chaque génération a apporté, et lesquels sont encore disponibles."
+updatedAt: "2026-10-03"
+readingMinutes: 7
 ---
 
-En deux ans, la famille Claude a connu six générations successives. Chacune a apporté un saut mesurable sur les benchmarks de raisonnement, de code et d'agentique. Comprendre cette trajectoire aide à choisir le bon modèle et à anticiper les prochaines transitions.
+En deux ans et demi, Anthropic est passé d'une gamme à trois modèles à un catalogue qui change presque chaque mois. Cette chronologie sert à deux choses : comprendre d'où viennent les fonctions que vous utilisez, et repérer les ID de modèles à migrer dans vos projets.
 
-## Claude 3 (mars 2024) — la trilogie Haiku/Sonnet/Opus
+## 2024 : la gamme Haiku, Sonnet, Opus
 
-Premier vrai catalogue segmenté d'Anthropic. Trois tailles, un seul format d'API. Opus dominait sur le raisonnement long, Sonnet équilibrait coût et qualité, Haiku visait la latence sub-seconde. Fenêtre de contexte de 200K tokens, vision intégrée, fonction d'usage d'outils encore expérimentale. C'est aussi le moment où Anthropic a publié les premières *system cards* documentant les évaluations de sûreté.
+- **Claude 3 (mars 2024).** Trois tailles, une seule API. Opus pour le raisonnement long, Sonnet pour l'équilibre, Haiku pour la vitesse. Contexte de 200K tokens et vision intégrée.
+- **Claude 3.5 Sonnet (juin 2024).** Moins cher qu'Opus 3 et meilleur que lui en code. C'est le début de la réputation de Claude chez les développeurs.
+- **Claude 3.5 Sonnet v2 et 3.5 Haiku (octobre 2024).** Arrivée du **computer use** : Claude pilote un écran par captures et clics.
 
-## Claude 3.5 (juin 2024 puis octobre 2024) — Sonnet prend la tête
+## 2025 : la réflexion et l'agent
 
-Sonnet 3.5 a marqué un tournant : moins cher qu'Opus 3, mais meilleur sur HumanEval (92 %) et SWE-bench. La version d'octobre 2024 (« Sonnet 3.5 v2 ») a introduit **Computer Use**, première capacité de pilotage d'écran via screenshots et coordonnées de souris. Haiku 3.5 a suivi avec un bond de qualité significatif tout en conservant la latence d'origine.
+- **Claude 3.7 Sonnet (février 2025).** Premier modèle à **réflexion étendue** : il peut réfléchir avant de répondre. Sortie en parallèle de **Claude Code** en aperçu de recherche.
+- **Claude 4 : Opus 4 et Sonnet 4 (mai 2025).** Saut net sur le code et les tâches longues. Claude Code devient disponible pour tous.
+- **Opus 4.1 (août 2025).** Mise à jour d'Opus 4 centrée sur le code agentique.
+- **Sonnet 4.5 (septembre 2025)** puis **Haiku 4.5 (octobre 2025)** et **Opus 4.5 (novembre 2025).** Sessions autonomes de plusieurs heures, meilleure tenue sur les longues chaînes d'outils. Haiku 4.5 apporte un niveau proche de Sonnet 4 pour 1 $ / 5 $.
 
-## Claude 4 (mai 2025) — extended thinking devient natif
+## Début 2026 : la série 4.6 à 4.8
 
-Bond majeur. Claude 4 introduit l'**extended thinking** (raisonnement étendu) en mode natif : le modèle peut allouer un budget de tokens à une phase de réflexion interne avant de répondre. Sonnet 4 et Opus 4 rejoignent le catalogue, avec une fenêtre étendue à 200K et un cache prompts plus performant (jusqu'à 90 % d'économies sur le replay). C'est aussi l'arrivée de l'**API Files** et des premiers patterns d'agents persistants.
+- **Opus 4.6 et Sonnet 4.6 (début 2026).** Fiabilité sur les longues sessions et compaction du contexte. Sonnet 4.6 devient le modèle par défaut de nombreuses applications.
+- **Opus 4.7 (avril 2026).** Introduit le niveau d'effort **`xhigh`**.
+- **Opus 4.8 (fin mai 2026).** Contexte 1M au tarif standard, fast mode moins cher. Il devient le modèle par défaut de Claude Code.
 
-## Claude 4.5 (août 2025) — agentique de longue durée
+## Été 2026 : la génération 5
 
-Sonnet 4.5 a poussé loin l'usage agentique : sessions de plusieurs heures sans dérive, gestion native de la mémoire entre tools, robustesse accrue sur les chaînes de plus de 50 appels d'outils. C'est la version qui a démocratisé Claude Code en CLI et popularisé les *managed agents*. Haiku 4.5 a suivi, ramenant des capacités proches de Sonnet 4 à un coût trois fois inférieur.
+- **Fable 5 et Mythos 5 (9 juin 2026).** Deux variantes d'un même modèle frontière : Fable pour tous, Mythos pour des clients vérifiés. Suspendus du 12 au 30 juin sur ordre du gouvernement américain (voir [Fable et Mythos](/wiki/modeles/fable-5-mythos-5)).
+- **Sonnet 5 (30 juin 2026).** Contexte 1M par défaut, raisonnement adaptatif. 2 $ / 10 $ en prix de lancement, puis 3 $ / 15 $ à partir de septembre. Il devient le modèle par défaut de Claude Code.
+- **Opus 5 (24 juillet 2026).** 5 $ / 25 $, il devient le modèle Opus par défaut.
 
-## Claude 4.6 (décembre 2025) — Sonnet 4.6 et compaction
+## Rentrée 2026 : 5.1 et 5.5
 
-Itération centrée sur la fiabilité longue durée. La fonctionnalité de **context compaction** permet au modèle de résumer automatiquement les anciennes parties d'une conversation pour rester sous la limite. Améliorations notables sur SWE-bench Verified (au-dessus de 70 %) et sur les langues non anglaises. Sonnet 4.6 devient le défaut recommandé pour les apps en production.
+- **Fable 5.1 et Mythos 5.1 (1er septembre 2026).** Environ 25 % moins chers à l'usage que la version 5, et cache 75 % moins cher.
+- **Opus 5.5 (22 septembre 2026).** Le niveau de Fable 5.1 sur la plupart des tâches, pour 4 $ / 20 $.
+- **Sonnet 5.5 (29 septembre 2026).** 30 % plus rapide que Sonnet 5, et revient à 2 $ / 10 $. Il devient la cible de l'alias `sonnet` ; le modèle par défaut de Claude Code est Opus 5.5.
+- **Haiku 5.5** est annoncé pour les semaines suivantes.
 
-## Claude 4.7 (avril 2026) — Opus 4.7 et raisonnement profond
+Détails dans [Opus 5.5 et Sonnet 5.5](/wiki/modeles/opus-sonnet-5-5).
 
-Dernière génération. Opus 4.7 reprend la couronne sur le raisonnement complexe (mathématiques de compétition, refactor multi-fichiers, analyse juridique). Le mode extended thinking est désormais combinable avec le web search et les tools en parallèle. Sonnet 4.7 (annoncé pour la suite) doit conserver le meilleur ratio prix/performance.
+## Ce qui est encore disponible
+
+| Statut (3 octobre 2026) | Modèles |
+|---|---|
+| Recommandés | Fable 5.1, Opus 5.5, Sonnet 5.5, Haiku 4.5 |
+| Disponibles, à migrer | Opus 5, Sonnet 5, Fable 5, Opus 4.8, Opus 4.7, Opus 4.6, Sonnet 4.6, Opus 4.5, Sonnet 4.5 |
+| Retirés | Claude 3.x, Sonnet 4 et Opus 4 (15 juin 2026), Opus 4.1 (5 août 2026) |
+
+La page officielle des dépréciations donne les dates exactes : https://docs.claude.com/en/docs/about-claude/model-deprecations
+
+## Trois habitudes à prendre
+
+- **Épinglez une version** dans vos applications plutôt que de suivre un alias. Vous choisissez le moment de la migration.
+- **Gardez un jeu d'evals** sur vos vrais cas. Rejouez-le à chaque nouveau modèle avant de basculer.
+- **Surveillez les annonces de dépréciation.** Anthropic prévient plusieurs mois avant de retirer un modèle.
 
 ## Pour aller plus loin
 
-- Lire les *system cards* officielles publiées avec chaque release pour comparer les évaluations de sûreté.
-- Consulter notre wiki interne sur les benchmarks pour reproduire les chiffres annoncés sur vos propres cas.
-- Tenir un tableau de pinning de versions (`claude-sonnet-4-6-20251201`) plutôt que `latest` afin d'éviter les régressions silencieuses.
+- [Comparatif des modèles Claude](/wiki/modeles/comparatif-modeles)
+- [Model drift et mises à jour silencieuses](/wiki/modeles/model-drift)

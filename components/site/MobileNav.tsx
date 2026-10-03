@@ -3,22 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Menu, X } from "lucide-react";
-
-type NavKey =
-  | "formation"
-  | "wiki"
-  | "fiches"
-  | "communaute"
-  | "messages"
-  | null;
-
-const LINKS: { key: Exclude<NavKey, null>; href: string; label: string }[] = [
-  { key: "formation", href: "/learn", label: "Formation" },
-  { key: "wiki", href: "/wiki", label: "Wiki" },
-  { key: "fiches", href: "/fiches", label: "Fiches" },
-  { key: "communaute", href: "/communaute", label: "Communauté" },
-  { key: "messages", href: "/messages", label: "Messages" },
-];
+import { NAV_LINKS as LINKS, type NavKey } from "@/lib/nav";
 
 export function MobileNav({ active = null }: { active?: NavKey }) {
   const [open, setOpen] = useState(false);
@@ -59,16 +44,13 @@ export function MobileNav({ active = null }: { active?: NavKey }) {
           className="fixed inset-0 z-[60] md:hidden"
         >
           <div
-            className="absolute inset-0 bg-on-surface/30 backdrop-blur-sm animate-fade-in"
+            className="absolute inset-0 bg-on-surface/40 animate-fade-in"
             onClick={() => setOpen(false)}
           />
           <div className="absolute right-0 top-0 h-full w-[82%] max-w-sm bg-surface border-l border-outline-variant shadow-2xl flex flex-col animate-slide-in-right">
             <div className="flex items-center justify-between h-16 px-5 border-b border-outline-variant">
-              <span className="font-headline-lg text-headline-lg font-bold text-on-surface tracking-tight">
-                Claude{" "}
-                <span className="font-normal text-on-surface-variant">
-                  Mastery
-                </span>
+              <span className="font-headline-lg text-[21px] font-bold text-on-surface tracking-tight">
+                Claude Mastery
               </span>
               <button
                 type="button"
@@ -90,8 +72,8 @@ export function MobileNav({ active = null }: { active?: NavKey }) {
                     onClick={() => setOpen(false)}
                     className={
                       isActive
-                        ? "flex items-center px-4 py-3 rounded-xl bg-primary-fixed/40 text-primary font-medium text-body-rt"
-                        : "flex items-center px-4 py-3 rounded-xl text-on-surface hover:bg-surface-container transition-colors text-body-rt"
+                        ? "flex items-center px-4 py-3 rounded-md bg-primary-fixed text-on-surface font-semibold text-body-rt"
+                        : "flex items-center px-4 py-3 rounded-md text-on-surface hover:bg-surface-container transition-colors text-body-rt"
                     }
                   >
                     {l.label}
@@ -101,7 +83,7 @@ export function MobileNav({ active = null }: { active?: NavKey }) {
             </nav>
 
             <div className="px-5 py-5 border-t border-outline-variant text-body-sm text-on-surface-variant">
-              Formation Claude Code en français.
+              Formation Claude Code en français, en accès libre.
             </div>
           </div>
         </div>

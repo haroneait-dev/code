@@ -445,7 +445,7 @@ export const exercisesByLesson: Record<string, Exercise[]> = {
       title: "Auto-format après chaque édition",
       description:
         "Configure un hook PostToolUse qui lance Prettier automatiquement sur chaque fichier que Claude modifie. Plus jamais de fichiers non-formatés.",
-      hint: "prettier --write \"$CLAUDE_TOOL_INPUT_FILE_PATH\" 2>/dev/null || true",
+      hint: "jq -r '.tool_input.file_path' | xargs npx prettier --write 2>/dev/null || true",
     },
     {
       level: "intermédiaire",
@@ -453,7 +453,7 @@ export const exercisesByLesson: Record<string, Exercise[]> = {
       title: "Log d'audit des commandes",
       description:
         "Crée un hook qui enregistre dans un fichier toutes les commandes bash que Claude exécute, avec timestamp et projet. Idéal pour les environnements sensibles.",
-      hint: "echo \"$(date) | $CLAUDE_TOOL_INPUT_COMMAND\" >> ~/.claude/audit.log",
+      hint: "jq -r '.tool_input.command' | sed \"s/^/$(date) | /\" >> ~/.claude/audit.log",
     },
     {
       level: "avancé",

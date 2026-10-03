@@ -52,15 +52,15 @@ export function SiteFooter() {
   const year = new Date().getFullYear();
 
   return (
-    <footer className="bg-surface-container-lowest border-t border-outline-variant mt-auto">
+    <footer className="bg-surface-container-low border-t border-outline-variant mt-auto">
       <div className="w-full max-w-container-max mx-auto px-margin-mobile md:px-margin-desktop py-12">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-10">
           <div className="col-span-2">
-            <div className="font-headline-lg text-headline-lg font-bold text-primary mb-3">
+            <div className="font-headline-lg text-[22px] font-bold text-on-surface mb-3">
               Claude Mastery
             </div>
             <p className="text-body-sm text-on-surface-variant max-w-sm leading-relaxed">
-              La formation francophone de référence pour maîtriser Claude Code.
+              Une formation Claude Code en français, gratuite et sans inscription. Tenue à jour au fil des versions.
             </p>
             {SOCIAL_LINKS.some((s) => s.href) && (
               <div className="flex items-center gap-2 mt-5">
@@ -71,7 +71,7 @@ export function SiteFooter() {
                     target="_blank"
                     rel="noopener noreferrer"
                     aria-label={s.label}
-                    className="w-9 h-9 rounded-full border border-outline-variant flex items-center justify-center text-on-surface-variant hover:text-primary hover:border-primary transition-colors"
+                    className="w-9 h-9 rounded-md border border-outline-variant flex items-center justify-center text-on-surface-variant hover:text-primary hover:border-primary transition-colors"
                   >
                     {s.icon}
                   </a>
@@ -96,11 +96,16 @@ export function SiteFooter() {
                 </Link>
               </li>
               <li>
+                <Link href="/fiches" className="hover:text-primary transition-colors">
+                  Fiches
+                </Link>
+              </li>
+              <li>
                 <Link
-                  href="/communaute"
+                  href="/wiki/actualites/nouveautes-2026"
                   className="hover:text-primary transition-colors"
                 >
-                  Communauté
+                  Nouveautés
                 </Link>
               </li>
             </ul>

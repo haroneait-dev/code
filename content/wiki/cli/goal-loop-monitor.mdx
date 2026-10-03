@@ -1,0 +1,87 @@
+---
+title: "/goal, /loop et Monitor : faire travailler Claude dans la durée"
+description: "Donner à Claude une condition de fin avec /goal, relancer un prompt à intervalle régulier avec /loop, programmer des rappels, et réagir à une sortie en continu avec Monitor."
+updatedAt: "2026-10-03"
+readingMinutes: 7
+---
+
+Par défaut, Claude rend la main à la fin de chaque tour. Pour une tâche longue, vous pouvez lui demander de continuer tout seul. Trois outils existent, et ils ne répondent pas au même besoin :
+
+| Outil | Le tour suivant démarre quand… | Ça s'arrête quand… |
+|---|---|---|
+| `/goal` | le tour précédent est terminé | un modèle juge la condition remplie (ou impossible) |
+| `/loop` | un intervalle de temps est écoulé | vous l'arrêtez, ou Claude juge le travail fini |
+| Hook `Stop` | le tour précédent est terminé | votre propre script en décide |
+
+## /goal : travailler jusqu'à ce que ce soit vrai
+
+`/goal` fixe une **condition de fin vérifiable**. Après chaque tour, un petit modèle relit la conversation et répond « pas encore », « atteint » ou « impossible ».
+
+```text
+/goal tous les tests de test/auth passent et le lint est propre
+/goal                 # état : durée, nombre de tours, tokens dépensés
+/goal clear           # abandonner (stop, off, cancel marchent aussi)
+```
+
+Pour bien écrire la condition :
+
+- **un état final mesurable** : un test, un code de sortie, un nombre de fichiers, une file vide ;
+- **la preuve attendue** : « `npm test` sort en 0 », « `git status` est propre » ;
+- **les contraintes** : « sans modifier d'autre fichier de test » ;
+- **une borne** si besoin : « ou arrête-toi après 20 tours ».
+
+L'évaluateur ne lance aucune commande lui-même : il juge seulement ce que Claude a montré dans la conversation. La condition doit donc se prouver par une sortie visible.
+
+`/goal` ne change pas votre mode de permission. Pour qu'il tourne sans vous, combinez-le avec le [mode auto](/wiki/cli/permissions-modes). Il marche aussi en non-interactif :
+
+```bash
+claude -p "/goal CHANGELOG.md contient une entrée pour chaque PR fusionnée cette semaine" \
+  --output-format stream-json --verbose
+```
+
+## /loop : relancer à intervalle régulier
+
+`/loop` relance un prompt tant que la session reste ouverte. Pratique pour surveiller un déploiement ou s'occuper d'une PR.
+
+```text
+/loop 5m vérifie si le déploiement est terminé et dis-moi ce qui s'est passé
+/loop vérifie si la CI passe et traite les nouveaux commentaires de revue
+/loop 20m /review-pr 1234
+/loop
+```
+
+- **Avec intervalle** (`5m`, `2h`, `1d`) : planning fixe.
+- **Sans intervalle** : Claude choisit lui-même le délai suivant, entre 1 minute et 1 heure, selon l'activité.
+- **Sans rien** : Claude suit un prompt de maintenance intégré (finir le travail en cours, traiter la PR de la branche, petit nettoyage). Vous pouvez le remplacer par votre propre fichier `.claude/loop.md`.
+
+`Échap` arrête une boucle en attente. Les tâches récurrentes expirent au bout de **7 jours**, pour qu'une boucle oubliée ne tourne pas indéfiniment.
+
+## Rappels ponctuels
+
+Inutile de passer par `/loop` pour une seule fois, demandez simplement :
+
+```text
+rappelle-moi à 15h de pousser la branche release
+dans 45 minutes, vérifie si les tests d'intégration sont passés
+```
+
+« Quelles tâches programmées ai-je ? » et « annule la vérification du déploiement » fonctionnent aussi. En coulisse, Claude utilise les outils `CronCreate`, `CronList` et `CronDelete`.
+
+## Monitor : réagir au lieu de vérifier
+
+L'outil **Monitor** lance un script en arrière-plan et renvoie chaque ligne de sortie à Claude au fil de l'eau. Au lieu de demander toutes les 5 minutes « c'est fini ? », Claude est réveillé dès qu'un événement arrive : une ligne d'erreur dans un log, la fin d'un build, un test qui casse. C'est souvent plus réactif et moins coûteux en tokens qu'une boucle.
+
+Pour des événements qui viennent de l'extérieur (CI, chat, monitoring), les **channels** permettent à un serveur MCP de pousser directement des messages dans la session.
+
+## Et quand la session doit pouvoir se fermer ?
+
+`/loop` et les rappels vivent dans la session : fermez le terminal, ils s'arrêtent. Pour une tâche durable :
+
+- **[Routines](/wiki/cli/cloud-routines-remote)** dans le cloud (intervalle minimum : 1 heure) ;
+- **tâches programmées de l'application de bureau**, qui tournent sur votre machine avec accès aux fichiers locaux ;
+- **GitHub Actions** avec un déclencheur `schedule`.
+
+## Pour aller plus loin
+
+- [Hooks : SessionStart, Stop et SessionEnd](/wiki/hooks/session-start-stop)
+- Documentation : https://code.claude.com/docs/en/goal et https://code.claude.com/docs/en/scheduled-tasks

@@ -49,7 +49,7 @@ from anthropic import Anthropic
 client = Anthropic()
 
 message = client.messages.create(
-    model="claude-sonnet-4-6",
+    model="claude-sonnet-5-5",
     max_tokens=1024,
     messages=[
         {"role": "user", "content": "Explique la récursion en une phrase."}
@@ -68,7 +68,7 @@ L'objet retourné est typé : `message.content` est une liste de `ContentBlock`,
 
 ```python
 message = client.messages.create(
-    model="claude-sonnet-4-6",
+    model="claude-sonnet-5-5",
     max_tokens=2048,
     system="Tu es un assistant pédagogique. Réponds toujours en français.",
     messages=[
@@ -97,7 +97,7 @@ messages = [
 ]
 
 response = client.messages.create(
-    model="claude-sonnet-4-6",
+    model="claude-sonnet-5-5",
     max_tokens=512,
     messages=messages,
 )

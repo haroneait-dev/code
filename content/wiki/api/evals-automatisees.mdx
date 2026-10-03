@@ -22,7 +22,7 @@ Un LLM produit des sorties qui varient à chaque appel (même avec `temperature:
 ```yaml
 # promptfooconfig.yaml
 providers:
-  - id: anthropic:messages:claude-sonnet-4-6
+  - id: anthropic:messages:claude-sonnet-5-5
   - id: anthropic:messages:claude-haiku-4-5
 
 prompts:
@@ -75,7 +75,7 @@ Réponse: {actual}
 
 Retourne uniquement un JSON: {{"score": int, "rationale": str}}"""
     msg = client.messages.create(
-        model="claude-opus-4-7",
+        model="claude-opus-5-5",
         max_tokens=300,
         messages=[{"role": "user", "content": prompt}]
     )

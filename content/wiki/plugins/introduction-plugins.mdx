@@ -1,0 +1,80 @@
+---
+title: "Les plugins Claude Code : installer et gérer"
+description: "Ce qu'est un plugin, ce qu'il peut contenir, comment l'installer depuis une marketplace, choisir sa portée, et vérifier ce qu'il coûte en contexte."
+updatedAt: "2026-10-03"
+readingMinutes: 7
+---
+
+Un **plugin** est un dossier qui regroupe des skills, des sous-agents, des hooks, des serveurs MCP ou un mod, et que Claude Code installe et charge d'un bloc. C'est la façon standard de partager une configuration : au lieu d'expliquer à un collègue quels fichiers copier dans `.claude/`, vous lui donnez une commande d'installation.
+
+## Ce qu'un plugin peut contenir
+
+| Composant | Fichier | Ce que ça apporte |
+|---|---|---|
+| Manifeste | `.claude-plugin/plugin.json` | Nom, version, description du plugin |
+| [Skills](/wiki/skills/structure-skill) | `skills/<nom>/SKILL.md` | Instructions chargées à la demande, utilisables comme commande `/plugin:skill` |
+| [Sous-agents](/wiki/subagents/creer-subagent-custom) | `agents/<nom>.md` | Agents spécialisés auxquels Claude délègue |
+| [Hooks](/wiki/hooks/introduction-hooks) | `hooks/hooks.json` | Commandes lancées à des moments précis (après un edit, au démarrage…) |
+| [Serveurs MCP](/wiki/mcp/introduction-mcp) | `.mcp.json` | Outils externes disponibles tant que le plugin est actif |
+| [Mod](/wiki/plugins/mods) | `hooks/register.js` | Code JavaScript qui dessine dans l'interface et réagit aux événements |
+
+Les plugins de « code intelligence » ajoutent un serveur de langage (LSP) : Claude voit les erreurs de type juste après un edit et navigue par symbole.
+
+## Faut-il un plugin ?
+
+Un skill, un hook ou un serveur MCP fonctionne très bien tout seul. Passez au plugin quand vous voulez :
+
+- **installer en une commande** une configuration construite par quelqu'un d'autre, avec les mises à jour ;
+- **distribuer votre configuration** à une équipe ou à plusieurs projets ;
+- **versionner** un ensemble cohérent (un skill de revue + son agent + ses hooks).
+
+## Installer un plugin
+
+Une **marketplace** est un dépôt qui liste des plugins et l'endroit où les récupérer. Claude Code ajoute automatiquement la marketplace officielle d'Anthropic, `claude-plugins-official`, à votre première session interactive.
+
+Le plus simple est d'ouvrir `/plugin` dans une session, onglet **Discover**, et de choisir. En ligne de commande :
+
+```text
+/plugin install commit-commands@claude-plugins-official
+/plugin marketplace add mon-org/plugins-claude
+/plugin list
+```
+
+```bash
+claude plugin install commit-commands@claude-plugins-official
+claude plugin disable commit-commands
+```
+
+Si vous installez depuis le shell pendant qu'une session est ouverte, lancez `/reload-plugins` dans la session pour charger le plugin.
+
+### Trois portées
+
+- **Utilisateur** : actif pour vous, dans tous vos projets sur cette machine.
+- **Projet** : actif pour toute l'équipe via le `.claude/settings.json` commité (chacun doit quand même l'installer chez lui).
+- **Local** : actif pour vous, dans ce dépôt uniquement.
+
+## Le coût caché d'un plugin
+
+Un plugin activé est présent **dans chaque session**, même quand vous ne l'utilisez pas :
+
+- le nom et la description de chacun de ses skills et agents occupent du contexte à **chaque tour** ;
+- ses serveurs MCP tournent en arrière-plan et ses hooks se déclenchent ;
+- tout ce qu'il exécute, il l'exécute **avec vos droits**.
+
+Avant d'installer, regardez l'estimation **Context cost** affichée dans `/plugin` pour les plugins officiels. Après coup, le groupe **Not used recently** de l'onglet **Installed** liste ceux que vous pourriez désactiver.
+
+## Confiance et sécurité
+
+Les noms de marketplace indiquent leur niveau :
+
+- **officielles** : `claude-plugins-official`, et la marketplace de démonstration `claude-code-plugins` ;
+- **communautaires** : `claude-community` et quelques autres, hébergées sous `github.com/anthropics/` ;
+- **tierces** : toutes les autres, y compris celle de votre entreprise.
+
+Dans tous les cas, un plugin peut exécuter du code sur votre machine. Lisez ce qu'il contient avant de l'installer, surtout s'il apporte des hooks ou un mod. Les organisations peuvent restreindre les marketplaces autorisées ou imposer des plugins via les réglages gérés.
+
+## Pour aller plus loin
+
+- [Créer et publier un plugin](/wiki/plugins/creer-plugin)
+- [Les mods](/wiki/plugins/mods)
+- Documentation : https://code.claude.com/docs/en/plugins

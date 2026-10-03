@@ -38,7 +38,7 @@ export const apiModule: Module = {
   -H "anthropic-version: 2023-06-01" \\
   -H "content-type: application/json" \\
   -d '{
-    "model": "claude-sonnet-4-6",
+    "model": "claude-sonnet-5-5",
     "max_tokens": 256,
     "messages": [
       {"role": "user", "content": "Dis-moi bonjour en haïku."}
@@ -58,7 +58,7 @@ export const apiModule: Module = {
 client = Anthropic()  # lit ANTHROPIC_API_KEY depuis l'env
 
 message = client.messages.create(
-    model="claude-sonnet-4-6",
+    model="claude-sonnet-5-5",
     max_tokens=512,
     system="Tu réponds toujours en français, de manière concise.",
     messages=[
@@ -82,7 +82,7 @@ print(f"Tokens: {message.usage.input_tokens} in / {message.usage.output_tokens} 
 const client = new Anthropic(); // process.env.ANTHROPIC_API_KEY
 
 const message = await client.messages.create({
-  model: "claude-sonnet-4-6",
+  model: "claude-sonnet-5-5",
   max_tokens: 512,
   system: "Tu es un assistant développeur précis.",
   messages: [
@@ -129,7 +129,7 @@ if (first.type === "text") {
             lang: "ts",
             label: "streaming.ts",
             code: `const stream = await client.messages.stream({
-  model: "claude-sonnet-4-6",
+  model: "claude-sonnet-5-5",
   max_tokens: 1024,
   messages: [{ role: "user", content: "Raconte-moi une histoire courte." }],
 });
@@ -177,7 +177,7 @@ console.log("\\nStop reason:", final.stop_reason);`,
 ]
 
 response = client.messages.create(
-    model="claude-sonnet-4-6",
+    model="claude-sonnet-5-5",
     max_tokens=1024,
     tools=tools,
     messages=[{"role": "user", "content": "Quel temps fait-il à Lyon ?"}],
@@ -204,7 +204,7 @@ response = client.messages.create(
     result = run_weather(tool_use.input["city"])  # votre fonction
 
     follow_up = client.messages.create(
-        model="claude-sonnet-4-6",
+        model="claude-sonnet-5-5",
         max_tokens=1024,
         tools=tools,
         messages=[
@@ -280,7 +280,7 @@ response = client.messages.create(
             lang: "ts",
             label: "prompt-cache.ts",
             code: `const response = await client.messages.create({
-  model: "claude-sonnet-4-6",
+  model: "claude-sonnet-5-5",
   max_tokens: 1024,
   system: [
     {
@@ -402,7 +402,7 @@ async function callWithBackoff<T>(fn: () => Promise<T>, attempts = 5) {
             code: `from anthropic import Anthropic, APIStatusError
 
 client = Anthropic()
-MODELS = ["claude-sonnet-4-6", "claude-haiku-4-5-20251001"]
+MODELS = ["claude-sonnet-5-5", "claude-haiku-4-5-20251001"]
 
 def ask(messages, **kwargs):
     last_err = None

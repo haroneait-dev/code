@@ -176,12 +176,12 @@ export const FICHES: Fiche[] = [
     category: "Claude Code",
     difficulty: "Débutant",
     summary:
-      "Le fast mode d'Opus 4.8 produit des tokens ~2,5× plus vite pour un coût par token supérieur. Il utilise bien Opus en sortie accélérée, pas un modèle plus petit déguisé.",
+      "Le fast mode sert Opus nettement plus vite pour un coût par token doublé. C'est bien Opus en sortie accélérée, pas un modèle plus petit déguisé.",
     technicalDetails:
-      "Dans Claude Code, `/fast` bascule Opus 4.8 (ou 4.7) en mode rapide. La tarification passe à 10 $/50 $ par million de tokens (contre 5 $/25 $ en standard) — trois fois moins cher que le fast mode d'Opus 4.7 qui était à 30 $/150 $.\n\nUsage type : le pair programming interactif, où la latence tue le flow. Pour les tâches batch ou peu sensibles à la latence, reste en standard ou bascule sur Sonnet 5 (3× moins cher qu'Opus). Le fast mode ne dégrade pas la qualité : c'est le même modèle, servi plus vite.",
-    codeSnippet: "# Dans Claude Code\n/fast   # bascule Opus 4.8 en mode rapide (~2,5x)",
-    tags: ["fast-mode", "opus-4-8", "latence", "coût"],
-    wikiHref: "/wiki/modeles/opus-4-8",
+      "Dans Claude Code, `/fast` bascule Opus en mode rapide. Sur Opus 5.5, la tarification passe à 8 $/40 $ par million de tokens (contre 4 $/20 $ en standard). Sur un abonnement, il consomme le quota plus vite.\n\nUsage type : le pair programming interactif, où la latence casse le rythme. Pour les tâches longues ou en arrière-plan, reste en standard, baisse l'effort, ou passe sur Sonnet 5.5 (2 fois moins cher qu'Opus 5.5). Le fast mode ne dégrade pas la qualité : c'est le même modèle, servi plus vite.",
+    codeSnippet: "# Dans Claude Code\n/fast   # bascule Opus en mode rapide (tarif doublé)",
+    tags: ["fast-mode", "opus-5-5", "latence", "coût"],
+    wikiHref: "/wiki/cli/effort-fast-advisor",
   },
 
   // ═══════════════════════════════════════════════════════════════════
@@ -818,9 +818,9 @@ export const FICHES: Fiche[] = [
     summary:
       "Trois jours après leur lancement, Fable 5 et Mythos 5 ont été suspendus mondialement (12 juin 2026) sur directive de contrôle des exportations, suite à un jailbreak. Restrictions levées le 30 juin (19 jours de gel).",
     technicalDetails:
-      "Des chercheurs (notamment chez Amazon) ont signalé un jailbreak contournant les protections de Fable 5, le transformant potentiellement en outil cyber non restreint. L'administration américaine a ordonné la suspension d'accès « à tout ressortissant étranger », forçant Anthropic à couper l'accès pour tous. Le Département du Commerce a levé les contrôles le 30 juin.\n\nImplication pour la production : un modèle frontière peut disparaître du jour au lendemain pour raison réglementaire. Prévois toujours un fallback dans ton routing (Opus 4.8 ou Sonnet 5) pour ne pas dépendre d'un seul modèle sensible. La disponibilité fait partie du risque produit.",
+      "Des chercheurs (notamment chez Amazon) ont signalé un jailbreak contournant les protections de Fable 5, le transformant potentiellement en outil cyber non restreint. L'administration américaine a ordonné la suspension d'accès « à tout ressortissant étranger », forçant Anthropic à couper l'accès pour tous. Le Département du Commerce a levé les contrôles le 30 juin.\n\nImplication pour la production : un modèle frontière peut disparaître du jour au lendemain pour raison réglementaire. Prévois toujours un repli dans ton routage (Opus 5.5 ou Sonnet 5.5) pour ne pas dépendre d'un seul modèle sensible. La disponibilité fait partie du risque produit.",
     codeSnippet:
-      "# Fallback de modèle (conceptuel)\nMODELS = [\"claude-fable-5\", \"claude-opus-4-8\", \"claude-sonnet-5\"]\nfor m in MODELS:\n    try: return call(m)\n    except ModelUnavailable: continue",
+      "# Fallback de modèle (conceptuel)\nMODELS = [\"claude-fable-5-1\", \"claude-opus-5-5\", \"claude-sonnet-5-5\"]\nfor m in MODELS:\n    try: return call(m)\n    except ModelUnavailable: continue",
     tags: ["export-control", "fable-5", "mythos-5", "résilience"],
     wikiHref: "/wiki/modeles/fable-5-mythos-5",
   },
@@ -906,7 +906,7 @@ export const FICHES: Fiche[] = [
     technicalDetails:
       "Un hook est déclaré dans settings.json avec un événement (matcher) et une commande. PreToolUse peut bloquer une action (ex. refuser un rm -rf), PostToolUse peut valider ou formater (ex. lancer prettier après une édition). Le hook reçoit le contexte via stdin en JSON et peut renvoyer une décision.\n\nCas d'usage courants : linter/formatter automatique après édition, notification système à la fin d'un agent, garde-fou de sécurité (bloquer les commandes dangereuses), et injection de contexte au démarrage (SessionStart). Le traitement de la sortie du hook est traité comme un retour utilisateur par Claude.",
     codeSnippet:
-      '{\n  "hooks": {\n    "PostToolUse": [{\n      "matcher": "Edit|Write",\n      "hooks": [{ "type": "command", "command": "npx prettier --write $CLAUDE_FILE_PATHS" }]\n    }]\n  }\n}',
+      '{\n  "hooks": {\n    "PostToolUse": [{\n      "matcher": "Edit|Write",\n      "hooks": [{ "type": "command", "command": "jq -r \'.tool_input.file_path\' | xargs npx prettier --write" }]\n    }]\n  }\n}',
     tags: ["hooks", "posttooluse", "automation", "settings"],
     wikiHref: "/wiki/hooks/hook-lifecycle",
   },
@@ -1300,7 +1300,7 @@ export const FICHES: Fiche[] = [
       "Opus 4.7 a marqué le passage au raisonnement adaptatif et a rejeté les paramètres de sampling non-défaut (contrainte reprise ensuite sur Sonnet 5). La compréhension d'images HD a nettement amélioré l'analyse de captures et de documents. Le niveau xhigh cible l'agentique de longue durée ; les task budgets (bêta) laissent le modèle voir un compte à rebours de tokens pour finir proprement.\n\nRevers documenté : un taux de faux refus élevé et une verbosité excessive dans les commentaires de code, plus des erreurs d'appels d'outils en sessions longues. Opus 4.8 a corrigé ces trois points. Historiquement instructif pour comprendre l'évolution vers les modèles plus directs.",
     codeSnippet: null,
     tags: ["opus-4-7", "images-hd", "task-budgets", "xhigh"],
-    wikiHref: "/wiki/modeles/opus-4-7",
+    wikiHref: "/wiki/modeles/evolution-claude",
   },
   {
     id: "mod-choisir",
@@ -1308,9 +1308,9 @@ export const FICHES: Fiche[] = [
     category: "Modèles & Recherche",
     difficulty: "Débutant",
     summary:
-      "Règle simple : Haiku pour le volume simple et rapide, Sonnet 5 pour le code et l'agentique au quotidien, Opus 4.8 pour le raisonnement le plus dur et les domaines à forte responsabilité.",
+      "Règle simple : Haiku 4.5 pour le volume simple et rapide, Sonnet 5.5 pour le code au quotidien, Opus 5.5 pour le raisonnement difficile, Fable 5.1 quand Opus bute.",
     technicalDetails:
-      "Commence par le modèle le moins cher qui tient la qualité sur tes cas, et n'escalade que si nécessaire. Sonnet 5 s'approche d'Opus 4.8 sur l'agentique pour ~3× moins cher : c'est le défaut raisonnable pour le développement. Réserve Opus 4.8 aux 5-10 % de tâches où Sonnet plafonne (juridique, finance, raisonnement profond).\n\nPour la latence critique, considère Opus 4.8 fast mode ou Haiku. Mesure toujours sur un dataset représentatif plutôt que de choisir au feeling. Et prévois un fallback en cas d'indisponibilité d'un modèle sensible.",
+      "Commence par le modèle le moins cher qui tient la qualité sur tes cas, et n'escalade que si nécessaire. Sonnet 5.5 coûte 2 fois moins qu'Opus 5.5 : c'est le choix raisonnable pour le développement courant. Opus 5.5, modèle par défaut de Claude Code, atteint le niveau de Fable 5.1 sur la plupart des tâches pour 2,5 fois moins cher que Fable.\n\nPour la latence critique, considère le fast mode d'Opus ou Haiku. Mesure toujours sur un jeu de cas représentatif plutôt que de choisir au feeling, et prévois un repli si un modèle devient indisponible.",
     codeSnippet: null,
     tags: ["choix-modèle", "coût", "qualité", "décision"],
     wikiHref: "/wiki/modeles/choisir-bon-modele",
@@ -1321,9 +1321,9 @@ export const FICHES: Fiche[] = [
     category: "Modèles & Recherche",
     difficulty: "Débutant",
     summary:
-      "Repères 2026 (standard, /1M tokens) : Sonnet 5 à 3 $/15 $ (input/output), Opus 4.8 à 5 $/25 $, avec fast mode Opus à 10 $/50 $. Batch API et prompt caching réduisent la facture.",
+      "Repères d'octobre 2026 (par million de tokens, entrée/sortie) : Haiku 4.5 à 1 $/5 $, Sonnet 5.5 à 2 $/10 $, Opus 5.5 à 4 $/20 $ (8 $/40 $ en fast mode), Fable 5.1 à 10 $/50 $. Batch API et prompt caching réduisent la facture.",
     technicalDetails:
-      "La facturation se fait au token, input et output séparés. Sonnet 5 est à 3 $/15 $ en standard (2 $/10 $ en lancement jusqu'au 31 août 2026) ; Opus 4.8 à 5 $/25 $, son fast mode à 10 $/50 $. Attention au tokenizer de Sonnet 5 (+30 % de tokens pour le même texte) qui augmente le coût réel même à prix par token inchangé.\n\nLeviers cumulables : Batch API (~-50 %), prompt caching (préfixe stable à tarif réduit), et le bon dimensionnement du modèle par tâche. Trace le champ usage de chaque réponse pour suivre input/output/thinking et repérer les gaspillages.",
+      "La facturation se fait au token, entrée et sortie séparées. Les anciens modèles restent plus chers : Sonnet 5 à 3 $/15 $ depuis la fin de son prix de lancement, Opus 5 et Opus 4.8 à 5 $/25 $. Attention au tokenizer de la génération 5 (environ 30 % de tokens en plus pour le même texte qu'avec la génération 4), qui augmente le coût réel même à prix par token égal.\n\nLeviers cumulables : Batch API (~-50 %), prompt caching (préfixe stable à tarif réduit), et le bon dimensionnement du modèle par tâche. Trace le champ usage de chaque réponse pour suivre input/output/thinking et repérer les gaspillages.",
     codeSnippet: null,
     tags: ["pricing", "tokens", "batch", "caching"],
     wikiHref: "/wiki/modeles/pricing-tokens",
@@ -1363,7 +1363,7 @@ export const FICHES: Fiche[] = [
       "Suivre un alias -latest expose au model drift : le comportement peut changer sans action de ta part. Pour la reproductibilité, épingle une version précise et re-teste avant de migrer.",
     technicalDetails:
       "Un alias comme claude-X-latest peut pointer vers une version mise à jour, modifiant subtilement les sorties (format, verbosité, refus). Pour un produit, cela peut casser des parseurs ou dégrader une éval. Épingle un ID de modèle daté/versionné en production, et traite chaque montée de version comme un changement à tester.\n\nMets en place une suite d'évals de non-régression, rejouée à chaque migration. Surveille aussi les changements documentés (ex. suppression de budget_tokens, rejet des paramètres de sampling, nouveau tokenizer) qui exigent des ajustements de code au-delà du simple ID.",
-    codeSnippet: 'model = "claude-sonnet-5"  # épinglé, pas un alias -latest volatil',
+    codeSnippet: 'model = "claude-sonnet-5-5"  # épinglé, pas un alias volatil',
     tags: ["model-drift", "versioning", "reproductibilité", "évals"],
     wikiHref: "/wiki/modeles/model-drift",
   },

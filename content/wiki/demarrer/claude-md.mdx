@@ -1,7 +1,7 @@
 ---
 title: "Mémoire & gestion du contexte (CLAUDE.md)"
 description: "Le fichier CLAUDE.md et la gestion du contexte dans Claude Code : hiérarchie des fichiers mémoire, anatomie d'un bon CLAUDE.md, /init et /memory, compaction automatique, et pourquoi un contexte propre vaut mieux qu'un gros contexte."
-updatedAt: "2026-06-08"
+updatedAt: "2026-10-03"
 readingMinutes: 9
 ---
 
@@ -17,6 +17,23 @@ Claude Code cherche le fichier à plusieurs niveaux, et **concatène** tout ce q
 4. `~/.claude/CLAUDE.md` — préférences globales utilisateur
 
 > Utilise [`/memory`](/wiki/slash-commands) dans le REPL pour voir exactement ce qui est chargé, et [`/init`](/wiki/slash-commands) pour générer un premier `CLAUDE.md` en analysant le projet.
+
+### Et AGENTS.md ?
+
+Beaucoup de projets ont déjà un fichier `AGENTS.md`, le format partagé par plusieurs agents de code. Depuis la version 2.1.277 (18 septembre 2026), Claude Code le lit comme instructions de projet **quand il n'y a pas de `CLAUDE.md`**. Si vous utilisez plusieurs outils, gardez vos consignes communes dans `AGENTS.md` et ne mettez dans `CLAUDE.md` que ce qui est propre à Claude, en important le premier :
+
+```markdown
+@AGENTS.md
+
+## Spécifique à Claude Code
+- Lance `npm run verify` avant chaque commit.
+```
+
+Le chargement d'`AGENTS.md` est assuré par un mod intégré, `cc-plugin-agents-md`, que vous pouvez désactiver dans `/plugin`.
+
+### Les règles par chemin
+
+Pour un gros dépôt, découpez les consignes dans `.claude/rules/` : chaque fichier peut cibler un chemin (`apps/web/**`) et n'est chargé que lorsque Claude travaille dans cette zone. Le contexte reste léger.
 
 ## Que mettre dans un CLAUDE.md
 

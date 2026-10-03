@@ -9,7 +9,7 @@ L'API **Message Batches** traite de nombreuses requêtes [Messages](/wiki/api) d
 
 ## La remise de 50 %
 
-Toute l'utilisation d'un batch est facturée à **la moitié** des prix standard de l'API, sur l'input **et** l'output. La remise est **inconditionnelle** : pas de seuil de volume à atteindre. Elle se cumule avec le [prompt caching](/wiki/prompt-caching).
+Toute l'utilisation d'un batch est facturée à **la moitié** des prix standard de l'API, sur l'input **et** l'output. La remise est **inconditionnelle** : pas de seuil de volume à atteindre. Elle se cumule avec le [prompt caching](/wiki/api/prompt-caching-implementation).
 
 ## Délai et limites
 
@@ -65,7 +65,7 @@ Un petit nombre de paramètres de l'API Messages ne sont **pas** acceptés en ba
 
 ## Combiner avec le prompt caching
 
-Les remises [caching](/wiki/prompt-caching) et batch **se cumulent** : l'effet combiné peut faire tomber le coût effectif autour d'un dixième du tarif non-caché. Comme le traitement est asynchrone, les hits de cache sont best-effort. Pour les maximiser : blocs `cache_control` **identiques** dans chaque requête, contexte partagé maximal, durée de cache **1 heure**, et flux de requêtes régulier.
+Les remises [caching](/wiki/api/prompt-caching-implementation) et batch **se cumulent** : l'effet combiné peut faire tomber le coût effectif autour d'un dixième du tarif non-caché. Comme le traitement est asynchrone, les hits de cache sont best-effort. Pour les maximiser : blocs `cache_control` **identiques** dans chaque requête, contexte partagé maximal, durée de cache **1 heure**, et flux de requêtes régulier.
 
 ## Quand utiliser le Batch ?
 
@@ -76,8 +76,8 @@ Les remises [caching](/wiki/prompt-caching) et batch **se cumulent** : l'effet c
 ## Pour aller plus loin
 
 - [L'API Anthropic](/wiki/api)
-- [Le prompt caching](/wiki/prompt-caching)
-- [Tarification & optimisation des coûts](/wiki/tarification)
+- [Le prompt caching](/wiki/api/prompt-caching-implementation)
+- [Tarification & optimisation des coûts](/wiki/modeles/pricing-tokens)
 
 ### Sources officielles
 - Batch processing : https://platform.claude.com/docs/en/build-with-claude/batch-processing

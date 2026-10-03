@@ -1,0 +1,103 @@
+---
+title: "Agent view : piloter plusieurs sessions en parallèle"
+description: "Lancer des sessions en arrière-plan avec claude --bg, les suivre depuis claude agents, leur répondre sans quitter la vue, et isoler leur travail dans des worktrees."
+updatedAt: "2026-10-03"
+readingMinutes: 7
+---
+
+Depuis mai 2026, Claude Code sait faire tourner **plusieurs sessions indépendantes** sur votre machine et les afficher sur un seul écran : l'**agent view**. Vous lancez une correction de bug, une revue de PR et une enquête sur un test instable, vous continuez à travailler, et vous revenez quand une ligne indique qu'elle a besoin de vous.
+
+> Fonction en aperçu de recherche : les raccourcis peuvent encore changer.
+
+## Ouvrir l'agent view
+
+```bash
+claude agents
+```
+
+Depuis une session ouverte, appuyez sur `←` quand le prompt est vide : la session passe en arrière-plan et l'agent view s'ouvre. `Échap` vous ramène où vous étiez.
+
+Quelques options utiles au lancement :
+
+```bash
+claude agents --cwd ~/projets/mon-app   # limiter à un dossier
+claude agents --model opus              # modèle par défaut des nouvelles sessions
+claude agents --effort high             # effort par défaut
+```
+
+## Lancer des sessions en arrière-plan
+
+Depuis l'agent view, tapez une consigne et validez avec `Entrée`. Depuis votre shell :
+
+```bash
+claude --bg "enquête sur l'échec du test de connexion"
+claude --bg --model opus --name "fix-auth" "renforce la validation des sessions"
+claude --agent code-reviewer --bg "relis la PR 1234"
+claude --bg --exec 'pytest -x'          # une simple commande shell en tâche de fond
+```
+
+Depuis l'intérieur d'une session :
+
+- `/bg` (ou `/background`) envoie la conversation en arrière-plan ;
+- `/fork` copie la conversation dans une nouvelle session d'arrière-plan et garde l'originale ouverte.
+
+## Lire l'état d'un coup d'œil
+
+| Icône | État |
+|---|---|
+| ✽ animé | Claude travaille |
+| ✻ jaune | Attend votre réponse ou une permission |
+| ∙ grisé | Inactive, prête pour la suite |
+| ✻ vert | Tâche terminée |
+| ✻ rouge | Échec |
+| ✢ | Session `/loop` en pause entre deux itérations |
+
+Pour filtrer, commencez la saisie par un préfixe : `s:blocked` (sessions bloquées), `a:reviewer` (un agent précis), `n:auth` (nom ou premier prompt), `o:texte` (dans le résultat), `#1234` (une PR). Les filtres se combinent : `s:blocked a:reviewer`.
+
+## Répondre sans quitter la vue
+
+- `Espace` ouvre un aperçu de la dernière sortie ou de la question posée. Tapez votre réponse et validez : elle part sans ouvrir la session. Préfixez par `!` pour envoyer une commande shell.
+- `Entrée` ou `→` ouvre la session complète. `←` sur un prompt vide vous ramène à la liste.
+- `Ctrl+R` renomme, `Ctrl+T` épingle (le processus reste actif même inactif), `Ctrl+X` arrête (deux fois pour supprimer), `?` liste tous les raccourcis.
+
+Les mêmes actions existent en ligne de commande, pratiques dans un script :
+
+```bash
+claude agents --json        # liste au format JSON
+claude logs <id>            # sortie récente
+claude attach <id>          # ouvrir dans ce terminal
+claude stop <id>
+```
+
+## Chaque session dans son worktree
+
+Avant de modifier des fichiers, une session d'arrière-plan passe dans un **worktree git isolé** sous `.claude/worktrees/`. Plusieurs sessions lisent le même dépôt, mais chacune écrit dans sa propre copie : pas de conflits en cours de route.
+
+Supprimer une session depuis l'agent view supprime aussi son worktree. **Commitez ou poussez avant** si vous voulez garder le travail. Pour désactiver l'isolation dans un projet :
+
+```json
+{
+  "worktree": { "bgIsolation": "none" }
+}
+```
+
+## Agent view, sous-agents, workflows : quelle différence ?
+
+| Outil | Ce que c'est |
+|---|---|
+| **Agent view** | Plusieurs sessions indépendantes que **vous** lancez et suivez |
+| **[Sous-agents](/wiki/subagents/pourquoi-subagents)** | Des assistants que Claude lance **dans** une conversation, sans session à part |
+| **Agent teams** | Des sessions qui s'envoient des messages et se partagent des tâches |
+| **[Dynamic workflows](/wiki/cli/dynamic-workflows-agents-arriere-plan)** | Un script écrit par Claude qui orchestre des dizaines de sous-agents |
+| **[Routines et cloud](/wiki/cli/cloud-routines-remote)** | Des sessions qui tournent chez Anthropic, même ordinateur éteint |
+
+## Limites
+
+- **Votre quota fond plus vite** : dix sessions en parallèle consomment environ dix fois plus.
+- **Tout tourne en local** : les sessions s'arrêtent si la machine s'éteint (la mise en veille est tolérée).
+
+## Pour aller plus loin
+
+- [Sessions et reprise](/wiki/cli/sessions-reprise)
+- [Multi-projet et context switching](/wiki/cli/multi-projet-context-switching)
+- Documentation : https://code.claude.com/docs/en/agent-view
