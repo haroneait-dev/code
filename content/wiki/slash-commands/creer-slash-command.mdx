@@ -1,132 +1,115 @@
 ---
-title: "Créer une slash command custom"
-description: "Structure, frontmatter, emplacement et déploiement d'une commande Claude Code maison."
-updatedAt: "2026-05-19"
+title: "Créer une commande personnalisée (skill ou .claude/commands)"
+description: "Créer sa propre commande /nom en 2026 : format skill recommandé, ancien format .claude/commands, emplacements, priorité et dépannage."
+updatedAt: "2026-10-03"
 readingMinutes: 6
 ---
 
-Une slash command custom, c'est juste un fichier Markdown. Pas de SDK, pas de plugin, pas de build : un `.md` dans le bon dossier, et la commande apparaît automatiquement dans `/help`. C'est probablement la fonctionnalité la plus rentable de Claude Code : chaque procédure que vous répétez peut devenir une commande, partagée avec votre équipe via git.
+Une commande personnalisée est un simple fichier Markdown : pas de SDK, pas de build. Depuis 2026, les commandes personnalisées ont été fusionnées dans les skills. Un fichier `.claude/commands/deploy.md` et un skill `.claude/skills/deploy/SKILL.md` créent tous les deux `/deploy` et se comportent de la même façon. Vos anciens fichiers continuent de fonctionner, mais le format skill est recommandé pour tout nouveau travail.
 
-## Emplacement : projet ou utilisateur
+## Deux formats, un même résultat
 
-Deux dossiers possibles, deux portées :
+| | `.claude/commands/` (ancien) | `.claude/skills/` (recommandé) |
+| --- | --- | --- |
+| Fichier | `deploy.md` | `deploy/SKILL.md` |
+| Fichiers annexes (scripts, exemples) | Non | Oui, dans le dossier |
+| Champ `name`, champ `paths` | Non | Oui |
+| Prise en compte des modifications en cours de session | Non | Oui |
+| Exécution dans un sous-agent (`context: fork`) | Non | Oui |
 
-- `.claude/commands/` à la racine du projet : commande **partagée** avec l'équipe via git
-- `~/.claude/commands/` dans votre home : commande **personnelle**, disponible dans tous vos projets
+Le format skill ajoute surtout la possibilité que Claude charge la commande de lui-même quand elle est pertinente. Si vous voulez qu'elle ne parte que sur votre demande, ajoutez `disable-model-invocation: true`.
 
-Si une commande existe aux deux endroits avec le même nom, la version projet l'emporte. C'est ce qui permet à une équipe de surcharger une commande globale par une version spécifique au repo.
+## Où placer le fichier
 
-## Structure minimale
+| Emplacement | Chemin | Portée |
+| --- | --- | --- |
+| Personnel | `~/.claude/skills/<nom>/SKILL.md` | Tous vos projets sur cette machine |
+| Projet | `.claude/skills/<nom>/SKILL.md` | Ce dépôt, partagé via git |
+| Sous-dossier | `<sous-dossier>/.claude/skills/<nom>/SKILL.md` | Sessions dans ce sous-dossier (monorepo) |
+| Plugin | `<plugin>/skills/<nom>/SKILL.md` | Partout où le plugin est activé, sous `/plugin:nom` |
+| Entreprise | Dossier des réglages gérés | Tous les postes de l'organisation |
 
-Le strict minimum, c'est un fichier `.md` avec un titre et des instructions en français (ou la langue de votre choix) :
+En cas de conflit de nom, l'ordre de priorité est : entreprise, puis personnel, puis projet. Attention, c'est l'inverse de l'intuition : un skill personnel `deploy` masque le `deploy` du projet. Les skills de plugin ne créent pas de conflit, ils sont toujours préfixés.
 
-```md
----
-description: "Lance les tests unitaires et affiche un résumé"
----
+L'ancien format suit la même logique : `.claude/commands/` pour le projet, `~/.claude/commands/` pour vous.
 
-Exécute `npm test` et résume les résultats :
-- nombre de tests passants / échouants
-- temps total
-- liste des fichiers en échec si applicable
-```
+## Le minimum
 
-Sauvegardé sous `.claude/commands/test.md`, ce fichier ajoute la commande `/test` à votre session. Le contenu du Markdown devient le prompt envoyé à Claude quand vous tapez `/test`.
-
-## Frontmatter complet
-
-Le frontmatter YAML accepte plusieurs champs qui modifient le comportement de la commande :
-
-```md
----
-description: "Audit sécurité de la PR courante"
-argument-hint: "[numéro de PR optionnel]"
-allowed-tools: [Read, Grep, Bash(gh pr view:*)]
-model: claude-opus-5-5
----
-
-Tu es un auditeur sécurité.
-
-PR à auditer : $ARGUMENTS
-
-1. Récupère le diff avec `gh pr diff`
-2. Liste les vulnérabilités par sévérité
-3. Propose un patch pour chaque problème HIGH
-```
-
-- `description` : affichée dans `/help`
-- `argument-hint` : hint qui apparaît dans l'auto-complétion
-- `allowed-tools` : restreint les tools que Claude peut utiliser pour cette commande
-- `model` : force un modèle spécifique (utile pour les audits coûteux où vous voulez Opus)
-
-## Exemple complet : commande de release
-
-Voici une commande utile dans la vraie vie, `.claude/commands/release.md` :
+`.claude/skills/tests/SKILL.md` :
 
 ```md
 ---
-description: "Prépare une release : changelog, version, tag"
-argument-hint: "<patch|minor|major>"
-allowed-tools: [Read, Edit, Bash(npm version:*), Bash(git log:*), Bash(git tag:*)]
+description: Lance les tests unitaires et résume les résultats
+disable-model-invocation: true
 ---
 
-Prépare une release `$ARGUMENTS` :
-
-1. Lis le dernier tag avec `git describe --tags --abbrev=0`
-2. Liste les commits depuis ce tag avec `git log <tag>..HEAD --oneline`
-3. Génère un CHANGELOG.md formaté en sections (feat, fix, chore)
-4. Bumpe la version avec `npm version $ARGUMENTS --no-git-tag-version`
-5. Affiche un résumé et demande confirmation avant de tagger
+Exécutez `npm test` puis résumez :
+- le nombre de tests réussis et échoués ;
+- la durée totale ;
+- les fichiers en échec, avec la première erreur de chacun.
 ```
+
+Tapez `/tests` : le contenu du fichier devient le prompt envoyé à Claude. Le nom vient du dossier (`tests`), ou du champ `name` s'il est présent. Sans `description`, Claude Code prend la première ligne non vide du contenu.
+
+## Un exemple complet : préparer une release
+
+`.claude/skills/release/SKILL.md` :
+
+```md
+---
+description: Prépare une release (changelog, version), sans pousser
+argument-hint: <patch|minor|major>
+disable-model-invocation: true
+allowed-tools: Read Edit Bash(git describe *) Bash(git log *) Bash(npm version *)
+---
+
+Préparez une release de type `$ARGUMENTS`.
+
+Dernier tag : !`git describe --tags --abbrev=0`
+
+1. Listez les commits depuis ce tag avec `git log <tag>..HEAD --oneline`.
+2. Ajoutez en tête de CHANGELOG.md une section classée en feat, fix et chore.
+3. Lancez `npm version $ARGUMENTS --no-git-tag-version`.
+4. Affichez un résumé. Ne créez pas de tag et ne poussez rien : je le ferai moi-même.
+```
+
+Ce que fait chaque ligne :
+
+- `argument-hint` s'affiche dans l'autocomplétion ;
+- `disable-model-invocation: true` garantit que Claude ne lancera pas une release de lui-même ;
+- `allowed-tools` pré-autorise ces outils pendant le tour où la commande est invoquée, pour éviter les demandes de confirmation. Il ne bloque pas les autres outils : vos règles de permission habituelles s'appliquent ;
+- `` !`git describe …` `` exécute la commande avant l'envoi à Claude et insère sa sortie dans le prompt (voir [Bash injection](/wiki/slash-commands/bash-injection-securisee)). Si le dépôt n'a encore aucun tag, la commande échoue et toute l'invocation est annulée : pensez-y sur un projet neuf.
 
 Usage :
 
-```bash
+```text
 > /release minor
-Reading last tag: v1.2.3
-Found 14 commits since v1.2.3:
-  - feat: add wiki vote endpoint
-  - fix: RLS policy on tips
-  - chore: bump deps
-Generated CHANGELOG.md
-Version bumped to 1.3.0
-Ready to tag? (y/n)
 ```
 
-## Tester votre commande
+## Tester et dépanner
 
-Une fois le fichier créé, lancez :
+Après avoir créé le fichier, tapez `/` et cherchez votre commande. Si elle n'apparaît pas :
 
-```bash
-> /help
-... liste ...
-/release   Prépare une release : changelog, version, tag
+1. **Vérifiez le chemin** : un skill doit être dans son propre dossier (`skills/release/SKILL.md`), pas directement dans `skills/`.
+2. **Nouveau dossier racine** : si `.claude/skills/` n'existait pas au démarrage de la session, lancez `/reload-skills` pour qu'il soit surveillé.
+3. **Ancien format** : les fichiers de `.claude/commands/` ne sont pas surveillés ; lancez `/reload-skills` après une modification.
+4. **Frontmatter** : les noms de champs sont sensibles à la casse (`disable-model-invocation`, pas `disableModelInvocation`) et un champ inconnu est ignoré sans erreur.
+5. **Nom réservé** : `anthropic-skills` et un dossier nommé `synced` sont réservés.
+6. **Conflit** : un skill personnel du même nom prend le pas sur celui du projet.
 
-> /release patch
-```
+`/skills` liste tous les skills chargés et leur coût en tokens (touche `t` pour trier). `/skill-doctor` montre ceux qui coûtent du contexte sans servir.
 
-Si la commande n'apparaît pas, vérifiez :
+## Partager avec l'équipe
 
-1. Le fichier est bien dans `.claude/commands/` (et pas dans un sous-dossier sans intention de namespacing)
-2. L'extension est bien `.md`
-3. Le frontmatter YAML est valide (pas de tab, indentation correcte)
-4. Vous avez bien rechargé la session (`/clear` ou redémarrage)
-
-## Déploiement en équipe
-
-Pour partager une commande, c'est `git add .claude/commands/release.md` et vous poussez. Les collègues qui pullent récupèrent la commande automatiquement, sans installation. Pas de plugin, pas de bundle, pas de versioning séparé : c'est ça la force du système.
-
-Pensez à ajouter une ligne à votre `CLAUDE.md` pour documenter les commandes maison :
-
-```md
-## Slash commands custom
-- /release <patch|minor|major>  — release helper
-- /audit-sec                    — audit sécurité maison
-- /db-migrate                   — génère et applique une migration Supabase
-```
+Commitez le dossier `.claude/skills/` : vos collègues récupèrent les commandes au prochain `git pull`. Documentez-les en une ligne chacune dans votre `CLAUDE.md` ou dans un README. Pour partager entre plusieurs dépôts, passez par un plugin : voir [Partager les commandes en équipe](/wiki/slash-commands/partage-equipe).
 
 ## Pour aller plus loin
 
-- Doc officielle : https://docs.claude.com/en/docs/claude-code/slash-commands
-- Découvrir les arguments avancés : guide "Arguments et namespacing"
-- Restreindre les tools : guide "Markdown frontmatter dans les commandes"
+- [Arguments et namespacing](/wiki/slash-commands/arguments-namespacing)
+- [Le frontmatter en détail](/wiki/slash-commands/markdown-frontmatter)
+- [Structure d'un skill](/wiki/skills/structure-skill)
+
+## Sources
+
+- [Skills](https://code.claude.com/docs/en/skills)
+- [Commands](https://code.claude.com/docs/en/commands)

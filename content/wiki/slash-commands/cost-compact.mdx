@@ -1,106 +1,134 @@
 ---
-title: "/cost et /compact : maîtriser tokens et contexte"
-description: "Suivre la consommation de tokens et compacter une conversation longue sans tout perdre."
-updatedAt: "2026-05-19"
-readingMinutes: 5
+title: "/usage et /compact : suivre la consommation et alléger le contexte"
+description: "Lire /usage (qui remplace /cost), comprendre le cache, et compacter une conversation longue avec /compact sans perdre l'essentiel."
+updatedAt: "2026-10-03"
+readingMinutes: 6
 ---
 
-Deux commandes économisent silencieusement des heures et des dollars à qui les utilise : `/cost` pour mesurer la consommation en temps réel, et `/compact` pour résumer une conversation longue afin de continuer à travailler sans repartir de zéro. Ensemble, elles transforment une session qui s'embourbe en outil productif sur plusieurs heures.
+Deux commandes vous évitent les mauvaises surprises : `/usage` pour savoir ce que coûte la session et où en sont vos limites, `/compact` pour résumer une conversation trop longue et continuer la même tâche. `/cost` existe toujours, mais c'est désormais un simple alias de `/usage`.
 
-## /cost — savoir où va l'argent
+## `/usage` : coût, limites et statistiques
 
-`/cost` affiche les tokens consommés et le coût estimé de la session courante. La sortie typique :
+`/usage` réunit trois informations : le coût de la session, les limites de votre offre et des statistiques d'activité. `/cost` et `/stats` ouvrent le même écran (`/stats` directement sur l'onglet Stats). La commande s'exécute même pendant que Claude répond.
 
-```bash
-> /cost
-Session usage:
-  Input tokens (uncached):  12,430
-  Input tokens (cached read): 84,210
-  Output tokens:             3,872
-  Cache write tokens:        8,120
+Le bloc Session ressemble à ceci :
 
-Estimated cost: $0.42
-Model: claude-sonnet-5-5
+```text
+Total cost:            $0.55
+Total duration (API):  6m 20s
+Total duration (wall): 6h 33m 10s
+Total code changes:    0 lines added, 0 lines removed
+Usage by model:
+   claude-opus-5-5:  1.2k input, 5.3k output, 940.0k cache read, 50.0k cache write ($0.55)
+Prompt cache (main):   14 requests · 91% of input tokens from cache · 2 misses ...
 ```
 
-Trois choses à comprendre :
+Comment le lire :
 
-1. **Le cache fait toute la différence** : les `cached read` coûtent ~10% du tarif normal. Une session avec beaucoup de cached read est saine ; une session avec peu de cache veut dire que Claude relit constamment les mêmes fichiers.
-2. **Output coûte plus cher que input** : un Claude bavard double rapidement la facture. Demandez des réponses concises.
-3. **Le cumulé monte vite** : sur une journée de pair-programming intensif, un développeur dépasse facilement $5–10 sans s'en rendre compte.
+- **Le montant est une estimation** calculée localement au prix catalogue. La facture fait foi dans la console Claude.
+- **Abonnés Pro, Max, Team, Enterprise** : le montant en dollars ne vous est pas facturé. Regardez plutôt les barres de limites et la répartition (skills, sous-agents, plugins, serveurs MCP) sur 24 h ou 7 jours (touches `d` et `w`).
+- **Le cache** : une lecture en cache coûte environ 10 % du prix d'entrée normal. Sur Opus 5.5 (4 $ / 20 $ par million de tokens en entrée / sortie), relire 1 million de tokens en cache coûte donc environ 0,40 $. Une ligne `Prompt cache` avec un fort pourcentage et peu de « misses » signale une session saine.
+- **Remise à zéro** : les totaux repartent à 0 après un `/clear`.
 
-Quand l'utiliser :
+Pour suivre le coût en continu, ajoutez-le à votre [ligne de statut](/wiki/cli/status-line-custom). En mode non interactif, `--output-format json` renvoie `total_cost_usd`.
 
-- Après une grosse tâche pour mesurer son coût réel
-- Quand vous sentez Claude "ramer" — souvent le signe d'un contexte saturé
-- Avant un `/clear`, pour comparer avant/après
+## Pourquoi la consommation grimpe
 
-## /compact — résumer pour continuer
+Chaque requête renvoie toute la conversation au modèle. Les causes classiques d'une session qui coûte cher :
 
-`/compact` remplace l'historique détaillé de la conversation par un résumé condensé, tout en préservant le contexte sémantique : ce qui a été décidé, les fichiers touchés, les TODO en cours. Vous gardez la main sur la même tâche, mais avec un contexte 5 à 10 fois plus léger.
+- un contexte long jamais nettoyé ;
+- une pause plus longue que la durée du cache (une heure sur abonnement, cinq minutes par défaut avec une clé API), qui oblige à tout retraiter ;
+- des tâches planifiées (`/loop`), des sous-agents ou des workflows qui envoient leurs propres requêtes ;
+- la compaction elle-même, qui relit toute la conversation pour la résumer.
 
-```bash
+`/context` affiche ce qui remplit la fenêtre : fichiers, outils MCP, mémoire, skills. C'est le premier réflexe avant de compacter.
+
+## `/compact` : résumer pour continuer
+
+`/compact` remplace l'historique par un résumé et libère de la place, tout en restant sur la même tâche. Vous pouvez orienter le résumé :
+
+```text
 > /compact
-Compacting conversation...
-Before: 84,210 tokens in context
-After:  9,340 tokens (summary preserved)
-
-Summary:
-- Refactored auth module to use @supabase/ssr
-- Fixed RLS policy on wiki_tips (vote count)
-- TODO: write tests for the new callback route
+> /compact Garder les décisions sur le schéma SQL et la liste des fichiers modifiés
 ```
 
-Le moment idéal pour `/compact` :
+Pour des consignes permanentes, ajoutez une section à votre `CLAUDE.md` :
 
-- Après 30–45 minutes de travail dense sur la même feature
-- Avant de partir en pause déjeuner pour revenir sur un contexte allégé
-- Quand vous remarquez que les réponses ralentissent ou deviennent imprécises
+```markdown
+# Compact instructions
 
-À l'inverse, `/compact` est une mauvaise idée si :
-
-- Vous comptez bientôt poser une question très spécifique sur un détail vu il y a 10 messages (le détail risque d'être perdu)
-- Vous changez complètement de sujet : préférez `/clear`
-
-## /cost + /compact : la boucle vertueuse
-
-Le workflow gagnant :
-
-```bash
-> /cost              # 84k tokens, $0.42
-> /compact           # condensation
-> /cost              # 9k tokens, coût futur divisé par ~9
-... 30 minutes plus tard ...
-> /cost              # 45k tokens
-> /compact           # on recommence
+Lors d'une compaction, conserver la sortie des tests et les changements de code.
 ```
 
-Sur une session de 4 heures, cette discipline divise la facture par 3 à 5 et évite le pic de latence qui survient autour de 150k tokens de contexte.
+Bons moments pour compacter :
 
-## Compact automatique
+- vous êtes au milieu d'une tâche longue et `/context` montre une fenêtre bien remplie ;
+- l'avertissement de compaction automatique apparaît ;
+- vous allez faire une pause longue sur une grosse session (le cache aura expiré au retour).
 
-Claude Code peut déclencher `/compact` automatiquement quand le contexte approche de la limite. Vous pouvez ajuster ce comportement via la config, et certains hooks personnalisés permettent même de logger systématiquement le résumé produit dans un fichier `.claude/sessions/<date>.md` pour garder une trace lisible des décisions.
+Mauvais moments :
 
-```bash
-# exemple : hook qui sauvegarde chaque compact
-# .claude/settings.json
+- vous changez de sujet : `/clear` est gratuit et plus propre ;
+- vous aurez besoin d'un détail précis vu plus tôt : il risque de disparaître du résumé ;
+- la conversation est courte : le résumé n'apporte rien.
+
+Ce qui survit à la compaction (règles, `CLAUDE.md`, skills invoqués) est détaillé dans la documentation sur la fenêtre de contexte. Retenez que les skills invoqués sont réattachés dans une limite de taille : un très gros skill peut être tronqué.
+
+## La compaction automatique
+
+Claude Code compacte tout seul quand la conversation approche de la limite. `/autocompact` règle ce seuil :
+
+```text
+> /autocompact          # affiche la fenêtre actuelle
+> /autocompact 500k     # compacter vers 500 000 tokens
+> /autocompact auto     # revenir au réglage adapté au modèle
+```
+
+La valeur est enregistrée dans vos réglages utilisateur (v2.1.221 et plus).
+
+Pour garder une trace de chaque compaction, un hook `PreCompact` peut écrire dans un journal. Le matcher distingue `manual` et `auto` :
+
+```json
 {
   "hooks": {
     "PreCompact": [
-      { "command": "echo 'Compacting at $(date)' >> .claude/sessions.log" }
+      {
+        "matcher": "auto",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo \"compaction auto $(date -Iseconds)\" >> \"$CLAUDE_PROJECT_DIR/.claude/compact.log\""
+          }
+        ]
+      }
     ]
   }
 }
 ```
 
+## Réduire la facture sans compacter
+
+- `/clear` entre deux tâches sans rapport.
+- `/model` : réservez Opus aux tâches difficiles, Sonnet 5.5 (2 $ / 10 $) suffit pour beaucoup de travail courant.
+- `/effort` : un niveau plus bas réduit les tokens de réflexion sur les tâches simples.
+- Déplacez les instructions spécialisées de `CLAUDE.md` vers des skills, chargés seulement quand ils servent.
+- Désactivez dans `/mcp` les serveurs inutilisés.
+- Confiez les sorties volumineuses (tests, logs) à un sous-agent : seul le résumé revient.
+
 ## Erreurs classiques
 
-- **Ne jamais regarder `/cost`** : on découvre la facture à la fin du mois sur le dashboard.
-- **`/compact` trop tôt** : si la conversation fait 5 messages, le résumé n'apporte rien et peut faire perdre du détail.
-- **`/compact` au lieu de `/clear`** : si vous changez de sujet, le résumé devient un parasite. `/clear` est plus honnête.
+- **Lire le montant de `/usage` comme une facture** quand on est abonné : ce sont les barres de limites qui comptent.
+- **Compacter pour changer de sujet** : le résumé devient du bruit.
+- **Compacter trop souvent une petite session** : chaque compaction est elle-même une grosse requête.
 
 ## Pour aller plus loin
 
-- Doc officielle : https://docs.claude.com/en/docs/claude-code/slash-commands
-- Étudiez l'impact du prompt caching d'Anthropic sur vos `/cost`
-- Mettez en place un hook qui alerte au-delà de $5 / session
+- [/help, /clear, /resume](/wiki/slash-commands/help-clear-resume)
+- [Hook PreCompact](/wiki/hooks/pre-compact)
+- [Effort, mode rapide et advisor](/wiki/cli/effort-fast-advisor)
+
+## Sources
+
+- [Manage costs effectively](https://code.claude.com/docs/en/costs)
+- [Commands](https://code.claude.com/docs/en/commands)
+- [Hooks reference](https://code.claude.com/docs/en/hooks)

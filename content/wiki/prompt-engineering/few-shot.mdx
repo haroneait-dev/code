@@ -1,100 +1,150 @@
 ---
-title: "Few-shot prompting"
-description: "Fournir 2 à 5 exemples bien choisis pour guider Claude — règles d'or, anti-patterns et cas d'usage."
-updatedAt: "2026-05-19"
-readingMinutes: 6
+title: "Few-shot prompting : guider Claude par l'exemple"
+description: "Choisir et présenter trois à cinq exemples pour obtenir un format, un ton ou une classification fiables, dans claude.ai comme via l'API, avec les pièges à éviter."
+updatedAt: "2026-10-03"
+readingMinutes: 7
 ---
 
-Le few-shot prompting consiste à donner à Claude quelques exemples (input + output) avant la vraie demande. C'est la technique la plus efficace pour aligner le modèle sur un format précis, un style particulier, ou un raisonnement métier — souvent plus efficace que d'écrire vingt lignes d'instructions.
+Le few-shot prompting consiste à montrer à Claude quelques exemples de ce que vous attendez avant de lui confier la vraie tâche. Selon la documentation d'Anthropic, c'est l'un des moyens les plus fiables d'orienter le format, le ton et la structure d'une réponse. Un bon exemple remplace souvent un long paragraphe de consignes.
 
-## Pourquoi ça marche si bien
+## Pourquoi ça marche
 
-Les LLM apprennent par imitation. Plutôt que de décrire en mots ce que vous voulez ("réponds de manière concise mais complète, avec un ton professionnel mais accessible..."), montrez-le. Claude infère les règles implicites — longueur, structure, vocabulaire, niveau de détail — beaucoup mieux qu'il ne suit des consignes abstraites.
+Décrire un style en mots est difficile (« concis mais complet, professionnel mais chaleureux »). Le montrer est simple. À partir d'exemples, Claude déduit des règles implicites : longueur, structure, vocabulaire, niveau de détail, façon de traiter les cas particuliers.
 
-Le zéro-shot ("fais X") fonctionne pour les tâches générales. Le few-shot devient indispensable dès que :
+Le few-shot devient presque indispensable quand :
 
-- La sortie doit suivre un format strict (JSON, CSV, balises spécifiques)
-- Le ton ou le style sont difficiles à décrire
-- Il existe des cas particuliers ou des conventions internes
-- Vous voulez une réponse stable d'un appel à l'autre
+- la sortie doit suivre un format strict (étiquettes, colonnes, gabarit) ;
+- le ton est difficile à décrire ;
+- votre domaine a des conventions internes ;
+- vous voulez des réponses homogènes d'un appel à l'autre.
 
-## La règle des 2 à 5 exemples
+## Combien d'exemples
 
-Un seul exemple peut être pris pour un cas isolé — Claude ne sait pas quelles propriétés généraliser. Deux suffisent pour les tâches simples. Trois à cinq couvrent les cas courants et les exceptions. Au-delà, vous gaspillez des tokens et risquez l'overfitting : Claude colle trop à vos exemples au lieu de généraliser.
+La documentation recommande **trois à cinq exemples** pour de meilleurs résultats. Un seul exemple risque d'être copié trop fidèlement : Claude ne sait pas quelles propriétés généraliser. Au-delà de cinq, le gain se réduit pour les tâches simples, mais des corpus d'exemples plus larges restent utiles pour des tâches complexes, surtout si vous les mettez en cache.
 
-```text
-Classifie le sentiment du tweet en POSITIF, NEUTRE ou NEGATIF.
+## Les trois qualités d'un bon exemple
 
-Tweet : "J'adore la nouvelle interface, c'est tellement fluide !"
-Sentiment : POSITIF
+Anthropic les résume ainsi :
 
-Tweet : "Mise à jour téléchargée, je teste."
-Sentiment : NEUTRE
+| Qualité | Ce que cela veut dire |
+|---|---|
+| **Pertinent** | Il ressemble aux vraies entrées : même langue, même longueur, même type de contenu. |
+| **Varié** | Il couvre les cas faciles, les cas limites et les cas ambigus, sans motif involontaire. |
+| **Structuré** | Il est encadré par `<example>` (et regroupé dans `<examples>`) pour ne pas être confondu avec la tâche. |
 
-Tweet : "Encore un bug, c'est la troisième fois cette semaine."
-Sentiment : NEGATIF
+Exemple de motif involontaire : trois exemples où la bonne catégorie correspond toujours au premier mot du message. Claude risque de reproduire ce hasard.
 
-Tweet : "Bof, ça change pas grand-chose finalement."
-Sentiment :
-```
-
-## Encadrer avec des balises XML
-
-Pour éviter toute confusion entre exemples et tâche réelle, structurez avec XML :
+## Un exemple de classification
 
 ```xml
+<instructions>
+Classez chaque avis client en POSITIF, NEUTRE ou NEGATIF.
+L'ironie compte comme NEGATIF.
+</instructions>
+
 <examples>
   <example>
-    <input>Le client demande un remboursement après 60 jours.</input>
-    <output>
-      <action>REFUSER</action>
-      <reason>Délai légal de 30 jours dépassé</reason>
-    </output>
+    <avis>Livraison rapide, produit conforme, je recommande.</avis>
+    <sentiment>POSITIF</sentiment>
   </example>
   <example>
-    <input>Article défectueux signalé après 7 jours.</input>
-    <output>
-      <action>ACCEPTER</action>
-      <reason>Garantie légale de conformité applicable</reason>
-    </output>
+    <avis>Colis reçu, pas encore testé.</avis>
+    <sentiment>NEUTRE</sentiment>
+  </example>
+  <example>
+    <avis>Troisième panne en un mois, bravo la qualité.</avis>
+    <sentiment>NEGATIF</sentiment>
+  </example>
+  <example>
+    <avis>Bof, ça change pas grand-chose finalement.</avis>
+    <sentiment>NEGATIF</sentiment>
   </example>
 </examples>
 
-<request>
-  <input>Le client veut échanger un produit acheté il y a 15 jours.</input>
-</request>
+<avis>
+Super, encore un remboursement qui n'arrive pas.
+</avis>
 ```
 
-## Choisir des exemples qui couvrent l'espace
+Les quatre exemples couvrent les trois catégories, un cas ironique et un cas de langage familier.
 
-L'erreur classique : donner trois exemples qui se ressemblent tous. Vos exemples doivent couvrir la **diversité** des cas que Claude rencontrera — incluez les cas faciles, les cas limites, et au moins un cas ambigu. Si votre tâche a quatre catégories possibles, montrez les quatre.
+## Un exemple dans claude.ai
 
-Mauvais : trois exemples qui retournent tous "POSITIF".
-Bon : un POSITIF, un NEGATIF, un NEUTRE, et un cas ironique difficile.
-
-## Anti-patterns à éviter
-
-**Incohérence de format.** Si vos exemples utilisent tantôt `Sentiment: X`, tantôt `[X]`, tantôt `<sentiment>X</sentiment>`, Claude ne saura pas lequel choisir. Verrouillez un format unique et tenez-le.
-
-**Exemples mal alignés avec la tâche réelle.** Si vos exemples sont en anglais et la requête en français, vous induisez Claude en erreur. Les exemples doivent ressembler aux inputs réels.
-
-**Raisonnement caché.** Pour les tâches qui demandent une analyse, ne donnez pas seulement input → output. Montrez le raisonnement intermédiaire (chain-of-thought few-shot) :
+Le few-shot n'a rien de technique. Pour que Claude écrive vos e-mails « comme vous », collez deux ou trois messages que vous avez réellement envoyés :
 
 ```text
-Question : Quelle est la marge brute si CA = 100k€ et coût direct = 40k€ ?
-Raisonnement : Marge brute = CA - coût direct = 100 - 40 = 60.
-               Taux de marge brute = 60 / 100 = 60%.
-Réponse : 60% (60 000 €)
+Voici trois e-mails que j'ai écrits à des clients. Inspirez-vous de leur ton
+(direct, chaleureux, phrases courtes) et de leur structure (une phrase de
+contexte, la réponse, une proposition concrète), pas de leur contenu.
+
+<exemple>
+Bonjour Claire, merci pour votre retour rapide. Oui, la livraison peut
+être avancée au 12. Je vous envoie le bon de commande modifié dans l'heure.
+</exemple>
+<exemple>
+...
+</exemple>
+
+Rédigez maintenant une réponse à ce client qui demande une remise de 15 % :
+<email_client>
+...
+</email_client>
 ```
 
-**Exemples qui contredisent les instructions.** Si votre system dit "réponds en français" et vos exemples sont en anglais, Claude suivra les exemples — ils sont plus contraignants. Alignez les deux.
+Si vous réutilisez souvent ces exemples, placez-les dans les **instructions d'un projet** ou dans un fichier de connaissances du projet (voir [Créer un projet](/wiki/claude-ai/projects-creation)).
 
-## Quand placer les exemples
+## Exemples et réflexion
 
-Dans le system prompt si les exemples sont **stables** (mêmes pour toutes les requêtes) — vous bénéficiez du cache. Dans le user prompt si les exemples sont **dynamiques** (sélectionnés par retrieval selon la requête, technique dite "dynamic few-shot").
+Les modèles récents réfléchissent avant de répondre ([thinking adaptatif](/wiki/modeles/adaptive-thinking-effort)). La documentation précise que des exemples travaillés **influencent aussi cette réflexion** : présentez chaque exemple comme un problème, la méthode à appliquer et la réponse attendue.
+
+```xml
+<example>
+  <probleme>Chiffre d'affaires 100 000 €, coûts directs 40 000 €. Taux de marge brute ?</probleme>
+  <methode>Marge brute = CA moins coûts directs, rapportée au CA.</methode>
+  <reponse>60 %</reponse>
+</example>
+```
+
+Montrez la **méthode** en une phrase, pas un long raisonnement à recopier. Sur Opus 5.5, Sonnet 5.5, Fable 5.1 et Opus 5, demander à Claude d'écrire tout son raisonnement dans la réponse peut entraîner un refus (`reasoning_extraction`). Voir [Faire réfléchir Claude](/wiki/prompt-engineering/chain-of-thought).
+
+## Les pièges à éviter
+
+**Format incohérent.** Si un exemple écrit `Sentiment : X` et un autre `[X]`, Claude ne sait pas lequel suivre. Fixez un format et tenez-le.
+
+**Exemples trop semblables.** Trois exemples positifs n'apprennent rien sur les négatifs. Si votre tâche a quatre catégories, montrez les quatre.
+
+**Exemples qui contredisent les consignes.** Si vos règles demandent du français et que vos exemples sont en anglais, le résultat sera incertain. Alignez les deux.
+
+**Confondre exemple et modèle à copier.** Précisez ce que l'exemple illustre : « La structure compte, pas le contenu ni la longueur. »
+
+**Exemples négatifs seuls.** Montrer ce qu'il ne faut pas faire est moins efficace que montrer la bonne réponse. Pour la concision par exemple, Anthropic observe que des exemples positifs de réponses courtes marchent mieux que des interdictions.
+
+## Où placer les exemples
+
+- **Exemples stables** : dans le prompt système (ou les instructions de projet). Ils bénéficient du [prompt caching](/wiki/prompt-engineering/prompt-caching-concepts), ce qui rend économique un jeu de 20 exemples ou plus.
+- **Exemples dynamiques** : choisis selon la requête (par recherche de similarité dans une base d'exemples), ils vont dans le message utilisateur.
+
+## Se faire aider par Claude
+
+La documentation suggère de demander à Claude d'évaluer la pertinence et la diversité de vos exemples, ou d'en générer de nouveaux à partir des vôtres :
+
+```text
+Voici mes cinq exemples de classification. Lesquels se ressemblent trop ?
+Quels cas réels manquent ? Proposez trois exemples supplémentaires qui
+couvrent ces trous.
+```
+
+Relisez toujours les exemples générés : un exemple faux enseigne une erreur.
 
 ## Pour aller plus loin
 
-- Combinez le few-shot avec les balises XML pour une structure maximale.
-- Lisez l'article system vs user pour décider où placer vos exemples.
-- Explorez le chain-of-thought prompting pour les tâches de raisonnement complexe.
+- [Balises XML](/wiki/prompt-engineering/balises-xml)
+- [Formater la sortie](/wiki/prompt-engineering/output-format)
+- [Tester un prompt](/wiki/prompt-engineering/tester-prompt)
+- [Meta-prompting](/wiki/prompt-engineering/meta-prompting)
+
+## Sources
+
+- [Prompting best practices : Use examples effectively (Anthropic)](https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/claude-prompting-best-practices)
+- [Prompting Claude Sonnet 5 : Response length and verbosity (Anthropic)](https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-sonnet-5)
+- [Prompt caching : Optimizing for different use cases (Anthropic)](https://platform.claude.com/docs/en/build-with-claude/prompt-caching)

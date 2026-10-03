@@ -1,80 +1,138 @@
 ---
 title: "Debugging hooks"
-description: "Diagnostiquer un hook qui ne se déclenche pas : matcher, JSON stdin, exit codes, logs."
-updatedAt: "2026-05-19"
-readingMinutes: 6
+description: "Diagnostiquer un hook qui ne se déclenche pas, renvoie une erreur ou dont le JSON est ignoré : /hooks, journal de debug, codes de sortie, test hors session et pièges fréquents."
+updatedAt: "2026-10-03"
+readingMinutes: 7
 ---
 
-Un hook qui ne s'exécute pas est l'un des bugs les plus frustrants de Claude Code : aucune erreur visible, aucune trace dans l'UI, et pourtant le script reste muet. Heureusement, la chaîne d'exécution des hooks est entièrement déterministe. En remontant méthodiquement les couches (matcher → JSON stdin → exit code → logs), on identifie presque toujours la cause en quelques minutes.
+Un hook qui ne fait rien est frustrant : quand il réussit, Claude Code n'affiche rien dans la conversation. La chaîne reste pourtant déterministe. En vérifiant dans l'ordre la configuration, le déclenchement, le code de sortie puis la sortie JSON, on trouve presque toujours la cause en quelques minutes.
 
-## Vérifier que le matcher déclenche bien
+## Étape 1 : le hook est-il chargé ?
 
-Avant tout, isolez la question : « est-ce que mon hook est seulement appelé ? ». La cause numéro un d'un hook silencieux est un `matcher` trop restrictif ou mal orthographié. Les matchers acceptent des expressions régulières et sont sensibles à la casse.
+Tapez `/hooks`. Ce menu en lecture seule liste les hooks configurés avec leur origine (settings utilisateur, projet, local, plugin, session). Sélectionnez-en un pour voir la commande exacte et le fichier qui la définit. `All events`, en bas de liste, affiche aussi les événements sans hook.
 
-```json
-{
-  "hooks": {
-    "PreToolUse": [
-      {
-        "matcher": "Bash",
-        "hooks": [{ "type": "command", "command": "/tmp/log-bash.sh" }]
-      }
-    ]
-  }
-}
-```
+Si votre hook n'apparaît pas :
 
-Pour valider qu'un matcher est bien évalué, remplacez-le temporairement par `".*"` : si le hook se déclenche alors, le problème vient bien du pattern initial.
+- **JSON invalide** : virgule finale ou commentaire dans `settings.json`. Vérifiez avec `jq . .claude/settings.json`.
+- **Mauvais fichier** : `.claude/settings.json` pour le projet, `~/.claude/settings.json` pour tous vos projets, `.claude/settings.local.json` pour vos réglages locaux.
+- **Modification non prise en compte** : les éditions sont normalement détectées automatiquement ; sinon, redémarrez la session.
+- **Message `Only hooks from managed settings run here`** : votre organisation a activé `allowManagedHooksOnly`. Vos hooks ne tournent pas.
+- **Dossier non approuvé** : en session interactive, aucun hook de settings ne tourne avant l'acceptation de la boîte de dialogue de confiance.
+- **`disableAllHooks: true`** quelque part dans vos settings.
 
-## Inspecter le JSON envoyé sur stdin
+## Étape 2 : le hook se déclenche-t-il ?
 
-Claude Code envoie un objet JSON sur l'entrée standard du script (event, tool_name, tool_input, session_id, transcript_path…). Un script qui n'attend rien sur stdin peut sembler ne « rien faire » alors qu'il s'exécute correctement.
+Les causes les plus fréquentes d'un hook présent mais muet :
 
-```bash
-#!/usr/bin/env bash
-# /tmp/log-bash.sh
-input=$(cat)
-echo "$(date -u +%FT%TZ) $input" >> /tmp/hook-trace.log
-```
+- **Matcher** : sensible à la casse. `bash` ne correspond pas à `Bash`. `mcp__memory` (sans `.*`) est comparé comme une chaîne exacte et ne correspond à aucun outil : écrivez `mcp__memory__.*`.
+- **Mauvais événement** : `PreToolUse` avant l'outil, `PostToolUse` après un succès seulement (un échec déclenche `PostToolUseFailure`), `PermissionRequest` uniquement quand une permission va vous être demandée.
+- **`if` sur un événement non-outil** : un hook avec `if` sur `Stop` ou `SessionStart` ne tourne jamais.
+- **Matcher sur un événement qui n'en a pas** (`UserPromptSubmit`, `Stop`, `PostToolBatch`…) : il est ignoré silencieusement, le hook tourne à chaque fois.
+- **Windows** : un hook qui ne cible que `Bash` ne voit rien quand Claude passe par l'outil `PowerShell`. Utilisez `Bash|PowerShell`.
+- **Fichier mentionné avec `@`** : inséré sans appel à `Read`, donc sans `PreToolUse`.
+- **Outil d'un MCP de plugin** : son nom réel est `mcp__plugin_<plugin>_<serveur>__<outil>`.
 
-Lire le payload dans un fichier de log donne immédiatement la structure réelle de l'événement. C'est aussi le meilleur moyen de découvrir les champs disponibles sans deviner.
+Pour isoler le problème, remplacez temporairement le matcher par `"*"` : si le hook se déclenche, c'est le motif qui est en cause.
 
-## Comprendre les exit codes
-
-Les exit codes pilotent le comportement de Claude Code :
-
-- `0` : succès, l'exécution continue normalement.
-- `2` : décision « bloquante » — la sortie sur stderr est renvoyée au modèle et l'action peut être annulée selon l'event (`PreToolUse`, `UserPromptSubmit`).
-- Autre code non nul : erreur non bloquante, affichée à l'utilisateur mais sans interrompre l'agent.
-
-Un hook qui retourne `1` n'aura donc pas l'effet d'un blocage. Pour refuser une action, il faut explicitement `exit 2` et écrire le motif sur stderr.
+## Étape 3 : lire le journal de debug
 
 ```bash
-if [[ "$input" == *"rm -rf /"* ]]; then
-  echo "Commande destructrice interdite" >&2
-  exit 2
-fi
+claude --debug-file /tmp/claude.log
+# dans un autre terminal
+tail -f /tmp/claude.log
+```
+
+`claude --debug` écrit aussi un journal, dans `~/.claude/debug/<session-id>.txt`, mais **n'affiche rien dans le terminal**. En cours de session, `/debug` active la journalisation et indique le chemin du fichier. Pour voir le détail du matching (nombre de hooks retenus par matcher), ajoutez `CLAUDE_CODE_DEBUG_LOG_LEVEL=verbose`.
+
+Un hook `PostToolUse` sur `Write` qui affiche `hook-ran` produit par exemple :
+
+```text
+[DEBUG] Hook output does not start with {, treating as plain text
+[DEBUG] "Hook PostToolUse:Write (PostToolUse) success:\nhook-ran"
+```
+
+La vue transcript (`Ctrl+O`) complète ce journal :
+
+- **succès** : rien n'apparaît, sauf un `systemMessage` ou un retour de hook `Stop` ;
+- **blocage** : le motif (champ `reason` ou stderr) ;
+- **erreur non bloquante** : une notice `<événement> hook error` suivie de la première ligne du stderr, préfixée par `Failed with non-blocking status code:`.
+
+## Étape 4 : vérifier le code de sortie
+
+| Code | Effet |
+|---|---|
+| `0` | Succès. stdout est analysé comme JSON s'il commence par `{` et finit par `}` |
+| `2` | Blocage sur les événements qui le permettent ; stderr devient le motif |
+| Autre (1, 127…) | Erreur non bloquante : l'action continue |
+
+`exit 1` ne bloque pas, même si c'est le code d'échec habituel sous Unix. Un script introuvable ou non exécutable produit un code 127 et une notice du type `/bin/sh: /chemin/hook.sh: No such file or directory`, mais l'action continue : un hook de sécurité mal configuré est **désactivé sans bruit**. Surveillez cette notice au premier lancement.
+
+Le stderr d'un hook qui sort en `0` va uniquement dans le journal de debug : ni vous ni Claude ne le voyez.
+
+## Étape 5 : tester hors session
+
+Le moyen le plus rapide : envoyer un JSON factice au script.
+
+```bash
+echo '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"rm -rf /tmp/build"}}' \
+  | .claude/hooks/block-rm.sh
+echo "code: $?"
+```
+
+Pour connaître la structure exacte des données réelles, capturez-les une fois :
+
+```bash
+#!/bin/bash
+# Hook temporaire : enregistre le JSON reçu
+cat >> /tmp/hook-payloads.jsonl
 exit 0
 ```
 
-## Activer les logs détaillés
+Transformez ces captures en tests automatisés qui vérifient le code de sortie attendu : un hook devient alors un composant testable comme un autre.
 
-Lancez Claude en mode debug pour voir le cycle de vie complet :
+## Quand le JSON n'a aucun effet
+
+Le hook affiche un JSON valide mais la décision est ignorée, sans erreur visible. Deux causes :
+
+1. **Texte parasite avant le JSON.** Un `echo` inconditionnel dans `~/.bashrc` ou `~/.zshrc`, chargé par certains shells non interactifs (Git Bash, `BASH_ENV`), s'imprime avant votre objet. La sortie ne commence plus par `{` et part comme texte brut. Correctif :
 
 ```bash
-claude --debug
+# Dans ~/.zshrc ou ~/.bashrc
+if [[ $- == *i* ]]; then
+  echo "Shell prêt"
+fi
 ```
 
-Le flux verbose imprime les hooks détectés, l'ordre de matching, le timeout configuré et le résultat de chaque exécution. Couplez cela à un `tail -f /tmp/hook-trace.log` dans un second terminal et vous obtenez une observabilité complète.
+2. **Champ au mauvais niveau.** `permissionDecision` et `additionalContext` vont dans `hookSpecificOutput`, avec `hookEventName`. Placés au premier niveau, ils sont ignorés sans erreur. Cherchez `Hook JSON output had unrecognized keys` dans le journal.
 
-## Pièges classiques à éliminer
+Si le transcript affiche un message de validation ou d'analyse JSON, construisez la sortie avec `jq -n --arg` plutôt que par concaténation de chaînes : les guillemets et antislashs seront échappés correctement.
 
-- **Permissions** : le script doit être exécutable (`chmod +x`).
-- **Shebang manquant** : sans `#!/usr/bin/env bash` (ou équivalent), le script peut échouer silencieusement.
-- **Chemin relatif** : utilisez toujours des chemins absolus, ou `$CLAUDE_PROJECT_DIR` pour les commandes situées dans le repo.
-- **JSON invalide** dans `settings.json` : Claude Code ignore alors tout le bloc `hooks`. Validez avec `jq . settings.json`.
-- **Timeout** : par défaut 60 s. Un script lent peut être tué sans message clair.
+## Autres pièges
 
-## Pour aller plus loin
+- **Commande introuvable** : utilisez des chemins absolus ou `${CLAUDE_PROJECT_DIR}`, et passez en forme exec (`"args": []`) pour éviter les problèmes de guillemets.
+- **`jq: command not found`** : installez `jq` ou parsez en Python ou Node.
+- **Timeout** : 600 s par défaut pour un hook `command`, mais 30 s sur `UserPromptSubmit` et 1,5 s de budget partagé pour `SessionEnd`. Un hook annulé ne rend aucune décision.
+- **Hook `Stop` qui boucle** : testez `stop_hook_active` et sortez en `exit 0` s'il vaut `true`. Après huit relances consécutives, Claude Code force la fin du tour.
+- **Deux hooks qui réécrivent la même entrée** : ils tournent en parallèle, le dernier à finir gagne.
 
-Une fois le hook fiable, automatisez sa vérification : ajoutez un test qui pipe un faux JSON dans le script (`echo '{"tool_name":"Bash"}' | ./mon-hook.sh`) et vérifie l'exit code attendu. Cette approche transforme les hooks en composants testables au même titre que le reste du code. Pour aller plus loin encore, étudiez le chaînage de hooks et l'envoi de traces vers OpenTelemetry, abordés dans d'autres articles de ce wiki.
+## Couper les hooks pour isoler un problème
+
+`"disableAllHooks": true` dans vos settings, ou pour une seule exécution :
+
+```bash
+claude --settings '{"disableAllHooks": true}'
+```
+
+Cela ne désactive pas les hooks imposés par les settings gérés de votre organisation.
+
+## Articles liés
+
+- [Hook lifecycle](/wiki/hooks/hook-lifecycle)
+- [Hooks et environnement d'exécution](/wiki/hooks/environnement)
+- [Chaînage de hooks](/wiki/hooks/chainage-hooks)
+- [Hooks pour l'observabilité](/wiki/hooks/observabilite-otel)
+
+## Sources
+
+- [Automate actions with hooks : Limitations and troubleshooting](https://code.claude.com/docs/en/hooks-guide)
+- [Hooks reference : Exit code output, Debug hooks](https://code.claude.com/docs/en/hooks)

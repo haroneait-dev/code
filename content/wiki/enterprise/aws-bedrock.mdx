@@ -1,25 +1,45 @@
 ---
-title: "Déployer Claude sur AWS Bedrock"
-description: "Guide pratique pour invoquer Claude via Amazon Bedrock : IAM, débit provisionné, boto3."
-updatedAt: "2026-05-19"
-readingMinutes: 6
+title: "Déployer Claude sur Amazon Bedrock"
+description: "Appeler Claude via Amazon Bedrock en 2026 : le nouvel endpoint Messages (bedrock-mantle), les ID de modèles, l'authentification IAM, les régions UE, les fonctionnalités absentes et la configuration de Claude Code."
+updatedAt: "2026-10-03"
+readingMinutes: 7
 ---
 
-Amazon Bedrock est le service managé d'AWS qui expose les modèles Claude sans quitter votre VPC. Aucun appel ne sort vers Anthropic : la facturation passe par AWS, la conformité repose sur les certifications AWS (SOC, HIPAA, FedRAMP). Voici comment l'intégrer proprement.
+Amazon Bedrock sert les modèles Claude sur l'infrastructure AWS, avec l'authentification, la facturation et le périmètre de sécurité d'AWS. Depuis Opus 4.7, Bedrock expose Claude via un endpoint qui reprend exactement le format de l'API Messages d'Anthropic. Voici comment l'utiliser proprement.
 
-## Activer l'accès aux modèles
+## Deux intégrations Bedrock, plus une alternative
 
-Avant toute chose, demander l'accès aux modèles Anthropic dans la console Bedrock (région `us-east-1` ou `eu-west-3` par exemple). L'activation est gratuite mais nécessite une validation manuelle pour certains modèles avancés.
+| Option | Modèles | Endpoint | Exploité par |
+|---|---|---|---|
+| **Claude in Amazon Bedrock** (recommandé) | Opus 4.7 et suivants, Sonnet 5, Sonnet 5.5, Fable, Haiku 4.5 | `https://bedrock-mantle.{region}.api.aws/anthropic/v1/messages` | AWS |
+| Intégration historique `InvokeModel` / `Converse` | Opus 4.6 et modèles plus anciens (Haiku 4.5 aussi) | `bedrock-runtime.{region}.amazonaws.com` | AWS |
+| **Claude Platform on AWS** | Tous les modèles de l'API Claude | `aws-external-anthropic.{region}.api.aws` | Anthropic, facturé via AWS Marketplace |
 
-```bash
-aws bedrock list-foundation-models \
-  --by-provider anthropic \
-  --region us-east-1
-```
+Choisissez Bedrock si vous voulez que l'inférence reste chez AWS (Anthropic n'a aucun accès opérateur à cette infrastructure). Choisissez Claude Platform on AWS si vous voulez toutes les fonctionnalités de l'API Claude (Batch, Files, Skills, exécution de code) le jour de leur sortie, avec une facturation AWS.
 
-## Politique IAM minimale
+## ID de modèles
 
-Le principe de moindre privilège impose de restreindre les actions et les ARN de modèles :
+Sur l'endpoint Messages, les ID portent le préfixe `anthropic.` et n'ont plus de date ni de suffixe `-v1:0` :
+
+| Modèle | ID Bedrock |
+|---|---|
+| Opus 5.5 | `anthropic.claude-opus-5-5` |
+| Sonnet 5.5 | `anthropic.claude-sonnet-5-5` |
+| Fable 5.1 | `anthropic.claude-fable-5-1` |
+| Sonnet 5 | `anthropic.claude-sonnet-5` |
+| Haiku 4.5 | `anthropic.claude-haiku-4-5` |
+
+Fable 5.1, Sonnet 5, Opus 4.8, Opus 4.7 et Haiku 4.5 sont ouverts à tous les clients Bedrock. Pour Opus 5.5 et Sonnet 5.5, vérifiez les conditions d'accès dans la page **Model access** de la console Bedrock.
+
+## Authentification
+
+Trois chemins, du plus sûr au moins conseillé :
+
+1. **Rôle de service Bedrock** : un administrateur crée le rôle et accorde `iam:PassRole` aux développeurs.
+2. **Rôles IAM assumés** via votre fournisseur d'identité (SAML, OIDC, IAM Identity Center), sessions de 12 heures maximum. La politique accorde l'action `bedrock-mantle:CreateInference` sur les seuls modèles autorisés.
+3. **Jetons bearer** de courte durée (12 heures maximum), générés avec `aws-bedrock-token-generator`. Bloquez les jetons longue durée avec une condition sur `bedrock:BearerTokenType`.
+
+Exemple de politique minimale (remplacez la ressource par les ARN des modèles autorisés, au format indiqué dans la documentation Bedrock) :
 
 ```json
 {
@@ -27,80 +47,87 @@ Le principe de moindre privilège impose de restreindre les actions et les ARN d
   "Statement": [
     {
       "Effect": "Allow",
-      "Action": [
-        "bedrock:InvokeModel",
-        "bedrock:InvokeModelWithResponseStream"
-      ],
-      "Resource": [
-        "arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-sonnet-4-6*",
-        "arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-opus-4-7*"
-      ]
+      "Action": "bedrock-mantle:CreateInference",
+      "Resource": "<ARN des modèles autorisés>"
     }
   ]
 }
 ```
 
-Attacher cette policy à un rôle IRSA (EKS) ou à un rôle EC2 plutôt qu'à un utilisateur IAM avec clés statiques.
+Attachez-la à un rôle (IRSA sur EKS, rôle de tâche ECS, rôle EC2), jamais à un utilisateur IAM avec des clés statiques.
 
-## Appel via boto3
-
-Le SDK Python `boto3` expose `bedrock-runtime`. Le payload reste compatible avec le format Messages d'Anthropic.
-
-```python
-import boto3, json
-
-client = boto3.client("bedrock-runtime", region_name="us-east-1")
-
-response = client.invoke_model(
-    modelId="anthropic.claude-sonnet-4-6-20260101-v1:0",
-    body=json.dumps({
-        "anthropic_version": "bedrock-2023-05-31",
-        "max_tokens": 1024,
-        "messages": [{"role": "user", "content": "Résume ce rapport en 3 points."}]
-    })
-)
-
-print(json.loads(response["body"].read())["content"][0]["text"])
-```
-
-Pour le streaming, utiliser `invoke_model_with_response_stream` et itérer sur les events.
-
-## Débit provisionné (Provisioned Throughput)
-
-Le mode on-demand est suffisant pour le prototypage. En production à fort volume, souscrire un **Provisioned Throughput** garantit des tokens/seconde dédiés et un coût prévisible.
+## Premier appel
 
 ```bash
-aws bedrock create-provisioned-model-throughput \
-  --model-units 2 \
-  --provisioned-model-name claude-sonnet-prod \
-  --model-id anthropic.claude-sonnet-4-6-20260101-v1:0 \
-  --commitment-duration OneMonth
+pip install -U "anthropic[bedrock]"
 ```
 
-Chaque *model unit* offre un débit fixe (consulter la doc Bedrock pour les valeurs par modèle). Engagements possibles : 1 mois ou 6 mois.
+```python
+from anthropic import AnthropicBedrockMantle
+
+client = AnthropicBedrockMantle(aws_region="eu-west-3")  # Paris
+
+message = client.messages.create(
+    model="anthropic.claude-sonnet-5-5",
+    max_tokens=1024,
+    messages=[{"role": "user", "content": "Résume ce rapport en trois points."}],
+)
+
+print(next(b.text for b in message.content if b.type == "text"))
+```
+
+Le SDK lit les identifiants AWS dans l'ordre standard (arguments, variables `AWS_*`, profil, rôle). En TypeScript, le paquet est `@anthropic-ai/bedrock-sdk` et la classe `AnthropicBedrockMantle`. Le streaming utilise le SSE standard, comme l'API Claude.
+
+## Régions et résidence des données
+
+- **Endpoint global** : routage dynamique entre toutes les régions, sans surcoût.
+- **Endpoint régional** : l'inférence reste dans la région choisie, avec un **surcoût de 10 %**. Pour router dans une zone (US, EU, JP, AU), utilisez un profil d'inférence.
+
+Régions européennes disponibles : `eu-west-3` (Paris), `eu-central-1` (Francfort), `eu-central-2` (Zurich), `eu-west-1` (Irlande), `eu-west-2` (Londres), `eu-north-1` (Stockholm), `eu-south-1` (Milan), `eu-south-2` (Espagne). Pour Fable 5.1, les endpoints régionaux ne sont disponibles qu'en `us-east-1` pour l'instant.
+
+## Ce qui n'existe pas sur Bedrock
+
+D'après la documentation d'Anthropic, l'endpoint Bedrock ne propose pas :
+
+- les sorties structurées (et donc les outils `strict`) ;
+- les sources par URL (images, documents) et la Files API ;
+- les outils côté serveur : exécution de code, recherche web, web fetch, advisor ;
+- Agent Skills, connecteur MCP, appel d'outils programmatique ;
+- les endpoints Batch, Models, Admin, Usage ;
+- le repli automatique côté serveur (`fallbacks`) : gérez le repli côté client.
+
+Le prompt caching, la réflexion, le tool use (bash, éditeur de texte, mémoire, computer use en version bêta) et les citations sont disponibles. Si une fonctionnalité absente vous est indispensable, regardez Claude Platform on AWS.
+
+## Quotas
+
+Quota par défaut : 2 millions de tokens d'entrée par minute. Vous pouvez demander jusqu'à 5 millions de tokens d'entrée et 500 000 tokens de sortie par minute sans approbation d'Anthropic. Les limites de requêtes par minute se règlent avec le support AWS.
 
 ## Observabilité et garde-fous
 
-Activer **CloudTrail** pour les appels d'API et **CloudWatch** pour les métriques de latence/erreurs. **Bedrock Guardrails** ajoute des filtres de contenu (PII, sujets sensibles) en amont et en aval du modèle :
+- **CloudTrail et CloudWatch** reçoivent les journaux. Anthropic recommande de conserver au moins 30 jours d'historique d'activité.
+- **Bedrock Guardrails** permet d'ajouter des filtres de contenu et de données personnelles. Vérifiez dans la documentation AWS leur compatibilité avec l'endpoint Messages avant de vous en servir comme seule protection.
+- Ajoutez vos propres contrôles applicatifs : voir [Filtres de modération](/wiki/enterprise/content-safety).
 
-```yaml
-guardrail:
-  name: claude-prod-guardrail
-  content_filters:
-    - hate: HIGH
-    - violence: HIGH
-    - sexual: HIGH
-  pii_entities:
-    - EMAIL
-    - PHONE
-    - CREDIT_DEBIT_CARD_NUMBER
-  blocked_topics:
-    - conseil_medical
-    - conseil_financier
+## Claude Code sur Bedrock
+
+```bash
+export CLAUDE_CODE_USE_BEDROCK=1
+export AWS_REGION=eu-west-3
+claude
 ```
+
+Utilisez Claude Code 2.1.280 ou plus récent pour Opus 5.5 sur Bedrock (2.1.255 pour Fable 5.1). Pour une flotte de postes, distribuez ces variables par réglages gérés. Voir [Claude sur Bedrock, Vertex et Foundry](/wiki/enterprise/clouds).
 
 ## Pour aller plus loin
 
-- Documentation AWS : *Bedrock User Guide* (section Anthropic)
-- Article wiki : `resilience-multi-cloud` pour le fallback Bedrock ↔ Anthropic
-- Bibliothèque `anthropic[bedrock]` pour conserver l'API SDK Anthropic native
+- [Claude sur Bedrock, Vertex et Foundry](/wiki/enterprise/clouds)
+- [Résilience multi-cloud](/wiki/enterprise/resilience-multi-cloud)
+- [Sovereign hosting et résidence des données](/wiki/enterprise/sovereign-hosting)
+- [Gestion des clés et API gateways](/wiki/enterprise/api-gateways)
+
+## Sources
+
+- [Claude in Amazon Bedrock (Claude Platform Docs)](https://platform.claude.com/docs/en/build-with-claude/claude-in-amazon-bedrock)
+- [Claude Platform on AWS](https://platform.claude.com/docs/en/build-with-claude/claude-platform-on-aws)
+- [Models overview](https://platform.claude.com/docs/en/models/overview)
+- [Pricing : cloud platforms](https://platform.claude.com/docs/en/about-claude/pricing)

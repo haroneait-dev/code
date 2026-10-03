@@ -1,74 +1,89 @@
 ---
-title: "Cycle de vie d'un Skill"
-description: "Comprendre l'activation, l'exécution et la libération d'un Skill Claude Code, de la détection automatique au nettoyage des ressources."
-updatedAt: "2026-05-19"
-readingMinutes: 6
+title: "Cycle de vie d'un skill"
+description: "Ce qui se passe réellement quand un skill est découvert, invoqué, conservé dans la conversation, compacté puis rechargé dans Claude Code."
+updatedAt: "2026-10-03"
+readingMinutes: 5
 ---
 
-Un Skill Claude Code n'est pas un script qui tourne en boucle : c'est une capacité dormante que le harness charge à la demande. Comprendre son cycle de vie — activation, exécution, libération — est essentiel pour écrire des Skills propres, rapides et qui ne polluent pas le contexte. Ce guide détaille chaque étape, de la détection initiale au nettoyage final.
+Un skill n'est pas un processus : c'est du texte que Claude Code place dans la conversation au bon moment. Comprendre quand il entre dans le contexte, combien de temps il y reste et ce qui le fait disparaître permet d'écrire des skills plus fiables et moins coûteux.
 
-## Activation automatique vs explicite
+## 1. Découverte au démarrage
 
-Claude Code propose deux modes d'activation pour un Skill.
+Au lancement, Claude Code lit les skills des emplacements entreprise, personnel, projet (et dossiers parents jusqu'à la racine du dépôt), des plugins activés et, si vous êtes connecté avec claude.ai, des skills synchronisés. Les skills de sous-dossiers (`apps/web/.claude/skills/`) se chargent plus tard, la première fois que Claude lit ou modifie un fichier dans ce sous-dossier.
 
-L'**activation automatique** s'appuie sur le champ `description` du `SKILL.md`. Au démarrage de la session, le harness lit les frontmatters de tous les Skills installés et compile une liste de "déclencheurs". Quand le message utilisateur correspond sémantiquement à un description (mots-clés, intention), le Skill est injecté dans le contexte. C'est la voie idéale pour les Skills opinionnés (linters, conventions internes, helpers métiers).
+Seuls le **nom** et la **description** de chaque skill entrent alors dans le contexte, et uniquement pour les skills que Claude peut invoquer. Côté plateforme, Anthropic estime ce coût à une centaine de tokens par skill.
 
-L'**activation explicite** se déclenche via une commande `/<nom-skill>` ou via l'invocation directe par un autre agent. Ici, c'est l'utilisateur (ou un sous-agent) qui décide. À privilégier pour les Skills coûteux en tokens ou pour des actions destructrices.
+## 2. Invocation
 
-```md
----
-name: deploy-staging
-description: Use when the user asks to deploy to staging or push a preview build. Skip for production deploys.
----
+Deux chemins mènent au même résultat :
+
+- **vous** tapez `/nom-du-skill` (sauf si `user-invocable: false`) ;
+- **Claude** juge que votre demande correspond à la description et appelle l'outil Skill (sauf si `disable-model-invocation: true`, ou si le champ `paths` exclut les fichiers en cours).
+
+À ce moment, Claude Code **rend** le skill :
+
+1. substitution des arguments (`$ARGUMENTS`, `$0`, `$nom`) et des variables (`${CLAUDE_SKILL_DIR}`, `${CLAUDE_SESSION_ID}`…) ;
+2. exécution des commandes injectées `` !`commande` `` et des blocs ` ```! ` : leur sortie remplace la ligne ;
+3. application des `allowed-tools` (pré-autorisation), `disallowed-tools`, `model` et `effort` pour ce tour ;
+4. enregistrement des `hooks` déclarés dans le frontmatter.
+
+Si une commande injectée échoue (code de sortie non nul) ou est refusée par vos règles de permission, **toute l'invocation est annulée** : Claude ne voit pas le skill. Ajoutez `|| true` aux commandes qui peuvent légitimement renvoyer une erreur.
+
+Avec `context: fork`, le contenu rendu devient le prompt d'un subagent séparé, en arrière-plan par défaut. Le reste de cet article concerne les skills exécutés dans la conversation principale.
+
+## 3. Pendant la conversation
+
+Le contenu rendu entre dans la conversation sous forme d'**un seul message** et y reste pour les tours suivants. Points importants :
+
+- Claude Code **ne relit pas** le fichier aux tours suivants. Écrivez donc des consignes valables pour toute la tâche (« Lancez les tests après chaque modification ») plutôt que des étapes ponctuelles.
+- Si Claude réinvoque le skill avec un rendu identique, Claude Code ajoute seulement une note indiquant qu'il est déjà chargé. Si le rendu diffère (autres arguments, sortie de commande différente), le contenu complet est ajouté de nouveau.
+- Les **permissions** ne persistent pas : la pré-autorisation `allowed-tools` tombe dès votre message suivant. La réinvoquer la réapplique.
+- Les **hooks** du skill, eux, restent actifs jusqu'à la fin de la session (sauf `once: true`).
+- Le `model` et l'`effort` du skill ne valent que pour le tour : le modèle de la session reprend au prompt suivant.
+
+Si vous modifiez `SKILL.md` en cours de session, la nouvelle version est détectée, mais la copie déjà présente dans la conversation ne change pas : réinvoquez le skill.
+
+## 4. Compaction
+
+Il n'y a pas de « libération » manuelle d'un skill. Le contenu reste jusqu'à ce que la conversation soit compactée (automatiquement ou avec `/compact`) ou effacée (`/clear`).
+
+Lors de l'auto-compaction, Claude Code réattache après le résumé la dernière invocation de chaque skill, **limitée à ses 5 000 premiers tokens**, dans un budget total de **25 000 tokens** rempli à partir du skill le plus récent. Conséquences :
+
+- placez les consignes essentielles **en haut** de `SKILL.md` ;
+- avec beaucoup de skills invoqués, les plus anciens peuvent être perdus ;
+- si Claude cesse de suivre un skill après une compaction, invoquez-le de nouveau.
+
+## 5. Fin de session et nettoyage
+
+À la fin de la session, rien ne reste en mémoire. Les seules traces sont les effets de bord produits par Claude ou par les scripts : fichiers temporaires, processus lancés en arrière-plan, branches Git. Si votre skill en crée, prévoyez une section explicite :
+
+```markdown
+## Nettoyage
+
+Une fois la tâche terminée :
+- supprimez le dossier `tmp/rapport-${CLAUDE_SESSION_ID}/` ;
+- arrêtez le serveur de prévisualisation que vous avez lancé.
 ```
 
-Le champ `description` doit indiquer **quand utiliser** ET **quand ne pas utiliser** — c'est ce qui évite les activations parasites.
+Pour un nettoyage garanti plutôt qu'au jugement de Claude, utilisez un hook `SessionEnd` ou `Stop`.
 
-## Exécution et chargement progressif
+## Observer le cycle de vie
 
-Une fois activé, le Skill suit un chargement en deux temps :
-
-1. **Frontmatter only** : à la session start, seuls les `name` + `description` sont en mémoire (environ 100 tokens par Skill).
-2. **Body load** : quand le Skill est déclenché, le corps complet du `SKILL.md` est injecté dans le contexte, ainsi que les fichiers référencés via `@./scripts/foo.ts` ou les chemins relatifs.
-
-Ce lazy-loading permet d'avoir 50 Skills installés sans saturer le contexte. Évitez les `SKILL.md` monolithiques de 2000 lignes : préférez des fichiers fins qui référencent des ressources externes au besoin.
-
-## Libération de la mémoire contextuelle
-
-Contrairement à un processus système, un Skill n'a pas de "kill". Sa "libération" se fait via la **compaction de contexte** : quand Claude Code atteint le seuil de tokens, les anciens Skills inutilisés sont parmi les premiers candidats à l'éviction.
-
-Bonnes pratiques pour faciliter la libération :
-
-- Ne pas réinjecter le `SKILL.md` à chaque tour si la tâche est terminée
-- Sortir explicitement avec un message court ("Skill `deploy-staging` terminé, ressources libérées")
-- Éviter les états persistants dans le prompt (utiliser des fichiers temporaires)
-
-## Nettoyage des ressources externes
-
-Si le Skill a ouvert des ressources hors du contexte (fichiers temporaires, connexions, processus background), il doit les fermer. Pattern recommandé : un bloc `## Cleanup` dans le `SKILL.md` qui liste explicitement les actions de fin.
-
-```md
-## Cleanup
-
-Always run after task completion:
-- Remove `/tmp/skill-cache-*` files
-- Kill background processes started via `run_in_background`
-- Revoke temporary tokens minted for this session
-```
-
-Pour les Skills qui lancent des `run_in_background`, gardez le PID dans une variable et terminez le process en fin de Skill — un orphelin qui tourne dans une session de 6h consomme RAM et fait planter Turbopack.
-
-## Observabilité du cycle de vie
-
-Pour debugger un Skill qui ne s'active pas ou qui reste collé en mémoire, plusieurs leviers :
-
-- `claude --debug` affiche les Skills chargés à chaque tour
-- Le fichier `.claude/logs/skills.jsonl` trace activation et libération (si activé)
-- Un hook `PostToolUse` peut logger l'usage réel d'un Skill pour repérer ceux qui ne servent jamais
+- `/skills` : skills chargés, source et nombre de tokens (touche `t`) ;
+- `/context` : poids de la liste des skills dans le contexte ;
+- `claude --debug` ou `/debug` : erreurs de parsing YAML et avertissements de budget ;
+- `/skill-doctor` : coût et fréquence d'usage de chaque skill ;
+- `/status` : skills dont l'`allowed-tools` a été ignoré par une politique d'entreprise.
 
 ## Pour aller plus loin
 
-- Documentation officielle : `docs.claude.com/claude-code/skills#lifecycle`
-- Voir aussi le guide **Sécurisation des secrets dans les Skills** pour la gestion des credentials pendant l'exécution
-- Le post de blog *Anthropic Engineering — Skills internals* détaille le lazy-loading
-- Tester avec `claude --skill-trace` pour visualiser activation / éviction en temps réel
+- [Composer plusieurs skills](/wiki/skills/composer-skills)
+- [Frontmatter de SKILL.md](/wiki/skills/skill-md-frontmatter)
+- [Hooks de session](/wiki/hooks/session-start-stop)
+- [Le hook PreCompact](/wiki/hooks/pre-compact)
+
+## Sources
+
+- Cycle de vie du contenu d'un skill, injection dynamique, dépannage : https://code.claude.com/docs/en/skills
+- Divulgation progressive : https://docs.claude.com/en/docs/agents-and-tools/agent-skills/overview
+- Hooks dans les skills : https://code.claude.com/docs/en/hooks

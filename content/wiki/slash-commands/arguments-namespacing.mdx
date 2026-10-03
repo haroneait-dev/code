@@ -1,155 +1,154 @@
 ---
-title: "Arguments et namespacing des slash commands"
-description: "Passer des arguments à une commande et organiser ses commandes en sous-dossiers."
-updatedAt: "2026-05-19"
-readingMinutes: 5
+title: "Arguments et namespacing des commandes personnalisées"
+description: "Passer des arguments avec $ARGUMENTS, $0, $1 ou des arguments nommés, et organiser ses commandes avec les préfixes dossier:commande et plugin:skill."
+updatedAt: "2026-10-03"
+readingMinutes: 6
 ---
 
-Une slash command qui ne prend pas d'arguments reste limitée à une seule façon d'être appelée. Dès qu'on veut paramétrer le comportement — un numéro de PR, un fichier, un mode — il faut savoir injecter ces valeurs dans le prompt via `$ARGUMENTS`. Et dès qu'on dépasse une dizaine de commandes, le namespacing par sous-dossiers évite que `/help` devienne illisible.
+Une commande sans argument ne sait faire qu'une chose. Dès que vous voulez la paramétrer (un numéro de PR, un fichier, un mode), il faut savoir où les valeurs arrivent dans le prompt. Et dès que le catalogue grossit, les préfixes de namespacing gardent le menu `/` lisible. Tout ce qui suit vaut pour les skills comme pour l'ancien format `.claude/commands/`.
 
-## $ARGUMENTS : la variable magique
+## `$ARGUMENTS` : tout le texte d'un bloc
 
-Tout ce que vous tapez après le nom de la commande est injecté dans le placeholder `$ARGUMENTS` du fichier `.md`. Exemple basique, `.claude/commands/explain.md` :
+Tout ce que vous tapez après le nom de la commande remplace `$ARGUMENTS`. Exemple, `.claude/skills/expliquer/SKILL.md` :
 
 ```md
 ---
-description: "Explique un concept ou un fichier"
-argument-hint: "<concept|chemin de fichier>"
+description: Explique un concept ou le rôle d'un fichier
+argument-hint: <concept ou chemin>
 ---
 
-Explique simplement : $ARGUMENTS
+Expliquez simplement : $ARGUMENTS
 
-Si c'est un chemin de fichier, lis-le et résume son rôle.
-Sinon, explique le concept en 3 paragraphes max.
+S'il s'agit d'un chemin de fichier, lisez-le et résumez son rôle.
+Sinon, expliquez le concept en trois paragraphes au plus.
 ```
 
-Appels possibles :
-
-```bash
-> /explain RLS Supabase
-> /explain lib/curriculum.ts
-> /explain le pattern Proxy dans lib/supabase.ts
+```text
+> /expliquer RLS Supabase
+> /expliquer lib/curriculum.ts
 ```
 
-Dans les trois cas, la chaîne après `/explain` remplace `$ARGUMENTS`. Le prompt envoyé à Claude est résolu côté harness avant l'appel API.
+La substitution se fait dans le texte envoyé à Claude, pas dans un shell. Si vous passez des arguments alors qu'aucun emplacement ne les reçoit, Claude Code ajoute `ARGUMENTS: <votre texte>` à la fin du prompt : Claude voit quand même ce que vous avez tapé.
 
-## Plusieurs arguments
+## Arguments par position : `$0`, `$1`, `$ARGUMENTS[N]`
 
-`$ARGUMENTS` contient **toute** la chaîne d'arguments en bloc. Pour distinguer plusieurs paramètres, deux approches :
-
-**Approche 1 — laisser Claude parser** : décrivez la convention dans le prompt et laissez le modèle découper.
+Pour distinguer plusieurs paramètres, utilisez les positions (comptées à partir de 0) :
 
 ```md
 ---
-description: "Crée une route API : /api-route <méthode> <chemin>"
-argument-hint: "<GET|POST|PUT|DELETE> <chemin>"
+description: Crée une route API Next.js
+argument-hint: <GET|POST|PUT|DELETE> <chemin>
 ---
 
-Génère une route Next.js App Router à partir de : $ARGUMENTS
-
-Convention attendue : <méthode HTTP> <chemin relatif sous app/api/>
-Exemple : POST wiki/comments → app/api/wiki/comments/route.ts
+Créez un handler $0 dans app/api/$1/route.ts.
+Respectez les conventions d'authentification du CLAUDE.md.
 ```
 
-Usage :
-
-```bash
-> /api-route POST wiki/comments
-Creating app/api/wiki/comments/route.ts (POST handler)...
+```text
+> /route-api POST wiki/comments
 ```
 
-**Approche 2 — utiliser des arguments positionnels** (selon les versions de Claude Code) : `$1`, `$2`, etc. captent chaque mot séparé par un espace. Vérifiez votre version : c'est supporté dans les builds récentes.
+`$0` vaut `POST`, `$1` vaut `wiki/comments`. `$ARGUMENTS[1]` est la forme longue de `$1`.
+
+Les positions suivent les règles de guillemets du shell : `/ma-commande "hello world" second` donne `$0` = `hello world` et `$1` = `second`. `$ARGUMENTS`, lui, contient toujours la chaîne complète telle que tapée.
+
+## Arguments nommés
+
+Le champ `arguments` du frontmatter donne un nom à chaque position :
 
 ```md
-Méthode : $1
-Chemin  : $2
+---
+description: Migre un composant d'un langage vers un autre
+arguments: [composant, depuis, vers]
+argument-hint: <composant> <depuis> <vers>
+---
+
+Migrez le composant $composant de $depuis vers $vers.
+Conservez le comportement et les tests existants.
 ```
 
-## Namespacing par sous-dossiers
-
-Quand votre `.claude/commands/` commence à compter 20+ fichiers, organisez-les en sous-dossiers : chaque sous-dossier devient un préfixe.
-
-Arborescence :
-
+```text
+> /migrer SearchBar JavaScript TypeScript
 ```
+
+Différence de comportement à connaître : un argument nommé absent devient une chaîne vide, alors qu'un `$2` sans valeur reste écrit tel quel (`$2`) dans le prompt.
+
+## Échappement et cas particuliers
+
+- **Dollar littéral** : écrivez `\$1.00` pour afficher « $1.00 » sans substitution.
+- **Valeurs contenant `$`** : si vous tapez `/resumer "$ARGUMENTS d'hier"`, la valeur est insérée telle quelle, sans nouvelle substitution.
+- **Variables toujours remplacées** : `${CLAUDE_SKILL_DIR}`, `${CLAUDE_PROJECT_DIR}`, `${CLAUDE_SESSION_ID}` et `${CLAUDE_EFFORT}` sont remplacées après les arguments. `${CLAUDE_SKILL_DIR}` sert à appeler un script rangé dans le dossier du skill.
+
+## Enchaîner plusieurs skills
+
+Depuis la v2.1.199, vous pouvez empiler jusqu'à six skills en début de message. Le texte qui suit est passé à chacun :
+
+```text
+> /ecrire-tests /corriger-issue 123
+```
+
+L'enchaînement s'arrête au premier élément qui n'est pas un skill simple : `/code-review`, qui tourne dans un sous-agent, ou `/loop` terminent la chaîne et tout ce qui suit devient du texte d'argument.
+
+## Namespacing
+
+### Ancien format : les sous-dossiers deviennent des préfixes
+
+Dans `.claude/commands/`, chaque sous-dossier devient un préfixe séparé par `:` :
+
+```text
 .claude/commands/
   db/
-    migrate.md
-    rollback.md
-    seed.md
+    migrate.md        → /db:migrate
+    seed.md           → /db:seed
   pr/
-    review.md
-    summary.md
-  test/
-    unit.md
-    e2e.md
+    resume.md         → /pr:resume
+  release.md          → /release
 ```
 
-Donne les commandes :
+Le chemin complet est converti, donc `db/migrations/new.md` donne `/db:migrations:new`. Tapez `/db` pour filtrer tout le domaine dans le menu.
 
-```bash
-/db:migrate
-/db:rollback
-/db:seed
-/pr:review
-/pr:summary
-/test:unit
-/test:e2e
-```
+### Skills : un dossier par skill
 
-Le séparateur `:` permet l'auto-complétion par namespace : tapez `/db:` puis Tab pour voir uniquement les commandes du domaine base de données. C'est aussi un excellent moyen de communiquer la structure : un nouveau venu comprend immédiatement les grands domaines d'outillage du repo.
+Un skill vit dans son propre dossier (`.claude/skills/db-migrate/SKILL.md` donne `/db-migrate`). Pour regrouper, deux options :
+
+- **un préfixe dans le nom** : `db-migrate`, `db-seed`, `pr-resume`. Le menu ignore les séparateurs `-` et `:` dans sa recherche, taper `/db` les retrouve ;
+- **un plugin** : ses skills sont toujours préfixés par le nom du plugin, par exemple `/outils-db:migrate`. C'est la bonne solution pour un catalogue partagé entre dépôts.
+
+Dans un monorepo, si un skill `deploy` existe à la racine et dans `apps/web/.claude/skills/`, `/deploy` lance celui de la racine et `/apps/web:deploy` celui du sous-dossier.
 
 ## Mélanger arguments et namespacing
 
-Rien n'empêche d'avoir des arguments dans une commande namespacée :
+`.claude/commands/db/migrate.md` :
 
 ```md
 ---
-description: "Génère une migration Supabase"
-argument-hint: "<nom-de-migration>"
-allowed-tools: [Bash(supabase migration:*), Write]
+description: Crée une migration Supabase
+argument-hint: <nom_de_migration> "<description>"
+allowed-tools: Bash(supabase migration new *)
 ---
 
-Crée une nouvelle migration Supabase nommée `$ARGUMENTS`.
-
-1. Lance `supabase migration new $ARGUMENTS`
-2. Édite le SQL généré selon ma demande qui suit
-3. Affiche le diff
+Créez une migration nommée `$0` avec `supabase migration new $0`,
+puis écrivez le SQL correspondant à cette demande : $1
+Activez RLS sur toute nouvelle table.
 ```
 
-Usage :
-
-```bash
-> /db:migrate add_wiki_votes_table
-Created: supabase/migrations/20260519_add_wiki_votes_table.sql
-Now editing...
+```text
+> /db:migrate ajout_votes "table des votes du wiki, un vote par utilisateur"
 ```
-
-## Patterns d'arguments utiles
-
-- **Argument optionnel avec fallback** :
-
-```md
-Si `$ARGUMENTS` est vide, utilise la branche courante.
-Sinon, utilise `$ARGUMENTS` comme numéro de PR.
-```
-
-- **Argument structuré JSON** : pour des cas avancés, demandez à l'utilisateur de passer un JSON et laissez Claude le parser :
-
-```bash
-> /deploy {"env": "staging", "skipTests": true}
-```
-
-- **Flags personnalisés** : conventionnez `--dry-run`, `--verbose`, etc. dans le prompt et laissez Claude les interpréter.
 
 ## Limites à connaître
 
-- `$ARGUMENTS` est une simple substitution de chaîne : pas d'échappement, pas de validation. Si l'utilisateur tape des guillemets, ils arrivent tels quels.
-- Le nom de la commande est dérivé du nom de fichier (sans `.md`) : `release.md` → `/release`.
-- Le namespacing par dossier ne descend qu'à un niveau dans la plupart des versions : `.claude/commands/db/migrations/new.md` n'est pas garanti de devenir `/db:migrations:new`. Vérifiez la version.
+- Aucune validation : une valeur absurde arrive telle quelle. Décrivez dans le prompt ce que Claude doit refuser.
+- `$ARGUMENTS` est inséré dans un prompt, pas exécuté. En revanche, ne le placez jamais dans un bloc `` !`…` `` qui, lui, s'exécute dans un shell (voir [Bash injection](/wiki/slash-commands/bash-injection-securisee)).
+- Pour des flags et des grammaires plus riches, voir [Arguments complexes](/wiki/slash-commands/arguments-complexes).
 
 ## Pour aller plus loin
 
-- Doc officielle : https://docs.claude.com/en/docs/claude-code/slash-commands
-- Guide "Slash commands avec arguments complexes" pour parser regex et flags
-- Guide "Partage et centralisation en équipe" pour structurer un gros `.claude/commands/`
+- [Créer une commande personnalisée](/wiki/slash-commands/creer-slash-command)
+- [Partager les commandes en équipe](/wiki/slash-commands/partage-equipe)
+- [Créer un plugin](/wiki/plugins/creer-plugin)
+
+## Sources
+
+- [Skills : pass arguments to skills](https://code.claude.com/docs/en/skills)
+- [Commands](https://code.claude.com/docs/en/commands)

@@ -1,58 +1,102 @@
 ---
-title: "Limites et quotas"
-description: "Comprendre les rate limits Anthropic, les tiers d'usage, et apprendre à lire les headers anthropic-ratelimit-* pour piloter vos applications en production."
-updatedAt: "2026-05-19"
+title: "Limites et quotas de l'API Claude"
+description: "Les paliers Start, Build et Scale, les plafonds de dépense mensuels, les limites RPM / ITPM / OTPM par modèle, les en-têtes anthropic-ratelimit-* et la bonne gestion des erreurs 429."
+updatedAt: "2026-10-03"
 readingMinutes: 6
 ---
 
-L'API Anthropic applique des limites de débit (rate limits) à plusieurs niveaux : requêtes par minute (RPM), tokens d'entrée par minute (ITPM), tokens de sortie par minute (OTPM) et un quota mensuel global. Comprendre ces limites est indispensable pour éviter les erreurs `429 Too Many Requests` en production et dimensionner correctement vos batchs.
+L'API Claude applique deux types de limites à chaque organisation : un **plafond de dépense mensuel** et des **limites de débit** (requêtes et tokens par minute). Les connaître évite les erreurs `429` en production et aide à dimensionner vos traitements.
 
-## Les tiers d'usage
+## Les paliers d'usage
 
-Anthropic segmente les comptes en quatre tiers (1 à 4), chacun débloquant des plafonds plus élevés. Les seuils varient par modèle, mais l'esprit est constant :
+Votre organisation est placée automatiquement sur un palier selon son historique d'usage et l'état du compte. Elle monte avec le temps, sans démarche particulière. Une organisation récente peut démarrer sur un palier d'évaluation, en dessous des limites standard, le temps de constituer un historique.
 
-- **Tier 1** : compte fraîchement créé, environ 50 RPM et quelques dizaines de milliers d'ITPM. Idéal pour prototyper, insuffisant pour servir du trafic réel.
-- **Tier 2** : débloqué après un dépôt initial (généralement 40 $) et 7 jours d'historique. Les limites doublent ou triplent.
-- **Tier 3** : nécessite environ 200 $ de dépenses cumulées et 7 jours supplémentaires. C'est le palier minimum pour une app SaaS naissante.
-- **Tier 4** : seuil professionnel (environ 400 $ et 14 jours). Les limites montent significativement (plusieurs millions d'ITPM sur Sonnet).
+| Palier | Plafond de dépense mensuel |
+|---|---|
+| Start | 500 $ |
+| Build | 1 000 $ |
+| Scale | 200 000 $ |
+| Custom | Aucun plafond, limites négociées avec l'équipe commerciale |
 
-Au-delà du tier 4, vous pouvez demander des limites custom via le formulaire Anthropic. Pour les workloads très volumineux, l'API Batch (50 % moins cher, async) ne consomme pas les mêmes quotas et reste un excellent levier.
+Vous voyez votre palier et vos limites dans la Console, page **Settings > Limits**. Pour aller plus haut, utilisez **Request rate limit increase** sur cette même page, ou le support pour un besoin urgent.
 
-## Comment monter en tier
+## Les limites de débit par modèle
 
-La progression est automatique : Anthropic vérifie deux conditions sur votre console — montant total facturé et ancienneté du compte. Vous n'avez rien à demander, le passage se déclenche dès que les seuils sont atteints.
+Trois compteurs s'appliquent par modèle : requêtes par minute (RPM), tokens d'entrée par minute (ITPM) et tokens de sortie par minute (OTPM).
 
-Astuces pour accélérer :
+| Modèle | Start (RPM / ITPM / OTPM) | Build | Scale |
+|---|---|---|---|
+| Opus 5.5 | 1 000 / 2M / 400K | 5 000 / 5M / 1M | 10 000 / 10M / 2M |
+| Sonnet 5.5 | 1 000 / 2M / 400K | 5 000 / 5M / 1M | 10 000 / 10M / 2M |
+| Haiku 4.5 | 1 000 / 2M / 400K | 5 000 / 5M / 1M | 10 000 / 10M / 2M |
+| Fable 5.x (limite commune 5 et 5.1) | 1 000 / 500K / 100K | 2 000 / 1,5M / 300K | 4 000 / 4M / 800K |
 
-1. Activer le prepayment (carte rechargeable) plutôt que la facturation post-paid.
-2. Concentrer la consommation sur un seul `Organization` pour cumuler les seuils.
-3. Surveiller la page **Plans & Billing** de la console pour voir le tier actif et la progression.
+Ce sont des maximums, pas des garanties. Quelques règles utiles :
 
-Si vous avez un besoin urgent (lancement produit, pic de trafic prévu), contactez le support avec un descriptif de votre cas d'usage.
+- **Algorithme du seau à jetons** : la capacité se recharge en continu, elle ne se remet pas à zéro chaque minute. Une rafale courte peut donc déclencher une `429` même sous la moyenne (60 RPM peut être appliqué comme 1 requête par seconde).
+- **Le cache est gratuit pour l'ITPM** : sur presque tous les modèles, les tokens lus depuis le cache (`cache_read_input_tokens`) ne comptent pas dans l'ITPM. Avec 80 % de cache, une limite de 2M ITPM permet de traiter environ 10M tokens d'entrée par minute.
+- **`max_tokens` ne pénalise pas l'OTPM** : seuls les tokens réellement générés comptent.
+- **Limites par modèle** : vous pouvez utiliser plusieurs modèles en parallèle, chacun jusqu'à sa limite. Opus 5.5 et Sonnet 5.5 ont chacun leur propre compteur.
+- **Limites d'accélération** : une hausse brutale de trafic peut déclencher des `429`. Montez en charge progressivement.
 
-## Lire les headers anthropic-ratelimit-*
+L'API Batch a ses propres limites (par exemple 100 000 requêtes par lot), indépendantes de celles du Messages API.
 
-Chaque réponse de l'API contient des headers précieux pour piloter votre logique de retry et de backpressure :
+## Plafond de dépense atteint
 
-- `anthropic-ratelimit-requests-limit` : RPM max sur le tier actuel.
-- `anthropic-ratelimit-requests-remaining` : requêtes restantes dans la fenêtre courante.
-- `anthropic-ratelimit-requests-reset` : timestamp ISO 8601 du reset de la fenêtre.
-- `anthropic-ratelimit-input-tokens-limit` / `-remaining` / `-reset` : équivalent pour les tokens d'entrée.
-- `anthropic-ratelimit-output-tokens-limit` / `-remaining` / `-reset` : tokens de sortie.
-- `retry-after` (uniquement sur 429) : nombre de secondes avant de retenter.
+Quand le plafond mensuel du palier est atteint, l'API répond `429` avec `error.details.error_code: "enforced_spend_limit_reached"` et **sans en-tête `retry-after`**. Réessayer ne sert à rien : l'accès reprend le 1er du mois suivant à 00:00 UTC, ou dès que vous passez à un palier supérieur.
 
-Un client robuste lit ces headers à chaque réponse, calcule le ratio `remaining / limit`, et ralentit proactivement (token bucket local) avant de toucher le mur. Le SDK officiel `@anthropic-ai/sdk` expose `response.headers` via le mode `withResponse()`.
+Vous pouvez aussi fixer votre propre limite, plus basse, dans **Settings > Billing**. Quand elle est atteinte, l'API renvoie une erreur `400` (`invalid_request_error`). Des limites peuvent également être posées par workspace.
 
-## Stratégies de gestion des 429
+## Lire les en-têtes de réponse
 
-Trois patterns éprouvés :
+Chaque réponse porte des en-têtes qui décrivent votre consommation :
 
-1. **Exponential backoff avec jitter** : retry avec délais croissants (1s, 2s, 4s...) plus un aléa pour éviter la synchronisation des clients.
-2. **Queue prioritaire** : segmenter les requêtes (UI temps réel vs jobs batch) et drainer la queue selon les headers restants.
-3. **Fallback multi-modèles** : basculer vers Haiku quand Sonnet sature, ou vers une autre clé/organisation de secours.
+| En-tête | Contenu |
+|---|---|
+| `retry-after` | Secondes à attendre avant de réessayer (sur une `429` de débit) |
+| `anthropic-ratelimit-requests-limit` / `-remaining` / `-reset` | Requêtes |
+| `anthropic-ratelimit-tokens-limit` / `-remaining` / `-reset` | Limite de tokens la plus contraignante en cours |
+| `anthropic-ratelimit-input-tokens-limit` / `-remaining` / `-reset` | Tokens d'entrée |
+| `anthropic-ratelimit-output-tokens-limit` / `-remaining` / `-reset` | Tokens de sortie |
+
+Les valeurs `-reset` sont au format RFC 3339. Les valeurs `-remaining` des tokens sont arrondies au millier.
+
+```ts
+import Anthropic from "@anthropic-ai/sdk";
+
+const client = new Anthropic({ maxRetries: 3 }); // retries avec backoff intégrés
+
+const { data, response } = await client.messages
+  .create({
+    model: "claude-sonnet-5-5",
+    max_tokens: 512,
+    messages: [{ role: "user", content: "Bonjour" }],
+  })
+  .withResponse();
+
+const remaining = Number(response.headers.get("anthropic-ratelimit-input-tokens-remaining"));
+const limit = Number(response.headers.get("anthropic-ratelimit-input-tokens-limit"));
+if (remaining / limit < 0.1) {
+  // ralentir la file d'attente avant de toucher la limite
+}
+```
+
+## Gérer les 429
+
+1. **Respectez `retry-after`** quand il est présent. Les SDK officiels réessaient déjà automatiquement avec un backoff exponentiel.
+2. **Distinguez débit et dépense** : sans `retry-after` et avec `enforced_spend_limit_reached`, inutile de réessayer.
+3. **Séparez les flux** : interactif d'un côté, traitements de fond de l'autre, avec une file à priorités.
+4. **Basculez le hors ligne vers l'API Batch** : 50 % moins cher et limites séparées.
+5. **Maximisez le cache** : c'est le moyen le plus simple d'augmenter votre débit utile.
 
 ## Pour aller plus loin
 
-- Documentation officielle : [Anthropic Rate Limits](https://docs.anthropic.com/en/api/rate-limits)
-- Voir aussi le wiki interne sur l'API Batch pour les jobs offline.
-- Pensez au prompt caching : il ne change pas vos RPM mais réduit drastiquement les ITPM facturés.
+- [Les en-têtes de rate limit en détail](/wiki/api/rate-limit-headers)
+- [L'API Batch](/wiki/api/batch-api)
+- [Prompt caching](/wiki/api/prompt-caching-implementation)
+- [Tarification et tokens](/wiki/modeles/pricing-tokens)
+
+## Sources
+
+- [Rate limits (Claude Platform Docs)](https://platform.claude.com/docs/en/api/rate-limits)
+- [Pricing](https://platform.claude.com/docs/en/about-claude/pricing)

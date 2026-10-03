@@ -1,139 +1,155 @@
 ---
-title: "Modes interactif vs one-shot"
-description: "Quand utiliser le REPL interactif et quand préférer une exécution one-shot scriptable."
-updatedAt: "2026-05-19"
-readingMinutes: 6
+title: "Mode interactif ou non interactif (-p)"
+description: "Quand dialoguer avec Claude Code dans le terminal et quand l'appeler en une commande avec claude -p pour vos scripts, votre CI et vos tâches planifiées."
+updatedAt: "2026-10-03"
+readingMinutes: 7
 ---
 
-Claude Code propose deux modes d'exécution radicalement différents : le **mode interactif** (REPL) où vous dialoguez en temps réel, et le **mode one-shot** (commande unique) idéal pour l'automatisation et les pipelines CI/CD. Comprendre quand utiliser chacun double votre efficacité.
+Claude Code s'utilise de deux façons. En **mode interactif**, vous dialoguez avec lui dans le terminal. En **mode non interactif** (`claude -p`), vous lui passez une demande, il travaille, affiche le résultat et rend la main : idéal pour les scripts, la CI et les tâches répétitives.
 
-## Mode interactif : le REPL
+## Le mode interactif
 
-C'est le mode par défaut, lancé sans argument :
+C'est le mode par défaut :
 
 ```bash
 claude
+# ou avec une première demande
+claude "explique le dossier src/auth"
 ```
 
-Vous obtenez un prompt clignotant, vous tapez des messages, Claude répond et exécute des outils en temps réel. Idéal pour :
+Vous gardez la main pendant toute la session : vous voyez chaque fichier lu, chaque commande lancée, vous interrompez avec `Échap`, vous revenez en arrière avec `/rewind`. Choisissez-le pour :
 
-- **Exploration** : comprendre un nouveau codebase
-- **Itération** : ajuster une feature au fur et à mesure
-- **Debug en direct** : voir les fichiers lus, les commandes lancées
-- **Pair programming** : discussion fluide avec contexte qui s'enrichit
+- découvrir un projet ;
+- une tâche qui demande des allers-retours (debug, conception) ;
+- tout ce que vous voulez relire avant validation.
 
-Le mode interactif maintient un **historique de conversation** : Claude se souvient de ce qui a été dit plus haut dans la session.
+## Le mode non interactif : `claude -p`
 
-## Mode one-shot : `-p` (print)
-
-Le flag `-p` (ou `--print`) lance Claude avec un prompt unique, attend la réponse, puis quitte :
+Le flag `-p` (ou `--print`) exécute une demande puis quitte. La réponse sort sur la sortie standard, ce qui la rend utilisable dans un pipe :
 
 ```bash
-claude -p "Liste les TODO du dossier src/ avec leur fichier"
+claude -p "Liste les TODO du dossier src/ avec leur fichier et leur ligne"
 ```
 
-La sortie est imprimée sur **stdout**, ce qui rend ce mode parfait pour :
-
-- **Scripts shell** : intégrer Claude dans un pipeline bash
-- **CI/CD** : générer un changelog, valider un PR
-- **Tâches répétitives** : automatiser un audit hebdomadaire
-- **Cron jobs** : maintenance, monitoring, rapports
-
-Exemple d'intégration dans un script :
+Vous pouvez aussi envoyer des données sur l'entrée standard (10 Mo maximum) :
 
 ```bash
-#!/bin/bash
-SUMMARY=$(claude -p "Résume les commits depuis hier en 5 bullet points")
-echo "$SUMMARY" | mail -s "Daily digest" team@example.com
+cat build-error.txt | claude -p "Explique la cause de cette erreur de build" > analyse.txt
+git diff main | claude -p "Signale les fautes de frappe de ce diff, une par ligne"
 ```
+
+Le code de sortie vaut 0 en cas de succès et une autre valeur en cas d'échec : vos scripts peuvent donc réagir.
 
 ## Comparaison rapide
 
-| Critère | Interactif | One-shot (`-p`) |
+| Critère | Interactif | Non interactif (`-p`) |
 |---|---|---|
-| Lancement | `claude` | `claude -p "<prompt>"` |
-| Historique | Oui (session) | Non (sauf `--resume`) |
-| Sortie | Terminal coloré | stdout brut |
-| Permissions | Demande à chaque action | Configurable via flags |
-| Idéal pour | Dev exploratoire | Automation, CI |
-| Streaming visible | Oui | Optionnel (`--output-format stream-json`) |
+| Lancement | `claude` | `claude -p "<demande>"` |
+| Interaction | Conversation, interruption, `/rewind` | Aucune pendant l'exécution |
+| Sortie | Interface du terminal | Texte, JSON ou flux JSON sur stdout |
+| Permissions | Mode `auto` par défaut (v2.1.283+), vous répondez aux demandes | Mode `default` le plus souvent ; ce qui demanderait une validation est refusé |
+| Idéal pour | Développement, exploration | Scripts, CI/CD, cron |
 
-## Formats de sortie one-shot
-
-Le mode `-p` accepte plusieurs formats via `--output-format` :
+## Formats de sortie
 
 ```bash
-# Texte brut (défaut)
-claude -p "Compte les lignes de TypeScript du repo"
+# Texte brut (par défaut)
+claude -p "Résume ce projet"
 
-# JSON structuré (parsable)
-claude -p "Liste les dépendances obsolètes" --output-format json
+# JSON : résultat dans .result, plus session_id, coût et métadonnées
+claude -p "Résume ce projet" --output-format json | jq -r '.result'
 
-# Stream JSON (un objet par événement, idéal pour pipes)
-claude -p "Analyse les logs/" --output-format stream-json
+# Flux JSON ligne par ligne (exige --verbose)
+claude -p "Analyse le dossier logs/" --output-format stream-json --verbose
 ```
 
-Le format `json` renvoie un objet contenant la réponse, les tool calls, le coût en tokens et la durée — utile pour observability.
+Le JSON contient notamment `result`, `session_id` et `total_cost_usd` (une estimation calculée côté client, qui peut différer de la facture).
 
-## Permissions en mode one-shot
-
-En interactif, Claude demande votre validation à chaque action sensible. En one-shot, ce comportement bloquerait le script. Trois options :
+Pour obtenir une sortie qui respecte un schéma précis, ajoutez `--json-schema` ; le résultat validé arrive dans `structured_output` :
 
 ```bash
-# Mode planning seulement (aucune écriture/exécution)
-claude -p "Audite la sécurité du repo" --permission-mode plan
-
-# Auto-accepte les actions standards
-claude -p "Lance les tests et corrige les échecs" --permission-mode acceptEdits
-
-# Mode dangereux (à utiliser avec extrême prudence, en sandbox)
-claude -p "..." --dangerously-skip-permissions
+claude -p "Extrais les noms des fonctions exportées de auth.ts" \
+  --output-format json \
+  --json-schema '{"type":"object","properties":{"functions":{"type":"array","items":{"type":"string"}}},"required":["functions"]}' \
+  | jq '.structured_output'
 ```
 
-> N'utilisez jamais `--dangerously-skip-permissions` en dehors d'un environnement isolé (container, VM). C'est l'équivalent d'un `rm -rf` en mode aveugle.
+## Gérer les permissions sans humain
 
-## Reprendre une session one-shot
-
-Vous pouvez chaîner des appels one-shot en conservant l'historique :
+Personne n'est là pour répondre aux demandes d'autorisation. Une action non autorisée est donc refusée et Claude continue sans elle. Pré-autorisez ce dont la tâche a besoin :
 
 ```bash
-# Premier appel : démarre une conversation
-SESSION_ID=$(claude -p "Initialise un projet Next.js" --output-format json | jq -r '.session_id')
+# Autoriser précisément quelques outils
+claude -p "Lance les tests et corrige les échecs" \
+  --allowedTools "Read,Edit,Bash(npm test *)"
 
-# Deuxième appel : reprend la même session
-claude -p "Ajoute Tailwind" --resume "$SESSION_ID"
+# Accepter les modifications de fichiers, rien de plus
+claude -p "Applique les corrections du linter" --permission-mode acceptEdits
+
+# CI verrouillée : tout ce qui n'est pas explicitement autorisé est refusé
+claude -p "Lance la suite de tests" --permission-mode dontAsk \
+  --allowedTools "Bash(npm test)" "Read"
+
+# Analyse sans aucune modification
+claude -p "Audite la sécurité de ce dépôt" --permission-mode plan
 ```
 
-Cela permet de construire des workflows multi-étapes scriptés.
+Autres garde-fous utiles en script : `--max-turns 5` limite le nombre de tours, `--max-budget-usd 2.00` plafonne la dépense.
+
+> N'utilisez `--dangerously-skip-permissions` (équivalent de `--permission-mode bypassPermissions`) que dans un conteneur ou une VM jetable, avec un utilisateur non root. Les règles `deny` s'appliquent toujours, mais plus rien d'autre ne vous protège.
+
+## Démarrer vite et de façon reproductible : `--bare`
+
+Par défaut, `claude -p` charge tout ce qu'une session interactive chargerait : `CLAUDE.md`, hooks, skills, serveurs MCP du projet et de `~/.claude`. En CI, le flag `--bare` ignore tout cela et démarre plus vite, avec le même comportement sur toutes les machines :
+
+```bash
+claude --bare -p "Résume README.md" --allowedTools "Read"
+```
+
+Attention : en mode `--bare`, Claude Code ne lit pas votre connexion par abonnement. Il faut `ANTHROPIC_API_KEY` (ou un `apiKeyHelper`). Ajoutez le contexte voulu par flags : `--append-system-prompt`, `--settings`, `--mcp-config`.
+
+Autre point de sécurité : sans `--bare`, un `claude -p` lancé dans un dépôt inconnu exécute ses hooks et connecte ses serveurs MCP **sans** demande de confiance. N'utilisez pas `-p` sur un dépôt que vous n'avez pas relu.
+
+## Enchaîner plusieurs appels
+
+Chaque appel `-p` peut reprendre la conversation précédente :
+
+```bash
+claude -p "Passe en revue ce code pour les problèmes de performance"
+claude -p "Concentre-toi maintenant sur les requêtes SQL" --continue
+
+# Ou viser une session précise
+session_id=$(claude -p "Démarre une revue" --output-format json | jq -r '.session_id')
+claude -p "Poursuis cette revue" --resume "$session_id"
+```
+
+## Exemple : un message de commit généré
+
+```bash
+claude -p "Regarde mes changements indexés et crée un commit au format Conventional Commits" \
+  --allowedTools "Bash(git diff *),Bash(git status *),Bash(git commit *)"
+```
+
+L'espace avant `*` compte : `Bash(git diff *)` autorise toute commande qui commence par `git diff `, alors que `Bash(git diff*)` couvrirait aussi `git diff-index`.
 
 ## Quand choisir quoi ?
 
-**Choisissez interactif quand :**
-- Vous découvrez un projet
-- La tâche demande des allers-retours (debug, design)
-- Vous voulez voir/valider chaque action
-- Le contexte évolue au fur et à mesure
+**Interactif** quand vous découvrez un projet, quand la tâche demande des allers-retours ou quand vous voulez valider chaque étape.
 
-**Choisissez one-shot quand :**
-- La tâche est bien définie à l'avance
-- Vous l'exécutez régulièrement (cron, CI)
-- Vous voulez piper la sortie dans un autre outil
-- Vous automatisez sans présence humaine
+**Non interactif** quand la tâche est bien définie, qu'elle revient souvent (cron, CI), que sa sortie doit alimenter un autre outil ou qu'aucun humain n'est présent.
 
-## Exemple hybride : commit assistant
-
-Un cas pratique qui combine les deux modes — un alias git qui génère un message de commit :
-
-```bash
-# Dans ~/.gitconfig
-[alias]
-  aicommit = !git add -A && git commit -m \"$(claude -p 'Génère un message de commit conventionnel à partir de git diff --cached')\"
-```
-
-Vous tapez `git aicommit`, Claude analyse le diff stagé et compose le message — sans ouvrir d'interface interactive.
+Entre les deux existent aussi les sessions en arrière-plan (`claude --bg`, suivies avec `claude agents`) et les routines dans le cloud : voir [Agent view et sessions](/wiki/cli/agent-view-sessions).
 
 ## Pour aller plus loin
 
-- [Votre premier prompt](/wiki/demarrer/premier-prompt) — bases du REPL
-- [Permissions et sandbox](/wiki/demarrer/permissions-sandbox) — sécuriser le mode one-shot
-- [Documentation `claude -p`](https://docs.claude.com/claude-code/cli-reference) — flags complets
+- [Votre premier prompt](/wiki/demarrer/premier-prompt)
+- [Le mode headless en détail](/wiki/cli/headless-mode)
+- [Pipes et automatisation](/wiki/cli/pipes-automation)
+- [Claude Code en CI/CD](/wiki/cli/cicd-execution)
+- [Permissions et sandbox](/wiki/demarrer/permissions-sandbox)
+
+## Sources
+
+- [Run Claude Code programmatically](https://code.claude.com/docs/en/headless)
+- [CLI reference](https://code.claude.com/docs/en/cli-reference)
+- [Permission modes](https://code.claude.com/docs/en/permission-modes)

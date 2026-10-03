@@ -1,105 +1,141 @@
 ---
-title: "Gestion fine de la mémoire"
-description: "Forcer Claude Code à oublier des fichiers ou sections de contexte via /clear, /compact et les hooks."
-updatedAt: "2026-05-19"
-readingMinutes: 6
+title: "Mémoire et oubli sélectif"
+description: "Faire oublier à Claude Code ce qui ne sert plus : /clear, /compact ciblé, résumé partiel avec /rewind, règles deny, exclusion de CLAUDE.md et nettoyage de la mémoire automatique."
+updatedAt: "2026-10-03"
+readingMinutes: 7
 ---
 
-La fenêtre de contexte de Claude est large, mais pas infinie. Plus elle se remplit, plus le modèle ralentit, plus il coûte cher et plus il perd en précision. Apprendre à faire oublier sélectivement à Claude est aussi important que savoir lui faire mémoriser. Ce guide passe en revue les outils intégrés au CLI.
+Tout ce qui entre dans le contexte influence les réponses de Claude, coûte des tokens à chaque message et repousse le moment de la compaction. Savoir faire oublier est donc aussi utile que savoir faire retenir. Cet article distingue deux mémoires : le **contexte de la session** (volatil) et la **mémoire persistante** (`CLAUDE.md` et mémoire automatique, rechargées à chaque session).
 
-## /clear : repartir de zéro
+## Voir ce qui occupe le contexte
 
-La commande la plus radicale. Elle vide intégralement le contexte de la session courante : historique de conversation, fichiers lus, résultats d'outils.
-
-```bash
-> /clear
+```text
+/context
 ```
 
-À utiliser entre deux tâches sans rapport. Exemple typique : vous venez de finir un refactor sur le module auth, vous enchaînez sur du design CSS. `/clear` évite que Claude continue à raisonner avec en tête le code de l'auth.
+`/context` affiche une grille d'occupation par catégorie (prompt système, outils, fichiers de mémoire, skills, messages) et suggère des optimisations : serveurs MCP lourds, `CLAUDE.md` trop long. C'est le point de départ avant de faire le ménage.
 
-Attention : `/clear` ne supprime pas votre `CLAUDE.md` ni vos memories projet, qui sont rechargés à chaque démarrage de session. Il purge uniquement le contexte volatil.
+## Oublier toute la conversation : /clear
 
-## /compact : résumer pour libérer de l'espace
-
-Plus subtil que `/clear`. La commande `/compact` demande à Claude de résumer la conversation passée en un message court, puis remplace tout l'historique par ce résumé.
-
-```bash
-> /compact
+```text
+/rename refacto-auth
+/clear
 ```
 
-On peut guider la compaction avec une instruction :
+`/clear` démarre une conversation vide. Il n'efface pas la mémoire persistante : `CLAUDE.md` et la mémoire automatique sont rechargés. L'ancienne conversation reste accessible avec `/resume`. Utilisez-le dès que vous changez de sujet.
 
-```bash
-> /compact Garde uniquement les décisions d'architecture et oublie les détails d'implémentation
+## Résumer en gardant l'essentiel : /compact
+
+```text
+/compact Garde les décisions d'architecture et la liste des tests en échec ; oublie les essais ratés
 ```
 
-Idéal sur les sessions longues où vous voulez conserver les conclusions importantes sans traîner tout le détail des allers-retours. Le compactage automatique se déclenche aussi quand on approche de la limite de contexte.
+`/compact` remplace l'historique par un résumé orienté par votre consigne. Pour orienter toutes les compactions (y compris automatiques), ajoutez une section à `CLAUDE.md` :
+
+```markdown
+# Compact instructions
+Lors d'une compaction, conserve les décisions prises, les commandes de test et les erreurs non résolues.
+```
+
+Ce qui survit à une compaction :
+
+| Élément | Après compaction |
+|---|---|
+| Prompt système, output style | Toujours appliqués |
+| `CLAUDE.md` racine, mémoire automatique | Relus depuis le disque |
+| Plan du mode plan | Réinjecté |
+| Fichiers lus ou modifiés | Les 5 plus récents sont relus (au-delà de 5 000 tokens, seulement leur chemin) |
+| Skills invoquées | Réinjectées, tronquées à 5 000 tokens chacune |
+| `CLAUDE.md` des sous-dossiers, règles `paths:` | Rechargés quand Claude relit un fichier concerné |
+| Consignes données seulement dans la conversation | Résumées, donc parfois perdues |
+
+Pour déclencher la compaction automatique plus tôt : `/autocompact 500k` (seuil en tokens).
+
+## Oublier une partie seulement : /rewind
+
+`/rewind` (ou `Esc` deux fois) liste vos prompts. Choisissez-en un, puis :
+
+- **Summarize from here** : résume tout ce qui suit ce point, en gardant intact le début (vos consignes initiales) ;
+- **Summarize up to here** : résume ce qui précède et garde intacts les échanges récents ;
+- **Restore conversation** : supprime tout ce qui suit, comme si cela n'avait jamais eu lieu.
+
+C'est la méthode la plus précise pour se débarrasser d'une longue séance de débogage sans perdre le cadrage du début.
 
 ## Oublier un fichier précis
 
-Claude n'a pas de commande native `/forget fichier.ts`. La méthode pragmatique consiste à :
+Il n'existe pas de commande `/forget fichier`. Tant que le contenu est dans le contexte, il pèse sur les réponses. Deux options :
 
-1. Faire un `/compact` avec une instruction qui exclut le fichier.
-2. Ou recharger une session propre avec `/clear` puis ne lire que ce qui est utile.
-
-```bash
-> /compact Garde le contexte sauf le contenu de app/page.tsx que tu peux relire si besoin
+```text
+/compact Oublie le contenu de app/page.tsx ; relis-le seulement si nécessaire
 ```
 
-Cette approche fonctionne mieux que d'espérer que Claude ignore un fichier déjà chargé : tant que le texte est dans la fenêtre, il influence les réponses.
+ou bien `/rewind` jusqu'au prompt qui précède la lecture du fichier, puis « Restore conversation ».
 
-## Hooks pour contrôler ce qui entre
+## Empêcher certaines choses d'entrer
 
-Pour empêcher Claude de lire certains fichiers dès le départ, on utilise un hook `PreToolUse`. Configuration dans `.claude/settings.json` :
+Le plus efficace reste d'éviter qu'un contenu n'entre dans le contexte.
+
+**Règles `deny`** pour les fichiers sensibles ou inutiles :
 
 ```json
 {
-  "hooks": {
-    "PreToolUse": [
-      {
-        "matcher": "Read",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node .claude/scripts/block-secrets.js"
-          }
-        ]
-      }
-    ]
+  "permissions": {
+    "deny": ["Read(./.env)", "Read(./.env.*)", "Read(./dist/**)", "Read(./coverage/**)"]
   }
 }
 ```
 
-Le script reçoit le `tool_input` sur `stdin` et peut renvoyer `exit 2` pour bloquer la lecture. Exemple minimal :
+**Déléguer les lectures volumineuses** à un sous-agent : les logs, les gros fichiers et les recherches restent dans son contexte, seul un résumé revient.
 
-```bash
-#!/usr/bin/env node
-let data = "";
-process.stdin.on("data", c => data += c);
-process.stdin.on("end", () => {
-  const { tool_input } = JSON.parse(data);
-  if (tool_input.file_path?.includes(".env")) {
-    console.error("Lecture .env bloquée");
-    process.exit(2);
-  }
-});
-```
+**Filtrer avec un hook** : un hook `PreToolUse` peut réécrire une commande de test pour ne garder que les échecs, ou bloquer une lecture (code de sortie `2`, message sur stderr). Voir [PreToolUse et PostToolUse](/wiki/hooks/pre-post-tool-use).
 
-Résultat : Claude ne pourra jamais charger ces fichiers dans son contexte, donc jamais les retenir.
+**Alléger les outils** : coupez les serveurs MCP inutiles dans `/mcp`. Pour une skill que vous invoquez toujours à la main, `disable-model-invocation: true` retire sa description du contexte.
 
-## Memories projet et utilisateur
+## La mémoire persistante
 
-Les fichiers `CLAUDE.md` (projet) et `~/.claude/CLAUDE.md` (utilisateur) sont rechargés à chaque session. Pour faire oublier durablement une convention, il faut la retirer de ces fichiers.
+### CLAUDE.md
 
-```bash
-> /memory
-```
+Vos instructions. Pour faire oublier durablement une règle, retirez-la du fichier : `/memory` liste et ouvre tous les fichiers chargés. Quelques leviers :
 
-La commande `/memory` ouvre l'éditeur sur les memories actifs. C'est le seul oubli vraiment permanent : ce qui n'est pas dans `CLAUDE.md` ne sera pas réinjecté la prochaine fois.
+- **`claudeMdExcludes`** dans les réglages : ignorer certains `CLAUDE.md` (utile dans un monorepo où le fichier d'une autre équipe ne vous concerne pas) ;
+- **règles ciblées** dans `.claude/rules/` avec un frontmatter `paths:` : chargées seulement quand Claude touche aux fichiers concernés ;
+- **taille** : visez moins de 200 lignes. `/doctor` propose de supprimer ce que Claude peut déduire du code.
+
+### La mémoire automatique
+
+Claude y enregistre ce qu'il apprend : vos préférences, vos corrections, le contexte du projet. Elle se trouve dans `~/.claude/projects/<projet>/memory/` : un index `MEMORY.md` (200 premières lignes ou 25 Ko chargés à chaque session) et un fichier par sujet, lu à la demande.
+
+Pour faire oublier quelque chose :
+
+- ouvrez `/memory`, puis le dossier de mémoire automatique, et modifiez ou supprimez le fichier concerné ;
+- ou demandez simplement à Claude : « Oublie ce que tu as retenu sur l'utilisation de npm, nous sommes passés à pnpm. »
+
+Ces fichiers ne sont **pas** supprimés par le nettoyage automatique des transcriptions : ils restent jusqu'à ce que vous ou Claude les modifiiez. Une préférence obsolète peut donc persister longtemps. Relisez-les de temps en temps.
+
+Pour désactiver la mémoire automatique : l'interrupteur dans `/memory`, `"autoMemoryEnabled": false` dans les réglages d'un projet, ou `CLAUDE_CODE_DISABLE_AUTO_MEMORY=1`.
+
+## Récapitulatif
+
+| Je veux oublier | Outil |
+|---|---|
+| Toute la conversation | `/clear` |
+| Les détails, en gardant les conclusions | `/compact <consigne>` |
+| Une portion de la conversation | `/rewind` puis Summarize ou Restore conversation |
+| Un fichier lu par erreur | `/compact` ciblé ou `/rewind` |
+| Un fichier, pour toujours | Règle `deny` |
+| Une règle de projet | Modifier `CLAUDE.md` via `/memory` |
+| Une préférence apprise | Supprimer le fichier de mémoire automatique |
 
 ## Pour aller plus loin
 
-- Utiliser `/cost` régulièrement pour repérer quand le contexte coûte trop cher et déclencher `/compact`.
-- Créer un hook `SessionStart` qui rappelle à Claude les fichiers à ne pas charger spontanément.
-- Découper les longues sessions en sous-sessions thématiques avec `claude --resume` plutôt que tout faire dans un seul fil.
-- Documenter dans `CLAUDE.md` les patterns de mémoire de votre projet pour que toute l'équipe ait les mêmes réflexes.
+- [/clear, /resume et /usage](/wiki/cli/clear-resume-cost)
+- [Checkpoints et /rewind](/wiki/cli/continue-checkpoints)
+- [Écrire un bon CLAUDE.md](/wiki/demarrer/claude-md)
+- [Hook PreCompact](/wiki/hooks/pre-compact)
+
+## Sources
+
+- [Memory](https://code.claude.com/docs/en/memory)
+- [Explore the context window](https://code.claude.com/docs/en/context-window)
+- [Checkpointing](https://code.claude.com/docs/en/checkpointing)
+- [Manage costs effectively](https://code.claude.com/docs/en/costs)

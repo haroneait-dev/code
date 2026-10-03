@@ -1,106 +1,156 @@
 ---
-title: "Intégration de la Vision API d'Anthropic"
-description: "Encoder des images en base64, construire des payloads multi-modaux et exploiter la vision de Claude."
-updatedAt: "2026-05-19"
-readingMinutes: 6
+title: "Envoyer des images à Claude (vision)"
+description: "Passer des images à l'API Claude en base64, par URL ou par file_id, comprendre les limites (taille, nombre, résolution) et calculer le coût en tokens."
+updatedAt: "2026-10-03"
+readingMinutes: 7
 ---
 
-Tous les modèles Claude récents (Sonnet 4.6+, Opus 4.7) sont **multi-modaux** : ils acceptent du texte et des images dans le même message. Cela ouvre la porte à l'OCR avancé, à l'analyse de captures d'écran, au diagnostic de graphiques, à la lecture de documents scannés ou à la description d'interfaces. L'API ne nécessite aucun endpoint séparé : on passe simplement des blocs `image` dans le `content` d'un message.
+Tous les modèles Claude actuels comprennent les images. Aucun endpoint séparé : vous ajoutez des blocs `image` dans le `content` d'un message. Captures d'écran, schémas, factures, graphiques ou photos de tableau blanc peuvent ainsi être analysés dans la même requête que votre texte.
 
-## Encoder une image en base64
+## Trois façons de fournir une image
 
-Pour envoyer une image locale, encodez-la en base64 et précisez son `media_type` (`image/jpeg`, `image/png`, `image/gif`, `image/webp`).
+| Source | Quand l'utiliser |
+|---|---|
+| `base64` | Image locale envoyée une seule fois |
+| `url` | Image déjà hébergée publiquement |
+| `file` (`file_id`) | Image réutilisée sur plusieurs requêtes ou longues conversations |
+
+Sur Amazon Bedrock et Google Cloud, seule la source `base64` est disponible.
+
+## Image locale en base64 (Python)
 
 ```python
-import anthropic, base64, pathlib
-
-img_bytes = pathlib.Path("schema.png").read_bytes()
-img_b64 = base64.standard_b64encode(img_bytes).decode("utf-8")
+import base64
+import pathlib
+import anthropic
 
 client = anthropic.Anthropic()
+img_b64 = base64.standard_b64encode(pathlib.Path("schema.png").read_bytes()).decode("utf-8")
+
 response = client.messages.create(
-    model="claude-sonnet-5-5",
-    max_tokens=1024,
+    model="claude-opus-5-5",
+    max_tokens=4000,
     messages=[{
         "role": "user",
         "content": [
-            {
-                "type": "image",
-                "source": {
-                    "type": "base64",
-                    "media_type": "image/png",
-                    "data": img_b64,
-                },
-            },
-            {"type": "text", "text": "Décris ce schéma d'architecture."}
+            {"type": "image", "source": {"type": "base64", "media_type": "image/png", "data": img_b64}},
+            {"type": "text", "text": "Décrivez ce schéma d'architecture et repérez les points de défaillance."},
         ],
     }],
 )
-print(response.content[0].text)
+print(next(b.text for b in response.content if b.type == "text"))
 ```
 
-## Référencer une image par URL
-
-Plus simple si l'image est déjà hébergée : utilisez `source.type = "url"`. L'API télécharge l'image côté Anthropic.
+## Image par URL (TypeScript)
 
 ```ts
 import Anthropic from "@anthropic-ai/sdk";
 
 const client = new Anthropic();
+
 const msg = await client.messages.create({
-  model: "claude-sonnet-5-5",
-  max_tokens: 1024,
-  messages: [{
-    role: "user",
-    content: [
-      { type: "image", source: { type: "url", url: "https://exemple.com/photo.jpg" } },
-      { type: "text", text: "Que vois-tu sur cette photo ?" },
-    ],
-  }],
+  model: "claude-opus-5-5",
+  max_tokens: 4000,
+  messages: [
+    {
+      role: "user",
+      content: [
+        { type: "image", source: { type: "url", url: "https://exemple.com/capture.png" } },
+        { type: "text", text: "Quel bug d'interface voyez-vous sur cette capture ?" },
+      ],
+    },
+  ],
 });
 ```
 
-## Payloads multi-images
+## Image réutilisée via la Files API
 
-Vous pouvez passer plusieurs images dans le même message — utile pour comparer des versions, des avant/après ou plusieurs pages d'un document. Numérotez-les dans le texte pour aider Claude.
+Dans une conversation multi-tours, l'historique est renvoyé à chaque appel : une image en base64 alourdit chaque requête. Téléversez-la une fois et référencez son `file_id` :
+
+```python
+with open("facture.jpg", "rb") as f:
+    uploaded = client.files.upload(file=("facture.jpg", f, "image/jpeg"))
+
+response = client.messages.create(
+    model="claude-opus-5-5",
+    max_tokens=4000,
+    messages=[{
+        "role": "user",
+        "content": [
+            {"type": "image", "source": {"type": "file", "file_id": uploaded.id}},
+            {"type": "text", "text": "Extrayez le fournisseur, la date et le total TTC."},
+        ],
+    }],
+)
+```
+
+Voir [Files API](/wiki/api/files-api) pour le cycle de vie des fichiers.
+
+## Plusieurs images
+
+Introduisez chaque image par une étiquette texte pour pouvoir y faire référence :
 
 ```json
 {
   "role": "user",
   "content": [
-    { "type": "image", "source": { "type": "url", "url": "https://.../v1.png" } },
-    { "type": "image", "source": { "type": "url", "url": "https://.../v2.png" } },
-    { "type": "text", "text": "Image 1 = avant, Image 2 = après. Liste les différences." }
+    { "type": "text", "text": "Image 1 :" },
+    { "type": "image", "source": { "type": "url", "url": "https://exemple.com/v1.png" } },
+    { "type": "text", "text": "Image 2 :" },
+    { "type": "image", "source": { "type": "url", "url": "https://exemple.com/v2.png" } },
+    { "type": "text", "text": "Listez les différences entre l'image 1 et l'image 2." }
   ]
 }
 ```
 
-## Contraintes et bonnes pratiques
+Claude garde accès aux images des tours précédents : inutile de les renvoyer dans un nouveau tour.
 
-- **Taille max** : 5 Mo par image en base64, 100 Mo via URL.
-- **Résolution recommandée** : ≤ 1568 px sur le grand côté. Au-delà, l'image est redimensionnée et vous payez des tokens inutiles.
-- **Coût** : une image de 1000×1000 ≈ 1334 tokens d'entrée. Multipliez par le nombre d'images.
-- **Formats supportés** : JPEG, PNG, GIF (non animé), WebP. Pas de PDF natif — convertissez chaque page en image, ou utilisez l'API Files.
-- Placez le texte **après** les images dans le `content` : la documentation indique de meilleurs résultats dans cet ordre.
+## Limites à connaître
 
-## Cas d'usage typiques
+| Limite | Valeur |
+|---|---|
+| Formats | JPEG, PNG, GIF (première image seulement), WebP |
+| Taille par image (API directe) | 10 Mo en base64 (5 Mo sur Bedrock et Google Cloud) |
+| Dimensions max | 8000 × 8000 px |
+| Images par requête | 600 (100 pour les modèles à 200K de contexte, comme Haiku 4.5) |
+| Au-delà de 20 images | Limite plus stricte par image : restez sous 2000 px de côté |
+| Taille totale de requête | 32 Mo |
 
-```python
-# OCR de facture
-"Extrais en JSON : fournisseur, date, total HT, total TTC, lignes."
+## Coût en tokens
 
-# Description accessibilité
-"Génère un alt text concis (< 125 caractères) pour cette image."
+Claude découpe l'image en carrés de 28 × 28 pixels : coût ≈ `⌈largeur / 28⌉ × ⌈hauteur / 28⌉` tokens. Les images trop grandes sont réduites avant traitement.
 
-# Diagnostic UI
-"Cette capture montre un bug. Identifie le problème visible et propose un fix."
-```
+| Niveau | Modèles | Grand côté max | Tokens max |
+|---|---|---|---|
+| Haute résolution | Claude 4.7 et suivants (Opus 5.5, Sonnet 5.5...) | 2576 px | 4784 |
+| Standard | Autres (dont Haiku 4.5) | 1568 px | 1568 |
 
-Couplez la vision avec le **tool use** pour structurer la sortie (schéma JSON garanti) et avec le **prompt caching** si vous réutilisez les mêmes images dans plusieurs requêtes.
+Exemples : une image de 1000 × 1000 px coûte environ 1 296 tokens sur tous les modèles. Une capture 1920 × 1080 coûte environ 2 691 tokens en haute résolution, contre 1 560 en standard (réduite à 1456 × 819). Sur Opus 5.5 (4 $ par million de tokens en entrée), 1 000 images de 1 Mpx reviennent donc à environ 5,20 $.
+
+Si vous n'avez pas besoin du détail fin (texte minuscule, captures denses), réduisez vos images avant envoi : vous payez moins et la latence baisse.
+
+## Bonnes pratiques
+
+- Placez les images **avant** la question : c'est la structure qui donne les meilleurs résultats.
+- Assurez-vous que le texte important reste lisible après redimensionnement ; recadrez plutôt que de tout envoyer.
+- Évitez une compression JPEG trop forte, qui dégrade la lecture du texte.
+- Pour obtenir un JSON fiable (OCR de facture), combinez la vision avec les [sorties structurées](/wiki/prompt-engineering/output-format).
+- Pour les PDF, utilisez un bloc `document` plutôt que de convertir chaque page en image.
+
+## Limites du modèle
+
+Claude ne nomme pas les personnes sur les photos, compte de façon approximative les objets nombreux, peut se tromper sur des images floues, tournées ou très petites (moins de 200 px), et ne sait pas détecter si une image est générée par IA. Il n'est pas conçu pour interpréter des examens médicaux complexes (scanner, IRM). Gardez une vérification humaine pour les usages sensibles.
 
 ## Pour aller plus loin
 
-- Documentation : `docs.anthropic.com/claude/docs/vision`
-- Pour les PDFs, regardez l'API Files qui supporte le mime `application/pdf` nativement depuis 2025.
-- Évaluez la qualité OCR sur vos propres documents : Claude excelle sur les tableaux et le manuscrit, mais reste à benchmarker contre Textract sur des volumes industriels.
-- Streamez les réponses (`stream=True`) pour les analyses longues d'images riches.
+- [Capacités de vision des modèles](/wiki/modeles/vision-capacites)
+- [Files API](/wiki/api/files-api)
+- [Prompt caching](/wiki/api/prompt-caching-implementation)
+- [Citations API](/wiki/api/citations-api) (pour les PDF)
+
+## Sources
+
+- Vision : https://platform.claude.com/docs/en/build-with-claude/vision
+- Files API : https://platform.claude.com/docs/en/build-with-claude/files
+- Pricing : https://platform.claude.com/docs/en/about-claude/pricing
+- Cookbook vision : https://platform.claude.com/cookbook/multimodal-getting-started-with-vision

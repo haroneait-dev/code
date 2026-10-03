@@ -1,121 +1,183 @@
 ---
-title: "Génération de tests"
-description: "Faire écrire des tests à Claude — unitaires, intégration, end-to-end — avec couverture sérieuse."
-updatedAt: "2026-05-19"
-readingMinutes: 6
+title: "Génération de tests avec Claude Code"
+description: "Faire écrire par Claude des tests unitaires, d'intégration et end-to-end qui détectent vraiment les régressions, puis les brancher sur /goal, un hook Stop et la CI."
+updatedAt: "2026-10-03"
+readingMinutes: 8
 ---
 
-Écrire les tests est la corvée que tout le monde repousse — et c'est précisément la tâche que Claude exécute le mieux. À condition de cadrer : sans contexte, il génère des tests tautologiques qui ne prouvent rien. Voici comment obtenir une suite qui détecte vraiment les régressions.
+Écrire des tests est la tâche que tout le monde repousse, et Claude l'exécute bien, à condition de cadrer. Sans consignes, il produit des tests qui passent mais ne prouvent rien. Cet article montre comment obtenir une suite qui attrape les régressions, puis comment faire des tests la vérification qui guide tout le reste du travail de Claude.
+
+## Pourquoi les tests comptent double avec un agent
+
+La documentation officielle le dit en une phrase : donnez à Claude une vérification qu'il peut exécuter. Sans tests, Claude s'arrête quand le code « a l'air terminé », et c'est vous qui jouez le rôle de vérificateur. Avec une suite fiable, il travaille, lance la suite, lit le résultat et recommence jusqu'à ce qu'elle passe. Les tests ne servent donc pas seulement à protéger le code : ils rendent Claude autonome.
 
 ## Trois niveaux, trois objectifs
 
-Avant de demander un test, clarifier le niveau visé.
+| Niveau | Périmètre | Outils typiques (JS/TS) | Quand l'exécuter |
+| :- | :- | :- | :- |
+| Unitaire | Une fonction pure, sans entrée-sortie | Vitest, Jest | À chaque modification |
+| Intégration | Plusieurs modules, vraie base de test | Vitest + Supabase local ou Postgres de test | Avant chaque push |
+| End-to-end | L'application complète dans un navigateur | Playwright | En CI, sur les parcours critiques |
 
-- **Unitaire** — une fonction pure, sans I/O. Rapide, exécuté à chaque sauvegarde.
-- **Intégration** — plusieurs modules ensemble, avec DB en mémoire ou mockée.
-- **End-to-end** — l'app complète, pilotée via Playwright ou Cypress.
+Précisez toujours le niveau visé dans votre demande. Mélanger les niveaux donne des suites lentes et fragiles.
 
-Chaque niveau a son prompt, son outillage, son ratio coût/valeur. Confondre les niveaux est la cause numéro un de suites lentes et fragiles.
+## Partir des conventions existantes
+
+Claude lit vos fichiers de test existants pour en reprendre le style, le framework et les assertions. Commencez par lui faire trouver les trous :
+
+```text
+Trouve les fonctions de src/billing/ qui ne sont couvertes par aucun test.
+Classe-les par risque (argent, authentification, données utilisateur d'abord).
+```
+
+Puis demandez les tests un module à la fois.
 
 ## Tests unitaires : viser les branches
 
-Un bon test unitaire couvre les branches conditionnelles, les cas limites et les erreurs — pas le chemin heureux unique.
+Un bon test unitaire couvre les branches, les cas limites et les erreurs, pas seulement le cas nominal :
 
 ```text
-Voici la fonction `parseInvoiceAmount(input: string): number`.
-Écris une suite Vitest qui couvre :
-1. Cas nominal (montant valide).
-2. Montant avec virgule décimale française.
-3. Montant négatif (doit throw InvalidAmountError).
-4. Chaîne vide (doit throw).
-5. NaN, Infinity, undefined.
-Utilise `describe` + `it` + `expect`. Une assertion par test.
+Écris une suite Vitest pour `parseInvoiceAmount(input: string): number` :
+1. Montant valide (« 12.50 »).
+2. Virgule décimale française (« 12,50 »).
+3. Montant négatif : doit lever InvalidAmountError.
+4. Chaîne vide : doit lever une erreur.
+5. « NaN », « Infinity », espaces seuls.
+Un comportement par test, des noms de tests qui décrivent ce comportement.
+Lance la suite et montre-moi la sortie.
 ```
-
-Lancer ensuite :
 
 ```bash
-npx vitest run --coverage
+npx vitest run --coverage   # nécessite @vitest/coverage-v8 (ou istanbul)
 ```
 
-Le rapport de couverture par branches doit dépasser 90 % sur les modules critiques. En-dessous, Claude a oublié un cas.
+Regardez la couverture des branches sur les modules critiques. Une branche non couverte signale souvent un cas oublié, pas seulement un test manquant.
 
-## Tests d'intégration : faux mocks, vrais bugs
+## Tests d'intégration : mocker les frontières seulement
 
-Le piège des tests d'intégration : tout mocker pour aller vite. Résultat, le test passe alors que la vraie intégration est cassée. La règle :
+Le piège : tout mocker pour aller vite. Le test passe alors que l'intégration réelle est cassée. La règle :
 
-- Mock uniquement les frontières (HTTP externe, paiement, mail).
-- Utiliser une DB Postgres en mémoire (`pg-mem`) ou une instance Supabase locale.
-- Tester les chemins d'erreur autant que les chemins heureux.
+- mocker uniquement les frontières externes (HTTP tiers, paiement, e-mail) ;
+- utiliser une vraie base de test (Supabase en local via sa CLI, ou un Postgres jetable) ;
+- tester les chemins d'erreur autant que les chemins heureux.
 
 ```text
-Écris un test d'intégration pour la route POST /api/wiki :
-1. Crée un user authentifié via Supabase test client.
-2. POST avec un body valide → status 201, ligne en DB.
-3. POST sans Authorization → status 401.
-4. POST avec body invalide → status 400, message d'erreur explicite.
+Écris un test d'intégration pour POST /api/wiki :
+1. Crée un utilisateur de test authentifié.
+2. Body valide : statut 201 et une ligne en base.
+3. Sans en-tête Authorization : statut 401.
+4. Body invalide : statut 400 avec un message explicite.
 5. Vérifie qu'aucune ligne n'a été créée dans les cas 3 et 4.
 ```
 
-## Tests end-to-end : peu, mais critiques
+## Tests end-to-end : peu nombreux mais critiques
 
-Les E2E sont chers (lents, fragiles). Ils ne doivent couvrir que les parcours business critiques : signup, paiement, action principale du produit.
+Les tests E2E sont lents et coûteux à maintenir. Réservez-les aux parcours qui font vivre le produit : inscription, paiement, action principale.
 
 ```text
-Écris un test Playwright pour le parcours signup :
+Écris un test Playwright pour le parcours d'inscription :
 1. Visite /auth.
-2. Clique "Continuer avec Google" (mocke la réponse OAuth).
-3. Vérifie la redirection vers /dashboard.
-4. Vérifie la présence du nom de l'utilisateur dans la nav.
-Utilise `data-testid` pour les sélecteurs, jamais de classes CSS.
+2. Clique sur « Continuer avec Google » (réponse OAuth simulée).
+3. Vérifie la redirection vers /dashboard et le nom de l'utilisateur dans la barre de navigation.
+Sélecteurs par rôle ou par `data-testid`, jamais par classe CSS.
 ```
 
-Commande type :
-
 ```bash
-npx playwright test --reporter=html
+npx playwright test
 npx playwright show-report
+```
+
+## Écrire les tests avant le code
+
+Pour une nouvelle fonctionnalité, inversez l'ordre. La documentation propose un schéma en deux sessions : une instance de Claude écrit les tests à partir de la spécification, une autre écrit le code qui les fait passer. Celle qui implémente ne peut pas « adapter » les tests à son code.
+
+```text
+Session A : écris les tests de la fonction de calcul de TVA d'après SPEC.md.
+            Ne crée pas l'implémentation. Vérifie que les tests échouent.
+Session B : implémente la fonction pour faire passer tests/tva.test.ts
+            sans modifier le fichier de tests.
 ```
 
 ## Vérifier la qualité, pas la quantité
 
-100 % de couverture ne veut rien dire si les tests sont vides. Quatre signaux d'alerte :
+Une couverture de 100 % ne veut rien dire si les tests sont creux. Signaux d'alerte :
 
-- Tests sans `expect` (juste un appel de fonction).
-- Tests qui mockent la fonction testée elle-même.
-- Tests qui passent même quand on commente le corps de la fonction.
-- Tests qui dépendent de l'ordre d'exécution.
+- un test sans assertion (il appelle juste la fonction) ;
+- un test qui mocke la fonction qu'il est censé tester ;
+- un test qui passe encore quand on vide le corps de la fonction ;
+- un test qui dépend de l'ordre d'exécution ou de l'heure.
 
-Demandez à Claude de s'auto-auditer :
+Faites relire la suite par un regard neuf, dans un sous-agent qui n'a pas écrit les tests :
 
 ```text
-Relis la suite que tu viens d'écrire.
-Pour chaque test :
-1. Quelle régression réelle empêcherait-il ?
-2. Le test passerait-il encore si je supprimais la logique métier ?
-Si la réponse à 2 est OUI, réécris le test.
+Utilise un sous-agent pour relire tests/billing/. Pour chaque test :
+quelle régression réelle empêcherait-il ? Passerait-il encore si on supprimait
+la logique métier ? Liste les tests à réécrire, sans les modifier.
 ```
 
-## Intégrer dans le workflow quotidien
+Le test de mutation (Stryker en JavaScript) mesure cela automatiquement : il modifie le code et vérifie que la suite échoue.
 
-Le test ne vaut que s'il tourne. Trois automatisations utiles :
+## Faire des tests un garde-fou permanent
+
+Trois niveaux de contrainte, du plus léger au plus strict :
+
+1. **Dans le prompt** : « lance les tests et corrige jusqu'à ce qu'ils passent ».
+2. **Pour toute la session** : `/goal la commande npm test passe sans échec`. Un évaluateur séparé vérifie la condition après chaque tour et Claude continue tant qu'elle n'est pas remplie.
+3. **De façon déterministe** : un hook `Stop` qui lance la suite et empêche Claude de terminer son tour tant qu'elle échoue.
+
+```json
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          { "type": "command", "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/tests-ok.sh" }
+        ]
+      }
+    ]
+  }
+}
+```
 
 ```bash
-# Pre-commit : tests rapides sur les fichiers touchés
-npx vitest related --run
+#!/bin/bash
+# .claude/hooks/tests-ok.sh : bloque la fin du tour si les tests échouent
+if ! npx vitest run --reporter=dot > /tmp/vitest.log 2>&1; then
+  echo "Les tests échouent. Corrige-les avant de terminer :" >&2
+  tail -n 30 /tmp/vitest.log >&2
+  exit 2   # seul le code 2 bloque ; 1 serait ignoré
+fi
+exit 0
+```
 
-# Pre-push : suite complète
-npm run test
+Pour ne pas ralentir chaque modification, un hook `PostToolUse` avec `"async": true` peut lancer les tests liés aux fichiers modifiés en arrière-plan (`npx vitest related --run <fichier>`) et ne prévenir Claude qu'en cas d'échec.
 
-# CI : couverture + E2E
+## Brancher sur le quotidien et la CI
+
+```bash
+# Avant le commit : tests liés aux fichiers modifiés
+npx vitest related --run $(git diff --name-only --cached)
+
+# Avant le push : suite complète
+npm test
+
+# En CI : couverture + E2E
 npm run test:coverage && npm run test:e2e
 ```
 
-Configurer un seuil de couverture qui bloque le merge sous 80 % oblige l'équipe à entretenir la suite plutôt qu'à la laisser pourrir.
+Un seuil de couverture minimal en CI sur les dossiers critiques (configurable dans Vitest avec `coverage.thresholds`) évite que la suite se dégrade au fil des mois.
 
 ## Pour aller plus loin
 
-- Utiliser `vitest --ui` pour visualiser les tests qui échouent en local.
-- Combiner avec mutation testing (`stryker`) pour mesurer la vraie efficacité de la suite.
-- Demander à Claude de générer des fixtures réalistes via faker plutôt que des données bidon.
-- Lire l'article "Why Most Unit Tests Are Waste" de James Coplien pour challenger la doctrine du 100 % couverture.
+- [Débugger avec Claude Code](/wiki/workflows/debug-avec-claude)
+- [/goal, /loop et Monitor](/wiki/cli/goal-loop-monitor)
+- [Hooks Stop et SessionStart](/wiki/hooks/session-start-stop)
+- [Mode non-interactif et CI/CD](/wiki/cli/cicd-execution)
+
+## Sources
+
+- [Best practices : Give Claude a way to verify its work, documentation Claude Code](https://code.claude.com/docs/en/best-practices)
+- [Common workflows : Work with tests, documentation Claude Code](https://code.claude.com/docs/en/common-workflows)
+- [Hooks reference (Stop, exit code 2, async), documentation Claude Code](https://code.claude.com/docs/en/hooks)
+- [Vitest, guide de la couverture](https://vitest.dev/guide/coverage)
+- [Playwright, documentation](https://playwright.dev/docs/intro)

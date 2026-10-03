@@ -1,134 +1,136 @@
 ---
-title: "/mcp et /permissions : MCP et permissions à la volée"
-description: "Gérer les serveurs MCP actifs et ajuster les permissions sans quitter la session."
-updatedAt: "2026-05-19"
-readingMinutes: 5
+title: "/mcp et /permissions : serveurs MCP et règles d'accès en cours de session"
+description: "Vérifier, authentifier et reconnecter vos serveurs MCP avec /mcp, et gérer les règles allow, ask et deny avec /permissions sans redémarrer."
+updatedAt: "2026-10-03"
+readingMinutes: 6
 ---
 
-Deux commandes natives transforment Claude Code en outil ajustable en pleine session : `/mcp` pour inspecter et activer/désactiver les serveurs Model Context Protocol, et `/permissions` pour autoriser ou interdire des tools sans éditer `settings.json` à la main. Maîtriser ces deux commandes, c'est éviter les redémarrages constants et garder le contrôle fin sur ce que Claude peut faire.
+Deux commandes permettent d'ajuster Claude Code sans quitter la session : `/mcp` pour l'état et l'authentification des serveurs MCP, `/permissions` pour les règles qui décident de ce que Claude peut faire sans vous demander. Les deux s'utilisent même pendant que Claude travaille.
 
-## /mcp — état des serveurs MCP
+## `/mcp` : l'état de vos serveurs
 
-MCP (Model Context Protocol) est le système de plugins externes de Claude Code : un serveur MCP expose des tools (Supabase, Vercel, Gmail, GitHub, etc.) que Claude peut appeler. La commande `/mcp` affiche l'état de tous les serveurs configurés :
+Un serveur MCP (Model Context Protocol) expose des outils, des ressources et des prompts : GitHub, Supabase, Sentry, une base de données… `/mcp` ouvre la liste des serveurs configurés et leur état :
 
-```bash
-> /mcp
-MCP servers:
-  supabase       [connected]  12 tools
-  vercel         [connected]  18 tools
-  gmail          [auth required]
-  github         [connected]   8 tools
-  canva          [disabled]
+| Indicateur | Signification |
+| --- | --- |
+| `✔ Connected` | Serveur actif |
+| `! Needs authentication` | Connexion OAuth à faire |
+| `✘ Failed to connect` | Erreur, détail affiché |
+| `⏸ Pending approval` | Serveur du projet (`.mcp.json`) en attente de votre accord |
+| `⊘ Disabled for this project` | Désactivé localement |
+
+Depuis cette liste, vous lancez l'authentification OAuth dans le navigateur et vous activez ou désactivez un serveur sans toucher à sa configuration.
+
+Formes directes, utiles aussi en mode `-p` :
+
+```text
+> /mcp reconnect all        # relance tous les serveurs en échec ou à authentifier
+> /mcp reconnect github
+> /mcp disable sentry
+> /mcp enable all
 ```
 
-Quatre états possibles :
-
-- **connected** : le serveur tourne et ses tools sont disponibles
-- **auth required** : configuration OAuth en attente — relancez le flow
-- **disabled** : désactivé dans la config, peut être réactivé
-- **error** : le serveur a planté, regardez les logs
-
-`/mcp` permet aussi d'authentifier en live un serveur qui le demande. C'est très pratique pour Gmail, Google Drive, ou tout MCP avec OAuth : un lien s'affiche, vous l'ouvrez dans le navigateur, vous validez, et les tools deviennent immédiatement disponibles dans la session sans redémarrage.
-
-## /permissions — autoriser un tool en live
-
-Par défaut, Claude Code demande confirmation avant d'exécuter une commande Bash, d'éditer un fichier en dehors du projet, ou de lancer un tool sensible. `/permissions` permet de pré-autoriser ou bloquer des patterns à la volée :
+Depuis le terminal :
 
 ```bash
-> /permissions
-Current permissions:
-  Allow: Bash(npm:*), Bash(git status), Read, Edit, Write
-  Deny:  Bash(rm -rf:*), Bash(curl:*)
-  Ask:   Bash(*), WebFetch
-
-Add a permission? (allow/deny/ask)
+claude mcp list                 # serveurs et état de santé
+claude mcp login sentry         # authentification OAuth
+claude mcp logout sentry
+claude mcp add --transport http github https://api.githubcopilot.com/mcp/
+claude mcp add --transport stdio db -- npx -y @bytebase/dbhub --dsn "postgresql://..."
 ```
 
-Vous pouvez ajouter une règle sans quitter la session :
+Où vit la configuration : `.mcp.json` à la racine pour un serveur partagé avec l'équipe (portée `project`), `~/.claude.json` pour vos serveurs personnels (portées `local` et `user`). Les serveurs MCP ne se déclarent pas dans `settings.json`.
 
-```bash
-> /permissions allow Bash(supabase:*)
-Added: Allow Bash(supabase:*)
+Désactiver un serveur que vous n'utilisez pas allège le contexte : par défaut, seuls les noms d'outils sont chargés, mais chaque serveur ajoute ses instructions.
+
+### Les prompts MCP deviennent des commandes
+
+Un serveur peut exposer des prompts réutilisables. Le menu `/` les affiche sous la forme `/serveur:prompt (MCP)`, et vous pouvez aussi les lancer en tapant `/mcp__<serveur>__<prompt>`. Les arguments se passent séparés par des espaces (chaque argument est un seul mot) :
+
+```text
+> /mcp__github__list_prs
+> /mcp__github__pr_review 456
+> /mcp__jira__create_issue login-bug high
 ```
 
-Effet immédiat : Claude peut désormais lancer `supabase migration new`, `supabase db reset`, etc. sans demander à chaque fois. Les permissions ajoutées via `/permissions` sont persistées dans `.claude/settings.local.json` (par défaut) ou `~/.claude/settings.json` selon votre choix.
+Dans le nom du serveur, tout caractère hors `A-Z`, `a-z`, `0-9`, `_` et `-` est remplacé par `_`. Le résultat du prompt est injecté directement dans la conversation.
 
-## Patterns courants
+## `/permissions` : les règles allow, ask, deny
 
-**Autoriser un script de build entier** :
+`/permissions` ouvre une fenêtre qui liste toutes les règles avec le fichier de réglages dont chacune provient. Vous pouvez y ajouter ou retirer des règles, gérer les dossiers de travail et consulter les refus récents du mode `auto`. Un changement fait pendant que Claude travaille s'applique dès son prochain appel d'outil. L'alias est `/allowed-tools`.
 
-```bash
-> /permissions allow Bash(npm run:*)
-> /permissions allow Bash(npm test:*)
-```
-
-**Bloquer une opération dangereuse pour la session** :
-
-```bash
-> /permissions deny Bash(git push --force:*)
-> /permissions deny Bash(rm -rf:*)
-```
-
-**Restreindre l'accès web** :
-
-```bash
-> /permissions deny WebFetch
-> /permissions allow WebFetch(https://docs.claude.com/*)
-```
-
-Le matcher supporte les wildcards (`*`) et les préfixes (`Bash(npm:*)`). Les règles plus spécifiques l'emportent sur les plus générales.
-
-## Coordination MCP + permissions
-
-Quand vous activez un MCP via `/mcp`, les tools qu'il expose ne sont pas automatiquement permis pour autant. Vous pouvez les autoriser collectivement :
-
-```bash
-> /permissions allow mcp__supabase
-```
-
-Ce pattern autorise tous les tools dont le nom commence par `mcp__supabase` — typiquement `mcp__supabase__execute_sql`, `mcp__supabase__list_tables`, etc. C'est plus sûr que d'autoriser `*` et plus rapide que de cocher 12 tools un par un.
-
-## Bonnes pratiques
-
-1. **Ne jamais autoriser `Bash(*)` globalement** : c'est l'équivalent de désactiver le sandbox. Préférez des préfixes ciblés.
-2. **Séparer les permissions projet vs perso** : les règles d'équipe vont dans `.claude/settings.json` (versionné), vos préférences perso dans `.claude/settings.local.json` (gitignoré).
-3. **Vérifier avant un long run** : si vous lancez Claude sur une tâche autonome de 30 minutes, faites `/permissions` d'abord pour pré-autoriser ce dont il aura besoin — ça évite que la session se bloque sur un prompt à minuit.
-4. **Auditer périodiquement** : `/permissions` sans argument liste tout ; supprimez ce qui n'est plus utilisé.
-
-## Exemple : structure type d'un projet
-
-`.claude/settings.json` (versionné) :
+### Syntaxe des règles
 
 ```json
 {
   "permissions": {
     "allow": [
-      "Read", "Edit", "Write",
-      "Bash(npm:*)", "Bash(git status)", "Bash(git diff:*)"
+      "Bash(npm run *)",
+      "Bash(git diff *)",
+      "Edit(src/**)",
+      "WebFetch(domain:code.claude.com)",
+      "mcp__supabase__list_tables"
     ],
+    "ask": ["Bash(git push *)"],
     "deny": [
-      "Bash(rm -rf:*)",
-      "Bash(git push --force:*)"
+      "Bash(rm -rf *)",
+      "Read(./.env)",
+      "Read(./.env.*)"
     ]
-  },
-  "mcpServers": {
-    "supabase": { "command": "npx", "args": ["-y", "@supabase/mcp-server"] }
   }
 }
 ```
 
-`.claude/settings.local.json` (gitignoré) :
+Points de syntaxe :
+
+- `Bash(npm run *)` : `*` remplace n'importe quel texte. L'espace avant `*` compte : `Bash(git diff*)` accepterait aussi `git diff-index`.
+- L'ancienne forme `Bash(npm:*)` reste reconnue et équivaut à `Bash(npm *)`, mais seulement en fin de motif.
+- Les commandes composées sont découpées : `npm test && git push` est vérifié sous-commande par sous-commande.
+- `mcp__supabase` ou `mcp__supabase__*` couvrent tous les outils du serveur `supabase` ; `mcp__supabase__execute_sql` un seul outil.
+
+### L'ordre d'évaluation
+
+Les règles sont évaluées dans cet ordre : deny, puis ask, puis allow. La première qui correspond l'emporte, et une règle plus précise ne change rien à cet ordre. Conséquence : un `deny` sur `Bash(aws *)` bloque aussi `aws s3 ls` même si une règle allow le cite explicitement. On ne crée pas d'exception à un deny avec un allow.
+
+Les règles sont appliquées par Claude Code, pas par le modèle : écrire « ne fais jamais de push » dans `CLAUDE.md` oriente Claude, mais seule une règle (ou un hook) l'empêche réellement.
+
+## Les modes de permission
+
+Les règles s'ajoutent au mode de la session. Depuis août 2026, le mode par défaut est `auto` : un classifieur examine les actions au lieu de vous interroger. Les autres modes : `default` (manuel), `acceptEdits`, `plan`, `dontAsk` et `bypassPermissions`. `Maj+Tab` les fait défiler. Voir [Modes de permission](/wiki/cli/permissions-modes).
+
+## Coordonner MCP et permissions
+
+Connecter un serveur ne pré-autorise pas ses outils. Pour un serveur de confiance en lecture seule, autorisez précisément ce qui ne modifie rien :
 
 ```json
 {
   "permissions": {
-    "allow": ["Bash(gh:*)", "Bash(vercel:*)"]
+    "allow": ["mcp__supabase__list_tables", "mcp__supabase__get_advisors"],
+    "ask": ["mcp__supabase__execute_sql", "mcp__supabase__apply_migration"]
   }
 }
 ```
 
+C'est plus sûr que d'autoriser tout le serveur et plus rapide que de valider chaque appel.
+
+## Bonnes pratiques
+
+1. **Jamais de `Bash` ou `Bash(*)` en allow global** : préférez des préfixes ciblés. En mode `auto`, une entrée `Bash` nue est d'ailleurs ignorée.
+2. **Séparer équipe et perso** : règles communes dans `.claude/settings.json` (versionné), préférences dans `.claude/settings.local.json` (non versionné).
+3. **Préparer une tâche longue** : avant de laisser Claude travailler seul, ouvrez `/permissions` et autorisez ce dont il aura besoin.
+4. **Faire le ménage** : relisez régulièrement la liste. La commande `/fewer-permission-prompts` propose aussi une liste d'autorisations en lecture seule tirée de vos sessions.
+5. **Ne pas confondre règle et frontière de sécurité** : une règle Bash vise la commande telle que Claude l'écrit. Pour une garantie forte, ajoutez le [bac à sable](/wiki/demarrer/permissions-sandbox).
+
 ## Pour aller plus loin
 
-- Doc officielle : https://docs.claude.com/en/docs/claude-code/slash-commands
-- Documentation MCP : https://modelcontextprotocol.io/
-- Skill `fewer-permission-prompts` pour générer un allowlist optimal depuis vos transcripts
+- [Installer un serveur MCP](/wiki/mcp/installer-serveur-mcp)
+- [Sécurité MCP](/wiki/mcp/securite-mcp)
+- [Modes de permission](/wiki/cli/permissions-modes)
+
+## Sources
+
+- [Configure permissions](https://code.claude.com/docs/en/permissions)
+- [Connect Claude Code to tools via MCP](https://code.claude.com/docs/en/mcp)
+- [Commands](https://code.claude.com/docs/en/commands)
+- [Model Context Protocol](https://modelcontextprotocol.io)

@@ -1,77 +1,101 @@
 ---
-title: "Politique de confidentialité des données"
-description: "Comprendre la non-utilisation des données API et Enterprise pour l'entraînement des modèles Anthropic."
-updatedAt: "2026-05-19"
-readingMinutes: 6
+title: "Confidentialité des données : API, Enterprise et cloud"
+description: "Ce qu'Anthropic fait de vos données selon l'offre (API, Team, Enterprise, Bedrock, Google Cloud, Claude for Government) : entraînement, rétention, ZDR, HIPAA et bonnes pratiques côté client."
+updatedAt: "2026-10-03"
+readingMinutes: 7
 ---
 
-La confidentialité des données est un critère décisif pour toute adoption en entreprise. Anthropic applique une politique stricte : aucune donnée transitant par l'API commerciale ou les offres Enterprise n'est utilisée pour entraîner ses modèles, sauf consentement explicite. Cet article détaille les garanties contractuelles, techniques et opérationnelles.
+Avant de déployer Claude en entreprise, il faut savoir qui traite vos données, combien de temps elles sont conservées et si elles peuvent servir à l'entraînement. La réponse dépend de l'offre utilisée. Cette page résume les règles officielles et les bonnes pratiques côté client.
 
-## Principes fondamentaux
+## Qui traite vos données ?
 
-Anthropic distingue clairement deux flux de données :
+| Point d'accès | Responsable du traitement des requêtes | Règles applicables |
+|---|---|---|
+| API Claude (`api.anthropic.com`) | Anthropic | Conditions commerciales, page « API and data retention » |
+| Claude Platform on AWS | Anthropic (facturation et identité via AWS) | Mêmes règles que l'API Claude |
+| Microsoft Foundry | Anthropic | Mêmes règles que l'API Claude |
+| Amazon Bedrock | AWS | Documentation de protection des données de Bedrock |
+| Google Cloud (Agent Platform, ex-Vertex AI) | Google Cloud | Documentation de gouvernance des données de Google Cloud |
+| Claude for Government | Anthropic, en environnement FedRAMP High | Contrat secteur public |
+| Claude Free, Pro, Max | Anthropic | Conditions grand public |
+| Claude Team, Enterprise | Anthropic | Conditions commerciales et réglages de l'organisation |
 
-- **Consumer (Claude.ai gratuit/Pro)** : possibilité d'opt-in pour contribuer à l'amélioration des modèles.
-- **API, Bedrock, Vertex, Enterprise** : exclusion par défaut. Les prompts et complétions ne sont jamais utilisés pour l'entraînement.
+Sur Bedrock, Anthropic précise que son personnel n'a aucun accès à l'infrastructure d'inférence : tout reste dans le périmètre de sécurité AWS.
 
-Cette séparation est inscrite dans les **Commercial Terms of Service** et dans le **Data Processing Addendum (DPA)** signé avec chaque client Enterprise.
+## Entraînement des modèles
 
-## Rétention et journalisation
+- **Offres commerciales (API, Team, Enterprise, plateformes cloud)** : Anthropic s'engage à ne jamais utiliser les données retenues pour l'entraînement sans votre autorisation expresse.
+- **Offres grand public (Free, Pro, Max)** : chaque utilisateur choisit dans ses [réglages de confidentialité](https://claude.ai/settings/privacy) s'il autorise l'utilisation de ses conversations pour améliorer les modèles. Ces offres ne relèvent pas des conditions commerciales : ne les utilisez pas pour des données d'entreprise sensibles.
+- **Images envoyées en API** : la documentation Vision indique qu'Anthropic ne les utilise pas pour l'entraînement.
 
-Par défaut, les données API sont conservées 30 jours pour des raisons de sécurité (détection d'abus). Les clients Enterprise peuvent négocier une rétention **zero retention** (ZDR) qui supprime tout stockage côté Anthropic.
+## Rétention des données
 
-```bash
-# Vérifier les politiques activées sur un workspace
-curl https://api.anthropic.com/v1/organizations/me \
-  -H "x-api-key: $ANTHROPIC_API_KEY" \
-  -H "anthropic-version: 2023-06-01"
-```
+La page officielle « API and data retention » pose trois principes : ne garder que ce qui est techniquement nécessaire à une fonctionnalité, purger au plus tôt, et documenter la durée sur la page de chaque fonctionnalité. Points à connaître :
 
-Le mode ZDR exige une demande commerciale et un avenant au contrat. Une fois activé, aucun log applicatif ne persiste les contenus utilisateurs au-delà du temps de traitement.
+- **Modèles « Covered »** : Fable 5.1, Mythos 5.1, Fable 5 et Mythos 5 exigent une rétention de **30 jours**. Ils ne sont pas disponibles en ZDR, sauf autorisation expresse.
+- **Fonctionnalités avec état** : l'exécution de code garde les données du conteneur jusqu'à 30 jours. Les fonctionnalités qui stockent des fichiers, des lots ou des sessions (Files API, Batch, agents managés) suivent la durée indiquée sur leur propre page. Les transcriptions des agents managés restent jusqu'à ce que vous les supprimiez.
+- **Contenus signalés** : quel que soit votre contrat, un échange signalé par les systèmes de sécurité automatisés peut être conservé jusqu'à **2 ans**. Des obligations légales peuvent aussi imposer une conservation.
+- **claude.ai Team et Enterprise** : les conversations suivent la politique de rétention définie par l'administrateur (Organization settings > Data and privacy).
 
-## Chiffrement et isolation
+Pour la durée de rétention standard d'une organisation commerciale, référez-vous à l'article du Privacy Center d'Anthropic et à votre contrat.
 
-L'ensemble des échanges est protégé en transit (TLS 1.3) et au repos (AES-256). Les clés sont gérées via KMS interne. Pour les déploiements sur AWS Bedrock ou GCP Vertex AI, le chiffrement reste sous contrôle du client (CMEK/BYOK).
+## Zero Data Retention (ZDR)
 
-```yaml
-data_protection:
-  encryption_in_transit: TLS 1.3
-  encryption_at_rest: AES-256-GCM
-  key_management: AWS KMS | GCP Cloud KMS | Anthropic-managed
-  zero_data_retention: optional (Enterprise)
-  training_opt_out: default (API)
-```
+Avec un accord ZDR, Anthropic ne stocke pas vos prompts ni les réponses une fois la réponse renvoyée.
 
-## Conformité et certifications
+- **Comment l'obtenir** : demande à l'équipe commerciale, activation **par organisation**.
+- **Ce qui est couvert** : Messages API et comptage de tokens pour les fonctionnalités éligibles, Claude Code utilisé avec des clés API d'une organisation commerciale, Claude Platform on AWS (sur demande).
+- **Ce qui ne l'est pas** : la Console et son playground, les produits grand public, les interfaces Team et Enterprise (Claude Code sur Enterprise a sa propre offre ZDR), les agents managés, les modèles Covered, les intégrations tierces. Le CORS n'est pas pris en charge en ZDR : passez par un backend.
 
-Anthropic maintient un référentiel de conformité aligné sur les standards entreprise :
+Attention : avec ZDR, l'API ne bloque pas une fonctionnalité non éligible. L'utiliser revient à sortir du ZDR pour ces données.
 
-- **SOC 2 Type II** (audit annuel)
-- **ISO 27001** et **ISO 42001** (management de l'IA)
-- **HIPAA BAA** disponible pour les clients santé US
-- **RGPD** : Anthropic agit comme sous-traitant, le DPA inclut les Clauses Contractuelles Types
+## HIPAA (santé, États-Unis)
 
-Le rapport SOC 2 est accessible sur demande via le portail Trust Center.
+L'API Claude propose une configuration « HIPAA readiness ». Les organisations éligibles signent le BAA et l'activent directement dans la Console (Settings > Data retention). L'activation est **définitive**, et l'API renvoie une erreur 400 si une requête utilise une fonctionnalité non couverte. Ne mettez pas de données de santé dans les schémas JSON (sorties structurées, outils `strict`) : ils sont mis en cache sans les mêmes protections. Claude Code n'est pas couvert par cette configuration.
 
-## Contrôles côté client
+## Claude for Government
 
-Même avec une politique stricte d'Anthropic, le client reste responsable de la donnée qu'il envoie. Bonnes pratiques :
+**Claude for Government** est l'offre d'Anthropic pour les administrations américaines (fédérales, États, collectivités) et certains organismes publics. Elle est **disponible en général (GA) depuis le 30 septembre 2026** et fonctionne dans un environnement autorisé **FedRAMP High**, le niveau le plus exigeant pour les données gouvernementales sensibles non classifiées. Elle comprend les contrôles de sécurité, l'auditabilité et les circuits d'achat attendus par le secteur public. Le centre d'aide indique que toutes les organisations doivent migrer vers la nouvelle version « Desktop » de l'offre d'ici le 4 octobre 2026.
+
+Pour une administration française ou européenne, cette offre n'est pas la réponse : regardez plutôt la [résidence des données](/wiki/enterprise/sovereign-hosting).
+
+## Certifications
+
+Le [Trust Center d'Anthropic](https://trust.anthropic.com) donne accès au rapport SOC 2 Type 2, au certificat ISO 27001 et aux documents de conformité (DPA, guide HIPAA). Pour le RGPD, Anthropic agit comme sous-traitant pour les offres commerciales : le DPA encadre les transferts hors UE.
+
+## Vos responsabilités côté client
+
+Une politique stricte chez le fournisseur ne vous dispense pas de vos propres contrôles :
+
+- **Minimisez** : n'envoyez que les données nécessaires à la tâche.
+- **Masquez les données personnelles** avant l'envoi (Microsoft Presidio, solutions DLP) quand elles ne servent pas au traitement.
+- **Journalisez avec prudence** : préférez des empreintes ou des extraits masqués dans vos logs applicatifs.
+- **Séparez les organisations** : une organisation HIPAA ou ZDR distincte de celle des usages généraux.
+- **Documentez** le traitement dans votre registre RGPD et, si besoin, dans une analyse d'impact (AIPD).
 
 ```json
 {
-  "policies": {
-    "pii_redaction": "before_send",
-    "prompt_logging": "hashed_only",
-    "audit_trail": "siem_export",
-    "data_classification": ["public", "internal", "confidential"]
+  "politique_donnees": {
+    "masquage_pii": "avant_envoi",
+    "logs_prompts": "empreinte_uniquement",
+    "organisation_api": "prod-zdr",
+    "modeles_autorises": ["claude-sonnet-5-5", "claude-haiku-4-5-20251001"]
   }
 }
 ```
 
-Mettre en place un **proxy de redaction** (Presidio, Nightfall) en amont des appels API permet d'éliminer noms, emails, numéros de carte avant transmission.
-
 ## Pour aller plus loin
 
-- Trust Center Anthropic : [trust.anthropic.com](https://trust.anthropic.com)
-- Documentation officielle : *Usage Policies* et *Privacy Policy*
-- Articles connexes du wiki : `sovereign-hosting`, `aws-bedrock`, `gcp-vertex`
+- [Sovereign hosting et résidence des données](/wiki/enterprise/sovereign-hosting)
+- [Déployer Claude sur AWS Bedrock](/wiki/enterprise/aws-bedrock)
+- [Claude sur Google Cloud](/wiki/enterprise/gcp-vertex)
+- [Données sensibles dans Claude Code](/wiki/workflows/donnees-sensibles)
+
+## Sources
+
+- [API and data retention (Claude Platform Docs)](https://platform.claude.com/docs/en/manage-claude/api-and-data-retention)
+- [Claude in Amazon Bedrock](https://platform.claude.com/docs/en/build-with-claude/claude-in-amazon-bedrock)
+- [Vision : FAQ confidentialité](https://platform.claude.com/docs/en/build-with-claude/vision)
+- [Claude Code : sécurité et confidentialité](https://code.claude.com/docs/en/security)
+- [Commencer avec Claude pour le gouvernement (Centre d'aide)](https://support.claude.com/fr/articles/14503590-commencer-avec-claude-pour-le-gouvernement)
+- [Anthropic Trust Center](https://trust.anthropic.com)

@@ -1,27 +1,30 @@
 ---
 title: "Exemples pratiques : auto-format, anti-secrets, audit log"
-description: "Trois recettes de hooks prêtes à coller : Prettier automatique, blocage des secrets, journal d'audit JSONL."
-updatedAt: "2026-05-19"
-readingMinutes: 6
+description: "Trois hooks prêts à l'emploi : formatage automatique après édition, blocage des secrets avant écriture et journal d'audit JSONL relié aux prompts."
+updatedAt: "2026-10-03"
+readingMinutes: 7
 ---
 
-Assez de théorie : voici trois hooks qu'on peut copier-coller dans `settings.json` aujourd'hui et qui apportent une vraie valeur. Ils couvrent les trois besoins les plus fréquents : qualité de code, sécurité, traçabilité.
+Voici trois hooks à copier dans `.claude/settings.json` qui couvrent les besoins les plus fréquents : qualité du code, sécurité et traçabilité. Chaque recette donne la configuration, le script complet et une façon de le tester. Elles supposent que `jq` est installé (`brew install jq`, `apt-get install jq`).
 
-## 1. Auto-format avec Prettier sur chaque Edit/Write
+Placez les scripts dans `.claude/hooks/`, rendez-les exécutables (`chmod +x .claude/hooks/*.sh`) et versionnez-les pour que toute l'équipe en profite.
 
-L'idée : dès que Claude modifie un fichier source, le formater. Plus de PR avec des diffs cosmétiques, plus de "ah j'avais oublié de lancer prettier".
+## 1. Formatage automatique après chaque édition
+
+Dès que Claude écrit ou modifie un fichier, il est formaté avec l'outil du projet.
 
 ```json
 {
   "hooks": {
     "PostToolUse": [
       {
-        "matcher": "Edit|Write|MultiEdit",
+        "matcher": "Edit|Write",
         "hooks": [
           {
             "type": "command",
-            "command": "$CLAUDE_PROJECT_DIR/.claude/scripts/auto-format.sh",
-            "timeout": 8
+            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/auto-format.sh",
+            "args": [],
+            "timeout": 30
           }
         ]
       }
@@ -30,42 +33,46 @@ L'idée : dès que Claude modifie un fichier source, le formater. Plus de PR ave
 }
 ```
 
-Le script associé filtre les extensions concernées et utilise le `prettier` local du projet :
-
 ```bash
-#!/usr/bin/env bash
-set -euo pipefail
-INPUT="$(cat)"
-FILE="$(echo "$INPUT" | jq -r '.tool_input.file_path // empty')"
-[ -z "$FILE" ] && exit 0
-[ ! -f "$FILE" ] && exit 0
+#!/bin/bash
+# .claude/hooks/auto-format.sh
+FILE=$(jq -r '.tool_input.file_path // empty')
+[ -z "$FILE" ] || [ ! -f "$FILE" ] && exit 0
 
+cd "$CLAUDE_PROJECT_DIR" || exit 0
 case "$FILE" in
-  *.ts|*.tsx|*.js|*.jsx|*.json|*.md|*.css)
-    cd "$CLAUDE_PROJECT_DIR"
-    npx --no-install prettier --write "$FILE" 2>/dev/null || true
-    ;;
+  *.ts|*.tsx|*.js|*.jsx|*.json|*.css|*.md)
+    npx --no-install prettier --write -- "$FILE" >/dev/null 2>&1 ;;
+  *.py)
+    command -v ruff >/dev/null && ruff format -- "$FILE" >/dev/null 2>&1 ;;
+  *.go)
+    command -v gofmt >/dev/null && gofmt -w "$FILE" ;;
 esac
 exit 0
 ```
 
-Le `|| true` et le `--no-install` garantissent qu'on ne casse jamais une session si Prettier n'est pas installé ou plante.
+`--no-install` empêche `npx` de télécharger Prettier s'il manque, et le `exit 0` final garantit que le hook ne signale jamais d'erreur pour un simple formatage raté.
 
-## 2. Blocage des secrets avant écriture
+**Tester** : demandez à Claude d'ajouter une ligne avec des guillemets simples dans un fichier JavaScript. Avec la configuration par défaut de Prettier, ils deviennent des guillemets doubles.
 
-Ce hook intercepte chaque tentative d'écriture pour vérifier qu'aucun secret ne se glisse dans un fichier. C'est un `PreToolUse` qui peut bloquer l'opération.
+**Limite** : ce hook ne voit que `Edit` et `Write`. Un fichier réécrit par un script lancé via `Bash` n'est pas formaté ; pour un fichier précis, l'événement `FileChanged` couvre ce cas.
+
+## 2. Bloquer les secrets avant écriture
+
+Ce `PreToolUse` lit le contenu que Claude s'apprête à écrire (`content` pour `Write`, `new_string` pour `Edit`) et bloque si un motif de secret apparaît.
 
 ```json
 {
   "hooks": {
     "PreToolUse": [
       {
-        "matcher": "Write|Edit|MultiEdit",
+        "matcher": "Edit|Write",
         "hooks": [
           {
             "type": "command",
-            "command": "$CLAUDE_PROJECT_DIR/.claude/scripts/anti-secrets.sh",
-            "timeout": 3
+            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/anti-secrets.sh",
+            "args": [],
+            "timeout": 10
           }
         ]
       }
@@ -74,105 +81,116 @@ Ce hook intercepte chaque tentative d'écriture pour vérifier qu'aucun secret n
 }
 ```
 
-Le script teste plusieurs patterns courants : clés AWS, tokens GitHub, OpenAI/Anthropic, JWT, clés privées.
-
 ```bash
-#!/usr/bin/env bash
-set -euo pipefail
-INPUT="$(cat)"
-CONTENT="$(echo "$INPUT" | jq -r '
-  (.tool_input.content // "") + "\n" +
-  (.tool_input.new_string // "")
-')"
+#!/bin/bash
+# .claude/hooks/anti-secrets.sh
+INPUT=$(cat)
+FILE=$(jq -r '.tool_input.file_path // ""' <<<"$INPUT")
+CONTENT=$(jq -r '(.tool_input.content // "") + "\n" + (.tool_input.new_string // "")' <<<"$INPUT")
 
-# Patterns de secrets
+# Les fichiers d'exemple peuvent contenir de faux secrets
+case "$FILE" in *.example|*.sample|*/fixtures/*) exit 0 ;; esac
+
 PATTERNS=(
-  'AKIA[0-9A-Z]{16}'                       # AWS Access Key
-  'ghp_[A-Za-z0-9]{36}'                    # GitHub Personal Token
-  'sk-ant-api[0-9]{2}-[A-Za-z0-9_-]{80,}'  # Anthropic
-  'sk-[A-Za-z0-9]{48}'                     # OpenAI
-  '-----BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY-----'
-  'eyJ[A-Za-z0-9_-]{20,}\.eyJ[A-Za-z0-9_-]{20,}\.' # JWT
+  'AKIA[0-9A-Z]{16}'                                  # AWS Access Key
+  'gh[pousr]_[A-Za-z0-9]{36,}'                        # Tokens GitHub
+  'sk-ant-[A-Za-z0-9_-]{20,}'                         # Clés Anthropic
+  'sk-(proj-)?[A-Za-z0-9_-]{32,}'                     # Clés de type OpenAI
+  'xox[baprs]-[A-Za-z0-9-]{10,}'                      # Tokens Slack
+  '-----BEGIN [A-Z ]*PRIVATE KEY-----'                # Clés privées
+  'eyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.'    # JWT
 )
 
 for P in "${PATTERNS[@]}"; do
-  if echo "$CONTENT" | grep -qE "$P"; then
-    echo "Secret détecté (pattern: $P). Écriture bloquée." >&2
+  if printf '%s' "$CONTENT" | grep -qE -- "$P"; then
+    echo "Écriture bloquée : le contenu destiné à $FILE ressemble à un secret. Utilisez une variable d'environnement ou un fichier .env non versionné." >&2
     exit 2
   fi
 done
 exit 0
 ```
 
-Le `exit 2` est crucial : il bloque l'outil et renvoie le message au modèle, qui pourra corriger sa réponse au lieu d'écrire un secret en dur.
+L'`exit 2` bloque l'appel et transmet le stderr à Claude, qui peut proposer une alternative (lecture depuis `process.env`, par exemple). Un `exit 1` laisserait passer l'écriture.
 
-## 3. Audit log JSONL de toute la session
+**Tester** sans Claude :
 
-Pour les équipes qui doivent garder une trace de ce que fait Claude Code (conformité, debug post-mortem), un journal JSONL local est idéal : un événement par ligne, facile à requêter avec `jq`.
+```bash
+echo '{"tool_name":"Write","tool_input":{"file_path":"/tmp/a.ts","content":"const k = \"AKIAABCDEFGHIJKLMNOP\""}}' \
+  | .claude/hooks/anti-secrets.sh; echo "code: $?"
+# code: 2
+```
+
+**Limites** : une regex ne détecte que les formats connus et produit des faux positifs. Ce hook ne remplace pas un scanner en CI (gitleaks, trufflehog) ni la protection des fichiers `.env` par des règles de permission `deny`.
+
+## 3. Journal d'audit JSONL
+
+Un événement par ligne, facile à interroger avec `jq`. Utile pour la conformité ou pour comprendre après coup ce qu'a fait une session.
 
 ```json
 {
   "hooks": {
+    "UserPromptSubmit": [
+      { "hooks": [{ "type": "command", "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/audit.sh", "args": ["prompt"] }] }
+    ],
     "PreToolUse": [
-      {
-        "matcher": "*",
-        "hooks": [
-          { "type": "command", "command": "$CLAUDE_PROJECT_DIR/.claude/scripts/audit.sh pre" }
-        ]
-      }
+      { "matcher": "*", "hooks": [{ "type": "command", "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/audit.sh", "args": ["pre"] }] }
     ],
     "PostToolUse": [
-      {
-        "matcher": "*",
-        "hooks": [
-          { "type": "command", "command": "$CLAUDE_PROJECT_DIR/.claude/scripts/audit.sh post" }
-        ]
-      }
+      { "matcher": "*", "hooks": [{ "type": "command", "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/audit.sh", "args": ["post"] }] }
     ],
-    "UserPromptSubmit": [
-      {
-        "hooks": [
-          { "type": "command", "command": "$CLAUDE_PROJECT_DIR/.claude/scripts/audit.sh prompt" }
-        ]
-      }
+    "PostToolUseFailure": [
+      { "matcher": "*", "hooks": [{ "type": "command", "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/audit.sh", "args": ["fail"] }] }
     ]
   }
 }
 ```
 
-Le script `audit.sh` agrège tout dans un seul fichier, avec timestamp ISO :
-
 ```bash
-#!/usr/bin/env bash
-set -euo pipefail
+#!/bin/bash
+# .claude/hooks/audit.sh <phase>
 PHASE="${1:-unknown}"
-INPUT="$(cat)"
-TS="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 LOG="$CLAUDE_PROJECT_DIR/.claude/audit.jsonl"
 
-jq -c --arg ts "$TS" --arg phase "$PHASE" \
-  '{ts: $ts, phase: $phase, session: .session_id,
-    tool: .tool_name, cwd: .cwd, input: .tool_input,
-    prompt: .prompt}' <<< "$INPUT" >> "$LOG"
-
+jq -c --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" --arg phase "$PHASE" --arg user "$USER" '{
+  ts: $ts, phase: $phase, user: $user,
+  session: .session_id, prompt_id: .prompt_id, tool_use_id: .tool_use_id,
+  agent: .agent_type, tool: .tool_name, cwd: .cwd,
+  input: .tool_input, prompt: .prompt, error: .error, duration_ms: .duration_ms
+} | with_entries(select(.value != null))' >> "$LOG"
 exit 0
 ```
 
-Pour explorer le log ensuite :
+`tool_use_id` relie l'entrée `pre` à son `post` ou `fail`, et `prompt_id` relie tous les outils au prompt qui les a déclenchés. Ajoutez `.claude/audit.jsonl` au `.gitignore` : le journal contient vos prompts et les commandes exécutées.
+
+Exploiter le journal :
 
 ```bash
-# Tous les Bash exécutés aujourd'hui
-jq 'select(.tool == "Bash" and (.ts | startswith("2026-05-19")))' \
-  .claude/audit.jsonl
+# Toutes les commandes Bash du jour
+jq -r --arg d "$(date -u +%F)" 'select(.tool == "Bash" and .phase == "pre" and (.ts | startswith($d))) | .input.command' .claude/audit.jsonl
 
 # Top 10 des fichiers édités
-jq -r 'select(.tool == "Edit") | .input.file_path' .claude/audit.jsonl \
+jq -r 'select(.phase == "pre" and (.tool == "Edit" or .tool == "Write")) | .input.file_path' .claude/audit.jsonl \
   | sort | uniq -c | sort -rn | head
+
+# Échecs d'outils
+jq -c 'select(.phase == "fail") | {tool, error}' .claude/audit.jsonl
 ```
 
-## Pour aller plus loin
+Les hooks d'un même événement tournent en parallèle et un sous-agent peut écrire en même temps : des lignes JSONL courtes ajoutées avec `>>` restent en pratique lisibles, mais pour un audit réglementaire, préférez la télémétrie OpenTelemetry native qui centralise ces données sans script.
 
-- Combiner les trois hooks ci-dessus dans un seul `settings.json` : ils ne se gênent pas.
-- Ajouter un hook `SessionEnd` qui zippe le log de la session et l'archive.
-- Pour les équipes : pousser `audit.jsonl` vers un bucket S3 via un hook `Stop` asynchrone.
-- Versionner les scripts dans `.claude/scripts/` pour que toute l'équipe en bénéficie via le repo.
+## Combiner les trois
+
+Les trois recettes cohabitent dans un même `settings.json` : fusionnez simplement les tableaux par événement. Les hooks qui correspondent au même événement s'exécutent en parallèle ; si l'anti-secrets bloque, l'entrée d'audit `pre` est tout de même écrite, ce qui est utile pour tracer la tentative.
+
+## Articles liés
+
+- [PreToolUse et PostToolUse](/wiki/hooks/pre-post-tool-use)
+- [Sécurité des hooks](/wiki/hooks/securite-rce)
+- [Hooks pour l'observabilité](/wiki/hooks/observabilite-otel)
+- [Audit trail](/wiki/workflows/audit-trail)
+- [Secrets et .env](/wiki/workflows/secrets-env)
+
+## Sources
+
+- [Automate actions with hooks : What you can automate](https://code.claude.com/docs/en/hooks-guide)
+- [Hooks reference : PreToolUse input, PostToolUseFailure](https://code.claude.com/docs/en/hooks)

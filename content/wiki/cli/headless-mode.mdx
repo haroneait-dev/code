@@ -1,94 +1,135 @@
 ---
 title: "Mode headless (claude -p)"
-description: "Exécuter Claude Code sans interface interactive avec claude -p, parfait pour les scripts et la CI."
-updatedAt: "2026-05-19"
-readingMinutes: 6
+description: "Exécuter Claude Code sans interface avec claude -p : formats de sortie, JSON Schema, permissions sans surveillance, --bare, budget et reprise de conversation."
+updatedAt: "2026-10-03"
+readingMinutes: 7
 ---
 
-Le mode headless de Claude Code permet d'invoquer le CLI comme n'importe quelle commande Unix : sans REPL, sans interface interactive, en lui passant directement un prompt et en récupérant sa sortie. C'est le mode privilégié pour intégrer Claude Code dans des scripts shell, des pipelines CI/CD ou des tâches cron.
+Avec `-p` (ou `--print`), Claude Code s'exécute comme une commande Unix : il reçoit un prompt, travaille avec ses outils, écrit le résultat sur la sortie standard et se termine. C'est la base des scripts, des tâches planifiées et de la CI. Le même moteur existe en bibliothèque Python et TypeScript (Agent SDK) si vous avez besoin d'un contrôle plus fin.
 
-## Lancer Claude en mode headless
-
-La syntaxe est minimaliste : on passe le prompt avec le flag `-p` (pour `--print`).
+## Les bases
 
 ```bash
-claude -p "Résume le fichier README.md en 3 bullets"
+claude -p "Que fait le module d'authentification ?"
 ```
 
-Claude exécute le prompt, écrit le résultat sur `stdout`, puis termine son processus avec un code de retour standard (`0` succès, `1` erreur). Aucun affichage de progression, aucune animation : la sortie est propre, parfaite pour être capturée.
+- Code de sortie `0` en cas de succès, non nul en cas d'échec : votre script peut tester `$?`.
+- Un flag invalide est signalé sur stderr avant le démarrage. Une erreur pendant l'exécution (authentification manquante, par exemple) apparaît comme résultat sur stdout.
+- Les skills et commandes personnalisées fonctionnent : incluez `/nom-de-la-skill` dans le prompt. Les commandes purement interactives (`/login`) ne sont pas disponibles. `/model sonnet`, `/effort high` ou `/config cle=valeur` acceptent leur valeur en argument.
+
+## Démarrer vite et de façon reproductible : --bare
+
+Sans option, `claude -p` charge le même contexte qu'une session interactive : `CLAUDE.md`, hooks, skills, plugins, serveurs MCP, mémoire automatique. Résultat : le comportement dépend de la machine.
 
 ```bash
-SUMMARY=$(claude -p "Génère un changelog basé sur les 10 derniers commits")
-echo "$SUMMARY" > CHANGELOG.md
+claude --bare -p "Résume README.md" --allowedTools "Read"
 ```
 
-## Choisir le format de sortie
+`--bare` ignore toute cette découverte automatique et démarre plus vite. Ce que vous voulez charger se passe en flags : `--append-system-prompt-file`, `--settings`, `--mcp-config`, `--agents`, `--plugin-dir`. Attention : en mode bare, Claude Code n'utilise ni votre connexion à un abonnement ni le trousseau système. Il faut `ANTHROPIC_API_KEY` (ou un `apiKeyHelper` dans `--settings`). La documentation annonce que `--bare` deviendra le comportement par défaut de `-p`.
 
-Par défaut, Claude renvoie du texte. Pour parser la réponse depuis un script, on utilise `--output-format json` qui produit un objet structuré.
+Point de sécurité : sans `--bare`, un `claude -p` lancé dans un dépôt inconnu exécute ses hooks (`.claude/settings.json`) et connecte ses serveurs MCP (`.mcp.json`), sans boîte de dialogue de confiance. Utilisez `--bare` sur du code que vous n'avez pas vérifié.
+
+## Les formats de sortie
+
+| Format | Usage |
+|---|---|
+| `text` (défaut) | Texte brut, idéal pour rediriger dans un fichier |
+| `json` | Un objet final : `result`, `session_id`, `total_cost_usd`, usage par modèle |
+| `stream-json` | Un événement JSON par ligne, en temps réel |
 
 ```bash
-claude -p "Liste les fichiers TypeScript modifiés" --output-format json
+claude -p "Résume ce projet" --output-format json | jq -r '.result'
 ```
 
-Exemple de réponse :
+### Sortie structurée avec JSON Schema
 
-```json
-{
-  "type": "result",
-  "subtype": "success",
-  "result": "src/app/page.tsx, src/lib/supabase.ts",
-  "session_id": "abc123",
-  "total_cost_usd": 0.0042,
-  "duration_ms": 3120
-}
-```
-
-Avec `--output-format stream-json`, chaque évènement (message, tool_use, tool_result) arrive ligne par ligne, ce qui permet de logger le déroulé complet d'une exécution.
-
-## Contrôler les permissions et les outils
-
-En mode headless, on n'a pas de prompt interactif pour valider les actions. Deux options :
-
-- `--allowed-tools` pour autoriser explicitement certains outils.
-- `--permission-mode acceptEdits` pour accepter automatiquement les éditions de fichiers.
+Pour obtenir des données exploitables plutôt que du texte libre :
 
 ```bash
-claude -p "Corrige les erreurs de lint dans src/" \
-  --allowed-tools "Read,Edit,Bash(npm run lint)" \
-  --permission-mode acceptEdits
+claude -p "Extrais les noms des fonctions exportées de src/auth.ts" \
+  --output-format json \
+  --json-schema '{"type":"object","properties":{"functions":{"type":"array","items":{"type":"string"}}},"required":["functions"]}' \
+  | jq '.structured_output.functions'
 ```
 
-Ne jamais utiliser `--dangerously-skip-permissions` en production : ce flag désactive toutes les vérifications et peut entraîner des actions destructives.
+Le résultat validé se trouve dans `structured_output`. Un schéma invalide fait échouer la commande avec un message explicite.
 
-## Utiliser en CI
-
-Le mode headless brille dans GitHub Actions ou GitLab CI. On peut, par exemple, faire générer une revue de PR automatique.
+### Streaming
 
 ```bash
-- name: Claude review
-  env:
-    ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-  run: |
-    claude -p "Analyse les diffs de cette PR et propose des améliorations" \
-      --output-format json > review.json
+claude -p "Explique la récursivité" \
+  --output-format stream-json --verbose --include-partial-messages \
+  | jq -rj 'select(.type == "stream_event" and .event.delta.type? == "text_delta") | .event.delta.text'
 ```
 
-Le code de retour permet de faire échouer le pipeline si Claude détecte un problème bloquant : il suffit que le prompt demande `exit 1` via un script Bash autorisé.
+Le premier événement `system/init` décrit la session (modèle, outils, serveurs MCP, plugins chargés). Ses champs `plugin_errors` et `mcp_server_errors` permettent de faire échouer une CI quand un plugin ou un serveur ne se charge pas. La dernière ligne est le `result` final.
 
-## Reprendre une session
+## Permissions sans personne pour répondre
 
-Headless ne veut pas dire stateless. On peut reprendre une conversation existante avec `--resume <session_id>` ou continuer la dernière avec `--continue`.
+En `-p`, personne ne peut cliquer sur « Oui ». Une action qui demanderait une confirmation est refusée. Choisissez donc explicitement ce qui est permis :
 
 ```bash
-SESSION=$(claude -p "Initialise une refacto" --output-format json | jq -r .session_id)
-claude -p "Maintenant ajoute les tests" --resume "$SESSION"
+# Autoriser des outils précis (syntaxe des règles de permission)
+claude -p "Crée un commit pour les changements indexés" \
+  --allowedTools "Bash(git diff *),Bash(git status *),Bash(git commit *)"
+
+# Fixer un mode de base
+claude -p "Applique les corrections de lint" --permission-mode acceptEdits
 ```
 
-Pratique pour orchestrer des tâches en plusieurs étapes tout en gardant le contexte accumulé.
+| Mode | Comportement en `-p` |
+|---|---|
+| `acceptEdits` | Éditions de fichiers et commandes de fichiers courantes (`mkdir`, `mv`, `cp`) sans confirmation ; le reste exige une règle `allow` |
+| `dontAsk` | Refuse tout ce qui demanderait une confirmation : idéal pour une CI verrouillée |
+| `auto` | Un classifieur évalue chaque action et bloque les risquées |
+| `bypassPermissions` | Aucun contrôle. À réserver à un conteneur jetable et isolé |
+
+Sans mode explicite, le run démarre dans le mode par défaut, qui peut être `auto` : précisez toujours celui que vous voulez.
+
+L'espace avant `*` compte : `Bash(git diff *)` autorise `git diff --stat`, alors que `Bash(git diff*)` autoriserait aussi `git diff-index`.
+
+Pour une tâche planifiée sans aucun humain, ajoutez `--permission-prompts none` : Claude sait que personne ne peut approuver et ne réessaie pas. Les refus sont listés dans `permission_denials` du résultat.
+
+## Garde-fous
+
+```bash
+claude -p "Corrige les tests qui échouent" \
+  --permission-mode acceptEdits \
+  --allowedTools "Bash(npm test *)" \
+  --max-turns 15 \
+  --max-budget-usd 2
+```
+
+- `--max-turns` : nombre maximal de tours agentiques, puis erreur.
+- `--max-budget-usd` : plafond de dépense (sous-agents compris).
+- `--model` et `--effort` : fixez-les pour des résultats et des coûts prévisibles.
+- `--no-session-persistence` : n'écrit pas la session sur disque.
+
+## Reprendre une conversation
+
+```bash
+session=$(claude -p "Commence une revue de performance" --output-format json | jq -r '.session_id')
+claude -p "Concentre-toi maintenant sur les requêtes SQL" --resume "$session"
+claude -p "Fais la synthèse des problèmes trouvés" --continue
+```
+
+`--resume` retrouve la session depuis n'importe quel dossier de la machine. Avec `--continue` ou `--resume`, le coût rapporté est le total de la conversation, runs précédents compris.
+
+## Comportements à connaître
+
+- **Entrée standard limitée à 10 Mo** : au-delà, écrivez dans un fichier et donnez son chemin dans le prompt.
+- **Tâches d'arrière-plan** : un serveur lancé en arrière-plan est arrêté environ cinq secondes après le résultat. Un sous-agent d'arrière-plan, lui, est attendu (10 minutes d'inactivité au maximum).
+- **SIGTERM** termine avec le code 143 sans finir le tour en cours ; SIGINT termine proprement le tour.
 
 ## Pour aller plus loin
 
-- Combiner `claude -p` avec `xargs` ou `parallel` pour traiter des centaines de fichiers en lot.
-- Définir un `CLAUDE.md` projet pour donner du contexte stable à chaque invocation headless.
-- Logger systématiquement `session_id` et `total_cost_usd` pour suivre la consommation en production.
-- Encapsuler les invocations dans un wrapper shell qui injecte des garde-fous (timeout, allowlist d'outils, dry-run).
+- [Pipes et automatisation](/wiki/cli/pipes-automation)
+- [Exécution en CI/CD](/wiki/cli/cicd-execution)
+- [Variables d'environnement](/wiki/cli/variables-env)
+- [Modes de permissions](/wiki/cli/permissions-modes)
+
+## Sources
+
+- [Run Claude Code programmatically](https://code.claude.com/docs/en/headless)
+- [CLI reference](https://code.claude.com/docs/en/cli-reference)
+- [Permission modes](https://code.claude.com/docs/en/permission-modes)

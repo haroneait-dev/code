@@ -2,7 +2,7 @@
 title: "Versionner un skill sans casser ses utilisateurs"
 description: "Comment Claude Code détecte les versions d'un skill distribué en plugin, quand incrémenter, comment éviter les ruptures et organiser des canaux stable et bêta."
 updatedAt: "2026-10-03"
-readingMinutes: 6
+readingMinutes: 5
 ---
 
 Un skill partagé devient une dépendance : le modifier change le comportement de Claude chez tous ceux qui l'utilisent. Le frontmatter de `SKILL.md` n'a **pas** de champ `version` reconnu par Claude Code. Le versioning se gère donc à deux niveaux : Git pour les skills de projet, le manifeste du plugin pour les skills distribués.
