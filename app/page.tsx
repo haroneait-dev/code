@@ -11,11 +11,25 @@ const LAST_REVIEW = "3 octobre 2026";
 // Ce qui a vraiment changé ces dernières semaines, avec la page qui en parle.
 const RECENT = [
   {
+    date: "2 oct.",
+    part: "Claude Code",
+    title: "Moins de travail perdu en route",
+    text: "Une coupure en pleine réponse reprend où elle s'était arrêtée, et les sessions se retrouvent avec Ctrl+F.",
+    href: "/wiki/actualites/nouveautes-2026",
+  },
+  {
     date: "1 oct.",
     part: "Claude Code",
     title: "Les mods arrivent dans Claude Code",
     text: "Les plugins peuvent dessiner des panneaux et réagir aux événements de la session.",
     href: "/wiki/plugins/mods",
+  },
+  {
+    date: "30 sept.",
+    part: "Claude",
+    title: "Claude for Government ouvert aux administrations",
+    text: "Certifié FedRAMP High aux États-Unis, avec Claude Code et Microsoft 365 en accès anticipé.",
+    href: "/wiki/actualites/nouveautes-claude-2026",
   },
   {
     date: "28 sept.",

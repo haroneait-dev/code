@@ -95,9 +95,9 @@ export default async function ArticlePage({
     <div className="min-h-screen flex flex-col">
       <SiteHeader active={cat?.section === "claude" ? "claude" : cat?.section === "code" ? "code" : "wiki"} showSearch />
 
-      <div className="flex-grow w-full max-w-container-max mx-auto px-margin-mobile md:px-margin-desktop flex gap-gutter py-8 relative">
+      <div className="flex-grow w-full max-w-[1440px] mx-auto px-margin-mobile md:px-10 xl:px-margin-desktop flex gap-10 xl:gap-12 py-8 relative">
         {/* Left sidebar — categories + articles in current cat */}
-        <aside className="hidden lg:block w-72 flex-shrink-0 sticky top-[96px] h-[calc(100vh-120px)] overflow-y-auto pr-4">
+        <aside className="hidden lg:block w-60 xl:w-64 flex-shrink-0 sticky top-[96px] h-[calc(100vh-120px)] overflow-y-auto pr-2">
           <h3 className="font-body-sm text-on-surface-variant uppercase tracking-wider mb-4 font-semibold text-xs">
             <Link href={section?.href ?? "/wiki"} className="hover:text-primary transition-colors">
               {section ? `Partie ${section.name}` : "Catégories"}
@@ -151,7 +151,7 @@ export default async function ArticlePage({
         </aside>
 
         {/* Article */}
-        <main className="flex-grow max-w-[760px] w-full min-w-0">
+        <main className="flex-1 max-w-[740px] w-full min-w-0">
           <nav className="flex items-center gap-2 text-on-surface-variant font-body-sm mb-6 flex-wrap">
             <Link href="/wiki" className="hover:text-primary transition-colors">
               Wiki
@@ -176,6 +176,23 @@ export default async function ArticlePage({
               <span className="w-1 h-1 bg-outline-variant rounded-full" />
               <span>{article.readingMinutes} min de lecture</span>
             </div>
+
+            {headings.length > 2 && (
+              <details className="2xl:hidden mb-12 rounded-md border border-outline-variant bg-surface-container-low px-5 py-4">
+                <summary className="cursor-pointer font-semibold text-on-surface text-[15px]">
+                  Sur cette page ({headings.length} parties)
+                </summary>
+                <ol className="mt-4 grid gap-2 list-decimal pl-5 text-[15px] text-on-surface-variant">
+                  {headings.map((h) => (
+                    <li key={h.id}>
+                      <a href={`#${h.id}`} className="hover:text-primary transition-colors">
+                        {h.text}
+                      </a>
+                    </li>
+                  ))}
+                </ol>
+              </details>
+            )}
 
             <ArticleBody body={article.body} />
 
@@ -216,7 +233,7 @@ export default async function ArticlePage({
         </main>
 
         {/* Right sidebar — TOC */}
-        <aside className="hidden xl:block w-64 flex-shrink-0 sticky top-[96px] h-[calc(100vh-120px)] pl-4 border-l border-outline-variant overflow-y-auto">
+        <aside className="hidden 2xl:block w-60 flex-shrink-0 sticky top-[96px] h-[calc(100vh-120px)] pl-6 border-l border-outline-variant overflow-y-auto">
           <h3 className="font-body-sm text-on-surface-variant uppercase tracking-wider mb-4 font-semibold text-xs">
             Sur cette page
           </h3>
