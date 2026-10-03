@@ -1,36 +1,72 @@
 ---
 title: "Notification hook"
-description: "Déclencher des notifications système, Slack ou Discord quand Claude Code attend une action de l'utilisateur."
-updatedAt: "2026-05-19"
-readingMinutes: 6
+description: "Être prévenu quand Claude Code attend une permission, reste inactif ou termine une tâche de fond : types de notification, délais réels, terminalSequence et Slack."
+updatedAt: "2026-10-03"
+readingMinutes: 7
 ---
 
-Le hook `Notification` se déclenche chaque fois que Claude Code souhaite attirer ton attention : demande de permission pour exécuter un outil, prompt resté inactif trop longtemps, ou message explicite envoyé par l'agent. C'est le canal idéal pour ne plus rater une session qui tourne en arrière-plan pendant que tu fais autre chose.
+Le hook `Notification` se déclenche quand Claude Code envoie une notification : permission en attente, inactivité, dialogue MCP, fin d'une session en arrière-plan. Il sert à relayer l'alerte où vous êtes vraiment (bureau, Slack, téléphone) pendant qu'une session tourne sans vous.
 
-## Quand le hook se déclenche
+## Les types de notification
 
-Trois cas concrets déclenchent un évènement `Notification` :
+Le `matcher` filtre sur le type, que le hook reçoit aussi dans `notification_type`. Sans matcher, le hook réagit à tous.
 
-1. Claude demande l'autorisation d'utiliser un outil non auto-approuvé (par exemple `Bash` sur une commande inconnue).
-2. Un prompt reste sans réponse au-delà de 60 secondes (paramètre `idle_notifications`).
-3. Claude appelle explicitement la fonction `notify` côté harness pour signaler un évènement.
+| Matcher | Se déclenche quand |
+|---|---|
+| `permission_prompt` | Une demande de permission attend depuis environ six secondes |
+| `idle_prompt` | Claude a fini de répondre il y a environ 60 secondes et vous n'avez rien tapé |
+| `auth_success` | L'authentification aboutit |
+| `elicitation_dialog` | Un serveur MCP ouvre un formulaire et vous n'avez pas tapé depuis environ six secondes |
+| `elicitation_url_dialog` | Un serveur MCP demande d'ouvrir une URL, même délai |
+| `elicitation_complete` / `elicitation_response` | Une élicitation MCP se termine ou sa réponse part |
+| `agent_needs_input` | Une session en arrière-plan attend votre réponse (agent view ouverte dans un terminal) |
+| `agent_completed` | Une session en arrière-plan se termine ou échoue (agent view ouverte) |
+| `quota_auto_resume_fired` | Claude reprend la tâche après une limite d'usage claude.ai |
+| `quota_auto_resume_stale` / `quota_auto_resume_disabled` | La reprise automatique attend `Entrée` ou est abandonnée |
 
-À chaque déclenchement, le harness passe sur stdin un JSON contenant `session_id`, `transcript_path`, `message` et `title`. Tu lis ces champs depuis ton script.
+Les délais de six et soixante secondes reprennent ceux des notifications de bureau : dans un terminal, chaque frappe repousse l'alerte. Si vous voulez réagir **immédiatement** à une demande de permission, utilisez plutôt le hook `PermissionRequest`. Dans Claude Desktop et l'extension VS Code, `permission_prompt` part environ six secondes après la demande, sans report pendant la frappe.
 
-## Notification système macOS
+## Le JSON reçu
 
-Voici une configuration minimale qui envoie une notification native via `osascript` sur macOS :
+```json
+{
+  "session_id": "abc123",
+  "transcript_path": "/home/me/.claude/projects/.../transcript.jsonl",
+  "cwd": "/home/me/projet",
+  "hook_event_name": "Notification",
+  "message": "Claude needs your permission",
+  "title": "Permission needed",
+  "notification_type": "permission_prompt"
+}
+```
+
+`title` est optionnel. Le hook ne peut ni bloquer ni modifier la notification : Claude Code ignore son code de sortie et ses champs `systemMessage` et `continue`. Il est fait pour les effets de bord.
+
+Ces événements arrivent même si vous avez coupé les notifications de bureau : le réglage `preferredNotifChannel` change seulement la façon dont Claude Code vous alerte lui-même.
+
+## Méthode recommandée : `terminalSequence`
+
+Un hook tourne sans terminal de contrôle : il ne peut pas écrire dans `/dev/tty`. Pour déclencher une notification du terminal, renvoyez la séquence d'échappement dans le champ JSON `terminalSequence` et Claude Code l'émet lui-même. Cela fonctionne dans tmux, GNU screen et sous Windows.
+
+```bash
+#!/bin/bash
+# .claude/hooks/notify.sh
+INPUT=$(cat)
+BODY=$(jq -r '.message // "Claude Code attend votre attention"' <<<"$INPUT")
+SEQ=$(printf '\033]777;notify;%s;%s\007' "Claude Code" "$BODY")
+jq -nc --arg seq "$SEQ" '{terminalSequence: $seq}'
+```
 
 ```json
 {
   "hooks": {
     "Notification": [
       {
-        "matcher": "",
         "hooks": [
           {
             "type": "command",
-            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/notify-macos.sh"
+            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/notify.sh",
+            "args": []
           }
         ]
       }
@@ -39,69 +75,91 @@ Voici une configuration minimale qui envoie une notification native via `osascri
 }
 ```
 
-Et le script associé :
+Séquences acceptées : OSC `0`, `1`, `2` (titres de fenêtre), OSC `9` (iTerm2, Windows Terminal, WezTerm, ConEmu), OSC `99` (Kitty), OSC `777` (Ghostty, Warp, urxvt) et BEL. Adaptez le code OSC à votre terminal. Le champ n'a d'effet qu'en session interactive, pas en mode `-p`.
+
+## Notification système native
+
+macOS, avec le texte passé en argument plutôt qu'interpolé dans le script AppleScript (ce qui évite qu'un guillemet dans le message casse la commande) :
 
 ```bash
-#!/usr/bin/env bash
-set -euo pipefail
-
-INPUT=$(cat)
-MESSAGE=$(echo "$INPUT" | jq -r '.message // "Claude attend une réponse"')
-TITLE=$(echo "$INPUT" | jq -r '.title // "Claude Code"')
-
-osascript -e "display notification \"${MESSAGE//\"/\\\"}\" with title \"${TITLE//\"/\\\"}\" sound name \"Submarine\""
+#!/bin/bash
+MESSAGE=$(jq -r '.message // "Claude attend une réponse"')
+osascript -e 'on run argv' \
+          -e 'display notification (item 1 of argv) with title "Claude Code"' \
+          -e 'end run' -- "$MESSAGE"
 ```
 
-Pense à le rendre exécutable : `chmod +x .claude/hooks/notify-macos.sh`.
+Si rien ne s'affiche, `osascript` passe par l'app Éditeur de script : autorisez ses notifications dans Réglages Système > Notifications.
+
+Linux (paquet `libnotify-bin` sur Debian et Ubuntu, inutilisable sans démon de notification, donc pas en SSH ni en conteneur) :
+
+```bash
+#!/bin/bash
+MESSAGE=$(jq -r '.message // "Claude attend une réponse"')
+notify-send 'Claude Code' "$MESSAGE"
+```
 
 ## Envoi vers Slack
 
-Pour une équipe qui partage un agent long-running (build de doc, refactor de masse), poste plutôt sur un webhook Slack :
+Pour une session longue partagée en équipe, postez sur un webhook entrant :
 
 ```bash
-#!/usr/bin/env bash
-set -euo pipefail
-
+#!/bin/bash
 INPUT=$(cat)
-MESSAGE=$(echo "$INPUT" | jq -r '.message')
-SESSION=$(echo "$INPUT" | jq -r '.session_id')
+MESSAGE=$(jq -r '.message' <<<"$INPUT")
+TYPE=$(jq -r '.notification_type' <<<"$INPUT")
+SESSION=$(jq -r '.session_id' <<<"$INPUT")
 
-curl -sS -X POST -H 'Content-type: application/json' \
-  --data "$(jq -n --arg text "Claude (session ${SESSION:0:8}) : $MESSAGE" '{text: $text}')" \
-  "$SLACK_WEBHOOK_URL" > /dev/null
+[ -z "$SLACK_WEBHOOK_URL" ] && exit 0
+curl -sS --max-time 5 -X POST -H 'Content-type: application/json' \
+  --data "$(jq -n --arg t "Claude Code ($TYPE, session ${SESSION:0:8}) : $MESSAGE" '{text: $t}')" \
+  "$SLACK_WEBHOOK_URL" >/dev/null
+exit 0
 ```
 
-Stocke `SLACK_WEBHOOK_URL` dans `~/.zshrc` (ou via `direnv`), jamais en clair dans `settings.json` qui peut être commit.
+Gardez `SLACK_WEBHOOK_URL` dans votre environnement, jamais dans un `settings.json` versionné. Le même schéma fonctionne pour Discord (champ `content` au lieu de `text`).
 
 ## Filtrer le bruit
 
-Sans filtre, tu vas recevoir un ping à chaque demande de permission. Deux stratégies pour rester sain :
-
-- Côté script : ignore les messages contenant `permission` si tu utilises déjà l'auto-approve sur un large périmètre.
-- Côté harness : règle `idle_notifications_threshold_ms` dans `settings.json` pour repousser le seuil d'inactivité.
+Un hook sans matcher vous alerte pour tout. Le plus souvent, deux types suffisent :
 
 ```json
 {
-  "idle_notifications_threshold_ms": 180000,
   "hooks": {
     "Notification": [
-      { "matcher": "", "hooks": [{ "type": "command", "command": ".claude/hooks/notify-filtered.sh" }] }
+      {
+        "matcher": "permission_prompt",
+        "hooks": [{ "type": "command", "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/notify.sh", "args": [] }]
+      },
+      {
+        "matcher": "idle_prompt|agent_completed",
+        "hooks": [{ "type": "command", "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/slack.sh", "args": [] }]
+      }
     ]
   }
 }
 ```
 
-## Tester rapidement
+Pour être prévenu à **chaque** fin de réponse, sans attendre une minute d'inactivité, utilisez un hook `Stop` (voir [SessionStart, Stop et SessionEnd](/wiki/hooks/session-start-stop)).
 
-Le moyen le plus simple : lance une session, demande à Claude un `Bash` sur une commande inhabituelle (ex. `git push --force-with-lease`). La demande de permission déclenche le hook. Tu peux aussi simuler en pipant un JSON directement dans ton script :
+## Tester
+
+Simulez l'événement en envoyant un JSON au script :
 
 ```bash
-echo '{"session_id":"abc","message":"test","title":"Demo"}' | .claude/hooks/notify-macos.sh
+echo '{"message":"test","notification_type":"permission_prompt","session_id":"abc12345"}' \
+  | .claude/hooks/notify.sh
 ```
 
-## Pour aller plus loin
+Puis vérifiez dans `/hooks` que le hook apparaît bien sous `Notification`. En situation réelle, demandez à Claude une commande qui exige une permission et attendez sans taper.
 
-- Combine `Notification` avec `Stop` pour distinguer « Claude attend » vs « Claude a fini ».
-- Sur Linux, remplace `osascript` par `notify-send` (paquet `libnotify-bin`).
-- Pour Discord, utilise un webhook avec le même pattern `curl` que Slack.
-- Si tu utilises tmux, ajoute `tmux display-message` dans ton script pour superposer un toast dans ton terminal actif.
+## Articles liés
+
+- [SessionStart, Stop et SessionEnd](/wiki/hooks/session-start-stop)
+- [Agent view : piloter plusieurs sessions en parallèle](/wiki/cli/agent-view-sessions)
+- [Debugging hooks](/wiki/hooks/debugging-hooks)
+
+## Sources
+
+- [Hooks reference : Notification, terminalSequence](https://code.claude.com/docs/en/hooks)
+- [Automate actions with hooks : Get notified when Claude needs input](https://code.claude.com/docs/en/hooks-guide)

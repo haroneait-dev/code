@@ -1,104 +1,139 @@
 ---
 title: "Sessions et reprise"
-description: "Comment Claude Code persiste l'état d'une conversation et permet de reprendre exactement où vous vous étiez arrêté."
-updatedAt: "2026-05-19"
+description: "Reprendre, nommer, brancher et retrouver vos conversations Claude Code : --continue, --resume, /resume, /branch, stockage JSONL et rétention."
+updatedAt: "2026-10-03"
 readingMinutes: 6
 ---
 
-Une session Claude Code, c'est l'historique complet d'une conversation : messages, appels d'outils, résultats, todos. Le CLI persiste tout cela sur disque pour permettre la reprise après une fermeture (volontaire ou non) du terminal. Comprendre où sont stockées ces sessions et comment les manipuler ouvre des possibilités puissantes : reprendre une tâche longue, comparer deux pistes, ou simplement éviter de tout recommencer après un crash.
+Une session est une conversation enregistrée et rattachée à un dossier de projet. Claude Code l'écrit sur disque au fil de l'eau : vous pouvez fermer le terminal, faire `/clear` ou subir un crash, puis reprendre exactement où vous en étiez.
+
+## Reprendre une session
+
+| Commande | Effet |
+|---|---|
+| `claude --continue` (`-c`) | Rouvre la conversation la plus récente du dossier courant |
+| `claude --resume` (`-r`) | Ouvre le sélecteur de sessions |
+| `claude --resume <nom>` | Reprend directement la session portant ce nom |
+| `claude --resume <id>` | Reprend par identifiant, depuis n'importe quel dossier |
+| `claude --resume <chemin.jsonl>` | Reprend depuis un fichier de transcription |
+| `claude --from-pr 123` | Sélecteur filtré sur les sessions liées à la PR 123 |
+| `/resume` | Change de conversation sans quitter Claude Code |
+
+Les sessions lancées avec `claude -p` ou l'Agent SDK n'apparaissent ni dans le sélecteur ni dans `--continue`. Vous pouvez toujours les reprendre en passant leur identifiant à `--resume`.
+
+## Ce qu'une reprise restaure
+
+- **L'historique complet**, y compris les appels d'outils et leurs résultats. Un outil interrompu par un crash n'est pas relancé : Claude est prévenu qu'il doit vérifier s'il a eu lieu.
+- **Le modèle** utilisé, sauf si vous imposez `--model` ou `ANTHROPIC_MODEL`.
+- **Le mode de permission**, avec `--continue` ou `--resume <id|nom>` depuis le terminal. Exceptions : une session terminée en `bypassPermissions` ou en `plan` redémarre dans le mode par défaut. Depuis le sélecteur ou `/resume`, le mode n'est pas restauré.
+- **Les tâches planifiées** non expirées et l'objectif `/goal` actif.
+
+Ne sont **pas** restaurés : les flags `--mcp-config`, `--settings`, `--plugin-dir`, `--add-dir`, ni les dossiers ajoutés avec `/add-dir`. Repassez-les à la reprise si la session en dépend.
+
+Sur une offre Pro ou Max, si la session est inactive depuis plus d'une heure environ et dépasse 100 000 tokens, une boîte de dialogue propose de reprendre depuis un résumé (moins coûteux par la suite) ou la session complète. Le cache de prompt a expiré : la première requête retraitera de toute façon tout l'historique.
+
+## Nommer ses sessions
+
+Un nom rend la session facile à retrouver et à reprendre :
+
+```bash
+claude -n refacto-auth            # nom donné au démarrage
+claude --resume refacto-auth      # reprise par nom
+```
+
+En cours de session, `/rename refacto-auth` fait la même chose et affiche le nom dans la barre de saisie. Sans nom, Claude Code génère un titre à partir de votre premier prompt.
+
+## Le sélecteur de sessions
+
+`/resume` ou `claude --resume` sans argument ouvre un sélecteur. Raccourcis utiles :
+
+| Touche | Action |
+|---|---|
+| `Space` | Aperçu de la session |
+| `Ctrl+R` | Renommer |
+| `/` ou une lettre | Rechercher (on peut coller l'URL d'une PR) |
+| `Ctrl+B` | Filtrer sur la branche git courante |
+| `Ctrl+W` | Afficher tous les worktrees du dépôt |
+| `Ctrl+A` | Afficher tous les projets de la machine |
+
+Chaque ligne indique l'ancienneté, la branche git et la taille du fichier.
+
+## Brancher une conversation
+
+Pour tester une autre piste sans perdre la conversation actuelle :
+
+```text
+/branch piste-streaming
+```
+
+`/branch` copie l'historique dans une nouvelle session et vous y place. L'original reste intact dans le sélecteur. Depuis la ligne de commande :
+
+```bash
+claude --continue --fork-session
+```
+
+À ne pas confondre avec `/fork`, qui copie la conversation dans une **session d'arrière-plan** (visible dans `claude agents`) pendant que vous continuez ici.
+
+Évitez d'ouvrir la même session dans deux terminaux sans `--fork-session` : les messages des deux s'entremêlent dans une seule transcription.
 
 ## Où sont stockées les sessions
 
-Toutes les sessions vivent sous `~/.claude/projects/`. Chaque projet (identifié par son chemin absolu) reçoit un sous-dossier dont le nom est dérivé du `cwd` :
-
-```bash
-ls ~/.claude/projects/
-# -Users-harone-claude-code/
-# -Users-harone-sam-network-solutions/
-
-ls ~/.claude/projects/-Users-harone-claude-code/
-# 2c8f9e1a-...jsonl
-# 4d2b8c7f-...jsonl
+```text
+~/.claude/projects/<projet>/<session-id>.jsonl
 ```
 
-Chaque fichier `.jsonl` est une session. Le format **JSON Lines** stocke un message par ligne, ce qui rend les fichiers append-only et faciles à inspecter avec `grep`/`jq`.
+`<projet>` est le chemin du dossier de travail où chaque caractère non alphanumérique devient `-` (par exemple `-Users-marie-mon-app`). Conséquences :
 
-## Démarrer, reprendre, lister
+- renommer ou déplacer le dossier fait « disparaître » ses sessions du sélecteur courant (`Ctrl+A` les retrouve) ;
+- `/cd <chemin>` déplace la session en cours vers un autre dossier en conservant la conversation ;
+- les sessions d'un sous-dossier sont rangées à part.
 
-Trois flags principaux gèrent les sessions :
+Chaque ligne du fichier est un objet JSON (message, appel d'outil, métadonnées). **Le format est interne et change d'une version à l'autre** : ne construisez pas d'outils qui le parsent directement.
 
-```bash
-claude                  # nouvelle session dans le projet courant
-claude --continue       # reprend la session la plus récente
-claude --resume         # affiche une liste interactive de sessions
-claude --resume <id>    # reprend une session par son UUID
-```
+## Exploiter une session depuis un script
 
-`--continue` est idéal pour l'usage quotidien : si vous fermez et rouvrez le terminal, vous récupérez exactement la conversation précédente avec tout son contexte chargé. `--resume` est utile quand vous travaillez sur plusieurs pistes en parallèle.
-
-## Liaison projet ↔ session
-
-La clé de la persistance, c'est le `cwd`. Claude Code dérive l'identifiant projet du **chemin absolu** du dossier où vous avez lancé `claude`. Conséquences :
-
-- Si vous renommez le dossier, vous perdez l'historique (sauf à renommer aussi le dossier dans `~/.claude/projects/`).
-- Lancer `claude` depuis un sous-dossier crée potentiellement une nouvelle racine.
-- Deux projets avec le même nom dans des chemins différents sont bien séparés.
-
-## Inspecter une session
-
-Comme c'est du JSONL, vous pouvez explorer en CLI :
+Utilisez plutôt les interfaces prévues :
 
 ```bash
-# Compter les messages
-wc -l ~/.claude/projects/-Users-harone-claude-code/<id>.jsonl
-
-# Voir tous les prompts utilisateur
-jq -r 'select(.role=="user") | .content' \
-   ~/.claude/projects/-Users-harone-claude-code/<id>.jsonl
-
-# Extraire les tool calls Bash
-jq 'select(.content[]?.type=="tool_use" and .content[].name=="Bash")' \
-   ~/.claude/projects/-Users-harone-claude-code/<id>.jsonl
+# Poser une question à une session existante et lire la réponse
+claude -p --resume <session-id> --output-format json \
+  "Résume ce que nous avons modifié" | jq -r '.result'
 ```
 
-C'est précieux pour faire des post-mortems ou alimenter un système de mémoire externe.
+- `/export [fichier]` produit une transcription lisible en texte brut.
+- Les hooks et la barre d'état reçoivent `transcript_path` en entrée : un hook `SessionEnd` peut archiver la transcription.
 
-## Compaction et rétention
+## Rétention et confidentialité
 
-Pendant une session longue, Claude Code peut déclencher une **compaction automatique** : un résumé est généré et remplace l'historique antérieur pour libérer de la fenêtre de contexte. La session sur disque conserve toutefois la trace complète — la compaction n'affecte que ce qui est envoyé au modèle au prochain tour.
+| Pour | Réglage |
+|---|---|
+| Changer la durée de conservation (30 jours par défaut) | `cleanupPeriodDays` dans `settings.json` |
+| Déplacer le stockage | `CLAUDE_CONFIG_DIR` |
+| Ne rien écrire du tout | `CLAUDE_CODE_SKIP_PROMPT_HISTORY` |
+| Ne rien écrire pour un run `-p` | `--no-session-persistence` |
+| Effacer les données d'un projet | `claude purge` |
 
-```bash
-/compact           # force la compaction immédiate
-/compact <focus>   # compacte en gardant les détails liés à <focus>
-/clear             # repart de zéro (la session précédente reste sur disque)
-```
+Les transcriptions sont en clair : un secret lu par un outil y est écrit. Bloquez la lecture des `.env` avec une règle `deny`.
 
-## Cycle de vie typique
-
-| Phase | Commande | Effet |
-|-------|----------|-------|
-| Démarrage matinal | `claude --continue` | Reprend la session de la veille |
-| Bascule de tâche | `/clear` puis nouveau prompt | Garde la session mais vide le contexte |
-| Reprise après crash | `claude --continue` | Reload depuis le JSONL |
-| Switch entre pistes | `claude --resume` | Sélection interactive |
-| Archive | déplacer le `.jsonl` | Sortie du listing sans suppression |
-
-## Multi-machine et synchronisation
-
-Le dossier `~/.claude/projects/` n'est pas synchronisé nativement. Pour partager des sessions entre machines, vous pouvez :
-
-- Synchroniser `~/.claude/projects/<projet>/` via iCloud Drive, Dropbox ou un repo Git privé.
-- Attention aux conflits si vous travaillez en parallèle sur deux machines : le format JSONL append-only se prête mal aux merges.
+Synchroniser `~/.claude/projects/` entre machines (Dropbox, iCloud) est déconseillé : deux machines qui écrivent la même session corrompent l'historique. Pour passer d'un appareil à l'autre, préférez Remote Control ou les sessions cloud.
 
 ## Bonnes pratiques
 
-- Utilisez `--continue` par défaut, ne lancez `claude` (session neuve) que pour les tâches franchement nouvelles.
-- Préférez `/clear` à fermer/rouvrir : c'est plus rapide et ça garde la session indexée.
-- Sauvegardez périodiquement les sessions importantes (les fichiers JSONL peuvent dépasser plusieurs Mo).
-- Combinez avec un système de **mémoire long terme** (claude-mem par exemple) pour conserver les enseignements au-delà d'une session.
+- Nommez les sessions longues ou parallèles (`-n`, `/rename`).
+- Utilisez `/clear` quand vous changez de sujet : l'ancienne conversation reste accessible via `/resume`.
+- Brancher (`/branch`) coûte moins cher que de tout réexpliquer dans une nouvelle session.
+- Mettez les décisions durables dans `CLAUDE.md` ou la mémoire automatique : chaque nouvelle session repart d'un contexte vide.
 
 ## Pour aller plus loin
 
-- Article **--continue et checkpoints** pour la reprise fine.
-- Article **/clear, /resume, /cost** pour les commandes slash de gestion.
-- Article **Gestion fine de la mémoire** pour les techniques avancées.
+- [Checkpoints et /rewind](/wiki/cli/continue-checkpoints)
+- [/clear, /resume et /usage](/wiki/cli/clear-resume-cost)
+- [Agent view et sessions d'arrière-plan](/wiki/cli/agent-view-sessions)
+- [Mémoire et oubli sélectif](/wiki/cli/memoire-oubli-selectif)
+
+## Sources
+
+- [Manage sessions](https://code.claude.com/docs/en/sessions)
+- [CLI reference](https://code.claude.com/docs/en/cli-reference)
+- [Explore the .claude directory](https://code.claude.com/docs/en/claude-directory)
+- [Commands](https://code.claude.com/docs/en/commands)

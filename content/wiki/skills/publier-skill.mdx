@@ -1,91 +1,132 @@
 ---
-title: "Publier un skill"
-description: "Guide complet pour packager, versionner et publier un skill Claude Code sur npm avec une organisation propre."
-updatedAt: "2026-05-19"
-readingMinutes: 6
+title: "Publier un skill : plugin, marketplace et annuaire"
+description: "Partager un skill Claude Code avec votre équipe ou le public : dépôt Git, plugin, marketplace, annuaire d'Anthropic et checklist de publication."
+updatedAt: "2026-10-03"
+readingMinutes: 7
 ---
 
-Publier un skill Claude Code, c'est transformer un dossier local en module réutilisable que toute la communauté peut installer en une commande. La distribution se fait aujourd'hui principalement via **npm**, avec une convention claire : un package qui expose un `SKILL.md` et des assets associés. Ce guide couvre toutes les étapes, de la structure initiale à la signature du package.
+Publier un skill, c'est le rendre installable par d'autres avec des mises à jour. Dans Claude Code, le format de distribution officiel n'est pas npm mais le **plugin**, listé dans une **marketplace** (un simple fichier JSON dans un dépôt Git). Ce guide part d'un skill qui fonctionne et va jusqu'à sa publication.
 
-## Préparer la structure du package
+## Choisir le bon canal
 
-Un skill publiable suit une arborescence standard. Le `SKILL.md` est obligatoire et doit décrire ce que fait le skill, quand l'invoquer et quels outils sont nécessaires.
+| Canal | Pour qui | Mises à jour |
+|---|---|---|
+| Committer dans `.claude/skills/` du dépôt | L'équipe qui travaille sur ce dépôt | Via `git pull` |
+| Envoyer le dossier ou un `.zip` | Quelques personnes | Aucune, ils rechargent la copie |
+| Plugin dans votre marketplace | Quiconque peut cloner le dépôt (public ou privé) | `claude plugin update` ou auto-update |
+| Annuaire d'Anthropic (claude.ai/directory) | Utilisateurs de claude.ai, Cowork et Claude Code | Après validation de chaque version |
+| Managed settings | Toute l'organisation | Pilotées par l'admin |
 
-```md
-# my-skill
+Pour un skill d'équipe sur un seul dépôt, le commit suffit. Dès qu'il sert dans plusieurs projets ou à l'extérieur, passez au plugin.
 
-## Description
-Génère des migrations Prisma à partir d'un schéma SQL legacy.
+## Transformer le skill en plugin
 
-## Triggers
-- "migre cette table vers Prisma"
-- fichiers .sql modifiés dans /legacy
+Un plugin minimal contient un manifeste et un dossier `skills/` :
 
-## Steps
-1. Lire le schéma source
-2. Inférer les relations
-3. Écrire prisma/schema.prisma
+```text
+generateur-migrations/
+├── .claude-plugin/
+│   ├── plugin.json
+│   └── marketplace.json
+├── skills/
+│   └── generer-migration/
+│       ├── SKILL.md
+│       └── scripts/valider.py
+└── README.md
 ```
 
-Le `package.json` doit pointer vers ce fichier et inclure les bons mots-clés pour la découvrabilité.
+```json
+{
+  "name": "generateur-migrations",
+  "displayName": "Générateur de migrations",
+  "version": "1.0.0",
+  "description": "Génère et valide des migrations SQL Supabase",
+  "author": { "name": "Acme" },
+  "homepage": "https://github.com/acme/generateur-migrations",
+  "repository": "https://github.com/acme/generateur-migrations"
+}
+```
 
-## Organiser le code et les assets
+Le skill s'invoquera en `/generateur-migrations:generer-migration`. Dans les chemins de scripts, utilisez `${CLAUDE_SKILL_DIR}` (dossier du skill) ou `${CLAUDE_PLUGIN_ROOT}` (racine du plugin).
 
-Évitez de tout mettre à la racine. Une organisation propre facilite la maintenance et permet à Claude de naviguer dans le skill sans charger des fichiers inutiles.
+Raccourci : un dossier de skill qui contient `.claude-plugin/plugin.json` se charge déjà comme un plugin.
 
-- `SKILL.md` — point d'entrée, lu par Claude
-- `scripts/` — helpers bash ou node invoqués par le skill
-- `templates/` — fichiers modèles à copier
-- `README.md` — documentation humaine, distincte du SKILL.md
-- `.skillignore` — exclut les fichiers de la distribution
+## Ajouter le fichier de marketplace
 
-Le `README.md` cible les développeurs qui parcourent npm, tandis que le `SKILL.md` cible Claude. Les deux audiences ont des besoins différents : l'un veut des badges et des exemples visuels, l'autre veut des instructions impératives et déterministes.
+Pour publier depuis le dépôt du plugin lui-même, placez `marketplace.json` à côté de `plugin.json`, avec une entrée dont la source est la racine :
 
-## Versionner avec SemVer
+```json
+{
+  "name": "acme-outils",
+  "owner": { "name": "Acme" },
+  "plugins": [
+    { "name": "generateur-migrations", "source": "./" }
+  ]
+}
+```
 
-Les skills suivent le semantic versioning classique. Une **patch** corrige un bug d'instruction, une **minor** ajoute un nouveau trigger ou une nouvelle étape rétrocompatible, une **major** change la signature ou supprime des comportements.
+Gardez le même `name` dans l'entrée et dans `plugin.json`, sinon l'installation échoue avec `Plugin "<nom>" not found in marketplace`. Poussez le dépôt : le plugin est publié, sans formulaire.
+
+## Checklist avant chaque release
+
+1. **Nom définitif** en kebab-case. Les utilisateurs installent par `nom@marketplace` : renommer casse les installations existantes. Changez plutôt `displayName`.
+2. **Stratégie de version** : incrémentez `version` à chaque release, ou omettez-la pour que Claude Code utilise le SHA du commit. Si vous gardez une `version` figée, `claude plugin update` répond « already at the latest version ».
+3. **Validation** :
+
+   ```bash
+   claude plugin validate --strict .
+   ```
+
+   `--strict` échoue aussi sur les avertissements (champ inconnu, `version` manquante) : idéal en CI.
+4. **Test d'installation** depuis une marketplace locale :
+
+   ```bash
+   claude plugin marketplace add ./
+   claude plugin install generateur-migrations@acme-outils
+   ```
+
+5. **Métadonnées** : `description`, `author`, `homepage`, `repository` et un `README.md` pour les humains (le `SKILL.md` s'adresse à Claude).
+6. **Évaluations** : `claude plugin eval .` si vous avez une suite de tests (voir [Tester un skill](/wiki/skills/tester-skill)).
+
+## Ce que font vos utilisateurs
 
 ```bash
-npm version patch -m "fix: clarifie le trigger SQL"
-npm version minor -m "feat: ajoute support PostgreSQL"
-npm version major -m "breaking: renomme le skill"
+claude plugin marketplace add acme/generateur-migrations
+claude plugin install generateur-migrations@acme-outils
 ```
 
-Pensez à publier un `CHANGELOG.md` à la racine. Claude le lit parfois pour comprendre l'évolution, et les utilisateurs y reviennent avant chaque mise à jour.
+Ou en une commande dans une session (v2.1.275 et plus) :
 
-## Publier sur npm
-
-Avant le premier push, créez une **organisation npm** dédiée (`@mon-org/skill-name`). Les skills scoped sont plus faciles à identifier et évitent les conflits de noms.
-
-```bash
-npm login
-npm init --scope=@mon-org
-npm publish --access public
+```text
+/plugin install generateur-migrations --marketplace acme/generateur-migrations
 ```
 
-Vérifiez le contenu du tarball avant publication. Trop de fichiers gonflent le téléchargement et ralentissent l'installation des utilisateurs.
+L'auto-update est désactivé par défaut pour une marketplace tierce. Chaque utilisateur peut l'activer dans `/plugin` > **Marketplaces**, ou un admin via `"autoUpdate": true` dans les managed settings.
 
-```bash
-npm pack --dry-run
-```
+## Soumettre à l'annuaire d'Anthropic
 
-Ajoutez un champ `files` dans `package.json` pour ne publier que l'essentiel : `SKILL.md`, `scripts/`, `templates/`, `README.md`.
+L'annuaire (claude.ai/directory) touche les utilisateurs de claude.ai, de Cowork et de Claude Code. La soumission se fait depuis le portail développeur `claude.ai/directory/manage` et demande une offre claude.ai payante. Avant de soumettre :
 
-## Signer et sécuriser
+- `claude plugin validate --strict` doit passer (le portail applique des règles supplémentaires) ;
+- vérifiez quels composants se chargent hors de Claude Code : par exemple, les champs de frontmatter propres à Claude Code ne sont pas acceptés sur claude.ai, qui n'admet que `name`, `description`, `license`, `compatibility`, `metadata` et `allowed-tools`.
 
-La signature des packages devient un standard sur npm avec **Sigstore**. Activez la provenance lors du publish pour prouver que votre skill vient bien de votre dépôt GitHub.
+La marketplace officielle `claude-plugins-official` ne prend pas de soumissions par ce portail.
 
-```bash
-npm publish --provenance --access public
-```
+## Et npm ?
 
-La provenance lie le package à un workflow GitHub Actions, ce qui rassure les utilisateurs sensibles à la chaîne d'approvisionnement. Pour les entreprises, c'est souvent une exigence interne avant d'autoriser l'installation d'un skill tiers.
-
-Pensez aussi à activer la 2FA sur votre compte npm et à utiliser des **automation tokens** pour vos workflows CI plutôt que votre token personnel.
+Une entrée de marketplace peut avoir une source `npm`, mais ce n'est pas le chemin recommandé : la version calculée vaut alors `unknown` si le manifeste n'en fixe pas. Préférez une source Git (`github`, `url`, `git-subdir`), épinglable sur un `ref` ou un `sha`.
 
 ## Pour aller plus loin
 
-- Documentation officielle Claude Code sur le format SKILL.md
-- Guide npm Sigstore et provenance
-- Convention de nommage `@anthropic/skill-*` pour les skills inspirés des officiels
-- Outils de lint comme `skill-lint` (communautaire) pour vérifier la structure avant publish
+- [Versioning des skills](/wiki/skills/versioning)
+- [Créer un plugin](/wiki/plugins/creer-plugin)
+- [Installer un skill](/wiki/skills/installer-skill)
+- [Partager ses commandes avec l'équipe](/wiki/slash-commands/partage-equipe)
+
+## Sources
+
+- Publier un plugin : https://code.claude.com/docs/en/plugins/publish
+- Créer une marketplace : https://code.claude.com/docs/en/plugin-marketplaces
+- Héberger une marketplace et mises à jour : https://code.claude.com/docs/en/plugins/host-marketplace
+- Partager des skills : https://code.claude.com/docs/en/skills
+- Champs acceptés hors de Claude Code : https://code.claude.com/docs/en/skills

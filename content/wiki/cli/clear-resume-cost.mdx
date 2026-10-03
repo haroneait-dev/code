@@ -1,66 +1,106 @@
 ---
-title: "/clear, /resume, /cost : gérer ses sessions Claude Code"
-description: "Maîtriser les commandes de gestion de session : effacer le contexte, reprendre une conversation et suivre le coût d'utilisation."
-updatedAt: "2026-05-19"
+title: "/clear, /resume et /usage : gérer ses sessions et sa consommation"
+description: "Vider le contexte avec /clear, revenir à une conversation avec /resume et suivre coût, cache et limites de forfait avec /usage (ex-/cost)."
+updatedAt: "2026-10-03"
 readingMinutes: 6
 ---
 
-Les sessions Claude Code peuvent vite devenir longues et coûteuses. Trois commandes intégrées vous permettent de garder le contrôle : `/clear` pour repartir d'une page blanche, `/resume` pour reprendre une conversation antérieure, et `/cost` pour surveiller votre consommation en temps réel. Bien utilisées, elles font la différence entre un workflow fluide et un agent qui dérape (contexte saturé, hallucinations, factures inattendues).
+Trois commandes suffisent à garder une session Claude Code rapide et économique : `/clear` pour repartir d'un contexte propre, `/resume` pour revenir à une conversation, `/usage` pour savoir ce que vous consommez. `/cost` existe toujours, mais c'est désormais un alias de `/usage`.
 
-## /clear : repartir d'un contexte propre
+## Pourquoi le contexte coûte cher
 
-Quand votre conversation accumule trop de fichiers lus, de logs et d'allers-retours, Claude commence à perdre en précision. La fenêtre de contexte se remplit, le coût par tour explose et le modèle a du mal à se concentrer sur la tâche courante.
+Chaque requête renvoie au modèle toute la conversation : fichiers lus, sorties de commandes, échanges. Plus la session est longue, plus chaque message coûte cher et plus les consignes du début risquent de se diluer. Le cache de prompt réduit fortement le coût des parties répétées, mais il expire après une période d'inactivité.
 
-```bash
+## /clear : repartir d'un contexte vide
+
+```text
 /clear
+/clear migration-db      # nomme la conversation que vous quittez
 ```
 
-Cette commande purge entièrement le contexte de la session active. Elle est idéale entre deux tâches indépendantes : vous venez de finir une refonte du front, vous voulez attaquer une migration de base de données — `/clear` évite que Claude continue de raisonner sur des fichiers React qui ne sont plus pertinents. Les fichiers `CLAUDE.md` du projet restent injectés automatiquement à chaque nouveau message, donc votre agent ne perd pas ses repères.
+`/clear` démarre une nouvelle conversation avec un contexte vide. L'ancienne n'est pas supprimée : elle reste dans `/resume`, et le menu `/rewind` propose d'y revenir tant que vous n'avez pas quitté Claude Code. Vos fichiers `CLAUDE.md` et la mémoire automatique sont rechargés.
 
-Astuce : prenez le réflexe de `/clear` toutes les 30 à 60 minutes d'usage intensif, ou dès que vous changez de domaine fonctionnel.
+Utilisez-le dès que vous passez à une tâche sans rapport avec la précédente. Si vous voulez garder le fil mais alléger, préférez `/compact` :
 
-## /resume : reprendre une conversation antérieure
-
-Claude Code conserve l'historique de vos sessions sur disque (généralement dans `~/.claude/projects/`). La commande `/resume` ouvre un sélecteur interactif qui liste vos dernières sessions, avec un aperçu du premier message et la date.
-
-```bash
-/resume
+```text
+/compact Garde les décisions d'architecture et les tests qui échouent
 ```
 
-Sélectionnez une session avec les flèches et appuyez sur Entrée : Claude recharge l'intégralité du contexte (fichiers lus, décisions prises, code écrit) et vous pouvez continuer comme si vous n'aviez jamais quitté. Pratique pour :
+Vous pouvez aussi ajouter une section « Compact instructions » dans `CLAUDE.md` pour orienter tous les résumés.
 
-- reprendre un debug complexe le lendemain matin
-- continuer une refonte démarrée la veille sans réexpliquer le contexte
-- récupérer une session interrompue par un crash terminal
+## /resume : revenir à une conversation
 
-Vous pouvez aussi passer un identifiant directement : `claude --resume <session-id>` depuis le shell pour relancer Claude Code directement sur une session précise.
-
-## /cost : suivre la dépense en temps réel
-
-Anthropic facture chaque token consommé. Sur les modèles haut de gamme (Opus, Sonnet), une grosse session peut coûter plusieurs dollars sans qu'on s'en rende compte. La commande `/cost` affiche un récapitulatif clair :
-
-```bash
-/cost
+```text
+/resume                  # sélecteur interactif
+/resume migration-db     # reprise directe par nom
 ```
 
-Vous obtenez le total dépensé sur la session courante, ventilé par modèle utilisé, ainsi que le nombre de tokens d'entrée, de sortie, et de cache hit/miss. Le cache (prompt caching) est crucial : un bon ratio de cache hit divise la facture par 5 ou 10.
+Depuis le shell : `claude --resume` (sélecteur), `claude --resume <nom|id>` ou `claude --continue` pour la plus récente. Le réflexe utile : `/rename` avant `/clear`, pour retrouver facilement la conversation plus tard.
 
-Vérifiez `/cost` régulièrement, surtout quand vous travaillez sur de gros monorepos ou que vous laissez tourner des sous-agents en autonomie.
+Dans le sélecteur : `Space` pour un aperçu, `Ctrl+R` pour renommer, `Ctrl+B` pour filtrer sur la branche git, `Ctrl+A` pour voir tous les projets. Détails dans [Sessions et reprise](/wiki/cli/sessions-reprise).
 
-## Combiner les trois dans un workflow sain
+## /usage : coût, cache et limites
 
-Une routine efficace :
+`/usage` (alias `/cost` et `/stats`) regroupe plusieurs informations.
 
-1. Démarrer une session avec un objectif précis
-2. Vérifier `/cost` toutes les 20 à 30 minutes
-3. Lancer `/clear` dès qu'on change de domaine
-4. Quitter proprement et reprendre via `/resume` le lendemain
+**Le bloc Session** donne le coût estimé de la session au prix public, la durée et le détail par modèle :
 
-Cette discipline maintient les performances du modèle, limite les hallucinations dues à un contexte pollué, et garde la facture sous contrôle.
+```text
+Total cost:            $0.55
+Total duration (API):  6m 20s
+Total duration (wall): 6h 33m 10s
+Total code changes:    0 lines added, 0 lines removed
+Usage by model:
+   claude-sonnet-5-5:  1.2k input, 5.3k output, 940.0k cache read, 50.0k cache write ($0.55)
+```
+
+Ce chiffre est utile si vous payez à l'usage (clé API). Avec un abonnement Pro ou Max, il n'a pas de valeur de facturation. Il repart de zéro après `/clear`.
+
+**La ligne `Prompt cache (main)`** indique la part des tokens d'entrée servie par le cache, les échecs de cache (avec une cause probable) et si le cache est encore « chaud ». Un taux élevé signifie des requêtes beaucoup moins chères.
+
+**Pour les abonnés** (Pro, Max, Team, Enterprise) : les barres de limites du forfait, et une répartition de la consommation par skill, sous-agent, plugin, serveur MCP et tâche `/loop`. `d` et `w` basculent entre 24 heures et 7 jours.
+
+Commandes voisines :
+
+- `/context` : grille d'occupation du contexte, avec des suggestions (outils MCP lourds, mémoire trop longue) ;
+- `/insights` : rapport HTML sur vos habitudes d'utilisation et vos points de friction ;
+- `/usage-credits` : activer ou demander des crédits pour dépasser la limite du forfait.
+
+## Afficher la consommation en permanence
+
+Une [barre d'état personnalisée](/wiki/cli/status-line-custom) peut afficher le coût de la session, le pourcentage de contexte utilisé et vos limites de forfait sans taper de commande.
+
+## Réduire la consommation
+
+| Levier | Comment |
+|---|---|
+| Vider entre deux tâches | `/rename`, puis `/clear` |
+| Choisir le bon modèle | Sonnet pour l'essentiel, Opus pour les décisions complexes, `model: haiku` pour les sous-agents simples |
+| Baisser l'effort | `/effort medium` ou `low` sur les tâches simples |
+| Alléger `CLAUDE.md` | Moins de 200 lignes ; déplacer les procédures spécialisées dans des skills |
+| Limiter MCP | Couper les serveurs inutiles avec `/mcp`, préférer `gh` ou `aws` en CLI |
+| Déléguer le verbeux | Tests, logs et recherches dans un sous-agent qui ne renvoie qu'un résumé |
+| Être précis | « Ajoute une validation à login() dans auth.ts » plutôt que « améliore le code » |
+
+Sur Opus 5.5, Sonnet 5.5 et les modèles Fable, la réflexion étendue ne peut pas être désactivée : jouez sur le niveau d'effort.
+
+## Une routine simple
+
+1. Démarrez avec un objectif précis et nommez la session (`claude -n ma-tache`).
+2. Surveillez le contexte dans la barre d'état ou avec `/context`.
+3. `/compact` quand la session s'alourdit mais que le fil compte encore.
+4. `/rename` puis `/clear` quand vous changez de sujet.
+5. Le lendemain, `claude --resume ma-tache`.
 
 ## Pour aller plus loin
 
-- Documentation officielle des slash commands : `claude.com/docs`
-- Configurer une status line custom pour afficher le coût en permanence (voir l'article dédié)
-- Utiliser `/compact` comme alternative douce à `/clear` : Claude résume le contexte au lieu de l'effacer
-- Définir `MAX_THINKING_TOKENS` dans `settings.json` pour borner la dépense par tour
+- [Sessions et reprise](/wiki/cli/sessions-reprise)
+- [Checkpoints et /rewind](/wiki/cli/continue-checkpoints)
+- [Barre d'état personnalisée](/wiki/cli/status-line-custom)
+- [Effort, fast mode et advisor](/wiki/cli/effort-fast-advisor)
+
+## Sources
+
+- [Manage costs effectively](https://code.claude.com/docs/en/costs)
+- [Commands](https://code.claude.com/docs/en/commands)
+- [Manage sessions](https://code.claude.com/docs/en/sessions)

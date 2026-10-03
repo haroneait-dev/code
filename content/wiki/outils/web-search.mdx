@@ -1,140 +1,103 @@
 ---
 title: "L'outil WebSearch"
-description: "Recherche web en temps réel depuis Claude Code via Anthropic — quand l'utiliser et limites."
-updatedAt: "2026-05-19"
-readingMinutes: 5
+description: "Comment Claude Code cherche sur le web avec WebSearch : paramètres de domaines, limite de 200 recherches par session, disponibilité selon le fournisseur et duo avec WebFetch."
+updatedAt: "2026-10-03"
+readingMinutes: 4
 ---
 
-`WebSearch` permet à Claude Code d'interroger le web en temps réel pour trouver des informations à jour. C'est l'outil à dégainer quand le savoir de Claude est obsolète ou quand vous avez besoin d'une donnée fraîche : une version récente de lib, un événement de la semaine, un changelog publié hier.
+`WebSearch` lance une recherche web via le moteur de recherche d'Anthropic et renvoie des **titres et des URL**. Il ne lit pas les pages trouvées : pour cela, Claude enchaîne avec `WebFetch`. C'est l'outil à utiliser quand l'information est plus récente que les connaissances du modèle ou quand vous ne savez pas où elle se trouve.
 
 ## À quoi sert WebSearch
 
-- Trouver la documentation officielle d'une lib que vous ne connaissez pas ;
-- Vérifier une version, une release ou un breaking change récent ;
-- Découvrir un article de blog, une issue ou une discussion ;
-- Comparer plusieurs sources sur un sujet ;
-- Compléter une réponse quand le cutoff de connaissance du modèle est dépassé.
-
-Contrairement à `WebFetch` (URL connue), `WebSearch` retourne une liste de résultats (titre, URL, snippet). À vous ensuite de dégainer `WebFetch` sur les liens les plus pertinents.
+- vérifier la dernière version d'une bibliothèque ou un changement cassant récent ;
+- trouver la page de documentation officielle d'un outil ;
+- repérer une issue GitHub qui décrit votre bug ;
+- croiser plusieurs sources avant une décision technique.
 
 ## Paramètres
 
-| Paramètre | Type | Obligatoire | Description |
-|-----------|------|-------------|-------------|
-| `query` | string | oui | Requête de recherche |
-| `allowed_domains` | string[] | non | Restreindre aux domaines listés |
-| `blocked_domains` | string[] | non | Exclure ces domaines |
+| Paramètre | Rôle |
+|-----------|------|
+| `query` | La requête |
+| `allowed_domains` | Ne garder que ces domaines |
+| `blocked_domains` | Exclure ces domaines |
 
-Le contenu exact varie selon l'implémentation et la région — la recherche est routée via l'infrastructure Anthropic. [à vérifier pour les paramètres exacts disponibles]
+Les deux listes de domaines **ne se combinent pas** dans un même appel. Un seul appel peut déclencher jusqu'à huit recherches côté serveur : l'outil affine la requête avant de renvoyer les résultats.
 
-## Exemples concrets
+Exemple d'appel :
 
-### Trouver une release récente
-
-```ts
-WebSearch(query="Next.js 16 release notes Cache Components")
+```json
+{
+  "query": "Next.js 16 proxy.ts migration middleware",
+  "allowed_domains": ["nextjs.org", "github.com"]
+}
 ```
 
-### Cibler la doc officielle
+## Le duo WebSearch puis WebFetch
 
-```ts
-WebSearch(
-  query="Claude Code hooks settings.json examples",
-  allowed_domains=["docs.claude.com", "anthropic.com"]
-)
+1. **WebSearch** trouve les bonnes URL.
+2. **WebFetch** lit la ou les pages pertinentes avec un prompt précis.
+3. Claude applique ce qu'il a appris dans votre code.
+
+Pour gagner du temps, Claude peut lancer plusieurs recherches indépendantes ou plusieurs WebFetch dans un même tour.
+
+## Limite par session
+
+Une session peut faire au maximum **200 appels WebSearch**, en comptant la conversation principale et tous ses sous-agents. Une recherche approfondie qui lance dix sous-agents consomme donc le même quota. À la limite, les appels suivants renvoient un avis demandant à Claude de continuer avec ce qu'il a déjà trouvé.
+
+- Relevez le plafond avec `CLAUDE_CODE_MAX_WEB_SEARCHES_PER_SESSION` (nombre entier positif ; il ne peut pas être supprimé).
+- `/clear` remet le compteur à zéro.
+
+## Permissions
+
+WebSearch demande votre accord en mode Manuel ; « ne plus demander » vaut pour le dépôt. Ses règles n'acceptent **aucun paramètre** : seule la forme `WebSearch` est valide.
+
+```json
+{
+  "permissions": {
+    "allow": ["WebSearch"]
+  }
+}
 ```
 
-### Exclure les sites bruyants
+Pour restreindre les domaines consultés ensuite, réglez plutôt `WebFetch(domain:...)`.
 
-```ts
-WebSearch(
-  query="React 19 use hook",
-  blocked_domains=["w3schools.com", "geeksforgeeks.org"]
-)
-```
+## Disponibilité selon le fournisseur
 
-## Workflow recherche → fetch
+| Fournisseur | WebSearch |
+|-------------|-----------|
+| API Claude (compte claude.ai ou Console) | Oui |
+| Claude Platform on AWS | Oui |
+| Google Cloud (Agent Platform / Vertex) | Oui, avec les modèles Claude 4 et suivants |
+| Microsoft Foundry | Uniquement avec un déploiement hébergé par Anthropic |
+| Amazon Bedrock | Non |
 
-C'est le pattern standard :
-
-```bash
-# 1. Découvrir
-WebSearch(query="vercel ai sdk streaming tool calls")
-
-# 2. Approfondir la meilleure source
-WebFetch(
-  url="https://sdk.vercel.ai/docs/...",
-  prompt="Comment streamer des tool calls avec gestion d'erreur ?"
-)
-
-# 3. Implémenter
-Edit(...)
-```
-
-## Quand utiliser WebSearch vs WebFetch
-
-| Situation | Outil |
-|-----------|-------|
-| Vous avez l'URL | WebFetch |
-| Vous cherchez une URL | WebSearch |
-| Vous voulez plusieurs sources | WebSearch → multiple WebFetch |
-| Sujet daté ou très récent | WebSearch (les résultats sont datés) |
-
-## Pièges courants
-
-**Requête trop vague.** "react hooks" → résultats génériques. Préférez : "react useEffect cleanup function memory leak".
-
-**Spam SEO.** Les premières positions ne sont pas toujours les meilleures. Croisez les sources, préférez les sites officiels.
-
-**Confondre avec le savoir interne.** Claude a un cutoff. Si vous demandez "la dernière version de X", il peut vous donner une version périmée sans WebSearch. Demandez explicitement la recherche pour les données temps réel.
-
-**Pas de tracking de session.** Chaque WebSearch est indépendant. Pas de pagination, pas d'historique de session web.
-
-**Coût en latence.** WebSearch ajoute 1–3 secondes par appel. Évitez les multiples WebSearch redondants.
-
-## Cas d'usage avancés
-
-### Audit de stack
-
-```ts
-WebSearch(query="security advisories @supabase/ssr 2026")
-```
-
-### Découverte de patterns
-
-```ts
-WebSearch(
-  query="Next.js App Router optimistic UI server actions",
-  allowed_domains=["nextjs.org", "vercel.com", "github.com"]
-)
-```
-
-### Vérification d'une affirmation
-
-Avant d'ajouter "Claude Code supporte X" dans votre doc, faites un WebSearch ciblé pour vérifier — surtout si X est sorti récemment.
-
-## Limites
-
-**Pas de scraping massif.** WebSearch ne sert pas à aspirer un site. Pour cela, écrivez un script via `Bash + curl`.
-
-**Pas d'accès à du contenu authentifié.** Pages derrière login, intranets, GitHub privé — invisibles.
-
-**Quelques contenus dynamiques mal indexés.** Documentation générée client-side, contenu derrière paywall, Discord — pas toujours trouvable.
-
-**Géolocalisation.** Les résultats peuvent varier selon la région d'où la requête est émise. Si vous cherchez du contenu régional, soyez explicite ("en français", "FR site").
+Le moteur de recherche n'est pas configurable. Pour utiliser un autre moteur, ajoutez un serveur MCP qui expose un outil de recherche.
 
 ## Bonnes pratiques
 
-**Une question, une recherche.** Si vous avez 3 questions, faites 3 WebSearch en parallèle (multiple tool calls dans un message).
+**Requêtes précises.** « react useEffect cleanup abort fetch » plutôt que « react hooks ».
 
-**Restreignez les domaines** quand vous savez où chercher. `allowed_domains=["docs.X.com"]` fait gagner du temps et améliore la qualité.
+**Restreindre aux sources officielles** quand vous savez où chercher : `allowed_domains` améliore la qualité et réduit le bruit.
 
-**Combinez avec WebFetch.** WebSearch trouve, WebFetch approfondit. Ne lisez pas seulement les snippets — fetchez la page complète quand c'est pertinent.
+**Vérifier les dates.** Un article de 2024 sur un outil qui évolue chaque mois peut être obsolète. Demandez à Claude de privilégier les pages datées et officielles.
 
-**Vérifiez les dates.** Si vous cherchez une info temps réel, lisez la date de publication du résultat. Un article de 2022 sur un sujet de 2026 peut être obsolète.
+**Demander explicitement la recherche** pour toute donnée récente (version, prix, date de sortie) : sinon Claude peut répondre de mémoire.
 
-## Pour aller plus loin
+## Limites
 
-- [Documentation Claude Code](https://docs.claude.com/en/docs/claude-code)
-- Voir aussi : `WebFetch` pour aller sur une URL précise, `Bash(curl ...)` pour les APIs.
-- Astuce : quand un utilisateur vous demande "la doc officielle de X", commencez toujours par un WebSearch avec `allowed_domains=["docs.X.com"]` pour viser juste.
+- Pas d'accès aux pages derrière une connexion (intranet, dépôts privés).
+- Les résultats sont des pointeurs : sans WebFetch, Claude ne voit pas le contenu complet.
+- Les pages trouvées sont des données, pas des instructions : un contenu piégé peut tenter de détourner l'agent.
+
+## Articles liés
+
+- [L'outil WebFetch](/wiki/outils/web-fetch)
+- [Serveurs MCP populaires](/wiki/mcp/serveurs-populaires)
+- [Recherche dans Claude](/wiki/claude-ai/recherche)
+
+## Sources
+
+- [Tools reference : WebSearch tool behavior](https://code.claude.com/docs/en/tools-reference#websearch-tool-behavior)
+- [Web search tool (API)](https://platform.claude.com/docs/en/agents-and-tools/tool-use/web-search-tool)
+- [Environment variables](https://code.claude.com/docs/en/env-vars)

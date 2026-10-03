@@ -1,91 +1,147 @@
 ---
 title: "Refactor à grande échelle"
-description: "Renommer ou restructurer des centaines de fichiers via Claude Code et ses subagents."
-updatedAt: "2026-05-19"
-readingMinutes: 6
+description: "Renommer, déplacer ou migrer des centaines de fichiers avec /batch, les dynamic workflows, les sous-agents en worktree et claude -p, en gardant un build vert à chaque étape."
+updatedAt: "2026-10-03"
+readingMinutes: 8
 ---
 
-Renommer une API, déplacer un dossier, migrer d'une lib à une autre : les refactors massifs sont historiquement la zone rouge des codebases. Claude Code change la donne en parallélisant le travail via des subagents, avec un agent orchestrateur qui pilote des dizaines d'agents enfants chacun responsable d'un fragment.
+Renommer un module, déplacer un dossier ou remplacer une API dans tout un dépôt : ces changements touchent trop de fichiers pour une seule conversation. En 2026, Claude Code propose trois façons de répartir ce travail entre plusieurs agents (`/batch`, les dynamic workflows et une boucle `claude -p`). Cet article explique quand utiliser chacune et comment garder la maîtrise du résultat.
 
-## Quand sortir l'artillerie lourde
+## D'abord : faut-il vraiment un agent ?
 
-Un simple `find` + `sed` suffit pour un renommage textuel. On bascule sur Claude dès qu'il faut :
+Un outil déterministe est plus rapide, moins cher et reproductible quand la transformation est purement syntaxique :
 
-- Comprendre le contexte sémantique (renommer `User` en `Account` sans casser `UserAgent`).
-- Adapter les imports en cascade après un déplacement de dossier.
-- Migrer une API (par ex. `useState` vers une lib de state management) avec adaptation des appels.
-- Mettre à jour la documentation et les tests en même temps que le code.
+- renommage textuel sans ambiguïté : `rg -l ancienNom | xargs sed -i 's/ancienNom/nouveauNom/g'` ;
+- transformation d'arbre syntaxique : `ast-grep`, `jscodeshift`, les codemods officiels de votre framework ;
+- renommage de symbole : la fonction « Rename symbol » de votre IDE, ou un [plugin de code intelligence](https://code.claude.com/docs/en/plugins/code-intelligence) qui donne à Claude « aller à la définition » et « trouver les références ».
 
-## Pattern : un orchestrateur, N subagents
+Passez à Claude quand il faut comprendre le sens : renommer `User` en `Account` sans toucher `UserAgent`, adapter les appels après un changement de signature, migrer une bibliothèque dont l'API diffère, mettre à jour tests et documentation en même temps. Le meilleur compromis est souvent mixte : demandez à Claude d'écrire le codemod, relisez-le, puis exécutez-le.
 
-L'idée centrale : un agent principal lit la carte du repo, découpe le travail en chunks indépendants (par dossier, par feature) et délègue chaque chunk à un subagent. Chaque subagent travaille en isolation puis remonte un diff.
+## Les trois outils de 2026
 
-```text
-Tu es l'orchestrateur d'un refactor : renommer le module `payments` en `billing`.
-Étapes :
-1. Liste tous les fichiers qui importent depuis `lib/payments` ou `app/payments`.
-2. Groupe-les par feature (max 15 fichiers par groupe).
-3. Pour chaque groupe, lance un subagent avec la tâche :
-   "Mets à jour les imports, les noms de fonctions et les commentaires de ces fichiers."
-4. Une fois tous les subagents revenus, lance `npm run build` et corrige les erreurs résiduelles.
-```
+| Outil | Ce qu'il fait | Quand l'utiliser |
+| :- | :- | :- |
+| `/batch <instruction>` | Explore le dépôt, découpe le travail en 5 à 30 unités indépendantes, vous montre le plan, puis lance un sous-agent d'arrière-plan par unité, chacun dans son propre worktree, qui implémente, lance les tests et publie son changement | Refactor de taille moyenne, découpable par dossier ou par fonctionnalité |
+| Dynamic workflow (`ultracode:` ou « utilise un workflow ») | Claude écrit un script JavaScript qui orchestre des dizaines à des centaines d'agents ; le script se relance et se reprend | Migration de plusieurs centaines de fichiers, besoin de vérification croisée, orchestration à réutiliser |
+| Boucle `claude -p` | Votre propre script appelle Claude fichier par fichier avec des permissions restreintes | Pipeline déjà existant, contrôle total, exécution en CI |
 
-L'avantage : chaque subagent a un contexte propre, ne pollue pas la fenêtre principale, et plusieurs peuvent tourner en parallèle.
+Les sous-agents classiques (« utilise des sous-agents pour… ») restent utiles pour 2 à 5 tâches parallèles. Au-delà, le plan qui vit dans la conversation de Claude devient fragile : c'est le rôle de `/batch` et des workflows.
 
-## Préparer le terrain avant de lancer
+## Préparer le terrain
 
-Un refactor massif réussi se prépare. Avant de lancer Claude :
+Un refactor massif part d'une base saine et d'une vérification que Claude peut exécuter seul.
 
 ```bash
-git checkout -b refactor/payments-to-billing
-git status                       # repo propre
-npm run test -- --passWithNoTests
-npm run build                    # baseline verte
+git switch -c refactor/payments-vers-billing
+git status                      # arbre propre
+npm run build && npm test       # base verte : toute casse viendra du refactor
 ```
 
-Cette baseline permet à Claude de comparer après chaque batch. Si le build casse, on sait que la régression vient du dernier batch — pas d'un bug préexistant.
-
-## Découper en batchs vérifiables
-
-Plutôt qu'un seul commit géant, demandez à Claude de committer après chaque batch validé :
+Puis, en mode plan (`Shift+Tab` jusqu'à « plan mode on »), faites produire un plan écrit avant toute modification :
 
 ```text
-Pour chaque feature refactorée :
-1. Modifie les fichiers du groupe.
-2. Lance `npm run build` — si KO, corrige sans toucher aux autres groupes.
-3. Lance les tests liés à cette feature.
-4. Commit avec le message : "refactor(billing): rename X in <feature>".
-Ne passe au groupe suivant que si les 3 étapes précédentes ont réussi.
+Je veux renommer le module `payments` en `billing` dans tout le dépôt
+(dossiers, imports, noms de fonctions publiques, tests, docs).
+Liste les fichiers concernés, les cas ambigus (ex. `PaymentIntent` de Stripe
+à ne pas renommer) et propose un découpage en lots indépendants.
+Écris le plan dans REFACTOR_PLAN.md avec, pour chaque lot, la commande de vérification.
 ```
 
-Cette discipline permet un `git bisect` simple si une régression apparaît plus tard.
+Relisez `REFACTOR_PLAN.md`, en particulier la liste des exceptions. C'est là que se cachent les régressions.
 
-## Exemple concret : migration de Pages Router vers App Router
-
-Sur un projet Next.js de 300 fichiers, on peut formuler la tâche ainsi :
+## Option 1 : `/batch`
 
 ```text
-Migre toutes les pages de `pages/` vers `app/` selon le mapping :
-- pages/api/* → app/api/*/route.ts (handler GET/POST exporté)
+/batch renommer le module payments en billing selon REFACTOR_PLAN.md ;
+chaque unité doit passer `npm run build` et les tests de son dossier
+```
+
+Claude vous présente le découpage. Ajustez-le avant d'accepter (fusionner deux unités qui se touchent, exclure un dossier). Ensuite, chaque sous-agent travaille dans un worktree isolé : les modifications ne se marchent pas dessus. Il faut un dépôt git (ou un hook `WorktreeCreate` pour un autre système de versions).
+
+Bon à savoir : les unités doivent vraiment être indépendantes. Si deux lots modifient le même fichier central (un `index.ts` qui réexporte tout), traitez ce fichier à part, avant ou après le `/batch`.
+
+## Option 2 : un dynamic workflow
+
+Pour un chantier plus gros, demandez un workflow. Le mot-clé `ultracode` dans votre prompt suffit :
+
+```text
+ultracode: migre chaque fichier de src/components/ de JavaScript vers TypeScript,
+chacun dans sa propre copie isolée ; vérifie chaque résultat avec `npx tsc --noEmit`
+sur le fichier, puis fais relire par un agent indépendant les fichiers
+où des `any` ont été ajoutés.
+```
+
+Ce qui change par rapport à `/batch` :
+
+- le plan vit dans un script, pas dans le contexte de Claude, qui ne reçoit que le résultat final ;
+- jusqu'à 16 agents en parallèle par défaut (réglable avec `CLAUDE_CODE_WORKFLOW_MAX_CONCURRENT_AGENTS`) et 1 000 agents au maximum par exécution ;
+- `/workflows` affiche la progression par phase, permet de mettre en pause (`p`), d'arrêter (`x`) et de sauvegarder le script (`s`) dans `.claude/workflows/` pour le relancer plus tard sous forme de commande ;
+- une exécution interrompue se reprend dans la même session : les agents terminés renvoient leur résultat enregistré.
+
+Un workflow ne demande pas votre avis en cours de route. Si vous voulez valider entre deux étapes (par exemple après le premier lot), lancez chaque étape comme un workflow séparé. Le détail est dans [Dynamic workflows et agents en arrière-plan](/wiki/cli/dynamic-workflows-agents-arriere-plan).
+
+## Option 3 : une boucle `claude -p`
+
+Pour piloter vous-même le découpage, faites d'abord écrire la liste des fichiers, testez sur deux ou trois, puis lancez le reste :
+
+```bash
+claude -p "Liste les fichiers qui importent depuis lib/payments et écris-les dans files.txt, un par ligne." \
+  --allowedTools "Read,Grep,Glob,Write"
+
+while read -r file; do
+  claude -p "Dans $file, remplace les imports de lib/payments par lib/billing et renomme les symboles selon REFACTOR_PLAN.md. Réponds OK ou FAIL." \
+    --allowedTools "Read,Edit" --bare
+done < files.txt
+```
+
+`--allowedTools` limite ce que Claude peut faire sans surveillance. `--bare` accélère le démarrage et rend l'exécution reproductible en ignorant hooks, plugins, serveurs MCP et `CLAUDE.md` du projet : c'est le mode recommandé en script. Attention, il n'utilise pas votre connexion d'abonnement : il faut une variable `ANTHROPIC_API_KEY` (ou les identifiants de votre fournisseur cloud).
+
+## Vérifier lot par lot
+
+Quel que soit l'outil, la règle est la même : un lot n'est accepté que s'il est vert.
+
+```text
+Pour chaque lot :
+1. Applique les modifications du lot, et seulement celles-là.
+2. Lance `npm run build` puis les tests du dossier. Si ça échoue, corrige sans toucher aux autres lots.
+3. Commit avec le message « refactor(billing): <lot> ».
+Montre-moi la sortie des commandes, pas seulement « c'est bon ».
+```
+
+Des commits par lot rendent `git bisect` simple si une régression apparaît plus tard. Pour verrouiller la règle sans compter sur la mémoire de Claude, fixez la condition avec `/goal` (« le build et les tests passent ») ou un hook `Stop` qui lance le build.
+
+## Exemple : passer de Pages Router à App Router (Next.js)
+
+```text
+Migre les pages de `pages/` vers `app/` :
+- pages/api/* → app/api/*/route.ts (handlers GET/POST exportés)
 - pages/[slug].tsx → app/[slug]/page.tsx
-- getServerSideProps → fetch dans le composant async
-Préserve les comportements existants, mets à jour les tests Playwright,
-et regroupe les changements par segment de route.
+- getServerSideProps → récupération des données dans un composant serveur async
+Préserve les comportements, mets à jour les tests Playwright,
+et regroupe le travail par segment de route (un lot = un segment).
 ```
 
-Lancer ça à la main prend deux semaines. Avec Claude orchestrateur, comptez deux à trois jours avec validation humaine entre chaque batch.
+Lancez le premier segment seul, relisez-le entièrement, corrigez le prompt, puis seulement ensuite le reste en `/batch` ou en workflow.
 
-## Validation et garde-fous
+## Garde-fous
 
-Trois règles non négociables pour éviter le carnage :
-
-- Toujours partir d'une branche dédiée, jamais sur `main`.
-- Demander à Claude de produire un plan écrit avant la première modification.
-- Réviser le premier batch à la main avant de laisser tourner les suivants.
+- Toujours une branche dédiée, jamais `main`.
+- Un plan écrit et relu avant la première modification.
+- Le premier lot relu à la main avant de lancer les suivants.
+- Une revue finale indépendante : `/code-review` sur la branche, ou `/code-review ultra` pour un gros diff (limite de 500 fichiers et 8 000 lignes par défaut).
+- Les checkpoints (`/rewind`) ne couvrent que les modifications faites par les outils d'édition de Claude, pas celles des commandes shell ni des sous-agents en arrière-plan. Votre filet de sécurité, c'est git.
 
 ## Pour aller plus loin
 
-- Lire la doc des subagents Claude Code (`Task` tool) et le pattern d'orchestration.
-- Combiner avec `ast-grep` pour les transformations purement syntaxiques (plus rapide et déterministe).
-- Utiliser `git worktree` pour faire tourner plusieurs refactors en parallèle sans conflit.
-- Mesurer la couverture de tests avant/après pour s'assurer qu'aucun chemin n'est passé à la trappe.
+- [Dynamic workflows et agents en arrière-plan](/wiki/cli/dynamic-workflows-agents-arriere-plan)
+- [Paralléliser avec les sous-agents](/wiki/subagents/parallelisation)
+- [Migration de stack](/wiki/workflows/migration-stack)
+- [Gérer les conflits de merge](/wiki/outils/merge-conflicts-handling)
+
+## Sources
+
+- [Orchestrate subagents at scale with dynamic workflows, documentation Claude Code](https://code.claude.com/docs/en/workflows)
+- [Commands (`/batch`), documentation Claude Code](https://code.claude.com/docs/en/commands)
+- [Best practices : Fan out across files, documentation Claude Code](https://code.claude.com/docs/en/best-practices)
+- [Common workflows : Refactor code, documentation Claude Code](https://code.claude.com/docs/en/common-workflows)
+- [Create custom subagents (`isolation: worktree`), documentation Claude Code](https://code.claude.com/docs/en/sub-agents)

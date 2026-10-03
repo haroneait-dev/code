@@ -1,98 +1,115 @@
 ---
-title: "La réflexion étendue (extended thinking)"
-description: "Faire raisonner Claude avant de répondre via l'API : réflexion adaptative vs budget_tokens, le paramètre effort, limites de sortie par modèle, réflexion résumée (thinking.display), Task Budgets, et facturation des tokens de thinking comme output."
-updatedAt: "2026-06-08"
-readingMinutes: 9
+title: "La réflexion de Claude (thinking) : mécanismes"
+description: "Comment fonctionne la réflexion de Claude en API en 2026 : modes adaptive, enabled et between_tools selon le modèle, affichage résumé ou masqué, facturation, cache et erreurs fréquentes."
+updatedAt: "2026-10-03"
+readingMinutes: 8
 ---
 
-Avec la **réflexion étendue**, le modèle raisonne en interne avant de produire sa réponse visible. Cela améliore la qualité sur les tâches complexes (debug, planification, math, code multi-fichiers), au prix de tokens supplémentaires. **Tous les modèles Claude actuels** la prennent en charge — mais **le mécanisme a changé en 2026**, et c'est le piège n°1 à connaître.
+Avec la réflexion (*thinking*), Claude travaille le problème dans des blocs `thinking` avant d'écrire sa réponse. La qualité augmente sur le code, le débogage, les maths et les tâches agentiques longues, au prix de tokens de sortie supplémentaires. Le mécanisme dépend du modèle : c'est la première chose à vérifier.
 
-## ⚠️ Le mécanisme dépend du modèle
+## Le mode dépend du modèle
 
-Historiquement, on activait la réflexion avec `thinking: {type: "enabled", budget_tokens: N}`. **Ce n'est plus le cas sur les modèles récents.**
+| Modèle | Sans champ `thinking` | `adaptive` | `enabled` + `budget_tokens` | `disabled` |
+|---|---|---|---|---|
+| Opus 5.5, Fable 5.1, Mythos 5.1 | Adaptatif (toujours actif) | Oui | 400 | 400 |
+| Sonnet 5.5 | Adaptatif | Oui | 400 | 400 (utiliser `between_tools`) |
+| Opus 5 | Adaptatif | Oui | 400 | Oui jusqu'à `high`, 400 en `xhigh` et `max` |
+| Sonnet 5 | Adaptatif | Oui | 400 | Oui |
+| Opus 4.8, Opus 4.7 | Pas de réflexion | Oui | 400 | Oui |
+| Opus 4.6, Sonnet 4.6 | Pas de réflexion | Oui (recommandé) | Déprécié mais accepté | Oui |
+| Haiku 4.5, Sonnet 4.5, Opus 4.5 | Pas de réflexion | 400 | Oui (seul mode) | Oui |
 
-| Modèle | Comment activer la réflexion |
-|---|---|
-| **Opus 4.8 / 4.7** | `thinking: {type: "adaptive"}` **uniquement**. `{type: "enabled", budget_tokens: N}` renvoie une **erreur 400** — `budget_tokens` est **supprimé** (tout comme `temperature`, `top_p`, `top_k`). |
-| **Opus 4.6 / Sonnet 4.6** | `thinking: {type: "adaptive"}` (recommandé). `budget_tokens` y est **déprécié** mais encore fonctionnel (échappatoire transitoire). |
-| **Anciens modèles** (Sonnet 4.5, etc.) | `thinking: {type: "enabled", budget_tokens: N}`, avec `budget_tokens` **strictement inférieur** à `max_tokens` (min 1024). |
+Deux familles :
 
-En clair : avec **adaptive**, Claude décide lui-même **quand** et **combien** réfléchir — il n'y a plus de budget de tokens à régler à la main. Tu doses la profondeur avec le paramètre `effort` (ci-dessous).
+- **Réflexion adaptative** (`type: "adaptive"`) : Claude décide quand et combien réfléchir. Vous orientez avec `output_config.effort`. Voir [Raisonnement adaptatif et effort](/wiki/modeles/adaptive-thinking-effort).
+- **Réflexion manuelle** (`type: "enabled"`) : vous fixez `budget_tokens` (minimum 1 024, inférieur à `max_tokens`). Réservée aux modèles qui n'ont pas le mode adaptatif.
+
+Sur Sonnet 5.5, le réglage le plus bas est `thinking: {"type": "between_tools"}` : pas de réflexion avant la réponse, mais des notes de progression entre les appels d'outils. Il n'est accepté qu'avec un effort `high` ou inférieur.
 
 ```javascript
-// Opus 4.8 — réflexion adaptative (la bonne façon en 2026)
-{
+// Opus 4.8 : la réflexion est coupée par défaut, il faut l'activer
+const res = await client.messages.create({
   model: "claude-opus-4-8",
-  max_tokens: 16000,
-  thinking: { type: "adaptive" },
-  output_config: { effort: "high" },   // low | medium | high | xhigh | max
-  messages: [{ role: "user", content: "Démontre que…" }]
-}
+  max_tokens: 32000,
+  thinking: { type: "adaptive", display: "summarized" },
+  output_config: { effort: "xhigh" },
+  messages: [{ role: "user", content: "Démontre que..." }],
+});
+
+// Opus 5.5 : rien à activer, la réflexion est toujours là
+const res2 = await client.messages.create({
+  model: "claude-opus-5-5",
+  max_tokens: 32000,
+  output_config: { effort: "high" },
+  messages: [{ role: "user", content: "Démontre que..." }],
+});
 ```
 
-> Note : sur Opus 4.7/4.8, la réflexion adaptative est **désactivée par défaut** — une requête sans champ `thinking` tourne sans réflexion. Mets `thinking: {type: "adaptive"}` explicitement pour l'activer.
+## Afficher ou masquer la réflexion (`display`)
 
-## Le paramètre `effort`
+Le texte d'un bloc `thinking` n'est jamais la réflexion brute : c'est un **résumé** produit par un autre modèle. Le champ `display` contrôle ce que vous recevez :
 
-`effort` (GA, pas de header beta) contrôle la profondeur de réflexion **et** la dépense globale de tokens, via `output_config: {effort: …}` (à l'intérieur de `output_config`, pas au niveau racine).
+| Valeur | Contenu du bloc | Défaut sur |
+|---|---|---|
+| `"summarized"` | Résumé lisible | Opus 4.6, Sonnet 4.6 et modèles plus anciens |
+| `"omitted"` | Champ `thinking` vide, seule la `signature` est présente | Opus 4.7 et suivants, Sonnet 5, Sonnet 5.5, Fable, Mythos |
+| `"updates"` (bêta) | Seules les notes de progression entre outils sont lisibles | Sur demande, en-tête `thinking-display-updates-2026-08-18` |
 
-| Niveau | Usage |
-|---|---|
-| `low` | Tâches courtes/cadrées, latence prioritaire |
-| `medium` | Bon équilibre coût/qualité |
-| `high` | Défaut (équivaut à l'omettre) ; minimum recommandé pour le travail exigeant |
-| `xhigh` | **Meilleur réglage pour le code et l'agentique** (Opus 4.7/4.8) — entre `high` et `max` |
-| `max` | Correction avant tout, coût secondaire — **Opus uniquement** (4.6+) |
+Si votre interface montre la réflexion à l'utilisateur, passez explicitement `display: "summarized"`. Sinon, le défaut `"omitted"` a un avantage : le texte de la réponse commence à arriver plus tôt en streaming.
 
-`max` n'est pas disponible sur Sonnet ni Haiku ; `effort` lève une erreur sur Sonnet 4.5 / Haiku 4.5.
+Sur Opus 5.5, Sonnet 5.5 et Fable 5.1, demander au modèle de recopier son raisonnement interne dans la réponse peut déclencher un refus de catégorie `reasoning_extraction`. Lisez les blocs `thinking` plutôt.
 
-## Réflexion résumée (`thinking.display`)
+## Coût : la réflexion est facturée comme de la sortie
 
-Sur **Opus 4.7/4.8**, les blocs de réflexion sont renvoyés **vides par défaut** (`display: "omitted"`) — le nom du champ reste `block.thinking`, mais son texte est vide. Pour récupérer un **résumé** du raisonnement, opte explicitement :
+- Les tokens de réflexion sont facturés au tarif de sortie, **même en mode `omitted`**. Vous payez la réflexion complète, pas le résumé.
+- Le détail est dans `usage.output_tokens_details.thinking_tokens` (en streaming, uniquement dans le dernier événement `message_delta`).
+- La réflexion compte dans `max_tokens`. Un `max_tokens` dimensionné pour une réponse sans réflexion est souvent trop petit.
 
-```javascript
-thinking: { type: "adaptive", display: "summarized" }
+```python
+print(response.usage.output_tokens)                         # total facturé
+print(response.usage.output_tokens_details.thinking_tokens) # dont réflexion
 ```
 
-Si ton produit affiche le raisonnement à l'utilisateur, le défaut `"omitted"` ressemble à une longue pause avant la réponse : passe en `"summarized"` pour restaurer une progression visible. Ce résumé fournit l'essentiel du bénéfice intellectuel tout en limitant les usages abusifs.
+## Limites de sortie
 
-## Coût : les tokens de thinking sont des output
-
-Les tokens de réflexion sont **facturés comme des tokens de sortie**, au tarif output standard ([tarification](/wiki/modeles/pricing-tokens)). Une tâche qui génère 5 000 tokens de réflexion + 500 tokens de réponse coûte ~5 500 tokens de sortie. En production : **plafonne** via `max_tokens` (un défaut raisonnable : 3 à 5× la longueur de réponse visible attendue) et baisse l'`effort` d'un cran si la facture grimpe.
-
-## Limites de sortie par modèle
-
-| Modèle | Sortie max (standard) |
+| Modèle | Sortie max (API synchrone) |
 |---|---|
-| Opus 4.8 / 4.7 / 4.6 | jusqu'à **128k** tokens |
-| Sonnet 4.6 / Haiku 4.5 | jusqu'à **64k** tokens |
+| Fable 5.1, Opus 5.5, Sonnet 5.5, Opus 5, Sonnet 5, Opus 4.x récents | 128K tokens |
+| Haiku 4.5 | 64K tokens |
 
-> Au-delà de ~16k tokens de sortie, **streame la réponse** (`.stream()` + `.get_final_message()` / `.finalMessage()`) pour éviter les timeouts HTTP du SDK. Sur l'API [Batch](/wiki/api/batch-api), un en-tête beta (`output-300k-…`) peut relever la limite à **300k** pour Opus 4.8/4.7/4.6 et Sonnet 4.6.
+Sur l'[API Batch](/wiki/api/batch-api), l'en-tête bêta `output-300k-2026-03-24` porte la limite à 300K pour Opus 5.5, Opus 5, Sonnet 5.5, Sonnet 5, Opus 4.8, 4.7, 4.6 et Sonnet 4.6. Au-delà d'environ 16K tokens de sortie, streamez la réponse pour éviter les timeouts HTTP.
 
-## Task Budgets (beta, Opus 4.7 / 4.8)
+## Réflexion, outils et conversations multi-tours
 
-`output_config: {task_budget: {type: "tokens", total: N}}` indique au modèle combien de tokens il a pour **toute une boucle agentique** (réflexion + appels d'outils + réponse). Il voit un compte à rebours et s'auto-modère. C'est **distinct** de `max_tokens`, qui reste un plafond dur par réponse dont le modèle n'a pas conscience. Minimum `total` : **20 000 tokens** ; en-tête beta `task-budgets-2026-03-13`.
+- **Réflexion entrelacée** : automatique en mode adaptatif, sans en-tête bêta. Haiku 4.5 ne la prend pas en charge.
+- **Renvoyez les blocs `thinking` sans les modifier**, surtout pendant une boucle d'outils. Un bloc modifié provoque une erreur 400.
+- **Conservation des blocs** : Opus 4.5 et les modèles 4.6 et suivants gardent les blocs des tours précédents dans le contexte (facturés en entrée). Les modèles plus anciens, Haiku 4.5 compris, ne gardent que le dernier tour.
+- **Outil forcé** : avec la réflexion manuelle, seul `tool_choice` `auto` ou `none` est accepté. Opus 5.5, Sonnet 5.5, Fable 5.1 et Mythos 5.1 refusent aussi `any` et `tool`.
 
-## Compatibilité
+## Cache de prompt
 
-- **Streaming** : supporté — tu reçois des `thinking_delta` puis des `text_delta`.
-- **Tool use** : supporté ; la réflexion adaptative active automatiquement la **réflexion entrelacée** (interleaved thinking) entre les appels d'outils, sans header beta.
-- **Prompt caching** : les blocs de thinking ne portent pas de `cache_control` explicite mais sont mis en cache automatiquement ([prompt caching](/wiki/api/prompt-caching-implementation)).
+La configuration de réflexion et l'effort sont inscrits dans le prompt. Changer de mode, de `budget_tokens` ou d'effort entre deux requêtes invalide le cache. Choisissez un réglage par conversation et gardez-le. Voir [Prompt caching](/wiki/api/prompt-caching-implementation).
 
 ## Erreurs fréquentes
 
-- **Utiliser `budget_tokens` sur Opus 4.7/4.8** → 400. Passe à `thinking: {type: "adaptive"}` + `effort`.
-- **Activer la réflexion partout** : explose la facture sans gain mesurable sur les tâches simples.
-- **Renvoyer le `thinking` brut à l'utilisateur** : préfère `display: "summarized"` et ne logue le détail qu'en debug.
-- **Oublier `max_tokens` adapté** à `xhigh`/`max` : prévois ≥ 64000 pour laisser de la place à la réflexion + l'action.
+| Erreur | Cause | Correction |
+|---|---|---|
+| 400 `"thinking.type.enabled" is not supported` | `budget_tokens` sur Opus 4.7 ou plus récent | Passer à `adaptive` + `effort` |
+| 400 sur `thinking: {"type": "disabled"}` | Opus 5.5, Fable, ou Sonnet 5.5 | Baisser l'effort, ou `between_tools` sur Sonnet 5.5 |
+| Blocs `thinking` vides | `display: "omitted"` par défaut | Ajouter `display: "summarized"` |
+| `stop_reason: "max_tokens"` fréquent | Réflexion longue en `high` et au-dessus | Monter `max_tokens` (64K en `xhigh`) ou baisser l'effort |
+| Cache qui ne fonctionne plus | Effort ou mode changé entre deux requêtes | Garder la même configuration |
 
 ## Pour aller plus loin
 
-- [L'API Anthropic](/wiki/api)
-- [Le prompt caching](/wiki/api/prompt-caching-implementation) · [L'API Batch](/wiki/api/batch-api)
-- [Tarification & optimisation des coûts](/wiki/modeles/pricing-tokens) · [Modèles](/wiki/modeles)
-- [Extended Thinking : impact sur l'ingénierie logicielle](/wiki/modeles/extended-thinking-software)
+- [Raisonnement adaptatif et effort](/wiki/modeles/adaptive-thinking-effort)
+- [Extended thinking et ingénierie logicielle](/wiki/modeles/extended-thinking-software)
+- [Le prompt caching](/wiki/api/prompt-caching-implementation)
+- [Tarification et tokens](/wiki/modeles/pricing-tokens)
 
-### Sources officielles
-- Extended thinking : https://platform.claude.com/docs/en/build-with-claude/extended-thinking
-- Réflexion adaptative : https://platform.claude.com/docs/en/build-with-claude/adaptive-thinking
+## Sources
+
+- [Thinking (Claude Platform Docs)](https://platform.claude.com/docs/en/build-with-claude/thinking)
+- [Extended thinking](https://platform.claude.com/docs/en/build-with-claude/extended-thinking)
+- [Steering thinking : coût et cache](https://platform.claude.com/docs/en/build-with-claude/thinking-steering-and-cost)
+- [Models overview](https://platform.claude.com/docs/en/models/overview)

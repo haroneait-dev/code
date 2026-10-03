@@ -1,115 +1,199 @@
 ---
-title: "Tool use (function calling) avec l'API Anthropic"
-description: "Définir des outils JSON Schema que Claude peut appeler via les blocs tool_use et tool_result."
-updatedAt: "2026-05-19"
-readingMinutes: 6
+title: "Tool use (function calling) avec l'API Claude"
+description: "Définir des outils en JSON Schema, gérer la boucle tool_use / tool_result, utiliser le tool runner des SDK, strict: true, les appels parallèles et les outils serveur comme la recherche web."
+updatedAt: "2026-10-03"
+readingMinutes: 8
 ---
 
-Le **tool use** (aussi appelé *function calling*) permet à Claude d'appeler des fonctions que vous définissez côté serveur. C'est la brique fondamentale pour construire des agents capables d'interagir avec des bases de données, des APIs externes, des outils internes, ou pour structurer des sorties JSON fiables. Le modèle décide quand appeler un outil, avec quels arguments, puis vous renvoyez le résultat pour qu'il poursuive son raisonnement.
+Le **tool use** permet à Claude d'appeler des fonctions que vous définissez (base de données, API interne, calcul) ou des outils fournis par Anthropic (recherche web, exécution de code). Claude décide quand appeler un outil et avec quels arguments ; votre code l'exécute et renvoie le résultat. C'est la brique de base de tout agent.
 
-## Définir un outil avec JSON Schema
+## Outils client et outils serveur
 
-Chaque outil est décrit par un nom, une description et un `input_schema` au format JSON Schema. La description est cruciale : c'est ce que Claude lit pour décider quand utiliser l'outil.
+| Type | Qui exécute | Exemples |
+|---|---|---|
+| Outils client (les vôtres) | Votre application | `get_weather`, `search_orders` |
+| Outils client à schéma Anthropic | Votre application | `bash`, `text_editor`, `memory`, computer use |
+| Outils serveur | Anthropic | `web_search`, `web_fetch`, `code_execution`, `tool_search`, connecteur MCP |
+
+## Définir un outil
+
+Un outil, c'est un `name`, une `description` et un `input_schema` (JSON Schema). La description est ce que Claude lit pour décider : précisez quand l'utiliser, les formats attendus et les unités.
 
 ```python
 tools = [
     {
         "name": "get_weather",
-        "description": "Récupère la météo actuelle pour une ville donnée.",
+        "description": "Renvoie la météo actuelle d'une ville. À utiliser pour toute question sur le temps qu'il fait maintenant.",
         "input_schema": {
             "type": "object",
             "properties": {
-                "city": {"type": "string", "description": "Nom de la ville"},
-                "unit": {"type": "string", "enum": ["celsius", "fahrenheit"]}
+                "city": {"type": "string", "description": "Nom de la ville, par exemple Lyon"},
+                "unit": {"type": "string", "enum": ["celsius", "fahrenheit"]},
             },
-            "required": ["city"]
-        }
+            "required": ["city"],
+            "additionalProperties": False,
+        },
+        "strict": True,  # garantit que les arguments respectent le schéma
     }
 ]
 ```
 
-Plus la description est précise, moins Claude hallucine d'arguments. Indiquez les unités attendues, les formats de date, les valeurs par défaut.
+Avec `strict: True`, le schéma doit déclarer `additionalProperties: false` et ses champs `required`.
 
-## Le cycle tool_use / tool_result
+## La boucle tool_use / tool_result
 
-Quand Claude décide d'appeler un outil, sa réponse contient un bloc `tool_use` avec un `id`, le nom de l'outil et les arguments. Le `stop_reason` vaut `tool_use`. Vous devez alors exécuter l'outil et renvoyer un bloc `tool_result` dans un message `user`.
+Quand Claude veut un outil, la réponse contient un bloc `tool_use` (`id`, `name`, `input`) et `stop_reason` vaut `"tool_use"`. Vous exécutez, puis vous renvoyez un bloc `tool_result` dans un message `user`.
 
 ```python
+import json
 import anthropic
 
 client = anthropic.Anthropic()
 
-response = client.messages.create(
-    model="claude-sonnet-5-5",
-    max_tokens=1024,
-    tools=tools,
-    messages=[{"role": "user", "content": "Quel temps à Paris ?"}]
-)
+def run_tool(name: str, args: dict) -> str:
+    if name == "get_weather":
+        return json.dumps({"city": args["city"], "temp": 18, "sky": "nuageux"})
+    raise ValueError(f"Outil inconnu : {name}")
 
-# Si stop_reason == "tool_use"
-tool_use = next(b for b in response.content if b.type == "tool_use")
-result = my_weather_api(tool_use.input["city"])
+messages = [{"role": "user", "content": "Quel temps fait-il à Lyon et à Lille ?"}]
 
-followup = client.messages.create(
-    model="claude-sonnet-5-5",
-    max_tokens=1024,
-    tools=tools,
-    messages=[
-        {"role": "user", "content": "Quel temps à Paris ?"},
-        {"role": "assistant", "content": response.content},
-        {"role": "user", "content": [{
-            "type": "tool_result",
-            "tool_use_id": tool_use.id,
-            "content": str(result)
-        }]}
-    ]
-)
+while True:
+    response = client.messages.create(
+        model="claude-opus-5-5",
+        max_tokens=16000,
+        tools=tools,
+        messages=messages,
+    )
+    messages.append({"role": "assistant", "content": response.content})
+
+    if response.stop_reason != "tool_use":
+        break
+
+    results = []
+    for block in response.content:
+        if block.type == "tool_use":
+            try:
+                output = run_tool(block.name, block.input)
+                results.append({"type": "tool_result", "tool_use_id": block.id, "content": output})
+            except Exception as exc:
+                results.append({"type": "tool_result", "tool_use_id": block.id,
+                                "content": f"Erreur : {exc}", "is_error": True})
+    messages.append({"role": "user", "content": results})
+
+print(next(b.text for b in response.content if b.type == "text"))
 ```
 
-## Forcer ou contraindre l'usage des outils
+Trois règles :
 
-Le paramètre `tool_choice` permet de piloter le comportement :
+1. Renvoyez `response.content` **tel quel** (les blocs `thinking` signés doivent rester intacts).
+2. Claude peut demander **plusieurs outils en parallèle** : renvoyez **tous** les `tool_result` dans **un seul** message `user`. Les répartir sur plusieurs messages lui apprend à ne plus paralléliser.
+3. En cas d'échec, renvoyez un `tool_result` avec `is_error: true` et un message utile, plutôt que de l'omettre.
 
-```json
-{ "tool_choice": { "type": "auto" } }
-{ "tool_choice": { "type": "any" } }
-{ "tool_choice": { "type": "tool", "name": "get_weather" } }
+Si un outil serveur prend trop de temps, la réponse peut s'arrêter avec `stop_reason: "pause_turn"` : renvoyez la conversation telle quelle pour que Claude continue.
+
+## Le tool runner : la boucle écrite pour vous
+
+Les SDK fournissent un **tool runner** (en bêta) qui exécute vos fonctions et boucle jusqu'à la réponse finale.
+
+```python
+import anthropic
+from anthropic import beta_tool
+
+client = anthropic.Anthropic()
+
+@beta_tool
+def get_weather(city: str, unit: str = "celsius") -> str:
+    """Renvoie la météo actuelle d'une ville.
+
+    Args:
+        city: Nom de la ville, par exemple Lyon.
+        unit: "celsius" ou "fahrenheit".
+    """
+    return f"18 degrés et nuageux à {city}"
+
+runner = client.beta.messages.tool_runner(
+    model="claude-opus-5-5",
+    max_tokens=16000,
+    tools=[get_weather],
+    messages=[{"role": "user", "content": "Quel temps fait-il à Lyon ?"}],
+)
+for message in runner:
+    print(message.stop_reason)
 ```
 
-- `auto` : Claude choisit s'il faut appeler un outil (défaut).
-- `any` : il **doit** appeler un outil, n'importe lequel.
-- `tool` : il doit appeler exactement cet outil — idéal pour extraire une sortie structurée.
-
-## Parallel tool use
-
-Claude peut renvoyer plusieurs blocs `tool_use` dans une seule réponse pour paralléliser les appels. Vous devez répondre avec **tous** les `tool_result` correspondants dans le message suivant, dans un seul bloc `content`.
+En TypeScript, avec Zod :
 
 ```ts
-const results = response.content
-  .filter(b => b.type === "tool_use")
-  .map(tu => ({
-    type: "tool_result",
-    tool_use_id: tu.id,
-    content: JSON.stringify(executeTool(tu.name, tu.input)),
-  }));
+import Anthropic from "@anthropic-ai/sdk";
+import { betaZodTool } from "@anthropic-ai/sdk/helpers/beta/zod";
+import { z } from "zod";
+
+const client = new Anthropic();
+
+const getWeather = betaZodTool({
+  name: "get_weather",
+  description: "Renvoie la météo actuelle d'une ville",
+  inputSchema: z.object({ city: z.string() }),
+  run: async ({ city }) => `18 degrés et nuageux à ${city}`,
+});
+
+const final = await client.beta.messages.toolRunner({
+  model: "claude-opus-5-5",
+  max_tokens: 16000,
+  tools: [getWeather],
+  messages: [{ role: "user", content: "Quel temps fait-il à Lyon ?" }],
+});
+console.log(final.content);
 ```
 
-## Gestion des erreurs
+Piège : le runner ne relance pas automatiquement un tour terminé en `pause_turn`. Vérifiez le `stop_reason` final si vous mélangez outils serveur et outils client.
 
-Si votre outil échoue, renvoyez le `tool_result` avec `is_error: true`. Claude saura qu'il doit réessayer, demander à l'utilisateur ou changer de stratégie.
+## tool_choice : attention aux nouveaux modèles
 
-```json
-{
-  "type": "tool_result",
-  "tool_use_id": "toolu_01A...",
-  "content": "Timeout après 5s",
-  "is_error": true
-}
+| Valeur | Effet | Opus 5.5 / Sonnet 5.5 |
+|---|---|---|
+| `{"type": "auto"}` | Claude décide (défaut) | Accepté |
+| `{"type": "none"}` | Aucun outil | Accepté |
+| `{"type": "any"}` | Doit appeler un outil | **Erreur 400** |
+| `{"type": "tool", "name": "..."}` | Doit appeler cet outil | **Erreur 400** |
+
+Sur Opus 5.5, Sonnet 5.5 et Fable 5.1, le tool use forcé n'existe plus. Remplacements : `auto` + une consigne claire dans le prompt (« Utilisez l'outil `get_weather` ») + `strict: true`, ou les [sorties structurées](/wiki/prompt-engineering/output-format) (`output_config.format`) si vous vouliez seulement obtenir du JSON. Haiku 4.5 accepte encore `any` et `tool`. `disable_parallel_tool_use: true` reste utilisable avec `auto` pour limiter à un appel par tour.
+
+## Outils serveur : la recherche web
+
+```python
+response = client.messages.create(
+    model="claude-opus-5-5",
+    max_tokens=16000,
+    tools=[{"type": "web_search_20260209", "name": "web_search", "max_uses": 5}],
+    messages=[{"role": "user", "content": "Quelles sont les nouveautés de Python 3.14 ?"}],
+)
 ```
+
+Aucun code d'exécution de votre côté : les résultats arrivent dans la même réponse, avec citations. La recherche web coûte 10 $ pour 1 000 recherches en plus des tokens ; `web_fetch` n'a pas de surcoût.
+
+## Coût des outils
+
+Les définitions d'outils, les blocs `tool_use` et `tool_result` sont facturés comme des tokens. L'API ajoute aussi un prompt système d'outillage : 286 tokens sur Opus 5.5 et Sonnet 5.5, 496 sur Haiku 4.5. Mettez la liste `tools` en cache avec le [prompt caching](/wiki/api/prompt-caching-implementation) si elle est longue.
+
+## Bonnes pratiques
+
+- Validez toujours les arguments avant d'exécuter (Pydantic, Zod), surtout pour les actions irréversibles.
+- Parsez `input` comme un objet JSON, ne faites jamais de comparaison de chaîne sur sa sérialisation.
+- Bornez la taille des résultats d'outils pour ne pas saturer le contexte (voir [Token budgeting](/wiki/api/token-budgeting)).
+- Pour des centaines d'outils, regardez l'outil `tool_search` et `defer_loading`.
 
 ## Pour aller plus loin
 
-- Documentation officielle : `docs.anthropic.com/claude/docs/tool-use`
-- Combinez avec le **prompt caching** sur le tableau `tools` pour économiser sur les longues définitions.
-- Pour des agents complexes, regardez le pattern *agentic loop* : boucle `while stop_reason == "tool_use"`.
-- En production, validez toujours les arguments renvoyés par Claude avant exécution (zod, pydantic).
+- [Streaming](/wiki/api/streaming)
+- [SDK Python](/wiki/api/sdk-python) et [SDK TypeScript](/wiki/api/sdk-typescript)
+- [Introduction à MCP](/wiki/mcp/introduction-mcp)
+- [Bonnes pratiques de production](/wiki/api/best-practices-production)
+
+## Sources
+
+- Tool use overview : https://platform.claude.com/docs/en/agents-and-tools/tool-use/overview
+- Tool runner : https://platform.claude.com/docs/en/agents-and-tools/tool-use/tool-runner
+- Strict tool use : https://platform.claude.com/docs/en/agents-and-tools/tool-use/strict-tool-use
+- Errors (forced tool use not supported) : https://platform.claude.com/docs/en/api/errors
+- Pricing (tool use) : https://platform.claude.com/docs/en/about-claude/pricing

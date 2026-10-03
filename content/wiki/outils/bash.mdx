@@ -1,158 +1,128 @@
 ---
 title: "L'outil Bash"
-description: "Exécuter des commandes shell depuis Claude Code — sandbox, timeouts, background, et règles de sécurité."
-updatedAt: "2026-05-19"
+description: "Comment Claude Code exécute vos commandes shell avec Bash : ce qui persiste entre deux commandes, timeouts, arrière-plan, limites de sortie, règles de permission et sandbox."
+updatedAt: "2026-10-03"
 readingMinutes: 8
 ---
 
-L'outil `Bash` permet à Claude Code d'exécuter n'importe quelle commande shell — `git`, `npm`, `python`, `curl`, ou vos propres scripts. C'est le pont entre Claude et votre système. Sa puissance vient avec une responsabilité : une commande Bash peut tout faire, y compris détruire votre projet. Heureusement, le harness Claude Code expose un système de permissions, des timeouts et un mode background pour cadrer son usage.
+`Bash` permet à Claude Code d'exécuter des commandes shell dans votre environnement : tests, build, Git, gestionnaires de paquets, scripts. C'est l'outil le plus puissant du harness, donc le plus encadré : règles de permission, mode auto avec classifieur, sandbox optionnel et timeouts.
 
 ## À quoi sert Bash
 
-Bash est utilisé pour :
-
-- exécuter des **commandes de build** (`npm run build`, `cargo build`) ;
-- lancer des **tests** (`npm test`, `pytest`) ;
-- interagir avec **Git** (`git status`, `git diff`, `git commit`) ;
-- gérer les **dépendances** (`npm install`, `pip install`) ;
-- exécuter des **scripts utilitaires** ;
-- requêter une **API** (`curl`, `gh api`) ;
-- créer ou déplacer des fichiers (`mkdir`, `mv`, `cp`).
-
-Pour lire ou écrire des fichiers, **n'utilisez pas Bash** : Read/Write/Edit sont plus sûrs et alimentent correctement le contexte.
+- lancer les tests et le build (`npm test`, `pytest`, `cargo build`) ;
+- interagir avec Git et GitHub (`git diff`, `gh pr view`) ;
+- installer des dépendances ;
+- chercher dans le code (`rg`, `grep`, `find`) : sur macOS, Linux et WSL, c'est même le chemin par défaut, car les outils Glob et Grep n'y sont pas chargés ;
+- lancer un serveur de dev en arrière-plan.
 
 ## Paramètres
 
-| Paramètre | Type | Obligatoire | Description |
-|-----------|------|-------------|-------------|
-| `command` | string | oui | La commande shell à exécuter |
-| `description` | string | non | Description courte (active voice, 5-10 mots) |
-| `timeout` | integer | non | Timeout en ms (max 600000 = 10 min) |
-| `run_in_background` | boolean | non | Lance en arrière-plan |
-| `dangerouslyDisableSandbox` | boolean | non | Désactive le sandbox (rare) |
+| Paramètre | Rôle |
+|-----------|------|
+| `command` | Commande à exécuter |
+| `description` | Courte description affichée dans l'interface |
+| `timeout` | Délai en millisecondes, choisi par Claude si besoin |
+| `run_in_background` | Lance la commande comme tâche d'arrière-plan |
+| `dangerouslyDisableSandbox` | Demande une nouvelle tentative hors sandbox (voir plus bas) |
 
-Le `cwd` est réinitialisé entre chaque appel — utilisez **toujours des chemins absolus** et évitez `cd`.
+## Ce qui persiste entre deux commandes
 
-## Exemples concrets
+Chaque commande tourne dans un processus séparé, mais :
 
-### Lancer les tests
+- **le répertoire courant persiste** : après un `cd` dans le projet ou un répertoire ajouté (`--add-dir`, `/add-dir`), les commandes suivantes partent de là. Si `cd` sort de ces répertoires, Claude Code revient au dossier du projet et ajoute `Shell cwd was reset to <dir>` au résultat. Les sous-agents ne conservent jamais un changement de répertoire ;
+- **les variables d'environnement ne persistent pas** : un `export` est perdu à la commande suivante ;
+- **vos alias et fonctions** définis dans `~/.zshrc`, `~/.bashrc` ou `~/.profile` sont capturés au démarrage et disponibles.
 
-```bash
-Bash(
-  command="npm test -- --run",
-  description="Run test suite once"
-)
-```
+Activez votre virtualenv ou environnement conda **avant** de lancer `claude`. Pour des variables persistantes, pointez `CLAUDE_ENV_FILE` vers un script shell avant le lancement, ou remplissez-le avec un hook `SessionStart`.
 
-### Git status + diff en parallèle
+## Timeouts
 
-Au lieu de deux appels séquentiels, lancez les deux dans un même message (plusieurs tool calls) :
+| Variable | Défaut | Effet |
+|----------|--------|-------|
+| `BASH_DEFAULT_TIMEOUT_MS` | 120000 (2 min) | Délai quand Claude n'en précise pas |
+| `BASH_MAX_TIMEOUT_MS` | 600000 (10 min) | Plafond de ce que Claude peut demander |
 
-```bash
-Bash(command="git status", description="Show working tree status")
-Bash(command="git diff", description="Show unstaged changes")
-```
+Quand une commande atteint son timeout sans finir, Claude Code ne la tue pas : il la **bascule en arrière-plan** (sauf si elle commence par `sleep`). Le résultat l'indique avec l'identifiant de tâche et le fichier où la sortie s'écrit.
 
-### Build long en arrière-plan
+## Commandes en arrière-plan
 
-```bash
-Bash(
-  command="npm run build",
-  description="Build production bundle",
-  run_in_background=true,
-  timeout=300000
-)
-```
+Pour un serveur de dev ou un build long, Claude passe `run_in_background: true` et continue à travailler. Vous pouvez aussi appuyer sur `Ctrl+B` pendant qu'une commande tourne (deux fois sous tmux). La commande `/tasks` liste et arrête les tâches en cours.
 
-Vous serez notifié à la fin — pas besoin de polling.
+- La sortie est écrite dans un fichier que Claude relit avec `Read`.
+- En session locale (terminal, application de bureau, VS Code), pas de limite de durée.
+- En session sans surveillance (`claude -p`, Agent SDK, CI, cloud), limite de 30 minutes par défaut, jusqu'à 2 heures avec un `timeout` explicite.
+- Une tâche dont la sortie dépasse 5 Go est arrêtée.
+- `CLAUDE_CODE_DISABLE_BACKGROUND_TASKS=1` désactive tout le mécanisme.
 
-### Créer un commit (méthode HEREDOC)
+Pour **réagir** à une sortie au fil de l'eau (log, CI, fichier), Claude dispose de l'outil `Monitor`, qui renvoie chaque nouvelle ligne comme un événement.
 
-```bash
-Bash(
-  command=`git commit -m "$(cat <<'EOF'
-feat: ajoute le composant Hero
+## Limites de sortie
 
-Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>
-EOF
-)"`,
-  description="Create commit"
-)
-```
+| Résultat | Ce que Claude reçoit |
+|----------|----------------------|
+| Succès | Jusqu'à environ 30 000 caractères en ligne ; au-delà, le chemin d'un fichier et un aperçu des 2 000 premiers caractères |
+| Échec | Jusqu'à environ 10 000 caractères ; au-delà, un extrait début + fin |
 
-Le HEREDOC garantit un message multilignes correctement formaté, même avec des caractères spéciaux.
+Un code de sortie 1 est considéré comme normal pour `grep`, `rg`, `find`, `diff`, `test`, `[`, `git diff` et `git grep`. Le détail et les réglages (`BASH_MAX_OUTPUT_LENGTH`, `bashOutputMaxChars`) sont dans l'article sur la gestion des sorties.
 
-## Sandbox et sécurité
+## Permissions
 
-Claude Code tourne par défaut dans un environnement sandboxé qui restreint certaines opérations (accès réseau, écriture en dehors du projet, etc. — selon la configuration). Le paramètre `dangerouslyDisableSandbox` est à éviter sauf cas explicite.
+En mode Manuel, Bash demande votre accord, sauf pour un ensemble intégré de commandes en lecture seule (`ls`, `cat`, `echo`, `pwd`, `head`, `tail`, `grep`, `find`, `wc`, `which`, `diff`, `stat`, `du`, `cd` et les formes en lecture de `git`). Depuis août 2026, le mode par défaut est `auto` : un classifieur examine les commandes à votre place.
 
-Les **permissions** sont configurées dans `.claude/settings.json` :
+Les règles se placent dans `.claude/settings.json` :
 
 ```json
 {
   "permissions": {
-    "allow": ["Bash(npm:*)", "Bash(git status)", "Bash(git diff:*)"],
-    "deny": ["Bash(rm -rf:*)"]
+    "allow": ["Bash(npm run test *)", "Bash(npm run lint)", "Bash(git diff *)"],
+    "ask": ["Bash(git push *)"],
+    "deny": ["Bash(rm -rf *)", "Bash(curl *)"]
   }
 }
 ```
 
-Cela permet d'autoriser certaines commandes sans prompt et d'en bloquer d'autres dur.
+À retenir :
 
-## Bonnes pratiques
+- `*` remplace n'importe quel texte. L'ancienne forme `Bash(npm:*)` reste équivalente à `Bash(npm *)`, mais seulement en fin de motif ;
+- les opérateurs `&&`, `||`, `;`, `|` sont compris : `Bash(npm test *)` n'autorise pas `npm test && rm -rf build`. Chaque sous-commande doit être autorisée ;
+- une règle `deny` sur Bash n'est pas une frontière de sécurité absolue : le même programme peut être appelé sous une autre forme. Pour une vraie barrière, utilisez le sandbox.
 
-**1. Chemins absolus partout.** `cd` ne persiste pas entre les appels. Préférez `npm --prefix /path/to/projet test` à `cd /path && npm test`.
+## Le sandbox
 
-**2. Pas de cd inutile.** Si vous devez vraiment chaîner, faites-le **dans la même commande** : `cd /path && npm test`. Mais évitez d'enchaîner avec une commande git ensuite — `git` opère sur le cwd au moment de l'appel.
+Le sandbox Bash limite, au niveau du système d'exploitation, ce que les commandes peuvent écrire et les domaines qu'elles peuvent joindre. Il est **désactivé par défaut**. Activez-le avec `/sandbox` ou `"sandbox": { "enabled": true }` dans vos settings. Il fonctionne sur macOS, Linux et WSL2 (sous Linux, il nécessite `bubblewrap` et `socat`).
 
-**3. Parallélisez les commandes indépendantes.** `git status` et `git diff` sont indépendantes : un seul message, deux tool calls Bash. Bien plus rapide.
+Par défaut, une commande sandboxée peut écrire dans le répertoire de travail, un dossier temporaire et les répertoires ajoutés. Quand une commande échoue à cause du sandbox, Claude peut proposer de la relancer hors sandbox avec `dangerouslyDisableSandbox`. Refusez si vous ne comprenez pas pourquoi, ou désactivez cette échappatoire avec `"allowUnsandboxedCommands": false`.
 
-**4. Préférez `&&` à `;`.** `cmd1 && cmd2` exécute cmd2 seulement si cmd1 réussit. `;` exécute toujours — utile rarement.
+## PowerShell sous Windows
 
-**5. Pas de sleep en boucle de polling.** Si une commande est longue, utilisez `run_in_background=true`. Pour attendre une condition, utilisez `Monitor` (si dispo) ou laissez l'utilisateur vous notifier.
+Sous Windows, l'outil `PowerShell` exécute les commandes nativement. Il est actif automatiquement sans Git Bash, et par défaut pour les comptes claude.ai et Console avec Git Bash (`CLAUDE_CODE_USE_POWERSHELL_TOOL=0` pour le couper). Sous Linux, macOS et WSL, il est optionnel et nécessite PowerShell 7 (`pwsh`). Dans vos hooks, utilisez le matcher `Bash|PowerShell` pour couvrir les deux.
 
-**6. Quote les chemins avec espaces.** `cd "/path with spaces/projet"` — pas `cd /path with spaces/projet`.
+## Pièges fréquents
 
-## Pièges courants
+**Commandes interactives.** `git rebase -i`, `vim`, un `ssh` qui demande un mot de passe : Claude ne peut pas répondre. Préférez les variantes non interactives.
 
-**Commandes interactives.** `git rebase -i`, `git add -i`, `vim`, `ssh` interactif — Claude ne peut pas répondre à des prompts interactifs. Le shell se bloque. Utilisez les variantes non interactives (`git rebase` simple, `git add <files>`).
+**Hooks Git qui attendent une saisie.** Un pre-commit interactif bloque le commit. Ne contournez pas avec `--no-verify` sans le décider vous-même.
 
-**Hooks Git qui demandent une entrée.** Si votre pre-commit hook demande une saisie, le commit bloquera. Adaptez le hook ou désactivez-le ponctuellement (avec autorisation explicite — jamais `--no-verify` en douce).
+**Commandes qui saturent la sortie.** `npm install` verbeux, tests en mode `-v` : filtrez ou redirigez vers un fichier.
 
-**`find /` au lieu de `find .`.** Scanner toute la racine du système épuise les ressources. Toujours partir de `.` ou d'un chemin précis.
+**Mémoire.** Sous Linux et WSL, `CLAUDE_CODE_TOOL_MEMORY_LIMIT=4G` plafonne la mémoire de toutes les commandes Bash, PowerShell et Monitor d'une session.
 
-**Pas de `cat`, `head`, `tail`, `sed`, `awk`, `echo` pour fichiers.** Utilisez les outils dédiés (Read, Edit, Write). Bash est pour les commandes système.
+## Exécuter vous-même une commande
 
-**Timeout par défaut court.** 2 minutes par défaut. Pour un build de 5 min, montez à 360000 ms.
+Préfixez votre saisie par `!` pour lancer une commande sans passer par Claude : `! npm test`. La commande et sa sortie sont ajoutées au contexte de la conversation.
 
-**Newlines dans `command`.** Évitez les newlines littéraux pour séparer des commandes — utilisez `&&` ou `;`. Les newlines dans des strings quotées (HEREDOC) sont OK.
+## Articles liés
 
-## Background processes
+- [Gestion des sorties longues](/wiki/outils/output-management)
+- [Permissions et sandbox](/wiki/demarrer/permissions-sandbox)
+- [Modes de permission](/wiki/cli/permissions-modes)
+- [/goal, /loop et Monitor](/wiki/cli/goal-loop-monitor)
+- [Variables d'environnement](/wiki/cli/variables-env)
 
-Les processus lancés avec `run_in_background=true` :
+## Sources
 
-- ne bloquent pas la conversation ;
-- envoient une notification à la fin ;
-- peuvent être inspectés via leur sortie ;
-- doivent toujours avoir un timeout raisonnable.
-
-Cas typiques : `npm run dev` (serveur de dev), `npm run build` (build long), `pytest` sur une grosse suite.
-
-## Combiner avec d'autres outils
-
-```bash
-# 1. Trouver les fichiers
-Glob(pattern="**/*.test.ts")
-
-# 2. Lancer les tests
-Bash(command="npm test", description="Run tests")
-
-# 3. Si échec, lire le log
-Read(file_path="/path/to/test-output.log")
-```
-
-## Pour aller plus loin
-
-- [Documentation Claude Code — Permissions](https://docs.claude.com/en/docs/claude-code)
-- Voir aussi : `Monitor` pour suivre un background, skill `fewer-permission-prompts` pour réduire les confirmations.
-- Bonne pratique : configurez votre `.claude/settings.json` pour autoriser vos commandes les plus fréquentes (`npm:*`, `git status`, `git diff:*`) et travaillez sans interruption.
+- [Tools reference : Bash tool behavior](https://code.claude.com/docs/en/tools-reference#bash-tool-behavior)
+- [Configure permissions : Bash](https://code.claude.com/docs/en/permissions#bash)
+- [Sandboxing](https://code.claude.com/docs/en/sandboxing)
+- [Interactive mode : background commands](https://code.claude.com/docs/en/interactive-mode)
+- [Environment variables](https://code.claude.com/docs/en/env-vars)

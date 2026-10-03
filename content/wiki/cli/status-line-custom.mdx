@@ -1,110 +1,179 @@
 ---
-title: "Status line custom : afficher branche git, coût et model"
-description: "Configurer une status line personnalisée dans Claude Code via un hook pour afficher en permanence les informations clés."
-updatedAt: "2026-05-19"
-readingMinutes: 6
+title: "Barre d'état personnalisée : contexte, coût, branche git et limites"
+description: "Configurer la status line de Claude Code avec /statusline ou un script : champs JSON disponibles, exemples bash avec contexte, git et limites de forfait, dépannage."
+updatedAt: "2026-10-03"
+readingMinutes: 7
 ---
 
-La **status line** de Claude Code est cette ligne discrète affichée en bas du terminal pendant une session. Par défaut elle reste minimaliste, mais elle est entièrement personnalisable via un hook : vous pouvez y afficher la branche git courante, le coût cumulé de la session, le modèle actif, le mode de permission, et n'importe quelle information utile. C'est une amélioration majeure du quotidien quand on passe ses journées dans Claude Code.
+La barre d'état (status line) est une ligne personnalisable en bas de Claude Code. Elle exécute un script de votre choix, lui transmet l'état de la session en JSON et affiche ce qu'il imprime. C'est le moyen le plus simple de garder un œil sur le contexte utilisé, le coût, la branche git ou vos limites de forfait sans taper de commande.
 
-## Comment fonctionne la status line
+## La méthode rapide : /statusline
 
-Claude Code appelle un script externe à intervalles réguliers (et après chaque tour). Ce script reçoit en **stdin** un objet JSON contenant l'état de la session, et doit imprimer sur **stdout** une seule ligne qui sera affichée telle quelle.
+```text
+/statusline affiche le modèle, le dossier, la branche git et le pourcentage de contexte avec une barre de progression
+```
 
-La configuration se fait dans `~/.claude/settings.json` :
+Claude Code génère un script dans `~/.claude/` et met à jour vos réglages. Sans argument, `/statusline` s'inspire de votre prompt shell. Pour la retirer : `/statusline supprime-la` ou effacez la clé `statusLine`.
+
+## La configuration manuelle
+
+Dans `~/.claude/settings.json` (ou les réglages du projet) :
 
 ```json
 {
   "statusLine": {
     "type": "command",
-    "command": "~/.claude/statusline.sh"
+    "command": "~/.claude/statusline.sh",
+    "padding": 0,
+    "refreshInterval": 5
   }
 }
 ```
 
-Le payload JSON reçu contient notamment :
+- `command` : un chemin de script ou une commande en ligne.
+- `padding` (facultatif) : espacement horizontal supplémentaire.
+- `refreshInterval` (facultatif, en secondes, minimum 1) : relance périodique, utile pour une horloge ou quand des sous-agents modifient git pendant que la session principale attend.
+- `hideVimModeIndicator` (facultatif) : masque `-- INSERT --` si votre script affiche déjà le mode vim.
 
-- `model.id` : le modèle actif (`claude-opus-5-5`, etc.)
-- `workspace.current_dir` : le répertoire courant
-- `cost.total_cost_usd` : le coût cumulé en USD
-- `cost.total_duration_ms` : durée totale de la session
-- `cost.total_lines_added` / `total_lines_removed` : stats d'édition
+Claude Code recharge les réglages à l'enregistrement : pas besoin de redémarrer.
 
-## Un script bash de base
+## Quand le script s'exécute
 
-Créez `~/.claude/statusline.sh` :
+Au démarrage et à la reprise d'une session, puis à chaque nouveau message de Claude, à la fin d'un `/compact`, au changement de mode de permission ou de mode vim, et selon `refreshInterval`. Les mises à jour sont regroupées (300 ms). Si une nouvelle mise à jour arrive pendant que le script tourne, l'exécution en cours est annulée.
+
+La barre d'état tourne en local et ne consomme aucun token.
+
+## Les données reçues
+
+Champs les plus utiles du JSON reçu sur stdin :
+
+| Champ | Contenu |
+|---|---|
+| `model.id`, `model.display_name` | Modèle actif (`claude-opus-5-5`, « Opus ») |
+| `workspace.current_dir`, `workspace.project_dir` | Dossier courant et dossier de lancement |
+| `workspace.repo.owner`, `workspace.repo.name` | Dépôt déduit du remote `origin` |
+| `context_window.used_percentage` | Pourcentage du contexte utilisé |
+| `context_window.context_window_size` | Taille de la fenêtre (200 000 ou 1 000 000) |
+| `cost.total_cost_usd` | Coût estimé au prix public (remis à zéro par `/clear`) |
+| `cost.total_duration_ms`, `cost.total_lines_added`, `cost.total_lines_removed` | Durée et lignes modifiées |
+| `rate_limits.five_hour.used_percentage`, `rate_limits.seven_day.used_percentage` | Consommation des limites de forfait sur 5 h et 7 jours |
+| `effort.level`, `fast_mode`, `thinking.enabled` | Effort, fast mode, réflexion |
+| `prompt_cache` | Statistiques du cache de prompt |
+| `session_name`, `session_id`, `transcript_path` | Identité de la session |
+| `output_style.name`, `vim.mode`, `agent.name` | Style, mode vim, agent |
+| `pr.number`, `pr.url`, `pr.review_state` | PR ouverte pour la branche |
+| `worktree.name`, `worktree.branch` | Worktree actif |
+| `version` | Version de Claude Code |
+
+Certains champs valent `null` avant la première réponse : prévoyez toujours une valeur par défaut (`// 0` avec `jq`). Le JSON ne contient pas le mode de permission.
+
+## Un script de base
+
+`~/.claude/statusline.sh` (nécessite [`jq`](https://jqlang.org/)) :
 
 ```bash
 #!/usr/bin/env bash
 input=$(cat)
 
-model=$(echo "$input" | jq -r '.model.id')
-cwd=$(echo "$input" | jq -r '.workspace.current_dir')
+model=$(echo "$input" | jq -r '.model.display_name')
+dir=$(echo "$input" | jq -r '.workspace.current_dir')
+pct=$(echo "$input" | jq -r '.context_window.used_percentage // 0' | cut -d. -f1)
 cost=$(echo "$input" | jq -r '.cost.total_cost_usd // 0')
 
-cd "$cwd" 2>/dev/null
-branch=$(git branch --show-current 2>/dev/null || echo "no-git")
+branch=$(git -C "$dir" branch --show-current 2>/dev/null)
 
-printf "[%s] %s | $%.2f" "$branch" "$model" "$cost"
+printf '[%s] %s%s | contexte %s%% | $%.2f\n' \
+  "$model" "${dir##*/}" "${branch:+ ($branch)}" "$pct" "$cost"
 ```
-
-Rendez-le exécutable :
 
 ```bash
 chmod +x ~/.claude/statusline.sh
 ```
 
-Relancez Claude Code : vous verrez désormais quelque chose comme `[main] claude-opus-5-5 | $0.42` en bas de l'écran, mis à jour après chaque tour.
+Résultat : `[Opus] mon-app (main) | contexte 12% | $0.42`.
 
-## Version enrichie : git status, dirty flag, tokens
+## Version enrichie : couleurs, deux lignes, limites
 
-Pour les utilisateurs qui veulent tout voir d'un coup :
+Chaque ligne imprimée devient une ligne de la barre. Les codes ANSI sont pris en charge.
 
 ```bash
 #!/usr/bin/env bash
 input=$(cat)
 
-model=$(echo "$input" | jq -r '.model.id' | sed 's/claude-//')
-cwd=$(echo "$input" | jq -r '.workspace.current_dir')
-cost=$(echo "$input" | jq -r '.cost.total_cost_usd // 0')
+model=$(echo "$input" | jq -r '.model.display_name')
+dir=$(echo "$input" | jq -r '.workspace.current_dir')
+pct=$(echo "$input" | jq -r '.context_window.used_percentage // 0' | cut -d. -f1)
+five=$(echo "$input" | jq -r '.rate_limits.five_hour.used_percentage // empty' | cut -d. -f1)
 added=$(echo "$input" | jq -r '.cost.total_lines_added // 0')
 removed=$(echo "$input" | jq -r '.cost.total_lines_removed // 0')
 
-cd "$cwd" 2>/dev/null
-branch=$(git branch --show-current 2>/dev/null)
-dirty=""
-if [ -n "$branch" ] && [ -n "$(git status --porcelain 2>/dev/null)" ]; then
-  dirty="*"
-fi
+# Couleur du contexte : vert < 50 %, jaune < 80 %, rouge au-delà
+if [ "$pct" -ge 80 ]; then c='\033[31m'; elif [ "$pct" -ge 50 ]; then c='\033[33m'; else c='\033[32m'; fi
 
-printf "\033[36m%s%s\033[0m | %s | \033[32m+%s\033[0m \033[31m-%s\033[0m | \033[33m$%.3f\033[0m" \
-  "${branch:-no-git}" "$dirty" "$model" "$added" "$removed" "$cost"
+# Barre de 10 caractères
+filled=$((pct / 10))
+bar=$(printf '%*s' "$filled" '' | tr ' ' '#')$(printf '%*s' $((10 - filled)) '' | tr ' ' '-')
+
+branch=$(git -C "$dir" branch --show-current 2>/dev/null)
+dirty=""
+[ -n "$branch" ] && [ -n "$(git -C "$dir" status --porcelain 2>/dev/null)" ] && dirty="*"
+
+printf '\033[36m%s\033[0m %s%s\n' "$model" "${dir##*/}" "${branch:+ ($branch$dirty)}"
+printf "${c}[%s] %s%%\033[0m | \033[32m+%s\033[0m \033[31m-%s\033[0m%s\n" \
+  "$bar" "$pct" "$added" "$removed" "${five:+ | forfait 5h : $five%}"
 ```
 
-Les codes ANSI ajoutent de la couleur (cyan pour la branche, vert/rouge pour les lignes, jaune pour le coût).
+Pour la largeur du terminal, lisez les variables `COLUMNS` et `LINES` : `tput cols` ne fonctionne pas, la sortie étant capturée.
 
-## Conseils de performance
+## Garder le script rapide
 
-Le script est exécuté souvent — il doit rester rapide (idéalement sous 100 ms). Quelques règles :
+Un script lent fige la barre jusqu'à sa fin. Bonnes pratiques :
 
-- Évitez les appels réseau (pas de `curl`, pas de `gh api`)
-- Mettez en cache les valeurs lentes dans `/tmp` avec une TTL
-- Préférez `git symbolic-ref` à `git branch --show-current` (plus rapide)
-- Si le script est lent, Claude affiche temporairement l'ancienne valeur
+- pas d'appel réseau à chaque exécution ;
+- mettez en cache les commandes coûteuses (`git status` dans un gros dépôt) dans un fichier temporaire **propre à la session**, par exemple `/tmp/statusline-git-$session_id`, rafraîchi toutes les quelques secondes ;
+- gardez une sortie courte : une ligne trop longue est tronquée.
 
-## Désactiver ou tester
-
-Pour désactiver temporairement, commentez la clé `statusLine` dans `settings.json`. Pour tester votre script sans relancer Claude :
+## Tester sans relancer Claude Code
 
 ```bash
-echo '{"model":{"id":"opus-4-7"},"workspace":{"current_dir":"'$PWD'"},"cost":{"total_cost_usd":1.23}}' \
+echo '{"model":{"display_name":"Opus"},"workspace":{"current_dir":"'"$PWD"'"},"context_window":{"used_percentage":25},"cost":{"total_cost_usd":1.23},"session_id":"test"}' \
   | ~/.claude/statusline.sh
 ```
 
+## Windows
+
+Claude Code exécute la commande via Git Bash s'il est installé, sinon via PowerShell. Écrivez les chemins avec des barres obliques (`C:/Users/vous/...`). Pour un script PowerShell :
+
+```json
+{
+  "statusLine": {
+    "type": "command",
+    "command": "powershell -NoProfile -File C:/Users/vous/.claude/statusline.ps1"
+  }
+}
+```
+
+## Dépannage
+
+| Symptôme | Piste |
+|---|---|
+| Rien ne s'affiche | Script non exécutable (`chmod +x`), sortie sur stderr au lieu de stdout, code de sortie non nul |
+| Barre vide dans un nouveau projet | Le dossier n'est pas encore approuvé (même règle de confiance que les hooks) |
+| Barre disparue | `disableAllHooks: true`, ou l'organisation impose `allowManagedHooksOnly` |
+| Valeurs `--` ou vides | Champs `null` avant la première réponse : ajoutez des valeurs par défaut |
+| Pourcentage différent de `/context` | `/context` ajoute une estimation des messages récents |
+
+`claude --debug` journalise la sortie d'erreur du script.
+
+Des projets communautaires comme ccstatusline ou starship-claude proposent des configurations prêtes à l'emploi.
+
 ## Pour aller plus loin
 
-- Affichez le mode de permission actif via `.permissionMode` du payload
-- Intégrez un compteur de PRs ouvertes sur le repo (avec cache de 5 min)
-- Utilisez Python ou Node si bash devient trop limitant — le hook accepte n'importe quel exécutable
-- Combinez avec les hooks `SessionStart` et `Stop` pour des notifications système
-- Versionnez votre `statusline.sh` dans un dotfiles repo pour le partager entre machines
+- [/clear, /resume et /usage](/wiki/cli/clear-resume-cost)
+- [Le fichier settings.json](/wiki/cli/settings-json)
+- [Thèmes et accessibilité](/wiki/cli/themes-accessibilite)
+
+## Sources
+
+- [Customize your status line](https://code.claude.com/docs/en/statusline)
+- [Settings reference : statusLine](https://code.claude.com/docs/en/settings-reference)

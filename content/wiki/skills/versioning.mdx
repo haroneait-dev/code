@@ -1,73 +1,114 @@
 ---
-title: "Versioning des skills"
-description: "Appliquer le SemVer aux skills Claude Code : gérer les breaking changes, émettre des avertissements de dépréciation et bâtir un plan de migration sain."
-updatedAt: "2026-05-19"
+title: "Versionner un skill sans casser ses utilisateurs"
+description: "Comment Claude Code détecte les versions d'un skill distribué en plugin, quand incrémenter, comment éviter les ruptures et organiser des canaux stable et bêta."
+updatedAt: "2026-10-03"
 readingMinutes: 6
 ---
 
-Un skill installé chez un utilisateur est une dépendance comme une autre : il évolue, il se déprécie, parfois il casse. Adopter une discipline de versioning évite que vos améliorations transforment l'expérience d'autrui en cauchemar silencieux. Cette page applique les conventions SemVer au monde des skills Claude Code et décrit un plan de migration que vous pouvez réutiliser tel quel.
+Un skill partagé devient une dépendance : le modifier change le comportement de Claude chez tous ceux qui l'utilisent. Le frontmatter de `SKILL.md` n'a **pas** de champ `version` reconnu par Claude Code. Le versioning se gère donc à deux niveaux : Git pour les skills de projet, le manifeste du plugin pour les skills distribués.
 
-## Choisir un schéma SemVer
+## Skill de projet : Git suffit
 
-Chaque skill expose un champ `version` dans son frontmatter, suivant le format `MAJOR.MINOR.PATCH` :
+Un skill dans `.claude/skills/` est versionné avec le dépôt. Chaque développeur a la version de sa branche. Les bonnes pratiques habituelles s'appliquent : relecture en pull request, message de commit clair, et un test de déclenchement avant fusion (voir [Tester un skill](/wiki/skills/tester-skill)).
 
-- **PATCH** (`1.2.3` → `1.2.4`) : reformulation, correction de typo, amélioration de prompt sans changement de comportement observable.
-- **MINOR** (`1.2.4` → `1.3.0`) : nouveau trigger, nouvelle référence à un fichier, capacité supplémentaire compatible avec l'usage existant.
-- **MAJOR** (`1.3.0` → `2.0.0`) : changement de nom de skill, suppression d'un trigger, modification du contrat avec un script externe, renommage d'un fichier de référence.
-
-La règle d'or : si un utilisateur peut être surpris après une mise à jour, c'est un MAJOR.
-
-## Détecter les breaking changes
-
-Voici la check-list à parcourir avant chaque release :
-
-- Le nom du skill (clé d'invocation) a-t-il changé ?
-- Un `trigger` a-t-il été supprimé ou rendu plus strict ?
-- Un script appelé par le skill change-t-il sa signature CLI ?
-- Une variable d'environnement requise a-t-elle été ajoutée ?
-- Le `SKILL.md` référence-t-il maintenant un fichier qui n'existait pas dans la version précédente ?
-
-Si vous répondez oui à une seule de ces questions, bumpez MAJOR. Documentez le changement dans un `CHANGELOG.md` à la racine du skill, organisé par version avec une section "Breaking changes" en tête de chaque entrée majeure.
-
-## Avertissements de dépréciation
-
-Avant de supprimer un trigger ou de renommer un skill, marquez l'ancien comme déprécié pendant au moins une version mineure. Le frontmatter accepte un champ `deprecated` :
+Si vous voulez tout de même tracer une version dans le fichier, utilisez `metadata`, que Claude Code ignore :
 
 ```yaml
 ---
-name: mon-skill
-version: 1.4.0
-deprecated:
-  - trigger: "ancien-mot-cle"
-    replacement: "nouveau-mot-cle"
-    removeIn: "2.0.0"
+name: generer-migration
+description: Génère une migration SQL Supabase. À utiliser quand l'utilisateur modifie le schéma.
+metadata:
+  version: "2.1.0"
 ---
 ```
 
-Quand l'utilisateur déclenche un alias déprécié, Claude Code affiche un avertissement en début de réponse. Cela laisse le temps aux utilisateurs de migrer sans surprise. La fenêtre habituelle est de deux releases mineures avant le retrait définitif.
+## Skill en plugin : comment Claude Code calcule la version
 
-## Plan de migration type
+Pour un plugin installé depuis une marketplace, Claude Code calcule une version et ne remplace la copie en cache que si elle change. Ordre de résolution :
 
-Pour une release majeure bien préparée, suivez ce plan en cinq étapes :
+1. le champ `version` de `plugin.json` ;
+2. sinon le champ `version` de l'entrée dans `marketplace.json` ;
+3. sinon une valeur dérivée de la source :
 
-1. **Annonce** dans la version `N.M.0` avec un `CHANGELOG.md` listant les changements prévus pour `N+1.0.0`.
-2. **Dépréciation** des anciens triggers dès `N.M+1.0`, avec messages d'avertissement actifs.
-3. **Compatibilité descendante** maintenue jusqu'à `N.M+2.0` au minimum.
-4. **Release majeure** `N+1.0.0` qui retire les éléments dépréciés, accompagnée d'un guide de migration sous `MIGRATION.md`.
-5. **Patch correctif** `N+1.0.1` rapidement après la sortie pour traiter les bugs remontés par les early adopters.
+| Source | Version par défaut |
+|---|---|
+| `github`, `url`, `git-subdir` | SHA du commit (12 caractères) |
+| Chemin relatif dans une marketplace Git | SHA du commit du dossier |
+| `archive` | Empreinte SHA-256 (12 caractères) |
+| `npm` ou dossier local hors Git | `unknown` |
 
-## Communiquer les changements
+Le piège classique : vous fixez `"version": "1.0.0"`, vous poussez des correctifs sans l'incrémenter, et `claude plugin update` répond `is already at the latest version (1.0.0)`. Vos utilisateurs gardent l'ancienne copie.
 
-Un skill se diffuse souvent par bouche-à-oreille ou via un registre communautaire. Trois canaux à maintenir à jour :
+Deux stratégies valides :
 
-- Le `CHANGELOG.md` (source de vérité technique).
-- La page wiki ou README du skill (vue d'ensemble pour les nouveaux utilisateurs).
-- Une note dans le `description` du frontmatter quand un changement majeur récent risque de surprendre.
+- **SemVer explicite** : incrémentez `version` à chaque release (et utilisez `claude plugin validate --strict` en CI, qui signale une version manquante) ;
+- **SHA automatique** : omettez `version` dans une marketplace Git, chaque commit devient une version.
 
-Pour les skills installés via un registre, ajoutez un champ `compatibility` indiquant la version minimum de Claude Code requise. Cela évite qu'un utilisateur sur une version ancienne installe un skill qui exploite des features récentes.
+## Quand incrémenter quoi (SemVer)
+
+Pour un skill, le « contrat » est ce que l'utilisateur tape et ce qu'il obtient :
+
+| Changement | Niveau |
+|---|---|
+| Reformulation, correction d'une étape, meilleur exemple | PATCH |
+| Nouvel argument facultatif, nouveau fichier de référence, nouveau skill dans le plugin | MINOR |
+| Renommage d'un skill ou du plugin, argument obligatoire ajouté ou supprimé, passage à `disable-model-invocation: true`, `allowed-tools` élargi, nouvelle variable d'environnement requise | MAJOR |
+
+Règle simple : si un utilisateur peut être surpris ou bloqué après la mise à jour, c'est une version majeure. Élargir `allowed-tools` mérite aussi d'être signalé pour des raisons de sécurité.
+
+## Éviter les ruptures
+
+- **Ne renommez pas un plugin publié.** L'installation est enregistrée sous `nom@marketplace`. Si c'est inévitable, ajoutez une entrée `renames` dans `marketplace.json` pour migrer les installations existantes. Pour changer seulement le libellé, modifiez `displayName`.
+- **Renommer un skill** change sa commande (`/plugin:ancien` devient `/plugin:nouveau`). Gardez l'ancien skill pendant une ou deux versions : un corps qui renvoie vers le nouveau nom et `disable-model-invocation: true` pour que Claude ne le choisisse plus de lui-même.
+- **Arguments** : ajoutez plutôt des arguments facultatifs ; un placeholder nommé sans valeur devient une chaîne vide.
+- **Documentez** chaque release dans un `CHANGELOG.md` à la racine du plugin, avec une section « Ruptures » en tête des versions majeures.
+
+## Étiqueter les releases
+
+Si d'autres plugins dépendent du vôtre avec une plage de versions (champ `dependencies` de `plugin.json`), ces plages se résolvent sur des tags Git. Créez-les avec :
+
+```bash
+claude plugin tag --push
+```
+
+La commande crée un tag `{nom}--v{version}` et le pousse sur `origin`.
+
+## Canaux stable et bêta
+
+Claude Code n'a pas de notion de canal. Pour proposer deux pistes, hébergez **deux marketplaces** aux `name` différents, dont les entrées pointent vers des refs différentes du même plugin :
+
+```json
+{
+  "name": "acme-stable",
+  "owner": { "name": "Acme" },
+  "plugins": [
+    {
+      "name": "generateur-migrations",
+      "source": { "source": "github", "repo": "acme/generateur-migrations", "ref": "stable" }
+    }
+  ]
+}
+```
+
+Une seconde marketplace `acme-beta` pointe vers `"ref": "main"`. Chaque utilisateur ajoute celle qu'il veut. Donnez aux deux refs des `version` différentes dans `plugin.json` (ou omettez `version`) : une ref qui avance sans changement de version laisse les utilisateurs sur la copie en cache.
+
+## Comment les utilisateurs reçoivent la mise à jour
+
+- **À la demande** : `claude plugin update generateur-migrations@acme-stable`.
+- **Automatiquement** : l'auto-update est désactivé par défaut pour une marketplace tierce. L'utilisateur l'active dans `/plugin` > **Marketplaces**, ou l'admin via `"autoUpdate": true` dans les managed settings.
+
+Avant chaque release, relancez votre suite d'évaluations (`claude plugin eval .`) pour détecter les régressions, y compris après la sortie d'un nouveau modèle.
 
 ## Pour aller plus loin
 
-- La page **tester un skill localement** explique comment automatiser des snapshot tests qui détectent les breaking changes avant publication.
-- Voir **composer plusieurs skills** pour comprendre les conflits de version entre skills qui dépendent l'un de l'autre.
-- La spécification SemVer officielle (semver.org) reste la référence ultime — un investissement de lecture rentable.
+- [Publier un skill](/wiki/skills/publier-skill)
+- [Tester un skill](/wiki/skills/tester-skill)
+- [Créer un plugin](/wiki/plugins/creer-plugin)
+
+## Sources
+
+- Versions et mises à jour des plugins : https://code.claude.com/docs/en/plugins/loading
+- Publier, renommer, taguer : https://code.claude.com/docs/en/plugins/publish
+- Héberger une marketplace, canaux de release : https://code.claude.com/docs/en/plugins/host-marketplace
+- Frontmatter des skills : https://code.claude.com/docs/en/skills
+- Spécification SemVer : https://semver.org/lang/fr/

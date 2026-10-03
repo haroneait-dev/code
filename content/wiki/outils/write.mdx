@@ -1,112 +1,99 @@
 ---
 title: "L'outil Write"
-description: "Créer ou écraser un fichier avec Claude Code — règles de sécurité, idempotence et bonnes pratiques."
-updatedAt: "2026-05-19"
-readingMinutes: 6
+description: "Comment Claude Code crée ou écrase un fichier avec Write : règle de lecture préalable selon le modèle, permissions, retour arrière et différence avec Edit."
+updatedAt: "2026-10-03"
+readingMinutes: 5
 ---
 
-L'outil `Write` permet à Claude Code d'écrire un fichier sur le disque, soit pour le créer, soit pour le remplacer intégralement. C'est l'outil le plus "destructif" du trio Read/Write/Edit : il écrase sans demander confirmation si le fichier existe déjà. Bien utilisé, il est parfait pour bootstrap un nouveau composant, générer un fichier de configuration ou réécrire complètement un module. Mal utilisé, il efface du travail.
+`Write` crée un nouveau fichier ou remplace intégralement un fichier existant par le contenu fourni. Il n'ajoute rien à la fin et ne fusionne pas : ce qui était là disparaît. C'est l'outil idéal pour créer un fichier, et le mauvais choix pour changer trois lignes.
 
-## À quoi sert Write
+## Quand Claude utilise Write
 
-Write sert à :
+- **Créer** un fichier qui n'existe pas : composant, script, test, migration ;
+- **Réécrire entièrement** un petit fichier dont presque tout change (fichier de configuration, fixture régénérée) ;
+- **Produire un fichier généré** : rapport, données de test, export.
 
-- **créer un nouveau fichier** qui n'existe pas encore (ex. un nouveau composant React, un script Python) ;
-- **réécrire intégralement** un fichier existant lorsque la majorité du contenu change (refactoring complet, regénération depuis un template) ;
-- **matérialiser un fichier de configuration** (`.env.example`, `tsconfig.json`, `vercel.json`) ;
-- **écrire un fichier généré** (snapshot, output d'un build, fichier de migration).
+Pour une modification partielle d'un fichier existant, Claude utilise `Edit`. C'est plus sûr (seul le passage visé change) et le diff reste lisible.
 
-Pour modifier seulement quelques lignes d'un fichier, préférez `Edit` : il est plus sûr, plus rapide, et n'envoie que le diff.
+## Paramètres
 
-## Syntaxe et paramètres
+| Paramètre | Obligatoire | Rôle |
+|-----------|-------------|------|
+| `file_path` | oui | Chemin absolu du fichier |
+| `content` | oui | Contenu complet du fichier |
 
-| Paramètre | Type | Obligatoire | Description |
-|-----------|------|-------------|-------------|
-| `file_path` | string | oui | Chemin absolu du fichier (les répertoires parents doivent exister) |
-| `content` | string | oui | Contenu intégral du fichier |
+Exemple d'appel tel que Claude l'envoie :
 
-Write ne crée pas les répertoires parents automatiquement. Si vous écrivez dans `/Users/harone/projet/lib/utils/format.ts` mais que `lib/utils/` n'existe pas, l'appel échoue. Faites un `mkdir -p` via `Bash` au préalable.
-
-## Règles à connaître
-
-**1. Lire avant d'écraser.** Si le fichier existe déjà, Claude doit l'avoir lu dans la conversation courante avant d'appeler Write. Cette garantie évite d'effacer du contenu inattendu.
-
-**2. Préférer Edit pour des changements ciblés.** Write réécrit tout le fichier — c'est plus de tokens, plus de risques, et le diff est moins lisible dans une review.
-
-**3. Pas de création de docs spontanée.** Par convention, Claude Code ne crée pas de `*.md` ou de `README.md` à votre place, sauf demande explicite. Cela évite la pollution du repo.
-
-**4. Pas d'emojis non sollicités.** Claude n'ajoute pas d'emojis dans les fichiers sauf si vous le demandez. Important pour les codebases sérieuses.
-
-## Exemples concrets
-
-### Créer un nouveau composant React
-
-```ts
-Write(
-  file_path="/Users/harone/projet/components/Button.tsx",
-  content=`export function Button({ children }: { children: React.ReactNode }) {
-  return <button className="px-4 py-2 rounded bg-blue-500">{children}</button>;
+```json
+{
+  "file_path": "/home/vous/projet/components/Button.tsx",
+  "content": "export function Button({ children }: { children: React.ReactNode }) {\n  return <button type=\"button\">{children}</button>;\n}\n"
 }
-`
-)
 ```
 
-Notez le `\n` final : convention POSIX, évite les warnings de certains linters.
+## Faut-il lire le fichier avant de l'écraser ?
 
-### Réécrire un fichier de configuration
+La règle dépend du modèle et du fichier :
 
-```bash
-Write(
-  file_path="/Users/harone/projet/.eslintrc.json",
-  content='{"extends": ["next/core-web-vitals"], "rules": {"no-console": "warn"}}'
-)
+| Situation | Lecture préalable exigée ? |
+|-----------|----------------------------|
+| Nouveau fichier | Non |
+| Fichier existant, Claude Opus 4.6, Haiku 4.5 ou modèle plus ancien | Oui, sinon erreur |
+| Fichier existant, modèle plus récent (Opus 5.5, Sonnet 5.5…) | Non, si la lecture ne demanderait pas d'autorisation et que l'outil Read est disponible |
+| Notebook Jupyter | Oui, sur tous les modèles |
+| Fichier lu seulement en partie (`PARTIAL view`) | Oui, sur tous les modèles |
+
+Une lecture via Bash compte aussi si la commande est simple (`cat`, `head`, `tail`, `sed -n 'X,Yp'`, `grep`, `rg`… sur un seul fichier, sans pipe ni redirection). Avant la version 2.1.228, tous les modèles devaient lire le fichier avant de l'écraser.
+
+## Permissions
+
+En mode Manuel (`default`), Write demande votre accord. En mode `acceptEdits` ou `auto`, les écritures dans le répertoire de travail passent sans question (hors chemins protégés comme `.git`).
+
+Pour encadrer les écritures, utilisez des règles **`Edit(...)`** : elles s'appliquent à tous les outils qui modifient des fichiers, Write compris.
+
+```json
+{
+  "permissions": {
+    "ask": ["Edit(/prisma/schema.prisma)"],
+    "deny": ["Edit(/.env*)", "Read(/secrets/**)"]
+  }
+}
 ```
 
-Ici Write est légitime : le fichier de config est petit et change intégralement.
+À savoir :
 
-### Bootstrap un script Python
+- une règle de chemin écrite pour `Write`, comme `Write(docs/**)`, est acceptée mais **jamais consultée**. Claude Code affiche un avertissement au démarrage. Écrivez `Edit(docs/**)` ;
+- une règle `Read(...)` en `deny` bloque aussi Write sur ce chemin, création comprise ;
+- dans `.claude/settings.json`, un chemin commençant par `/` est relatif au projet. Pour un chemin absolu, utilisez `//`.
 
-```python
-Write(
-  file_path="/Users/harone/scripts/migrate.py",
-  content="""#!/usr/bin/env python3
-import sys
-from pathlib import Path
+## Revenir en arrière
 
-def main():
-    for path in Path('.').rglob('*.txt'):
-        print(path)
+Chaque prompt que vous envoyez crée un checkpoint. Les fichiers créés ou écrasés par Write peuvent être restaurés avec `/rewind` (ou `Échap` deux fois sur une saisie vide), option « Restore code ». Les checkpoints ne remplacent pas Git : commitez avant les réécritures importantes.
 
-if __name__ == '__main__':
-    main()
-"""
-)
-```
+## Pièges fréquents
 
-## Pièges courants
+**Réécrire un gros fichier pour quelques lignes.** Claude doit renvoyer tout le contenu : c'est long, coûteux en tokens de sortie, et un oubli efface du code. Demandez explicitement `Edit` pour les retouches.
 
-**Écraser un gros fichier sans l'avoir lu.** Si vous demandez "remplace `app/page.tsx` par X" sans avoir lu le fichier, Claude refusera (ou devrait refuser) jusqu'à avoir lu le fichier. C'est une protection — ne la contournez pas.
+**Écraser des changements faits entre-temps.** Si vous modifiez le fichier dans votre éditeur pendant que Claude travaille, un Write efface vos changements. L'article sur les conflits d'édition détaille les parades.
 
-**Oublier le répertoire parent.** Si `mkdir -p` n'a pas été fait, Write échoue. Vérifiez l'arborescence avec `ls` avant.
+**Générer d'énormes fichiers de données.** Pour un jeu de données volumineux, demandez plutôt un script qui produit le fichier : Claude écrit vingt lignes au lieu de vingt mille.
 
-**Réécrire au lieu d'éditer.** Sur un fichier de 1000 lignes pour changer 3 lignes : c'est un mauvais réflexe. Trois `Edit` valent mieux qu'un Write géant.
+**Créer des fichiers non demandés.** Si Claude a tendance à ajouter des `README.md` ou des fichiers de notes, précisez-le dans votre `CLAUDE.md` (« ne crée pas de documentation sans demande explicite »).
 
-**Encodage et fin de ligne.** Write écrit en UTF-8 sans BOM, avec des `\n` Unix. Si vous travaillez sur Windows avec des `\r\n`, Edit conservera l'existant mais Write impose Unix.
+## Bonne pratique
 
-**Contenu trop volumineux.** Au-delà de 50–100 KB, vous saturez votre fenêtre de contexte. Pour générer un dataset, écrivez plutôt un script qui produit le fichier.
+Après un Write sur un fichier de configuration, faites valider le résultat par l'outil concerné : `npx tsc --noEmit`, `npm run lint`, `python -m json.tool fichier.json`. Un hook `PostToolUse` sur `Edit|Write` peut automatiser le formatage ou le lint après chaque écriture.
 
-## Quand préférer Edit
+## Articles liés
 
-Règle simple : **si moins de 30 % du fichier change, utilisez Edit**. Pour tout le reste — bootstrap, regénération, refactoring lourd — Write est plus rapide à raisonner.
+- [L'outil Edit](/wiki/outils/edit)
+- [L'outil Read](/wiki/outils/read)
+- [Conflits d'édition](/wiki/outils/merge-conflicts-handling)
+- [Checkpoints et /rewind](/wiki/cli/continue-checkpoints)
+- [Hooks PreToolUse et PostToolUse](/wiki/hooks/pre-post-tool-use)
 
-Exemple : ajouter un export à un fichier de barrel `index.ts` → `Edit`. Reconstruire intégralement un fichier de seed après changement de schéma → `Write`.
+## Sources
 
-## Sécurité
-
-Write ne demande pas de confirmation par défaut. Sur un projet sensible, configurez les permissions dans `.claude/settings.json` pour exiger une confirmation sur certains chemins (ex. tout ce qui touche à `prisma/schema.prisma` ou `.env*`).
-
-## Pour aller plus loin
-
-- [Documentation Claude Code](https://docs.claude.com/en/docs/claude-code)
-- Voir aussi : `Edit` pour les modifications ciblées, `NotebookEdit` pour les `.ipynb`.
-- Bonne pratique : après un Write, faites un `Read` du fichier produit pour vérifier le résultat — surtout sur les fichiers de config où une virgule manquante casse tout.
+- [Tools reference : Write tool behavior](https://code.claude.com/docs/en/tools-reference#write-tool-behavior)
+- [Configure permissions : Read and Edit](https://code.claude.com/docs/en/permissions#read-and-edit)
+- [Checkpointing](https://code.claude.com/docs/en/checkpointing)

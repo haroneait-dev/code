@@ -1,142 +1,124 @@
 ---
-title: "Installer un Skill : npx, manuel ou depuis Git"
-description: "Toutes les méthodes pour installer un Skill Claude Code, de la commande npx à l'installation depuis un dépôt privé."
-updatedAt: "2026-05-19"
+title: "Installer un skill : copie, plugin ou npx skills"
+description: "Les méthodes réelles pour ajouter un skill à Claude Code : dossier personnel ou projet, plugin depuis une marketplace, CLI skills ou synchronisation claude.ai."
+updatedAt: "2026-10-03"
 readingMinutes: 6
 ---
 
-Un Skill se distribue comme du code : npm, Git, ou simple copie de dossier. Chaque méthode a ses cas d'usage. Tour d'horizon pour ne plus jamais hésiter au moment d'ajouter un skill à votre stack.
+Un skill n'est qu'un dossier avec un `SKILL.md`. L'installer revient donc à placer ce dossier au bon endroit, à la main, via un plugin ou via un outil tiers. Voici les quatre méthodes et comment choisir.
 
-## Méthode 1 : via `claude-mem` (recommandée)
+## Méthode 1 : copier le dossier (la plus simple)
 
-`claude-mem` est l'outil officiel de gestion de skills et de mémoire pour Claude Code. La commande `add` télécharge, vérifie et installe en une seule étape.
-
-```bash
-npx claude-mem add anthropic/skill-security-review
-```
-
-Le skill est déposé dans `~/.claude/skills/` et activable immédiatement dans n'importe quelle session. Pour vérifier :
+Pour vous seul, dans tous vos projets :
 
 ```bash
-npx claude-mem list
+mkdir -p ~/.claude/skills
+git clone https://github.com/acme/skill-pdf.git ~/.claude/skills/pdf-outils
 ```
 
-Pour mettre à jour :
-
-```bash
-npx claude-mem update anthropic/skill-security-review
-```
-
-## Méthode 2 : installation manuelle
-
-Si vous préférez tout contrôler ou que le skill n'est pas publié, copiez simplement le dossier.
-
-```bash
-git clone https://github.com/acme/skill-pdf-tools.git \
-  ~/.claude/skills/pdf-tools
-```
-
-Au prochain démarrage de Claude Code, le skill apparaît. Aucune compilation, aucun manifeste à régénérer.
-
-Pour un skill **projet** (versionné avec votre repo, partagé avec l'équipe) :
+Pour toute l'équipe, dans le dépôt :
 
 ```bash
 mkdir -p .claude/skills
-cp -r ~/Downloads/skill-pdf-tools .claude/skills/pdf-tools
-git add .claude/skills/pdf-tools
-git commit -m "feat(skills): ajout pdf-tools"
+cp -r ~/Téléchargements/pdf-outils .claude/skills/
+git add .claude/skills/pdf-outils
+git commit -m "chore(skills): ajoute pdf-outils"
 ```
 
-## Méthode 3 : depuis npm
+Claude Code surveille ces dossiers : un skill ajouté ou modifié est pris en compte **dans la session en cours**, sans redémarrage. Si le dossier `skills/` lui-même n'existait pas au lancement, tapez `/reload-skills`.
 
-Beaucoup de skills sont publiés comme paquets npm classiques. Deux variantes :
-
-### Skill global
+Vous pouvez aussi utiliser un lien symbolique, pratique pour développer un skill dans un autre dépôt :
 
 ```bash
-npm install -g @acme/skill-pdf-tools
+ln -s ~/code/mes-skills/pdf-outils ~/.claude/skills/pdf-outils
 ```
 
-Le script `postinstall` du paquet copie le skill dans `~/.claude/skills/`.
+## Méthode 2 : installer un plugin depuis une marketplace
 
-### Skill projet via `package.json`
+C'est la méthode officielle pour distribuer des skills avec mises à jour. Un plugin regroupe un ou plusieurs skills (et éventuellement des agents, hooks ou serveurs MCP).
 
-```json
-{
-  "devDependencies": {
-    "@acme/skill-pdf-tools": "^0.3.1"
-  },
-  "claudeSkills": [
-    "@acme/skill-pdf-tools"
-  ]
-}
+Exemple avec le dépôt officiel `anthropics/skills`, dans une session :
+
+```text
+/plugin marketplace add anthropics/skills
+/plugin install document-skills@anthropic-agent-skills
 ```
 
-Au `npm install`, Claude Code détectera l'entrée `claudeSkills` et chargera le skill depuis `node_modules/`. C'est la méthode idéale pour qu'un nouveau membre de l'équipe ait immédiatement les bons skills après un simple `npm install`.
-
-## Méthode 4 : depuis Git (dépôt privé)
-
-Pour les skills internes hébergés sur GitLab/Bitbucket privés :
+Ou depuis votre shell :
 
 ```bash
-npx claude-mem add git+ssh://git@gitlab.acme.com/tools/skill-deploy.git
+claude plugin marketplace add anthropics/skills
+claude plugin install example-skills@anthropic-agent-skills
 ```
 
-Ou via `package.json` :
+La marketplace officielle `claude-plugins-official` est ajoutée automatiquement au premier lancement interactif. Parcourez-la avec `/plugin`, onglet **Discover**.
 
-```json
-{
-  "dependencies": {
-    "@acme/skill-deploy": "git+ssh://git@gitlab.acme.com/tools/skill-deploy.git#v1.2.0"
-  }
-}
-```
+Les skills d'un plugin sont préfixés par son nom : `/mon-plugin:review`. Au moment de l'installation, vous choisissez une portée :
 
-Le tag (`#v1.2.0`) verrouille la version installée — précieux pour reproductibilité.
+| Portée | Pour qui |
+|---|---|
+| User | Vous, dans tous vos projets |
+| Project | Toute l'équipe, via `.claude/settings.json` (chacun installe le plugin sur sa machine) |
+| Local | Vous, dans ce dépôt seulement |
 
-## Méthode 5 : pendant une session
+Mises à jour : `claude plugin update nom@marketplace`, ou activez l'auto-update par marketplace dans `/plugin` > **Marketplaces**.
 
-Vous pouvez aussi demander à Claude lui-même :
+## Méthode 3 : la CLI `skills` (écosystème ouvert)
 
-```
-> installe le skill anthropic/skill-pdf-tools
-```
-
-Claude exécutera `npx claude-mem add ...` après votre confirmation. Pratique quand vous découvrez un skill dont vous avez besoin **maintenant**.
-
-## Vérifier qu'un skill est bien chargé
+Les skills suivent le standard ouvert [Agent Skills](https://agentskills.io). La CLI `skills` de Vercel Labs installe des skills depuis un dépôt Git vers plusieurs agents, dont Claude Code :
 
 ```bash
-npx claude-mem list --verbose
+npx skills add vercel-labs/agent-skills --skill web-design-guidelines -a claude-code
+npx skills add supabase/agent-skills -g -a claude-code
 ```
 
-Sortie typique :
+`-g` installe dans votre dossier utilisateur au lieu du projet. C'est un outil tiers, non maintenu par Anthropic : relisez ce qu'il installe.
 
-```
-ACTIVE  pdf-tools          0.3.1   ~/.claude/skills/pdf-tools
-ACTIVE  security-review    1.0.4   ~/.claude/skills/security-review
-INERT   draft-skill        0.0.1   ~/.claude/skills/draft-skill  (no SKILL.md)
-```
+## Méthode 4 : synchronisation depuis claude.ai
 
-Le statut `INERT` indique un skill mal formé : généralement un `SKILL.md` manquant ou un frontmatter invalide.
+Si vous vous connectez à Claude Code avec votre compte claude.ai, les skills activés sur ce compte sont téléchargés dans `~/.claude/skills/synced/` et mis à jour toutes les dix minutes environ. Ils apparaissent dans `/skills` sous « claude.ai sync ». C'est aussi la seule façon de rendre un skill personnel disponible dans les sessions **cloud** et **Cowork**, qui ne lisent pas votre `~/.claude/skills/` local. Pour une session cloud, vous pouvez aussi committer le skill dans `.claude/skills/` du dépôt.
 
-## Désinstallation
+## Vérifier qu'un skill est chargé
 
-```bash
-npx claude-mem remove pdf-tools
-```
+Dans une session :
 
-Ou pour un skill projet, supprimez le dossier et committez.
+- `/skills` liste les skills disponibles, filtrables par nom, description ou source (touche `t` pour trier par nombre de tokens) ;
+- demandez « Quels skills sont disponibles ? » ;
+- invoquez-le directement : `/pdf-outils`.
 
-## Bonnes pratiques
+Si le skill n'apparaît pas, vérifiez le chemin (`.claude/skills/<nom>/SKILL.md`, pas `.claude/skills/SKILL.md`) et lancez `claude plugin validate ~/.claude/skills` pour repérer un frontmatter invalide.
 
-- **Skills d'équipe** : préférez l'installation via `.claude/skills/` dans le repo. Cohérence garantie.
-- **Skills perso** : `~/.claude/skills/` via `claude-mem add`.
-- **Versionnez tout** : un skill sans version est un skill qui cassera silencieusement.
-- **Auditez** avant d'installer : un skill peut contenir des scripts Bash. Lisez `SKILL.md` et les `scripts/` avant le premier usage.
+## Désinstaller
+
+| Origine | Comment |
+|---|---|
+| Dossier personnel ou projet | Supprimez le dossier |
+| Plugin | `/plugin uninstall nom@marketplace` ou désactivez-le dans `/plugin` |
+| Synchronisé depuis claude.ai | Désactivez-le sur claude.ai |
+| Skill intégré (bundled) | `skillOverrides` à `"off"`, ou `disableBundledSkills` pour tous |
+
+Pour garder un skill mais empêcher Claude de l'utiliser seul, mettez-le en `"user-invocable-only"` dans `skillOverrides` (raccourci : `Espace` dans le menu `/skills`).
+
+## Avant d'installer : auditez
+
+Un skill peut contenir des scripts exécutés avec vos droits et un champ `allowed-tools` qui évite les demandes de permission. Anthropic recommande de n'utiliser que des skills de sources de confiance. Avant le premier usage :
+
+- lisez `SKILL.md`, en particulier `allowed-tools` et `hooks` ;
+- lisez chaque script dans `scripts/` ;
+- méfiez-vous des skills qui téléchargent du contenu depuis des URL externes.
 
 ## Pour aller plus loin
 
-- Article wiki « Publier un skill » pour faire l'inverse.
-- Article wiki « Versioning des skills » pour gérer les mises à jour proprement.
-- Doc officielle : https://docs.claude.com/en/docs/claude-code/skills
+- [Structure d'un skill](/wiki/skills/structure-skill)
+- [Skills officiels Anthropic](/wiki/skills/skills-officiels)
+- [Skills tiers populaires](/wiki/skills/skills-tiers)
+- [Introduction aux plugins](/wiki/plugins/introduction-plugins)
+
+## Sources
+
+- Emplacements et chargement des skills : https://code.claude.com/docs/en/skills
+- Installer des plugins : https://code.claude.com/docs/en/plugins/install
+- Marketplaces d'Anthropic : https://code.claude.com/docs/en/plugins/anthropic-marketplaces
+- Dépôt et marketplace `anthropics/skills` : https://github.com/anthropics/skills
+- CLI `skills` : https://github.com/vercel-labs/skills
+- Sécurité des skills : https://docs.claude.com/en/docs/agents-and-tools/agent-skills/overview

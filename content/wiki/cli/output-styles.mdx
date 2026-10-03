@@ -1,111 +1,128 @@
 ---
-title: "Output styles : personnaliser le format des réponses de Claude"
-description: "Adapter le ton et la verbosité de Claude Code via les output styles intégrés et personnalisés."
-updatedAt: "2026-05-19"
+title: "Output styles : adapter le ton et le format des réponses"
+description: "Les styles intégrés de Claude Code (Default, Proactive, Concise, Explanatory, Learning), comment en changer et comment écrire votre propre style."
+updatedAt: "2026-10-03"
 readingMinutes: 6
 ---
 
-Par défaut, Claude Code répond de manière concise, orienté action, avec des résumés courts. Mais selon votre usage — pair programming, apprentissage, automatisation CI — vous voudrez ajuster cette personnalité. Les **output styles** permettent de modifier en profondeur le comportement de réponse de l'agent : verbosité, format, ton, structure.
+Un output style est un jeu d'instructions qui fixe le rôle, le ton et le format de toutes les réponses de Claude pendant une session. Il évite de répéter « sois bref » ou « explique tes choix » à chaque prompt, et peut même transformer Claude en assistant de rédaction ou en analyste de données.
 
-## Qu'est-ce qu'un output style ?
+## Les styles intégrés
 
-Un output style est un fichier Markdown qui remplace (ou complète) la portion du system prompt de Claude Code dédiée au formatage des réponses. Contrairement à un simple ajout dans `CLAUDE.md`, un output style modifie réellement les instructions de base de l'agent.
+Claude Code démarre en style **Default** : ses instructions standard d'ingénierie logicielle, sans ajout. Quatre autres styles conservent ces instructions et ajoutent les leurs :
 
-Claude Code livre plusieurs styles intégrés :
+| Style | Ce qui change | Quand l'utiliser |
+|---|---|---|
+| **Proactive** | Claude se lance tout de suite et fait des hypothèses raisonnables au lieu de poser des questions de routine | Vous voulez avancer vite et corriger si besoin |
+| **Concise** | La réponse commence par le résultat, sans préambule ni récapitulatif | Les réponses par défaut vous semblent trop longues |
+| **Explanatory** | Claude ajoute de courts blocs `Insight` qui expliquent ses choix | Vous découvrez une base de code |
+| **Learning** | En plus des `Insight`, Claude vous laisse écrire certains morceaux de code (`TODO(human)`) | Vous voulez pratiquer en codant |
 
-- **default** : concis, orienté code, peu de prose
-- **explanatory** : ajoute des explications pédagogiques après les actions
-- **learning** : interactif, demande à l'utilisateur d'écrire du code lui-même
+Quelques précisions :
 
-Pour changer de style en cours de session :
+- **Concise** reste complet quand c'est nécessaire : erreurs, tests en échec, alertes de sécurité et confirmations d'actions destructrices.
+- **Proactive** ne change pas votre mode de permission. Claude vous demande toujours confirmation dans la conversation avant de supprimer des données ou de toucher un système partagé.
+- **Learning** s'arrête après avoir placé un `TODO(human)` : écrivez votre code, puis dites à Claude que c'est fait.
 
-```bash
-/output-style explanatory
+Un bloc `Insight` ressemble à ceci :
+
+```text
+★ Insight ─────────────────────────────────────
+- Toutes les routes passent par withAuth : le nouvel endpoint hérite des contrôles de session.
+- Les limites de débit sont définies route par route dans limits.ts.
+─────────────────────────────────────────────────
 ```
 
-Le changement est persistant pour le projet courant (stocké dans `.claude/settings.local.json`).
+## Changer de style
 
-## Lister et inspecter les styles
-
-```bash
-/output-style
+```text
+/output-style              # liste les styles et marque l'actif
+/output-style concise      # bascule (la casse n'importe pas ici)
 ```
 
-Sans argument, la commande affiche la liste des styles disponibles et marque celui qui est actif. Vous pouvez aussi passer par `/config` pour accéder à l'interface complète.
+Vous pouvez aussi passer par `/config` puis **Output style**. Ces deux méthodes enregistrent le choix dans `.claude/settings.local.json`. Le nouveau style s'applique dès votre message suivant.
 
-Les styles utilisateurs vivent dans `~/.claude/output-styles/` et les styles projet dans `.claude/output-styles/`. Chaque style est un fichier `.md` avec un frontmatter :
-
-```bash
-ls ~/.claude/output-styles/
-# concise.md
-# verbose-tutor.md
-# ci-runner.md
-```
-
-## Créer un style personnalisé
-
-Créez un fichier `.claude/output-styles/mon-style.md` à la racine de votre projet :
-
-```bash
-mkdir -p .claude/output-styles
-touch .claude/output-styles/mon-style.md
-```
-
-Voici un exemple de style "tuteur verbeux" pour de l'apprentissage :
-
-```markdown
----
-name: Tuteur verbeux
-description: Explique chaque étape comme à un junior dev
----
-
-You are pair-programming with a junior developer who is learning.
-
-For every action you take :
-1. Explain WHY before doing it
-2. Reference the file path and line number being changed
-3. After the change, give a short paragraph on what was learned
-4. End with a "Try yourself" suggestion
-
-Be encouraging but rigorous. No shortcuts in explanations.
-```
-
-Rechargez via `/output-style mon-style` et Claude adoptera immédiatement le ton.
-
-## Styles utiles selon le contexte
-
-Quelques recettes éprouvées :
-
-- **ci-runner** : "Output only structured JSON. No prose, no markdown. Each step as `{step, status, error?}`."
-- **concise-pro** : "Maximum 3 lines per response unless code is required. No preamble. No postamble."
-- **commit-helper** : "After every set of edits, propose a conventional commit message in a fenced code block."
-- **review-mode** : "Don't write code. Critique and ask questions. Suggest alternatives."
-
-## Différence avec CLAUDE.md et les agents
-
-Trois mécanismes coexistent — il faut savoir lequel utiliser :
-
-- **CLAUDE.md** : injecté à chaque session, parfait pour les conventions projet (stack, palette, patterns)
-- **Output style** : modifie le system prompt de base, change la personnalité
-- **Sub-agents** (`.claude/agents/`) : crée un agent spécialisé invoqué via Task
-
-L'output style affecte tout ce que dit Claude dans la session. CLAUDE.md ajoute du contexte mais ne change pas le ton. Les agents s'exécutent dans leur propre fenêtre.
-
-## Configurer dans settings.json
-
-Pour fixer un style par défaut au niveau projet :
+Pour un style par défaut dans tous vos projets, mettez-le dans `~/.claude/settings.json` :
 
 ```json
 {
-  "outputStyle": "explanatory"
+  "outputStyle": "Explanatory"
 }
 ```
 
-Au niveau utilisateur (dans `~/.claude/settings.json`), pour tous vos projets.
+Attention : dans les fichiers de réglages, **la valeur est sensible à la casse**. `"explanatory"` ne correspond à aucun style et vous laisse en Default sans message d'erreur. Écrivez `Proactive`, `Concise`, `Explanatory` ou `Learning`.
+
+## Créer un style personnalisé
+
+Un style personnalisé est un fichier Markdown avec un frontmatter. Emplacements possibles :
+
+- utilisateur : `~/.claude/output-styles/` ;
+- projet : `.claude/output-styles/` (à commiter pour l'équipe) ;
+- réglages gérés par l'organisation ;
+- plugin : dossier `output-styles/` du plugin.
+
+Exemple : `.claude/output-styles/tuteur.md`
+
+```markdown
+---
+name: Tuteur
+description: Explique chaque étape à un développeur junior, en français
+keep-coding-instructions: true
+---
+
+Vous travaillez en binôme avec un développeur junior qui apprend.
+
+Pour chaque modification :
+1. Expliquez pourquoi avant d'agir.
+2. Indiquez le fichier et la fonction concernés.
+3. Après la modification, résumez en deux phrases ce qu'il faut retenir.
+4. Terminez par une petite suggestion d'exercice.
+
+Restez exigeant sur la qualité : pas de raccourci dans les explications.
+```
+
+Champs du frontmatter (tous facultatifs) :
+
+| Champ | Rôle |
+|---|---|
+| `name` | Nom affiché (par défaut : le nom du fichier) |
+| `description` | Description affichée dans `/config` |
+| `keep-coding-instructions` | `true` pour conserver les instructions d'ingénierie de Claude Code. Par défaut `false` |
+| `force-for-plugin` | Pour un plugin : applique le style automatiquement quand le plugin est activé |
+
+Le point essentiel est `keep-coding-instructions`. Sans lui, votre style **remplace** les consignes de Claude Code sur la façon de cadrer, commenter et vérifier le code. C'est voulu pour un style non technique (rédaction, analyse), mais rarement ce que vous voulez pour du développement.
+
+Claude Code lit les fichiers de style au démarrage : après avoir créé ou modifié un style, relancez Claude Code.
+
+## Idées de styles
+
+- **Revue** : « N'écris pas de code. Critique, pose des questions, propose des alternatives. »
+- **Commits** : « Après chaque série de modifications, propose un message de commit conventionnel dans un bloc de code. »
+- **Rédaction** (sans `keep-coding-instructions`) : « Tu es éditeur technique francophone. Corrige le style, la typographie et la clarté des fichiers Markdown. »
+
+## Output style, CLAUDE.md, skill ou hook ?
+
+| Vous voulez | Utilisez |
+|---|---|
+| Un ton, une longueur ou un rôle pour toute la session | Un output style |
+| Que Claude connaisse les conventions du projet | [CLAUDE.md](/wiki/demarrer/claude-md) |
+| Une procédure pour un type de tâche (checklist de release) | Une [skill](/wiki/skills/structure-skill) |
+| Une action garantie à chaque fois (formatage, blocage) | Un [hook](/wiki/hooks/introduction-hooks) |
+| Un assistant avec ses propres outils et son contexte | Un [sous-agent](/wiki/subagents/creer-subagent-custom) |
+
+Un output style reste une instruction : Claude la suit, mais rien ne la garantit. Il s'applique à la conversation principale et aux forks, pas aux autres sous-agents, qui ont leur propre prompt système.
+
+## Coût
+
+Les instructions du style s'ajoutent à chaque requête (le cache de prompt en absorbe l'essentiel). Explanatory et Learning produisent des réponses plus longues, donc plus de tokens de sortie ; Concise fait l'inverse.
 
 ## Pour aller plus loin
 
-- Documentation officielle Anthropic sur les output styles
-- Combiner output style + permission mode `plan` pour un mode "consultant senior"
-- Versionner vos styles d'équipe dans `.claude/output-styles/` et les partager via git
-- Tester un style temporairement avec `/output-style` sans modifier les settings
+- [Le fichier settings.json](/wiki/cli/settings-json)
+- [Thèmes et accessibilité](/wiki/cli/themes-accessibilite)
+- [Modes de permissions](/wiki/cli/permissions-modes)
+
+## Sources
+
+- [Output styles](https://code.claude.com/docs/en/output-styles)
+- [Settings reference : outputStyle](https://code.claude.com/docs/en/settings-reference)

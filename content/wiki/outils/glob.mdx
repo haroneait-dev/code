@@ -1,143 +1,99 @@
 ---
 title: "L'outil Glob"
-description: "Trouver des fichiers par pattern dans un projet — syntaxe glob, performance et cas d'usage."
-updatedAt: "2026-05-19"
-readingMinutes: 5
+description: "Comment Claude Code trouve des fichiers par motif : syntaxe glob, tri et plafond de 100 résultats, .gitignore, et pourquoi Glob est absent par défaut sur macOS, Linux et WSL."
+updatedAt: "2026-10-03"
+readingMinutes: 4
 ---
 
-`Glob` est l'outil de localisation de fichiers de Claude Code. Vous lui donnez un pattern (`**/*.ts`, `src/**/*.test.tsx`), il vous retourne la liste des chemins qui matchent, triés par date de modification. C'est l'équivalent rapide et propre du couple `find` + `grep -l` — sans la verbosité ni les pièges d'options POSIX.
+`Glob` trouve des fichiers par leur **nom ou leur chemin** à partir d'un motif comme `**/*.tsx`. Il ne regarde pas le contenu (c'est le rôle de Grep). Point important en 2026 : sur macOS, Linux et WSL, Glob n'est plus chargé par défaut, et Claude cherche avec `find` via Bash.
 
-## À quoi sert Glob
+## Glob est-il disponible chez vous ?
 
-Glob répond à la question "**où sont les fichiers qui correspondent à...** ?". Cas typiques :
+| Plateforme | Par défaut |
+|------------|-----------|
+| Windows | Glob et Grep sont présents |
+| macOS, Linux, WSL | Glob et Grep sont absents ; Claude utilise `find` et `grep` dans Bash |
 
-- trouver tous les composants React (`**/*.tsx`) ;
-- lister les tests d'un module (`src/auth/**/*.test.ts`) ;
-- repérer les fichiers de config (`**/{tsconfig,package}.json`) ;
-- localiser les fichiers récemment modifiés (Glob trie par mtime descendante par défaut).
+Sur macOS, Linux et WSL, ces deux commandes lancent dans le shell de Claude des versions intégrées de `bfs` et `ugrep`. Conséquence pratique : ces recherches passent par vos hooks et vos règles de permission en tant qu'appels **`Bash`**. `find` et `grep` font partie des commandes en lecture seule qui ne demandent pas d'autorisation.
 
-Pour chercher **dans le contenu** d'un fichier (motif texte), utilisez `Grep`. Glob ne regarde que les **noms** et **chemins**.
+Glob et Grep reviennent dans ces cas :
 
-## Syntaxe
+- vous les nommez au lancement : `claude --allowedTools Glob` (nommer l'un dans `--allowedTools` rétablit les deux), ou en les listant dans `--tools` (vous obtenez alors seulement ceux que vous nommez) ;
+- Bash est retiré de la session (règle `deny`, `--disallowedTools Bash` ou `--restricted`) ;
+- un sous-agent liste `Glob` ou `Grep` dans son champ `tools` sans `Bash`.
 
-Glob utilise la syntaxe glob standard étendue :
+Une règle `allow` dans un fichier de settings ne suffit pas à les faire revenir.
 
-| Pattern | Signification |
-|---------|---------------|
-| `*` | N'importe quels caractères (sauf `/`) |
-| `**` | N'importe quels segments de chemin (récursif) |
-| `?` | Un seul caractère |
-| `[abc]` | Un des caractères listés |
-| `{a,b}` | Alternative (a ou b) |
-| `!pattern` | Négation (selon implémentation) |
+## Syntaxe des motifs
 
-Exemples :
-
-- `*.ts` → fichiers `.ts` au niveau courant uniquement
-- `**/*.ts` → tous les `.ts` récursivement
-- `src/**/*.{ts,tsx}` → tous les `.ts` et `.tsx` dans `src/`
-- `**/test_*.py` → tous les fichiers de test Python
+| Motif | Correspond à |
+|-------|--------------|
+| `*.ts` | Fichiers `.ts` du dossier courant uniquement |
+| `**/*.ts` | Tous les `.ts`, à toute profondeur |
+| `src/**/*.{ts,tsx}` | `.ts` et `.tsx` sous `src/` |
+| `app/**/route.ts` | Toutes les routes API d'un projet Next.js App Router |
+| `.claude/skills/*/SKILL.md` | Les skills d'un projet |
 
 ## Paramètres
 
-| Paramètre | Type | Obligatoire | Description |
-|-----------|------|-------------|-------------|
-| `pattern` | string | oui | Le motif glob à matcher |
-| `path` | string | non | Répertoire de recherche (défaut: cwd) |
+| Paramètre | Rôle |
+|-----------|------|
+| `pattern` | Motif glob, obligatoire |
+| `path` | Dossier de départ (par défaut, le répertoire de travail) |
 
-## Exemples concrets
+Exemple d'appel :
 
-### Tous les composants React du projet
-
-```bash
-Glob(pattern="**/*.tsx")
+```json
+{
+  "pattern": "**/*.sql",
+  "path": "/home/vous/projet/supabase/migrations"
+}
 ```
 
-### Tous les fichiers de migration SQL dans un dossier précis
+## Résultats : tri, plafond et .gitignore
+
+- Les résultats sont **triés par date de modification** : les fichiers récemment touchés remontent en premier.
+- Ils sont **plafonnés à 100 fichiers**. Au-delà, Claude voit un indicateur de troncature et resserre le motif.
+- Glob **ne respecte pas `.gitignore`** par défaut : il peut renvoyer des fichiers de `node_modules/` ou `dist/`. Pour changer ce comportement, lancez Claude Code avec `CLAUDE_CODE_GLOB_NO_IGNORE=false`. Grep, lui, ignore les fichiers du `.gitignore`.
+
+## Permissions
+
+Glob ne demande pas d'autorisation dans le répertoire de travail, mais en demande hors de celui-ci. Les règles de chemin s'écrivent avec **`Read(...)`** : une règle `Glob(docs/**)` est ignorée (avec un avertissement), sauf passée dans `--allowedTools`.
+
+## Équivalents avec find
+
+Si Glob n'est pas chargé, Claude obtient la même chose avec `find` :
 
 ```bash
-Glob(
-  pattern="**/*.sql",
-  path="/Users/harone/projet/supabase/migrations"
-)
+# Tous les composants .tsx hors node_modules
+find . -name "*.tsx" -not -path "*/node_modules/*"
+
+# Les 10 fichiers modifiés le plus récemment (GNU find)
+find src -type f -printf '%T@ %p\n' | sort -rn | head -10
+
+# Fichiers modifiés depuis moins d'un jour
+find . -type f -mtime -1 -not -path "./.git/*"
 ```
 
-### Configs et lockfiles à la racine
+## Pièges fréquents
 
-```bash
-Glob(pattern="*.{json,lock,toml,yaml}")
-```
+**Confondre `*` et `**`.** `src/*.ts` ne trouve pas `src/auth/login.ts`. Utilisez `src/**/*.ts`.
 
-### Tests d'un module spécifique
+**Motifs trop larges.** `**/*` sur un monorepo atteint vite le plafond de 100 résultats. Ajoutez une extension ou un sous-dossier dans `path`.
 
-```bash
-Glob(pattern="src/auth/**/*.{test,spec}.ts")
-```
+**Casse.** Sur macOS et Linux, `*.MD` ne trouve pas `README.md`.
 
-## Tri par date
+**Chercher du contenu.** « Les fichiers qui importent Supabase » est une recherche de contenu : c'est Grep (ou `grep -rl`), pas Glob.
 
-Glob trie par défaut les résultats par **date de modification descendante**. C'est très pratique pour :
+## Articles liés
 
-- voir ce que vous avez touché en dernier sur un projet ;
-- prioriser les fichiers "chauds" lors d'un audit ;
-- détecter les fichiers obsolètes (ceux en bas de liste).
+- [L'outil Grep](/wiki/outils/grep)
+- [L'outil Bash](/wiki/outils/bash)
+- [L'outil Read](/wiki/outils/read)
+- [Combiner les outils](/wiki/outils/combiner-outils)
 
-## Pièges courants
+## Sources
 
-**Confondre `*` et `**`.** `*.ts` ne descend pas dans les sous-dossiers. `**/*.ts` oui. Erreur fréquente : `src/*.ts` ne trouvera **pas** `src/auth/login.ts`.
-
-**Patterns trop larges.** `**/*` sur un monorepo peut retourner des dizaines de milliers de fichiers, dont `node_modules`. Précisez toujours une extension ou un sous-dossier.
-
-**`node_modules` non exclu automatiquement.** Glob ne filtre pas `node_modules` par défaut (selon l'implémentation). Ajoutez `path` pour cibler `src/` ou similaire.
-
-**Ordre des alternatives dans `find -regex`.** Spécifique à `find` : `'.*\.\(ts\|tsx\)'` saute silencieusement les `.tsx`. Avec Glob et la syntaxe `{ts,tsx}`, pas ce problème — mais bon à savoir si vous tombez sur `find`.
-
-**Casse sensible.** Sur macOS/Linux, glob est case-sensitive par défaut. `*.MD` ne matche pas `README.md`.
-
-## Combiner avec d'autres outils
-
-**Glob → Read** : pour explorer rapidement les "n derniers fichiers modifiés".
-
-```bash
-Glob(pattern="**/*.tsx")
-# Puis Read sur les 3 premiers résultats
-```
-
-**Glob → Grep** : pour chercher un motif dans un sous-ensemble.
-
-```bash
-# D'abord cibler le périmètre
-Glob(pattern="src/auth/**/*.ts")
-# Puis chercher dedans avec Grep (path=src/auth)
-```
-
-**Glob → Edit** : pour appliquer un changement à plusieurs fichiers (en boucle, pas un par un manuellement).
-
-## Performance
-
-Glob est rapide — il s'appuie sur `ripgrep` ou équivalent en interne. Sur un monorepo de 100k fichiers, comptez < 1 seconde. Sur un projet typique (1–10k fichiers), c'est instantané.
-
-Pour des recherches très ciblées, passez `path` : cela divise le temps par 10 en évitant de scanner `node_modules`, `.git`, etc.
-
-## Cas d'usage courants
-
-**Trouver tous les TODO files :**
-```bash
-Glob(pattern="**/TODO*.md")
-```
-
-**Lister les routes Next.js App Router :**
-```bash
-Glob(pattern="app/**/route.{ts,js}")
-```
-
-**Inventaire des skills d'un dépôt :**
-```bash
-Glob(pattern=".claude/skills/**/SKILL.md")
-```
-
-## Pour aller plus loin
-
-- [Documentation glob — node-glob](https://www.npmjs.com/package/glob) [pour la syntaxe étendue]
-- Voir aussi : `Grep` pour chercher dans le contenu, `Bash(find ...)` si vous avez besoin de filtres avancés (taille, type, dates précises).
-- Astuce : `Glob` est souvent le premier outil à appeler quand on découvre un nouveau projet. Listez les `*.md`, les configs, puis les `index.{ts,js}` — cela donne une bonne carte mentale en quelques secondes.
+- [Tools reference : Glob tool behavior](https://code.claude.com/docs/en/tools-reference#glob-tool-behavior)
+- [Configure permissions : Read and Edit](https://code.claude.com/docs/en/permissions#read-and-edit)
+- [Environment variables](https://code.claude.com/docs/en/env-vars)

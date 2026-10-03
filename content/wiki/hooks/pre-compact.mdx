@@ -1,41 +1,50 @@
 ---
-title: "PreCompact"
-description: "Sauvegarder le transcript complet avant que Claude Code ne compacte le contexte pour récupérer des tokens."
-updatedAt: "2026-05-19"
+title: "PreCompact et PostCompact"
+description: "Archiver le transcript avant une compaction, bloquer un /compact au mauvais moment, récupérer le résumé produit et réinjecter le contexte essentiel ensuite."
+updatedAt: "2026-10-03"
 readingMinutes: 6
 ---
 
-Quand une session Claude Code dépasse le seuil de contexte, le harness lance une **compaction** : il résume les messages anciens pour libérer des tokens. C'est efficace, mais tu perds les détails fins (commandes shell exactes, sorties d'outils volumineuses, raisonnements intermédiaires). Le hook `PreCompact` te permet d'archiver l'état complet juste avant la compression.
+Quand le contexte approche de sa limite, Claude Code **compacte** la conversation : il la résume pour libérer de la place. Les détails fins (sorties de commandes, raisonnements intermédiaires) disparaissent du contexte. `PreCompact` s'exécute juste avant et peut archiver ou bloquer, `PostCompact` juste après et reçoit le résumé généré.
 
-## Anatomie de l'évènement
+## Le cycle d'une compaction
 
-Le hook reçoit sur stdin un JSON :
+```
+PreCompact (manual | auto)   → peut bloquer
+   compaction
+PostCompact (manual | auto)  → reçoit compact_summary
+SessionStart (source: compact) → peut réinjecter du contexte
+```
+
+Le matcher des deux événements vaut `manual` (commande `/compact`) ou `auto` (seuil de compaction automatique atteint).
+
+## Le JSON de PreCompact
 
 ```json
 {
-  "session_id": "01HX...",
-  "transcript_path": "/Users/me/.claude/projects/-Users-me-app/01HX....jsonl",
-  "trigger": "auto",
+  "session_id": "abc123",
+  "transcript_path": "/home/me/.claude/projects/-home-me-app/abc123.jsonl",
+  "cwd": "/home/me/app",
+  "hook_event_name": "PreCompact",
+  "trigger": "manual",
   "custom_instructions": null
 }
 ```
 
-`trigger` vaut `"auto"` (déclenché par le seuil de tokens) ou `"manual"` (utilisateur a tapé `/compact`). `transcript_path` est le fichier JSONL qui contient l'intégralité de la conversation — c'est ce que tu vas vouloir archiver.
+`custom_instructions` contient le texte passé à `/compact <instructions>`, et vaut `null` pour une compaction automatique ou un `/compact` sans argument.
 
-## Archivage simple du transcript
-
-Une stratégie low-tech mais efficace : copier le JSONL dans un dossier daté.
+## Archiver le transcript
 
 ```json
 {
   "hooks": {
     "PreCompact": [
       {
-        "matcher": "",
         "hooks": [
           {
             "type": "command",
-            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/snapshot.sh"
+            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/snapshot.sh",
+            "args": []
           }
         ]
       }
@@ -45,79 +54,133 @@ Une stratégie low-tech mais efficace : copier le JSONL dans un dossier daté.
 ```
 
 ```bash
-#!/usr/bin/env bash
-set -euo pipefail
-
+#!/bin/bash
+# .claude/hooks/snapshot.sh
 INPUT=$(cat)
-TRANSCRIPT=$(echo "$INPUT" | jq -r '.transcript_path')
-SESSION=$(echo "$INPUT" | jq -r '.session_id')
-TRIGGER=$(echo "$INPUT" | jq -r '.trigger')
+TRANSCRIPT=$(jq -r '.transcript_path' <<<"$INPUT")
+SESSION=$(jq -r '.session_id' <<<"$INPUT")
+TRIGGER=$(jq -r '.trigger' <<<"$INPUT")
 
 ARCHIVE_DIR="$HOME/.claude/archives/$(date +%Y-%m-%d)"
 mkdir -p "$ARCHIVE_DIR"
-
-TS=$(date +%H%M%S)
-cp "$TRANSCRIPT" "$ARCHIVE_DIR/${SESSION:0:8}-${TRIGGER}-${TS}.jsonl"
-
-echo "Snapshot sauvegardé dans $ARCHIVE_DIR" >&2
+[ -f "$TRANSCRIPT" ] && cp -- "$TRANSCRIPT" "$ARCHIVE_DIR/${SESSION:0:8}-${TRIGGER}-$(date +%H%M%S).jsonl"
+exit 0
 ```
 
-Tout ce que tu écris sur `stderr` apparaît dans le terminal de Claude — pratique pour confirmer que ça a tourné.
+Deux précisions :
 
-## Extraire un résumé Markdown lisible
+- Le transcript est écrit de façon asynchrone : les tout derniers messages peuvent manquer au moment du hook.
+- Le stderr d'un hook qui sort en `exit 0` part dans le journal de debug, pas dans votre terminal. Pour vérifier que l'archive a été créée, regardez le dossier ou lancez `claude --debug`.
 
-Le JSONL brut est verbeux. Tu peux convertir à la volée en Markdown :
+## Produire un Markdown lisible
+
+Le format JSONL du transcript est interne à Claude Code et peut changer d'une version à l'autre. Ce filtre fonctionne sur la structure actuelle (entrées `user` et `assistant` avec un objet `message`), mais gardez-le pour un usage personnel :
 
 ```bash
-#!/usr/bin/env bash
-set -euo pipefail
-
-INPUT=$(cat)
-TRANSCRIPT=$(echo "$INPUT" | jq -r '.transcript_path')
+#!/bin/bash
+TRANSCRIPT=$(jq -r '.transcript_path')
 OUT="$HOME/.claude/archives/$(date +%Y-%m-%d-%H%M%S).md"
-
 mkdir -p "$(dirname "$OUT")"
 
-{
-  echo "# Session $(date)"
-  echo
-  jq -r 'select(.type=="message") | "## \(.role)\n\n\(.content | if type==\"array\" then map(select(.type==\"text\").text) | join(\"\\n\") else . end)\n"' "$TRANSCRIPT"
-} > "$OUT"
+jq -r '
+  select(.type == "user" or .type == "assistant")
+  | .message.content
+  | if type == "string" then .
+    else (map(select(.type == "text") | .text) | join("\n"))
+    end
+  | select(length > 0)
+  | . + "\n\n---\n"
+' "$TRANSCRIPT" > "$OUT" 2>/dev/null
+exit 0
 ```
 
-Tu obtiens un fichier `.md` que tu peux relire dans n'importe quel éditeur, indexer dans Obsidian, ou commit dans un dossier `journal/`.
+Le résultat se relit dans n'importe quel éditeur ou s'indexe dans Obsidian.
 
-## Bloquer une compaction non désirée
+## Bloquer une compaction
 
-`PreCompact` peut renvoyer un code de sortie `2` pour **annuler** la compaction (uniquement pour le trigger `manual`). Utile si tu veux te protéger d'un `/compact` accidentel en pleine session critique :
+`PreCompact` peut bloquer avec `exit 2` ou un JSON `{"decision": "block", "reason": "..."}`, pour les deux déclencheurs :
 
 ```bash
-#!/usr/bin/env bash
-INPUT=$(cat)
-TRIGGER=$(echo "$INPUT" | jq -r '.trigger')
+#!/bin/bash
+TRIGGER=$(jq -r '.trigger')
 
-if [ "$TRIGGER" = "manual" ] && [ -f .claude/no-compact ]; then
-  echo "Compaction bloquée : retire .claude/no-compact pour autoriser" >&2
+if [ "$TRIGGER" = "manual" ] && [ -f "$CLAUDE_PROJECT_DIR/.claude/no-compact" ]; then
+  echo "Compaction bloquée : supprimez .claude/no-compact pour l'autoriser." >&2
   exit 2
 fi
 exit 0
 ```
 
-La compaction automatique (`auto`) ne peut pas être bloquée — sinon tu casserais la session quand le contexte est plein.
+Pour un `/compact` manuel, le message stderr vous est affiché. Bloquer une compaction **automatique** est possible mais risqué :
 
-## Envoyer vers un stockage distant
+- si elle était préventive (avant la limite), Claude Code la saute et la conversation continue sans être compactée ;
+- si elle devait rattraper une erreur de dépassement déjà renvoyée par l'API, l'erreur remonte et la requête échoue.
 
-Pour ne pas saturer le disque local, push vers S3, R2 ou un Git privé :
+Limitez donc le blocage au cas `manual`, sauf raison précise.
+
+## PostCompact : récupérer le résumé
+
+`PostCompact` reçoit `trigger` et `compact_summary`, le résumé généré. Il ne peut rien bloquer, mais c'est l'endroit idéal pour garder une trace de ce que Claude « retient » :
 
 ```bash
-aws s3 cp "$TRANSCRIPT" "s3://my-claude-archives/${SESSION}.jsonl" --quiet
+#!/bin/bash
+INPUT=$(cat)
+mkdir -p "$HOME/.claude/summaries"
+jq -r '.compact_summary' <<<"$INPUT" \
+  > "$HOME/.claude/summaries/$(jq -r '.session_id' <<<"$INPUT")-$(date +%H%M%S).md"
+exit 0
 ```
 
-Combine avec un cron qui purge les snapshots locaux de plus de 7 jours.
+```json
+{
+  "hooks": {
+    "PostCompact": [
+      { "hooks": [{ "type": "command", "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/save-summary.sh", "args": [] }] }
+    ]
+  }
+}
+```
 
-## Pour aller plus loin
+Claude Code ignore les champs `systemMessage` et `continue` de `PreCompact` et `PostCompact`.
 
-- Pair `PreCompact` avec `SessionEnd` pour une double sauvegarde (snapshot avant compaction + final à la fermeture).
-- Indexe les transcripts archivés avec `ripgrep` : `rg "ma fonction" ~/.claude/archives/` retrouve une discussion d'il y a 3 semaines.
-- Le champ `custom_instructions` contient les directives passées via `/compact <instructions>` — log-les pour comprendre tes patterns de compaction.
-- Pour un workflow équipe, push le résumé Markdown dans un canal Slack avec le webhook approprié.
+## Réinjecter le contexte essentiel
+
+Après la compaction, un hook `SessionStart` avec le matcher `compact` peut rappeler les règles qui ne doivent pas se perdre. Son texte sur stdout est ajouté au contexte :
+
+```json
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo 'Rappel : le projet utilise Bun, pas npm. Lancer bun test avant chaque commit. Sprint en cours : refonte auth.'"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+Remplacez l'`echo` par une commande dynamique (`git log --oneline -5`) si besoin.
+
+## Idées complémentaires
+
+- Archiver aussi en `SessionEnd` pour avoir une copie finale de chaque session.
+- Rechercher dans les archives avec `rg "maFonction" ~/.claude/archives/`.
+- Journaliser `custom_instructions` pour voir comment vous guidez vos compactions.
+- Purger les archives anciennes avec une tâche planifiée : les transcripts peuvent contenir du code et des secrets.
+
+## Articles liés
+
+- [SessionStart, Stop et SessionEnd](/wiki/hooks/session-start-stop)
+- [Hook lifecycle](/wiki/hooks/hook-lifecycle)
+- [Gérer ses sessions : /clear, /resume](/wiki/cli/clear-resume-cost)
+
+## Sources
+
+- [Hooks reference : PreCompact, PostCompact](https://code.claude.com/docs/en/hooks)
+- [Automate actions with hooks : Re-inject context after compaction](https://code.claude.com/docs/en/hooks-guide)

@@ -1,55 +1,89 @@
 ---
 title: "Skills officiels Anthropic"
-description: "Tour d'horizon des skills maintenus par Anthropic, leurs cas d'usage et comment les installer dans Claude Code."
-updatedAt: "2026-05-19"
+description: "Les skills intégrés à Claude Code (/code-review, /simplify, /batch, /claude-api…) et ceux du dépôt anthropics/skills, avec la façon de les installer."
+updatedAt: "2026-10-03"
 readingMinutes: 6
 ---
 
-Anthropic maintient une collection de skills officiels qui couvrent les besoins les plus fréquents des développeurs utilisant Claude Code. Ces skills bénéficient d'une qualité élevée, d'une maintenance régulière et d'une intégration native avec les évolutions du produit. Cet écosystème évolue **très rapidement** : vérifiez toujours la liste actuelle sur le dépôt officiel avant d'intégrer un skill en production.
+Anthropic fournit des skills à trois endroits : ceux **intégrés** à Claude Code (bundled skills), ceux du dépôt public **anthropics/skills**, et les skills de documents disponibles sur **claude.ai** et l'API. La liste évolue vite : vérifiez toujours la référence des commandes avant de bâtir un workflow dessus.
 
-## La famille des skills d'initialisation
+## Les skills intégrés à Claude Code
 
-Le skill `init` est souvent le premier que les utilisateurs rencontrent. Il analyse un dépôt et génère un `CLAUDE.md` adapté à la stack détectée. C'est la porte d'entrée recommandée sur un nouveau projet.
+Ils sont livrés avec la CLI et s'invoquent comme vos propres skills, en tapant `/` puis leur nom. Ce sont des prompts détaillés : Claude orchestre ensuite le travail avec ses outils. Dans la référence des commandes, ils sont marqués **Skill**.
 
-```bash
-claude /init
+| Skill | À quoi il sert |
+|---|---|
+| `/code-review` (alias `/review`) | Revue de bugs sur le diff courant, une PR, une branche ou un chemin. Options `--fix`, `--comment`, `--max-findings` |
+| `/simplify` | Revue de nettoyage du code modifié (réutilisation, simplification, efficacité) puis application |
+| `/batch <instruction>` | Changements à grande échelle découpés en unités confiées à des subagents en parallèle |
+| `/debug` | Active les logs de debug de la session et les analyse |
+| `/loop [intervalle] [prompt]` | Relance un prompt à intervalle régulier tant que la session est ouverte |
+| `/claude-api` | Référence de l'API Claude et des Managed Agents, sous-commandes `migrate`, `upgrade`, `prompt-audit`, `cost-optimize`, `build-eval`… |
+| `/doctor` (alias `/checkup`) | Bilan de santé de l'installation, y compris le coût des skills |
+| `/run`, `/verify`, `/run-skill-generator` | Lancer l'application et vérifier un changement en conditions réelles |
+| `/fewer-permission-prompts` | Analyse vos transcripts et propose une allowlist de commandes en lecture seule |
+| `/update-config` | Modifie `settings.json` à partir d'une demande en langage naturel |
+| `/design`, `/slides`, `/dataviz` | Maquettes, présentations et graphiques publiés en artifacts |
+
+Quelques précisions :
+
+- `/claude-api` se déclenche aussi tout seul quand votre code importe `anthropic` ou `@anthropic-ai/sdk` ;
+- `/verify` ne s'exécute que si vous l'invoquez, car il est long ;
+- `/workflow-authoring` n'existe que si les dynamic workflows sont activés.
+
+À ne pas confondre : `/init`, `/security-review`, `/schedule` ou `/skills` sont des **commandes intégrées**, pas des skills. `/init` et `/security-review` restent toutefois invocables par Claude via l'outil Skill.
+
+### Désactiver ou remplacer un skill intégré
+
+- Tous : `"disableBundledSkills": true` dans les settings.
+- Un seul : `"skillOverrides": { "simplify": "off" }`.
+- Le remplacer : créez un skill du même nom dans `.claude/skills/`. Un `code-review` de projet remplace `/code-review`, mais l'alias `/review` lance toujours la version intégrée.
+
+## Le dépôt anthropics/skills
+
+Le dépôt https://github.com/anthropics/skills contient des skills d'exemple, la spécification Agent Skills et un modèle de skill. Il sert aussi de marketplace de plugins :
+
+```text
+/plugin marketplace add anthropics/skills
+/plugin install document-skills@anthropic-agent-skills
+/plugin install example-skills@anthropic-agent-skills
 ```
 
-À côté, on trouve `gh-init` qui crée un dépôt GitHub à partir du projet local, commit l'état courant et le pousse. Ces deux skills sont conçus pour fonctionner ensemble sur un projet vierge.
+| Plugin | Skills inclus |
+|---|---|
+| `document-skills` | `docx`, `pdf`, `pptx`, `xlsx` (source disponible, pas open source) |
+| `example-skills` | `algorithmic-art`, `brand-guidelines`, `canvas-design`, `doc-coauthoring`, `frontend-design`, `internal-comms`, `mcp-builder`, `skill-creator`, `slack-gif-creator`, `theme-factory`, `web-artifacts-builder`, `webapp-testing` |
+| `claude-api` | Le skill `claude-api` |
 
-## Les skills de revue et qualité
+Anthropic précise que ces skills sont fournis **à titre de démonstration** : les comportements peuvent différer de ceux des produits Claude. Testez-les avant un usage critique.
 
-Anthropic propose plusieurs skills dédiés à la qualité du code. Le plus connu est `review`, qui effectue une revue complète d'une pull request en analysant les diffs, les conventions du projet et les risques fonctionnels.
+Pour écrire et évaluer vos propres skills, le plugin `skill-creator` de la marketplace officielle est le plus utile :
 
-Le skill `security-review` se concentre sur les vulnérabilités classiques : injection, exposition de secrets, mauvaise gestion d'authentification, dépendances obsolètes. Il s'exécute sur les changements en cours et produit un rapport priorisé.
-
-Le skill `simplify` complète cet arsenal en proposant des refactorings concrets sur du code récemment modifié, en cherchant les opportunités de réutilisation et les complexités évitables.
-
-## Les skills de configuration du harness
-
-Plusieurs skills officiels ciblent la configuration de Claude Code lui-même. `update-config` gère les modifications de `settings.json` (permissions, hooks, variables d'environnement). C'est lui qu'il faut invoquer pour automatiser un comportement récurrent.
-
-```bash
-claude /update-config "autorise toutes les commandes npm"
+```text
+/plugin install skill-creator@claude-plugins-official
 ```
 
-`keybindings-help` accompagne la personnalisation des raccourcis clavier dans `~/.claude/keybindings.json`, et `fewer-permission-prompts` analyse vos transcripts pour générer une allowlist de commandes courantes, réduisant drastiquement la friction quotidienne.
+## Les skills de documents sur claude.ai et l'API
 
-## Les skills d'orchestration
+Sur claude.ai et via l'API (avec l'outil d'exécution de code), Anthropic propose des skills prêts à l'emploi pour **PowerPoint, Excel, Word et PDF**. Ils ne sont pas intégrés à Claude Code. Si vous vous connectez à Claude Code avec votre compte claude.ai, certains (comme `pdf` et `xlsx`) sont toutefois synchronisés et apparaissent sous le préfixe `anthropic-skills:`.
 
-Anthropic expérimente beaucoup sur l'orchestration de tâches longues. `schedule` permet de créer des agents distants exécutés sur un cron, parfaits pour des tâches récurrentes (revue de PR matinale, génération de rapports). `loop` exécute un prompt ou un slash command à intervalle régulier dans la session courante.
+## Les plugins officiels d'Anthropic
 
-Ces skills sont en évolution active : leurs interfaces changent encore, et de nouveaux skills d'orchestration apparaissent au rythme des releases. Consultez la documentation à jour avant de bâtir un workflow critique dessus.
+La marketplace `claude-plugins-official`, ajoutée automatiquement, contient des plugins maintenus par Anthropic (`commit-commands`, `code-review`, `feature-dev`, les plugins de language server…) et de nombreux plugins de partenaires. Parcourez-la avec `/plugin`, onglet **Discover**, ou sur claude.com/marketplace/plugins.
 
-## Le skill claude-api
-
-Pour les développeurs qui construisent des applications avec le SDK Anthropic, le skill `claude-api` est indispensable. Il guide la construction, le debug et l'optimisation des apps utilisant `@anthropic-ai/sdk`, gère les migrations entre versions de modèles (4.5 → 4.6 → 4.7) et impose les bonnes pratiques comme le **prompt caching**.
-
-C'est typiquement le skill à invoquer dès qu'un fichier importe `anthropic` ou `@anthropic-ai/sdk`, ou quand on tune une feature comme le thinking, le tool use ou la compaction.
+Il n'existe pas de préfixe `@anthropic/` sur npm qui garantirait un skill officiel. Pour identifier une source Anthropic, fiez-vous au nom de la marketplace (`claude-plugins-official`, `claude-community`, `claude-code-plugins`), que Claude Code n'accepte que pour des dépôts `github.com/anthropics/`.
 
 ## Pour aller plus loin
 
-- Dépôt GitHub `anthropics/claude-code-skills` (vérifier la dernière version)
-- Changelog hebdomadaire de Claude Code pour suivre les nouveaux skills officiels
-- Documentation `claude.ai/docs/skills` pour la spécification complète
-- Convention : tout skill préfixé par `@anthropic/` est officiel et signé
+- [Skills tiers populaires](/wiki/skills/skills-tiers)
+- [Installer un skill](/wiki/skills/installer-skill)
+- [/init, /review et /security-review](/wiki/slash-commands/init-review-security)
+- [Dynamic workflows et agents en arrière-plan](/wiki/cli/dynamic-workflows-agents-arriere-plan)
+
+## Sources
+
+- Skills intégrés : https://code.claude.com/docs/en/skills
+- Référence des commandes : https://code.claude.com/docs/en/commands
+- Marketplaces d'Anthropic : https://code.claude.com/docs/en/plugins/anthropic-marketplaces
+- Dépôt anthropics/skills : https://github.com/anthropics/skills
+- Skills prêts à l'emploi de la plateforme : https://docs.claude.com/en/docs/agents-and-tools/agent-skills/overview
