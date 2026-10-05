@@ -1,76 +1,150 @@
 ---
-title: "Anti-patterns prompt engineering"
-description: "Ce qu'il ne faut PAS faire : formulations vagues, négations, contradictions et autres pièges courants."
-updatedAt: "2026-05-19"
-readingMinutes: 6
+title: "Anti-patterns : les erreurs de prompt les plus fréquentes"
+description: "Dix erreurs de prompt qui dégradent les réponses de Claude (consignes vagues, interdits empilés, majuscules, raisonnement exigé dans la réponse, prefill, consignes héritées d'anciens modèles) et comment les corriger, avec des exemples avant et après."
+updatedAt: "2026-10-03"
+readingMinutes: 8
 ---
 
-Beaucoup de problèmes attribués au modèle viennent en réalité du prompt. Avant de blâmer Claude, vérifier qu'on n'est pas en train de demander l'impossible — ou pire, des choses contradictoires. Voici les anti-patterns les plus fréquents observés en production, et comment les corriger.
+Beaucoup de problèmes attribués au modèle viennent du prompt. Certaines erreurs sont classiques depuis toujours, d'autres sont apparues avec les modèles récents : des consignes qui aidaient en 2024 nuisent aujourd'hui. Voici les plus fréquentes, avec leur correction.
 
-## Anti-pattern 1 : la formulation vague
+## 1. La consigne vague
 
-> "Réponds bien à l'utilisateur."
+> « Faites-moi un bon résumé. »
 
-"Bien" ne veut rien dire pour un modèle. Que signifie une bonne réponse dans votre contexte ? Concise ? Exhaustive ? Avec sources ? En markdown ?
+« Bon » ne dit rien : court ou complet ? Pour qui ? Sous quelle forme ?
 
-**Correction** : être explicite, quantifié, vérifiable.
+**Correction** : décrivez le résultat et son usage.
 
-> "Réponds en 3 paragraphes maximum. Cite au moins une source pour chaque affirmation factuelle. Utilise du markdown pour les listes. Refuse poliment si la question sort du domaine de la cybersécurité."
+> « Résumez ce rapport en cinq puces pour mon directeur, qui le lira sur son téléphone entre deux réunions. Gardez les chiffres clés et la recommandation finale. »
 
-Règle simple : si vous ne pouvez pas écrire un test qui valide la consigne, elle est probablement trop vague.
+Test simple tiré de la documentation : montrez votre prompt à un collègue sans contexte. S'il hésite, Claude hésitera aussi.
 
-## Anti-pattern 2 : les négations à répétition
+## 2. L'interdit sans explication
 
-> "Ne dis pas X. Ne mentionne pas Y. Ne fais jamais Z. N'utilise pas de smileys. Ne sois pas trop long."
+> « N'utilisez JAMAIS de points de suspension. »
 
-Les LLMs gèrent mal les négations empilées : on leur active le concept "smiley" en leur disant de ne pas en faire, et parfois ils en font. Pire : une liste de 15 "ne pas" devient un bruit que le modèle apprend à ignorer.
+**Correction** : donnez la raison. Claude généralise à partir de l'explication.
 
-**Correction** : reformuler en positif.
+> « Votre réponse sera lue par une synthèse vocale : évitez les points de suspension, qu'elle ne sait pas prononcer. »
 
-- "N'utilise pas de smileys" → "Garde un ton professionnel et factuel."
-- "Ne sois pas trop long" → "Réponds en moins de 200 mots."
-- "Ne mentionne pas la concurrence" → "Concentre-toi exclusivement sur nos produits Acme."
+## 3. La liste d'interdits au lieu du résultat voulu
 
-## Anti-pattern 3 : les contradictions internes
+> « Pas de Markdown. Pas de listes. Pas trop long. Pas de jargon. »
 
-> "Sois exhaustif et donne tous les détails techniques. Reste concis et accessible aux débutants."
+**Correction** : décrivez ce que vous voulez, pas ce que vous refusez.
 
-Le modèle va arbitrer arbitrairement, et le résultat sera décevant des deux côtés. Les contradictions se cachent souvent entre :
+> « Répondez en deux ou trois paragraphes de prose simple, compréhensibles par quelqu'un qui découvre le sujet. »
 
-- le system prompt et les exemples few-shot
-- le system prompt et le format de sortie demandé
-- deux règles écrites à six mois d'intervalle par deux personnes différentes
+## 4. Les contradictions
 
-**Correction** : prioriser explicitement. "En cas de conflit entre concision et exhaustivité, privilégier l'exhaustivité." Ou trancher : un seul objectif principal, les autres en contraintes secondaires.
+> « Soyez exhaustif et donnez tous les détails techniques. Restez concis et accessible aux débutants. »
 
-## Anti-pattern 4 : le mur de texte
+Elles se cachent souvent entre le prompt système et les exemples, ou entre deux règles ajoutées à des mois d'intervalle.
 
-Un system prompt de 4000 tokens avec 47 règles numérotées, des sous-sections imbriquées et trois listes à puces. Au-delà d'une certaine densité, le modèle commence à oublier des règles, surtout celles du milieu (le fameux "lost in the middle").
+**Correction** : tranchez ou hiérarchisez.
 
-**Correction** :
+> « Priorité à la clarté pour un débutant. Si un détail technique est indispensable, ajoutez-le en fin de réponse dans une section "Pour aller plus loin". »
 
-- Mettre les règles **critiques** au début **et** à la fin (effet primacy/recency).
-- Utiliser des balises XML (`<rules>`, `<examples>`, `<output_format>`) pour structurer.
-- Externaliser ce qui peut l'être : un outil dédié plutôt qu'une règle, un retrieval plutôt qu'un long contexte statique.
-- Si vous dépassez 2000 tokens de system, demandez-vous si toutes les règles sont vraiment utiles.
+## 5. Les majuscules et l'urgence artificielle
 
-## Anti-pattern 5 : confondre exemple et règle
+> « CRITIQUE : vous DEVEZ utiliser cet outil À CHAQUE FOIS que… »
 
-> "Voici un exemple de bonne réponse : [exemple en français formel]."
+Ce ton compensait le manque d'attention des anciens modèles. Les modèles récents sont beaucoup plus sensibles au prompt système : selon Anthropic, ce type de formulation provoque désormais du **sur-déclenchement** (l'outil est appelé à tort).
 
-Le modèle va supposer que **toutes** les réponses doivent être en français formel, même si l'utilisateur écrit en anglais familier. Les exemples sont des contraintes implicites très fortes.
+**Correction** : un ton normal et une condition précise.
 
-**Correction** : varier les exemples pour couvrir la diversité réelle. Inclure des cas où la langue change, le ton change, le format change. Ou être explicite : "Adapte la langue et le ton à l'utilisateur. L'exemple ci-dessous illustre seulement la **structure**, pas le style."
+> « Utilisez cet outil quand la question porte sur une commande en cours. »
 
-## Anti-pattern 6 : prompter contre le modèle
+## 6. Les consignes « anti-paresse » héritées
 
-Demander à Claude de faire semblant d'être un autre modèle, de désobéir à ses valeurs, ou de produire du contenu pour lequel il refusera systématiquement. On finit par empiler des contournements fragiles qui cassent à chaque mise à jour.
+> « En cas de doute, lancez une recherche. Lisez toujours tous les fichiers. Vérifiez trois fois. »
 
-**Correction** : travailler avec les capacités natives du modèle. Si vous avez besoin d'un comportement vraiment hors-norme (red-teaming, recherche sécurité), utiliser les bonnes API et flags officiels plutôt que de jailbreaker.
+Utiles autrefois, elles poussent les modèles actuels à en faire trop : explorations inutiles, coûts et délais en hausse. Opus 5 vérifie déjà son propre travail, et les consignes de vérification héritées le font **sur-vérifier**. Anthropic conseille de les retirer plutôt que de les réécrire.
+
+**Correction** : des consignes ciblées, et l'effort comme réglage principal.
+
+> « Utilisez la recherche quand elle améliore réellement votre compréhension du problème. »
+
+À l'inverse, une consigne qui **décourage** les outils (« n'utilisez la recherche qu'en dernier recours ») peut pousser Sonnet 5.5 à répondre de mémoire sur des sujets qui ont changé. Retirez-la si votre produit dépend d'informations à jour.
+
+## 7. Exiger le raisonnement dans la réponse
+
+> « Avant de répondre, écrivez tout votre raisonnement dans une balise `<thinking>`. »
+
+Sur Fable 5.1, Opus 5.5, Opus 5 et Sonnet 5.5, une demande de recopier le raisonnement interne dans la réponse peut être **refusée** (`stop_reason: "refusal"`, catégorie `reasoning_extraction`). Ces modèles réfléchissent déjà nativement.
+
+**Correction** : demandez une justification courte, ou lisez la réflexion résumée côté API.
+
+> « Donnez la réponse, puis en deux phrases les éléments qui la justifient. »
+
+Voir [Faire réfléchir Claude](/wiki/prompt-engineering/chain-of-thought).
+
+## 8. Les réglages techniques d'une autre époque
+
+| Réglage hérité | Ce qui se passe aujourd'hui | Remplacement |
+|---|---|---|
+| Prefill (dernier message `assistant` pré-rempli) | Erreur 400 depuis la génération 4.6 | Sorties structurées, consigne directe (voir [Prefilling](/wiki/prompt-engineering/prefilling)) |
+| `thinking: {type: "enabled", budget_tokens: N}` | Erreur 400 depuis Opus 4.7 | Thinking adaptatif et paramètre `effort` |
+| « Réfléchissez soigneusement avant de répondre » dans un chat sur Opus 5.5 | Réponses plus lentes à démarrer, sans gain de qualité observé par Anthropic | Retirer la ligne, régler l'effort |
+| Règles anti-Markdown très longues sur Fable 5.1 | Le modèle formate déjà peu : la structure utile disparaît | Une règle courte qui dit quand formater |
+
+## 9. Demander une suggestion quand vous voulez une action
+
+> « Pourriez-vous suggérer des améliorations à ce texte ? »
+
+Les modèles récents suivent les consignes à la lettre : vous obtiendrez des suggestions, pas un texte modifié.
+
+**Correction** : utilisez le verbe de l'action voulue.
+
+> « Réécrivez ce texte pour le rendre plus direct. »
+
+## 10. Prendre un exemple pour une règle
+
+> « Voici un exemple de bonne réponse : [réponse en français soutenu, trois paragraphes]. »
+
+Claude reproduit tout ce que l'exemple montre, y compris ce qui était accidentel : la langue, la longueur, le ton.
+
+**Correction** : variez les exemples (trois à cinq, recommande Anthropic) et dites ce qu'ils illustrent.
+
+> « L'exemple ci-dessous montre la structure attendue. Adaptez la langue et le ton à ceux du client. »
+
+Voir [Few-shot prompting](/wiki/prompt-engineering/few-shot).
+
+## Bonus : le mur de texte
+
+Un prompt système de plusieurs pages, avec des dizaines de règles accumulées, finit par contenir des doublons et des contradictions. Faites le ménage régulièrement :
+
+- regroupez les règles par thème dans des [balises XML](/wiki/prompt-engineering/balises-xml) ;
+- supprimez les règles qui ne correspondent plus à aucun problème observé ;
+- remplacez une règle par un outil ou un document de référence quand c'est possible.
+
+## Faire relire son prompt par Claude
+
+Dans claude.ai, collez votre prompt et demandez :
+
+```text
+Voici un prompt que j'utilise pour [usage]. Relisez-le comme le ferait
+un collègue qui le découvre. Listez :
+1. les consignes ambiguës ou contradictoires ;
+2. les interdits qui gagneraient à être reformulés en résultat attendu ;
+3. les informations de contexte qui manquent.
+Ne réécrivez pas encore le prompt.
+```
+
+Demandez la réécriture seulement après avoir validé le diagnostic. Formulez la demande de façon neutre : si vous affirmez que le prompt est mauvais, Claude aura tendance à tout changer, même ce qui fonctionnait.
 
 ## Pour aller plus loin
 
-- Lire *Itérer sur un prompt* pour la méthode de correction
-- Lire *Tester un prompt* pour détecter ces anti-patterns dans une eval suite
-- Documentation : [Be clear, direct, and detailed](https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/be-clear-and-direct)
-- Pattern utile : faire relire son system prompt par Claude lui-même, en lui demandant de pointer les ambiguïtés et contradictions
+- [Anatomie d'un prompt efficace](/wiki/prompt-engineering/anatomie-prompt)
+- [Itérer sur un prompt](/wiki/prompt-engineering/iterer-prompt)
+- [Tester un prompt](/wiki/prompt-engineering/tester-prompt)
+- [Prompter les modèles Claude 5.5](/wiki/prompt-engineering/prompting-sonnet-5)
+- [Les erreurs de débutant](/wiki/claude-bases/erreurs-debutant)
+
+## Sources
+
+- [Prompting best practices (Anthropic)](https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/claude-prompting-best-practices)
+- [Prompting Claude Opus 5.5 : Thinking instructions in chat system prompts (Anthropic)](https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-opus-5-5)
+- [Prompting Claude Sonnet 5.5 : Tool use in chat and knowledge work (Anthropic)](https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-sonnet-5-5)
+- [Prompting Claude Fable 5.1 : Formatting in chat (Anthropic)](https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5-1)
+- [Refusals and fallback : Keep reasoning in thinking blocks (Anthropic)](https://platform.claude.com/docs/en/build-with-claude/refusals-and-fallback)

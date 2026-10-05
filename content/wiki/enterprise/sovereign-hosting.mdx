@@ -1,104 +1,134 @@
 ---
-title: "Sovereign hosting & résidence des données"
-description: "EU Data Boundary, RGPD, HIPAA et SOC 2 Type II : héberger Claude en respectant la souveraineté."
-updatedAt: "2026-05-19"
-readingMinutes: 6
+title: "Sovereign hosting et résidence des données"
+description: "Où tournent réellement les requêtes Claude (API, Bedrock, Google Cloud, Foundry, Claude for Government) et comment respecter RGPD, HIPAA et SOC 2 en 2026."
+updatedAt: "2026-10-03"
+readingMinutes: 7
 ---
 
-La souveraineté numérique est devenue un pré-requis pour les organisations européennes, le secteur public et la santé. Déployer Claude tout en respectant la résidence des données, le RGPD, HIPAA et SOC 2 Type II est possible en combinant les bonnes régions cloud, les bons engagements contractuels et une architecture défensive.
+Pour une administration, un hôpital ou une entreprise européenne, la question n'est pas seulement « quel modèle ? » mais « où sont traitées et stockées les données ? ». Cet article fait le point, canal par canal, sur ce que vous pouvez réellement garantir avec Claude en octobre 2026, et sur les engagements contractuels à obtenir.
 
-## Cadre légal applicable
+## Le cadre à respecter
 
-Trois piliers structurent la conformité :
+- **RGPD** (UE) : base légale, minimisation, durée de conservation, encadrement des transferts hors UE, analyse d'impact (AIPD) pour les traitements à risque.
+- **HIPAA** (santé, États-Unis) : les données de santé identifiables (PHI) exigent un BAA (*Business Associate Agreement*) avec chaque sous-traitant.
+- **SOC 2 Type 2** : rapport d'audit indépendant sur l'efficacité des contrôles de sécurité pendant une période donnée.
+- **FedRAMP** (secteur public américain) : autorisation obligatoire pour les services cloud utilisés par les agences fédérales.
 
-- **RGPD** (UE) : minimisation, finalité, droits des personnes, transferts hors UE encadrés.
-- **HIPAA** (US santé) : PHI protégée, BAA obligatoire avec le sous-traitant.
-- **SOC 2 Type II** : audit indépendant des contrôles de sécurité sur 6 à 12 mois.
+Anthropic publie ses certifications (rapport SOC 2 Type 2, certificat ISO 27001, etc.) sur son **Trust Center** (`trust.anthropic.com`). Le DPA et, selon l'offre, un BAA se négocient avec l'équipe commerciale.
 
-Anthropic fournit un **DPA** (RGPD), un **BAA** (HIPAA, sur demande pour certaines offres) et publie son rapport **SOC 2 Type II** via son Trust Center.
+## Où tourne l'inférence, canal par canal
 
-## EU Data Boundary
+| Canal | Contrôle de la localisation | Résidence UE possible ? |
+|---|---|---|
+| API Claude (Anthropic) | Paramètre `inference_geo` : `"global"` (défaut) ou `"us"` | Non : seules les valeurs `us` et `global` existent |
+| Amazon Bedrock | Région de l'endpoint ou profil d'inférence | Oui, avec des régions et profils UE |
+| Google Cloud Agent Platform (ex-Vertex AI) | Région de l'endpoint | Oui, avec des régions UE |
+| Microsoft Foundry | Type de déploiement Azure | Selon le déploiement choisi |
+| Claude for Government | Environnement autorisé FedRAMP High | Non concerné (secteur public américain) |
 
-Pour rester dans la frontière européenne, deux options principales :
+Points clés :
 
-```yaml
-eu_residency:
-  option_1_vertex:
-    provider: gcp_vertex_ai
-    regions:
-      - europe-west1   # Belgique
-      - europe-west4   # Pays-Bas
-  option_2_bedrock:
-    provider: aws_bedrock
-    regions:
-      - eu-central-1   # Francfort
-      - eu-west-3      # Paris
-  option_3_api:
-    provider: anthropic_api
-    note: "Routage global, vérifier engagement contractuel EU-only"
+- Sur l'API Claude, `inference_geo: "us"` garantit une inférence aux États-Unis, facturée **1,1 fois** le tarif standard (modèles Claude 4.6 et suivants). La **workspace geo** (stockage au repos) n'existe aujourd'hui qu'en `"us"` et ne se change pas après création.
+- Sur Bedrock et Google Cloud, `inference_geo` ne s'applique pas : c'est l'URL de l'endpoint ou le profil d'inférence qui fixe la région.
+- Vérifiez toujours la **disponibilité du modèle** dans la région visée : tous les modèles n'arrivent pas en même temps dans toutes les régions.
+
+## Exemple : forcer une inférence UE
+
+Avec le SDK Python, la région se fixe à la création du client. Ne laissez jamais la région à une valeur par défaut implicite.
+
+```python
+from anthropic import AnthropicBedrock, AnthropicVertex
+
+# Bedrock, région Paris (vérifiez l'ID du modèle ou du profil UE dans la console AWS)
+bedrock = AnthropicBedrock(aws_region="eu-west-3")
+
+# Google Cloud, région Belgique
+vertex = AnthropicVertex(region="europe-west1", project_id="mon-projet-ue")
 ```
 
-Le choix Vertex ou Bedrock garantit que prompts et complétions ne quittent pas l'UE, sous condition d'utiliser exclusivement les régions européennes (forcer le `region` côté SDK).
+Pour Claude Code, le même principe passe par des variables d'environnement :
+
+```bash
+# Claude Code sur Bedrock, région UE
+export CLAUDE_CODE_USE_BEDROCK=1
+export AWS_REGION=eu-west-3
+
+# Ou sur Google Cloud, région UE
+export CLAUDE_CODE_USE_VERTEX=1
+export CLOUD_ML_REGION=europe-west1
+export ANTHROPIC_VERTEX_PROJECT_ID=mon-projet-ue
+```
+
+Un administrateur peut verrouiller ce choix avec le réglage géré `allowedProviders` (par exemple `["bedrock"]`), disponible depuis Claude Code v2.1.285 : une session pointée ailleurs est alors refusée.
+
+## Ce qui sort encore du périmètre
+
+Fixer la région d'inférence ne suffit pas. Claude Code envoie aussi du trafic annexe (vérifications de version, télémétrie, rapports d'erreurs) vers Anthropic et des services tiers :
+
+- `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1` coupe ce trafic non essentiel (et désactive les mises à jour automatiques : prévoyez un autre canal de mise à jour).
+- `DISABLE_TELEMETRY`, distribué via les **managed settings**, coupe la télémétrie pour toute l'organisation.
+- Si vous utilisez des clés de chiffrement gérées par le client (CMEK) et passez par une gateway ou un `ANTHROPIC_BASE_URL` personnalisé, la CMEK ne couvre pas la télémétrie opérationnelle de Claude Code : désactivez-la.
+- Les fonctions liées à claude.ai (sessions cloud, Remote Control, Slack) ne passent pas par votre cloud. Désactivez-les si le flux doit rester chez votre fournisseur.
+
+## Claude for Government (secteur public américain)
+
+Claude for Government est l'offre d'Anthropic pour les agences fédérales, étatiques et locales américaines et certaines organisations publiques éligibles. Elle est **généralement disponible depuis le 30 septembre 2026** et fonctionne dans un environnement **autorisé FedRAMP High**. L'application de bureau Claude for Government donne aussi accès à Claude Code et Cowork dans ce même environnement.
+
+Pour une organisation européenne, ce n'est pas une option de résidence UE. C'est en revanche un bon repère : un hébergement « souverain » se juge sur une autorisation formelle (FedRAMP, ou SecNumCloud en France) et un périmètre isolé, pas sur le seul choix d'une région.
 
 ## HIPAA et santé
 
-Pour traiter des informations de santé identifiables (PHI) aux US :
+1. Signez le BAA avec le fournisseur qui traite les PHI (AWS, Google Cloud, Microsoft ou Anthropic selon le canal).
+2. N'utilisez que des services et régions couverts par ce BAA.
+3. Activez la journalisation (CloudTrail, Cloud Audit Logs, Azure Monitor) et le chiffrement avec vos propres clés.
+4. Documentez le flux de PHI dans votre registre et votre analyse de risques.
 
-```bash
-# 1. Signer un BAA avec AWS (déjà actif sur la plupart des comptes)
-# 2. Activer les régions HIPAA-eligible
-aws bedrock list-foundation-models --region us-east-1
-
-# 3. Activer CloudTrail + KMS + chiffrement at-rest
-# 4. Documenter le flux PHI dans le registre des traitements
-```
-
-Bedrock est *HIPAA eligible* pour les modèles Claude lorsque le BAA AWS est en place. Côté Anthropic API, un BAA spécifique est négociable pour les offres Enterprise.
-
-## SOC 2 Type II : ce que cela couvre
-
-SOC 2 Type II atteste des contrôles **Security**, **Availability**, **Confidentiality**, **Processing Integrity** et **Privacy** sur une période d'audit (typiquement 12 mois).
-
-```json
-{
-  "soc2_trust_services_criteria": {
-    "security": ["access_control", "encryption", "vulnerability_mgmt"],
-    "availability": ["sla_monitoring", "dr_plan", "backup"],
-    "confidentiality": ["data_classification", "ndas", "least_privilege"],
-    "processing_integrity": ["change_mgmt", "qa_testing"],
-    "privacy": ["consent", "data_minimization", "retention"]
-  }
-}
-```
-
-Demander le rapport via `trust.anthropic.com` (NDA standard requis).
+Côté Anthropic, un BAA peut être conclu pour certaines offres commerciales. Vérifiez avec votre interlocuteur quelles fonctionnalités il couvre : certaines fonctions bêta ou outils serveur peuvent en être exclus.
 
 ## Architecture défensive recommandée
 
-Au-delà du choix de région, des couches additionnelles renforcent la posture :
-
 ```yaml
 defense_in_depth:
-  network:
-    - vpc_service_controls         # GCP
-    - privatelink_endpoints        # AWS
-    - egress_filtering
-  data:
-    - cmek_kms_byok
-    - tokenization_pii
-    - zero_data_retention
-  identity:
+  reseau:
+    - vpc_service_controls        # Google Cloud
+    - privatelink                 # AWS
+    - filtrage_egress
+  donnees:
+    - cmek_ou_byok
+    - pseudonymisation_des_pii_avant_envoi
+    - zero_data_retention_si_eligible
+  identite:
     - sso_saml_oidc
     - mfa_obligatoire
-    - just_in_time_access
+    - acces_juste_a_temps
   audit:
-    - siem_export
-    - immutable_logs
-    - dpia_documentee
+    - export_siem
+    - journaux_immuables
+    - aipd_documentee
 ```
+
+La pseudonymisation avant l'appel reste la mesure la plus efficace : une donnée qui n'est pas envoyée ne pose aucun problème de résidence.
+
+## Checklist de conformité
+
+1. Le canal et la région d'inférence sont choisis et verrouillés (code, variables, `allowedProviders`).
+2. Le modèle visé est disponible dans cette région.
+3. DPA signé, BAA si PHI, rapport SOC 2 Type 2 récupéré.
+4. Trafic non essentiel et télémétrie désactivés si nécessaire.
+5. Les durées de conservation sont documentées (voir [Confidentialité des données](/wiki/enterprise/data-privacy)).
 
 ## Pour aller plus loin
 
-- Trust Center Anthropic : DPA, BAA, SOC 2, ISO 27001/42001
-- CNIL : recommandations IA générative et RGPD
-- Articles wiki : `data-privacy`, `aws-bedrock`, `gcp-vertex`, `resilience-multi-cloud`
+- [Confidentialité des données : API, Enterprise et cloud](/wiki/enterprise/data-privacy)
+- [Déployer Claude sur Amazon Bedrock](/wiki/enterprise/aws-bedrock)
+- [Déployer Claude sur Google Cloud](/wiki/enterprise/gcp-vertex)
+- [Résilience multi-cloud](/wiki/enterprise/resilience-multi-cloud)
+
+## Sources
+
+- [Data residency (plateforme Claude)](https://platform.claude.com/docs/en/build-with-claude/data-residency)
+- [Enterprise deployment overview (Claude Code)](https://code.claude.com/docs/en/third-party-integrations)
+- [Connect Claude Code to an LLM gateway : trafic non essentiel](https://code.claude.com/docs/en/llm-gateway-connect)
+- [Security (Claude Code)](https://code.claude.com/docs/en/security)
+- [Anthropic Trust Center](https://trust.anthropic.com)
+- [Claude for Government (Anthropic)](https://www.anthropic.com/solutions/government)

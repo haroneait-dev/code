@@ -1,74 +1,133 @@
 ---
-title: "Prefilling (pré-remplissage de la réponse)"
-description: "Technique avancée pour dicter les premiers mots de la réponse de Claude et forcer un format strict comme JSON ou XML."
-updatedAt: "2026-05-19"
+title: "Prefilling : pourquoi il ne marche plus et par quoi le remplacer"
+description: "Le pré-remplissage de la réponse de Claude renvoie une erreur 400 sur tous les modèles depuis la génération 4.6 : quels modèles l'acceptent encore, et les alternatives officielles pour le JSON, les préambules, les continuations et la cohérence de rôle."
+updatedAt: "2026-10-03"
 readingMinutes: 6
 ---
 
-Le **prefilling** consiste à fournir à Claude le tout début de sa propre réponse via le rôle `assistant`. Au lieu de laisser Claude choisir comment commencer, vous lui imposez les premiers caractères. Le modèle continue alors la génération à partir de ce point — ce qui est l'une des techniques les plus puissantes (et sous-estimées) de l'API Anthropic pour garantir un format de sortie.
+Le *prefilling* consistait à écrire vous-même le début de la réponse de Claude, dans un dernier message `assistant`, pour qu'il continue à partir de là. Un simple `{` garantissait une réponse en JSON, sans préambule. **Cette technique n'est plus prise en charge sur les modèles récents** : la requête renvoie une erreur 400. Cet article explique ce qui a changé et comment obtenir le même résultat aujourd'hui.
 
-C'est particulièrement utile quand vous avez besoin d'une sortie machine-readable, quand Claude a tendance à ajouter du texte conversationnel ("Bien sûr ! Voici…"), ou quand vous voulez verrouiller un ton et une persona.
+## Ce qui a changé
 
-## Le principe en deux messages
+Selon la documentation d'Anthropic, depuis les modèles **Claude 4.6** (et Claude Mythos Preview), un message `assistant` pré-rempli en **dernière position** n'est plus accepté. La raison donnée : l'intelligence et le suivi des consignes ont tellement progressé que la plupart des usages du prefill n'en ont plus besoin.
 
-Un appel API classique contient un message `user`. Pour faire du prefilling, vous ajoutez un message `assistant` immédiatement après, partiellement rempli :
+| Modèle | Prefill en dernier tour |
+|---|---|
+| Fable 5.1, Mythos 5.1, Fable 5, Mythos 5 | Erreur 400 |
+| Opus 5.5, Opus 5, Opus 4.8, Opus 4.7, Opus 4.6 | Erreur 400 |
+| Sonnet 5.5, Sonnet 5, Sonnet 4.6 | Erreur 400 |
+| Haiku 4.5, Sonnet 4.5, Opus 4.5 et antérieurs | Encore accepté |
 
-```ts
-const response = await anthropic.messages.create({
-  model: "claude-sonnet-5-5",
-  max_tokens: 1024,
-  messages: [
-    { role: "user", content: "Donne-moi 3 ingrédients pour une pizza." },
-    { role: "assistant", content: "{" }
-  ]
-});
+Deux précisions :
+
+- Des messages `assistant` **ailleurs** dans la conversation (l'historique, des exemples de dialogue) ne posent aucun problème. Seul le dernier message pré-rempli est refusé.
+- Le prefill n'est **pas compatible** avec les sorties structurées, quel que soit le modèle.
+
+## L'ancienne technique, pour mémoire
+
+Sur Haiku 4.5, ce code fonctionne encore :
+
+```python
+import anthropic
+
+client = anthropic.Anthropic()
+
+response = client.messages.create(
+    model="claude-haiku-4-5-20251001",
+    max_tokens=500,
+    messages=[
+        {"role": "user", "content": "Extrayez nom et e-mail : Jean Martin, jean@exemple.fr"},
+        {"role": "assistant", "content": "{"},  # prefill
+    ],
+)
+
+texte = "{" + response.content[0].text  # le prefill n'est pas renvoyé
 ```
 
-Claude reprend exactement après `{` et produira directement le contenu d'un objet JSON. Pas de préambule, pas de markdown, pas d'explication.
+Le même appel avec `claude-sonnet-5-5` ou `claude-opus-5-5` échoue. Si vous maintenez une application qui utilise ce schéma, migrez-la avant de changer de modèle.
 
-## Forcer un JSON parfait
+## Les remplacements, cas par cas
 
-Le cas d'usage numéro 1 du prefilling, c'est la sortie structurée. Sans prefill, Claude entoure souvent son JSON de \`\`\`json … \`\`\`, ajoute un commentaire, ou commence par "Voici le JSON demandé :". Avec un prefill `{`, vous éliminez tout ça :
+### Forcer un format (JSON, YAML, classification)
 
-```ts
-messages: [
-  { role: "user", content: "Extrait nom, email, téléphone de ce texte: ..." },
-  { role: "assistant", content: "{" }
-]
+Utilisez les **sorties structurées** (`output_config.format`), conçues pour contraindre la réponse à un schéma JSON. Pour une classification, un outil avec un champ `enum` contenant vos étiquettes, ou une sortie structurée, fait le travail.
+
+```python
+response = client.messages.create(
+    model="claude-sonnet-5-5",
+    max_tokens=2000,
+    messages=[{"role": "user", "content": "Extrayez nom et e-mail : Jean Martin, jean@exemple.fr"}],
+    output_config={
+        "format": {
+            "type": "json_schema",
+            "schema": {
+                "type": "object",
+                "properties": {"nom": {"type": "string"}, "email": {"type": "string"}},
+                "required": ["nom", "email"],
+                "additionalProperties": False,
+            },
+        }
+    },
+)
 ```
 
-Vous récupérez ensuite la réponse en re-préfixant manuellement le `{` côté client avant `JSON.parse()`. C'est plus fiable que n'importe quel "réponds uniquement en JSON" dans le system prompt.
+Anthropic note aussi que les modèles récents respectent bien un schéma décrit dans le prompt, surtout avec une relance en cas d'échec. Détails dans [Formater la sortie](/wiki/prompt-engineering/output-format).
 
-## Forcer un format XML ou un tableau
+### Supprimer les préambules
 
-Le même principe marche pour les listes (`[`), les balises XML (`<analysis>`), les blocs de code (\`\`\`python), ou même un mot précis pour démarrer une réponse :
+Le prefill `Voici le résumé demandé :` servait à sauter l'introduction. Remplacement recommandé, dans le prompt système :
 
-```ts
-{ role: "assistant", content: "<thinking>" }
+```text
+Répondez directement, sans préambule. Ne commencez pas par des
+formules comme « Voici… » ou « D'après… ».
 ```
 
-Claude poursuivra dans cette balise jusqu'à fermer correctement. Très utile pour les pipelines de parsing XML.
+Autres options : demander la réponse dans une balise XML que votre code extrait, utiliser une sortie structurée, ou retirer en post-traitement le préambule qui passerait encore.
 
-## Verrouiller une persona ou un refus
+### Éviter les refus injustifiés
 
-Le prefilling sert aussi à orienter le ton. Pour une persona "Sherlock Holmes" :
+Le prefill servait parfois à « pousser » le modèle à répondre. Selon Anthropic, les modèles actuels refusent beaucoup plus à bon escient : une demande claire dans le message `user`, avec son contexte légitime, suffit.
 
-```ts
-{ role: "assistant", content: "*ajuste sa pipe* Élémentaire," }
+### Reprendre une réponse interrompue
+
+Déplacez la continuation dans le message utilisateur, avec la fin du texte déjà obtenu :
+
+```text
+Votre réponse précédente a été interrompue. Elle se terminait par :
+« …et c'est pourquoi la clause 4 doit être renégociée ». Reprenez
+exactement là où vous vous êtes arrêté.
 ```
 
-Claude continuera dans ce registre. Inversement, pour empêcher un refus ou une digression sur un sujet sensible (dans un cadre légitime), un prefill comme `"Voici la réponse : "` force le modèle à entrer directement dans le vif du sujet.
+Si l'interruption vient d'une erreur et que l'expérience utilisateur le permet, relancer simplement la requête est souvent plus simple.
 
-## Limites à connaître
+### Maintenir un rôle ou rappeler du contexte
 
-Le prefill ne fait **pas** partie de la réponse retournée par l'API : Claude renvoie uniquement ce qu'il génère après. Pensez donc à re-concaténer le prefill côté client si vous en avez besoin.
+Pour les très longues conversations, placez les rappels dans le tour **utilisateur** (ou dans un message système en cours de conversation) plutôt que dans un faux début de réponse. Dans un système agentique, exposez le contexte via des outils ou laissez la compaction côté serveur gérer l'historique.
 
-Évitez aussi les prefills trop longs ou trop directifs : si vous écrivez la moitié de la réponse vous-même, vous perdez la valeur du modèle. Le sweet spot, c'est 1 à 10 caractères qui verrouillent le format sans contraindre le fond.
+## Et dans claude.ai ?
 
-Enfin, le prefill ne peut pas se terminer par un espace en fin de chaîne (l'API renvoie une erreur). Utilisez `{`, `[`, `<balise>` ou une lettre — pas `"Voici : "`.
+L'interface n'a jamais proposé de prefill. L'équivalent est une consigne explicite dans votre message :
+
+```text
+Commencez directement par le tableau, sans phrase d'introduction.
+Colonnes : produit, prix, délai de livraison.
+```
+
+ou, pour un texte à réutiliser tel quel :
+
+```text
+Donnez uniquement le texte de l'e-mail, sans commentaire avant ni
+après, pour que je puisse le copier directement.
+```
 
 ## Pour aller plus loin
 
-- Documentation officielle Anthropic : "Prefill Claude's response"
-- Combiner prefill + tool use pour des sorties ultra-déterministes
-- Voir aussi l'article Meta-Prompting pour générer le prefill optimal automatiquement
+- [Formater la sortie](/wiki/prompt-engineering/output-format)
+- [Anti-patterns](/wiki/prompt-engineering/anti-patterns)
+- [Prompter les modèles Claude 5.5](/wiki/prompt-engineering/prompting-sonnet-5)
+- [Tool use](/wiki/api/tool-use)
+
+## Sources
+
+- [Prompting best practices : Migrating away from prefilled responses (Anthropic)](https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/claude-prompting-best-practices)
+- [Structured outputs (Anthropic)](https://platform.claude.com/docs/en/build-with-claude/structured-outputs)

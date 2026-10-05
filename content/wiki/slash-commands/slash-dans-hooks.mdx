@@ -1,131 +1,141 @@
 ---
-title: "Déclencher des slash commands depuis un hook"
-description: "Combiner hooks et slash commands pour automatiser les workflows Claude Code."
-updatedAt: "2026-05-19"
-readingMinutes: 5
+title: "Hooks et commandes personnalisées : les faire travailler ensemble"
+description: "Filtrer ou enrichir une commande /nom avec UserPromptExpansion, attacher des hooks à un skill, ou lancer un skill depuis un hook avec claude -p sans boucle infinie."
+updatedAt: "2026-10-03"
+readingMinutes: 7
 ---
 
-Les hooks de Claude Code exécutent du code à des moments précis du cycle de vie d'une session (avant un tool, après un edit, à la fin d'une session...). Combinés aux slash commands, ils permettent d'automatiser des workflows complexes sans intervention manuelle : un audit sécurité après chaque commit, un compact automatique au bout de N minutes, un rappel des conventions à chaque démarrage.
+Un hook ne peut pas « taper » une commande `/nom` dans votre session à votre place. En revanche, hooks et commandes personnalisées (skills) se combinent de quatre façons utiles : intercepter une commande au moment où vous la tapez, embarquer des hooks dans un skill, demander à Claude de lancer un skill, ou exécuter un skill dans une session séparée avec `claude -p`. Cet article présente chaque approche et ses pièges.
 
-## Le pattern de base
+## Rappel : le format d'un hook
 
-Un hook est défini dans `settings.json` (projet ou utilisateur). Pour déclencher une slash command, le hook lance un sous-process `claude` en mode non-interactif avec la commande en argument :
-
-```json
-{
-  "hooks": {
-    "Stop": [
-      {
-        "command": "claude -p '/cost' >> .claude/cost.log"
-      }
-    ]
-  }
-}
-```
-
-Ce hook logue le coût de chaque session à la fermeture. Le flag `-p` (print) exécute la commande et sort, sans ouvrir de REPL.
-
-## Hooks utiles disponibles
-
-Selon la version de Claude Code, les principaux événements hookables sont :
-
-- `SessionStart` : au démarrage d'une session
-- `Stop` : à la fin d'une session
-- `PreToolUse` / `PostToolUse` : avant/après un appel de tool
-- `UserPromptSubmit` : juste après que l'utilisateur a envoyé un message
-- `PreCompact` / `PostCompact` : autour de la compaction
-- `SubagentStop` : à la fin d'un sub-agent
-
-Chaque hook reçoit des données contextuelles (nom du tool, arguments, etc.) sur `stdin` au format JSON, et peut renvoyer une décision (autoriser, bloquer, modifier).
-
-## Exemple : audit sécurité après chaque commit
+Les hooks se déclarent dans `settings.json` (`~/.claude/settings.json`, `.claude/settings.json` ou `.claude/settings.local.json`). Le format a trois niveaux : l'événement, un groupe avec un `matcher` facultatif, puis une liste de handlers qui ont chacun un `type`.
 
 ```json
 {
   "hooks": {
     "PostToolUse": [
       {
-        "matcher": "Bash",
-        "command": "if jq -r '.tool_input.command' | grep -q 'git commit'; then claude -p '/security-review' --output-format text; fi"
+        "matcher": "Write|Edit",
+        "hooks": [
+          { "type": "command", "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/format.sh" }
+        ]
       }
     ]
   }
 }
 ```
 
-Dès que Claude exécute un `git commit`, le hook relance Claude en sous-session pour exécuter `/security-review`. Le résultat est imprimé dans le terminal sans bloquer la session principale.
+Une erreur fréquente dans les anciens tutoriels : mettre `"command"` directement sous l'événement, sans le tableau `hooks` ni le champ `type`. Ce format n'est pas reconnu.
 
-## Exemple : reprendre la session précédente automatiquement
+Autre confusion courante : `Stop` se déclenche à la fin de **chaque réponse** de Claude, pas à la fermeture de la session. Pour la fin de session, l'événement est `SessionEnd`.
 
-`SessionStart` peut détecter si une session récente existe et proposer un `/resume`. Plus simple : afficher un rappel des conventions à chaque démarrage :
+| Événement | Quand | Utile ici pour |
+| --- | --- | --- |
+| `UserPromptExpansion` | Quand une commande `/nom` tapée se transforme en prompt | Bloquer ou enrichir une commande précise |
+| `UserPromptSubmit` | À chaque prompt envoyé | Ajouter du contexte à tous les prompts |
+| `PostToolUse` | Après un appel d'outil réussi | Réagir à un `git commit` |
+| `Stop` | Quand Claude a fini de répondre | Demander à Claude de continuer |
+| `SessionStart` / `SessionEnd` | Début / fin de session | Contexte initial, nettoyage |
+
+La liste complète des événements est dans [Le cycle de vie des hooks](/wiki/hooks/hook-lifecycle).
+
+## 1. Intercepter une commande avec `UserPromptExpansion`
+
+`UserPromptExpansion` se déclenche quand une commande que vous tapez (skill, commande de `.claude/commands/` ou prompt MCP) est développée en prompt, avant d'arriver à Claude. Le `matcher` porte sur le nom de la commande. C'est le seul moyen de filtrer un `/nom` tapé directement : un hook `PreToolUse` sur l'outil `Skill` ne voit que les invocations faites par Claude.
+
+Exemple : bloquer `/deploy` tant qu'un fichier d'approbation n'existe pas.
 
 ```json
 {
   "hooks": {
-    "SessionStart": [
+    "UserPromptExpansion": [
       {
-        "command": "cat .claude/welcome.txt"
+        "matcher": "deploy",
+        "hooks": [
+          { "type": "command", "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/check-deploy.sh" }
+        ]
       }
     ]
   }
 }
 ```
 
-Et `.claude/welcome.txt` :
+`.claude/hooks/check-deploy.sh` :
 
+```bash
+#!/bin/bash
+if [ ! -f "$CLAUDE_PROJECT_DIR/.deploy-approved" ]; then
+  echo "Déploiement non approuvé : créez .deploy-approved d'abord." >&2
+  exit 2
+fi
+exit 0
 ```
-Bienvenue ! Rappels :
-- /clear entre chaque feature
-- /security-review avant chaque PR
-- Slash commands disponibles : /db:migrate, /pr:review, /release
+
+Le code de sortie 2 bloque l'expansion et affiche le message d'erreur. Le hook reçoit aussi sur stdin un JSON avec `command_name`, `command_args` et `command_source`, que vous pouvez lire avec `jq`.
+
+Pour enrichir au lieu de bloquer, renvoyez du contexte supplémentaire, par exemple la checklist de revue de l'équipe :
+
+```bash
+#!/bin/bash
+jq -n --rawfile checklist "$CLAUDE_PROJECT_DIR/docs/checklist-revue.md" '{
+  hookSpecificOutput: {
+    hookEventName: "UserPromptExpansion",
+    additionalContext: $checklist
+  }
+}'
 ```
 
-## Exemple : déclencher une commande custom depuis un hook
+## 2. Embarquer des hooks dans un skill
 
-Vous pouvez aussi lancer vos propres slash commands. Disons que vous avez `.claude/commands/log-decision.md` :
+Un skill peut déclarer ses propres hooks dans son frontmatter. Ils s'activent quand le skill est invoqué et restent actifs jusqu'à la fin de la session. Avec `once: true`, un hook est retiré après sa première exécution réussie.
+
+`.claude/skills/migration-db/SKILL.md` :
 
 ```md
 ---
-description: "Loggue une décision technique dans DECISIONS.md"
+description: Écrit une migration Supabase et vérifie le SQL avant chaque commande
+disable-model-invocation: true
+hooks:
+  PreToolUse:
+    - matcher: "Bash"
+      hooks:
+        - type: command
+          command: "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/refuser-drop.sh"
 ---
 
-Résume la dernière décision technique prise dans cette conversation
-et ajoute-la à `DECISIONS.md` avec date + auteur.
+Créez une migration pour : $ARGUMENTS
+Activez RLS sur toute nouvelle table.
 ```
 
-Hook qui l'appelle automatiquement à la fin de session :
+C'est la bonne approche quand une règle doit être appliquée à chaque fois pendant le travail du skill, et pas seulement « suggérée » dans le texte. Voir [Le frontmatter en détail](/wiki/slash-commands/markdown-frontmatter).
 
-```json
-{
-  "hooks": {
-    "Stop": [
-      { "command": "claude -p '/log-decision'" }
-    ]
-  }
-}
-```
+## 3. Demander à Claude de lancer un skill
 
-## Subtilités à connaître
-
-1. **Coût** : chaque déclenchement de `claude -p` est une nouvelle session avec son propre contexte et donc sa propre facture. Évitez les hooks `PostToolUse` qui se déclenchent à chaque appel sans filtre.
-
-2. **Récursion** : un hook qui appelle Claude qui à son tour déclenche le même hook = boucle infinie. Toujours conditionner ou utiliser des variables d'environnement pour casser la récursion :
+Un hook `Stop` peut empêcher Claude de s'arrêter et lui donner une consigne. Si le skill est invocable par Claude (pas de `disable-model-invocation: true`), Claude peut alors l'appeler lui-même.
 
 ```bash
-if [ -z "$CLAUDE_HOOK_RUNNING" ]; then
-  CLAUDE_HOOK_RUNNING=1 claude -p '/audit'
+#!/bin/bash
+# .claude/hooks/rappel-changelog.sh, branché sur Stop
+input=$(cat)
+# Évite de relancer Claude en boucle
+if [ "$(echo "$input" | jq -r '.stop_hook_active')" = "true" ]; then
+  exit 0
 fi
+if git diff --name-only | grep -q '^src/' && ! git diff --name-only | grep -q 'CHANGELOG.md'; then
+  jq -n '{hookSpecificOutput: {hookEventName: "Stop",
+    additionalContext: "Du code a changé dans src/ sans entrée de changelog. Invoquez le skill changelog avant de terminer."}}'
+fi
+exit 0
 ```
 
-3. **Permissions** : la sous-session a sa propre config de permissions. Si elle a besoin de tools sensibles, pré-autorisez-les ou passez `--allow Bash(...)`.
+Vérifiez toujours `stop_hook_active` : il vaut `true` quand Claude continue déjà à cause d'un hook `Stop`. Claude Code plafonne de toute façon à 8 relances consécutives.
 
-4. **Timeout** : les hooks ont une limite de temps. Pour des audits longs, utilisez une variante asynchrone : lancez la commande en background et écrivez le résultat dans un fichier que vous lirez plus tard.
+## 4. Exécuter un skill dans une session séparée avec `claude -p`
 
-```bash
-nohup claude -p '/security-review' > .claude/last-audit.md 2>&1 &
-```
+En mode non interactif, les skills et commandes personnalisées fonctionnent : `claude -p "/nom arguments"` développe la commande puis l'exécute. Un hook peut donc lancer une seconde session, indépendante de la vôtre.
 
-## Pattern complet : audit auto + résumé
+Exemple : une revue en arrière-plan après chaque `git commit` lancé par Claude.
 
 ```json
 {
@@ -133,22 +143,57 @@ nohup claude -p '/security-review' > .claude/last-audit.md 2>&1 &
     "PostToolUse": [
       {
         "matcher": "Bash",
-        "command": "if jq -r '.tool_input.command' | grep -qE 'git (commit|push)'; then (claude -p '/review' > .claude/review-$(date +%s).md &); fi"
-      }
-    ],
-    "Stop": [
-      {
-        "command": "ls .claude/review-*.md 2>/dev/null | tail -1 | xargs -I {} cat {}"
+        "hooks": [
+          {
+            "type": "command",
+            "if": "Bash(git commit *)",
+            "async": true,
+            "command": "claude -p '/revue-commit' --settings '{\"disableAllHooks\": true}' > \"$CLAUDE_PROJECT_DIR\"/.claude/derniere-revue.md 2>&1"
+          }
+        ]
       }
     ]
   }
 }
 ```
 
-À la fin de la session, le dernier rapport de revue généré en arrière-plan est affiché. Vous voyez les remarques sans interrompre votre flow pendant le travail.
+Ce qui compte ici :
+
+- **`if`** filtre sur la commande Bash elle-même, sans avoir à parser le JSON avec `jq` ;
+- **`async: true`** lance le hook en arrière-plan : Claude continue de travailler. La sortie du hook lui est transmise au tour suivant ;
+- **`--settings '{"disableAllHooks": true}'`** coupe les hooks dans la session enfant. Sans cela, la session `claude -p` charge les mêmes hooks de projet et peut se relancer elle-même ;
+- **`/revue-commit`** est un skill du projet. Évitez `--bare` ici : ce mode ne charge ni les skills ni les commandes personnalisées.
+
+### Le cas `SessionEnd`
+
+Les hooks `SessionEnd` disposent par défaut de 1,5 seconde au total. Une revue ne tiendra jamais dans ce délai : lancez un processus complètement détaché.
+
+```bash
+nohup claude -p '/journal-decisions' --settings '{"disableAllHooks": true}' \
+  > .claude/journal.log 2>&1 &
+```
+
+Attention : la session enfant ne voit pas votre conversation. Un skill qui dit « résumez la dernière décision prise dans cette conversation » ne fonctionnera pas. Donnez-lui une source qu'elle peut lire (le `git log`, un fichier de notes) ou passez le chemin du transcript, présent dans le JSON reçu par le hook (`transcript_path`).
+
+## Pièges à connaître
+
+1. **Coût** : chaque `claude -p` est une session complète, facturée en plus de la vôtre. Ne branchez jamais un `claude -p` sur un `PostToolUse` sans filtre `if` ou `matcher`.
+2. **Permissions** : la session enfant applique ses propres règles. En `-p`, aucune demande de confirmation n'est possible. Pré-autorisez les outils nécessaires avec `--allowedTools` ou avec `allowed-tools` dans le skill.
+3. **Sortie de `SessionStart`** : ce qu'un hook `SessionStart` écrit sur stdout part dans le contexte de Claude, pas dans votre terminal. Pour des rappels destinés à Claude, c'est parfait ; pour vous, utilisez plutôt `CLAUDE.md` ou la ligne de statut.
+4. **Délais** : le délai par défaut d'un hook `command` est de 600 secondes, mais 30 secondes sur `UserPromptSubmit`. Un hook bloquant trop long fige la session.
+5. **Mode `-p` du parent** : si votre session principale tourne elle-même en `-p`, les hooks `async` encore actifs à la fin sont tués. Détachez le processus s'il doit survivre.
+
+Pour vérifier ce qui est configuré, `/hooks` ouvre la liste des hooks actifs et leur origine. Pour générer la configuration sans éditer le JSON à la main, le skill intégré `/update-config` modifie le bon fichier `settings.json` à partir d'une description.
 
 ## Pour aller plus loin
 
-- Doc officielle des hooks : https://docs.claude.com/en/docs/claude-code/hooks
-- Doc des slash commands : https://docs.claude.com/en/docs/claude-code/slash-commands
-- Skill `update-config` pour générer ces hooks sans éditer le JSON à la main
+- [Introduction aux hooks](/wiki/hooks/introduction-hooks)
+- [UserPromptSubmit](/wiki/hooks/user-prompt-submit)
+- [Hooks SessionStart et Stop](/wiki/hooks/session-start-stop)
+- [Créer une commande personnalisée](/wiki/slash-commands/creer-slash-command)
+
+## Sources
+
+- [Hooks reference](https://code.claude.com/docs/en/hooks)
+- [Skills](https://code.claude.com/docs/en/skills)
+- [Run Claude Code programmatically (headless)](https://code.claude.com/docs/en/headless)

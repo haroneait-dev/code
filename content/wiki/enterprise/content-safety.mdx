@@ -1,63 +1,141 @@
 ---
-title: "Filtres de modération et Content Safety"
-description: "Guardrails Anthropic pour contenus toxiques/illégaux : politiques d'usage, classifieurs internes et stratégies de défense en profondeur."
-updatedAt: "2026-05-19"
-readingMinutes: 6
+title: "Modération et content safety avec Claude"
+description: "Comment Claude refuse un contenu (refus du modèle, classifieurs, stop_reason refusal), comment traiter ces refus dans votre code et quels garde-fous ajouter côté application."
+updatedAt: "2026-10-03"
+readingMinutes: 7
 ---
 
-La sécurité du contenu est un pilier incontournable de tout déploiement Claude en entreprise. Au-delà du modèle lui-même, Anthropic applique une chaîne de filtres et de politiques qui définissent ce que l'API peut produire, refuser, ou signaler. Comprendre ces garde-fous permet de construire des applications qui respectent à la fois la Usage Policy d'Anthropic et les obligations réglementaires de votre secteur (RGPD, DSA, AI Act, normes sectorielles).
+Claude intègre ses propres protections, mais elles ne remplacent pas la politique de modération de votre application. Cet article explique les trois façons dont l'API refuse un contenu, comment les gérer proprement dans le code, puis comment ajouter vos propres garde-fous et une traçabilité exploitable pour le RGPD, le DSA ou l'AI Act.
 
-## Les couches de Content Safety chez Anthropic
+## Les couches de protection côté Anthropic
 
-Claude est entraîné via Constitutional AI : les sorties indésirables (haineuses, dangereuses, sexuelles non consenties, instructions pour des armes CBRN, etc.) sont activement pénalisées pendant l'entraînement. Mais ce filtrage intrinsèque est complété par des classifieurs en aval qui scorent chaque réponse avant qu'elle ne soit livrée à votre application. Ces classifieurs peuvent déclencher un refus, un raffinement, ou un drapeau de modération transmis dans la réponse de l'API.
+1. **L'entraînement du modèle.** Claude est entraîné (notamment via l'approche Constitutional AI) à refuser les demandes dangereuses. Ces refus arrivent comme une réponse texte normale.
+2. **Les classifieurs de sécurité.** Sur les modèles récents (Fable 5.1, Fable 5, Opus 5.5, Opus 5, Sonnet 5.5), des classifieurs peuvent interrompre une réponse. L'API renvoie alors `stop_reason: "refusal"`.
+3. **La validation d'entrée.** Certaines requêtes sont rejetées avant le modèle, avec une erreur HTTP 400.
+4. **La politique d'usage.** La [Usage Policy](https://www.anthropic.com/legal/aup) d'Anthropic définit ce qui est interdit, quel que soit votre prompt système.
 
-Pour les workloads sensibles, vous pouvez aussi activer la Usage Policy Reporting via votre compte Console : les violations répétées d'une politique remontent dans les logs d'audit et peuvent suspendre une clé API.
+| Type de refus | Ce que vous recevez | Quand |
+|---|---|---|
+| Refus du modèle | Réponse texte standard | Le modèle décline lui-même |
+| Refus d'un classifieur | HTTP 200, `stop_reason: "refusal"` | Pendant la génération, y compris en streaming |
+| Validation d'entrée | Erreur HTTP 400 | Avant la génération |
 
-## Catégories de contenu surveillées
+## Lire un refus de classifieur
 
-Anthropic publie une taxonomie publique. Les catégories principales :
+Un refus de classifieur n'est **pas une erreur HTTP**. Un monitoring basé uniquement sur les taux d'erreur ne le verra pas. La réponse contient un objet `stop_details` :
 
-- **CSAM, contenu sexuel impliquant des mineurs** — tolérance zéro, blocage absolu.
-- **Conseils opérationnels armes CBRN** (chimique, biologique, radiologique, nucléaire).
-- **Discours haineux ciblé**, harcèlement, incitation à la violence.
-- **Activités illégales** spécifiques selon juridiction (fraude, vente d'armes, etc.).
-- **Manipulation politique** et désinformation à grande échelle.
-- **Privacy violations** — révélation de PII sans consentement.
+```json
+{
+  "role": "assistant",
+  "content": [],
+  "stop_reason": "refusal",
+  "stop_details": {
+    "type": "refusal",
+    "category": "cyber",
+    "explanation": "This request was declined because it could enable cyber harm."
+  }
+}
+```
 
-Chaque catégorie a un seuil d'action différent : certaines déclenchent un refus systématique, d'autres une réponse modulée selon le contexte (recherche académique vs déploiement grand public).
+Catégories documentées : `cyber`, `bio`, `frontier_llm`, `reasoning_extraction` et `general_harms`. Les champs `category` et `explanation` peuvent valoir `null` : branchez votre logique sur `stop_reason`, pas sur la catégorie, et prévoyez votre propre message pour l'utilisateur.
 
-## Construire vos propres guardrails applicatifs
+Trois règles pratiques :
 
-Les garde-fous Anthropic ne dispensent pas de filtres maison. Pour un assistant client par exemple, vous devez ajouter :
+- **Jetez toute sortie partielle.** Un refus peut arriver en plein streaming, après quelques tokens.
+- **Ne renvoyez pas la même conversation au même modèle.** Retirez ou reformulez le tour qui a déclenché le refus, ou réinitialisez le contexte.
+- **Comptez les refus comme un signal à part** dans vos tableaux de bord, y compris dans les résultats de la Batch API (un refus y apparaît comme un résultat réussi).
 
-- Un **pré-filtre d'entrée** qui détecte les requêtes manifestement abusives avant de payer un appel Claude.
-- Un **post-filtre de sortie** qui re-classifie la réponse selon vos critères métier (mentions de concurrents, conseils juridiques, promesses commerciales).
-- Une **politique de fallback** : que renvoyer si le filtre rejette ? Un message générique, une escalade humaine, un log enrichi.
+## Gérer le refus dans le code
 
-L'approche la plus robuste reste de chaîner un petit modèle classifieur (Claude Haiku, ou un modèle dédié comme Llama Guard) en amont et en aval, plutôt que de tout faire faire au modèle principal.
+```python
+import anthropic
 
-## Logging et audit pour la conformité
+client = anthropic.Anthropic()
 
-Pour le DSA et l'AI Act, vous devez démontrer un dispositif de modération traçable. Conservez (avec rotation appropriée) :
+def ask(messages):
+    response = client.messages.create(
+        model="claude-sonnet-5-5",
+        max_tokens=1024,
+        messages=messages,
+    )
+    if response.stop_reason == "refusal":
+        details = response.stop_details
+        category = getattr(details, "category", None)
+        log_refusal(category)  # votre journalisation
+        return "Je ne peux pas répondre à cette demande. Reformulez-la ou contactez le support."
+    return response.content[0].text
+```
 
-- Le hash du prompt utilisateur.
-- Le verdict du filtre d'entrée et la justification.
-- La catégorie remontée par Claude si refus.
-- L'action prise côté application.
+Pour les faux positifs (un travail légitime de cybersécurité ou de biologie peut déclencher un classifieur), l'API propose en bêta un **repli serveur** : avec `fallbacks: "default"` et l'en-tête bêta `server-side-fallback-2026-07-01`, la requête refusée est relancée sur le modèle recommandé pour cette catégorie. Ce repli n'existe pas sur Bedrock, Google Cloud ni Foundry ; utilisez-y le middleware des SDK.
 
-Stockez ces logs hors du contexte conversationnel pour respecter la minimisation des données et facilitez l'export pour les régulateurs.
+**Facturation** : un refus survenu avant toute sortie est facturé seulement pour certaines catégories (`bio`, `frontier_llm`, `reasoning_extraction` en septembre 2026). Il compte toujours dans vos limites de débit.
 
-## Tests adversariaux et red-teaming continu
+## Vos garde-fous applicatifs
 
-Un guardrail qui n'est pas testé est un guardrail théorique. Mettez en place :
+Les protections d'Anthropic couvrent les abus graves, pas vos règles métier (mentions de concurrents, conseils juridiques, promesses commerciales, ton de marque). Ajoutez :
 
-- Un corpus de prompts adversariaux versionné (jailbreaks publics + prompts métier sensibles).
-- Une CI qui rejoue ce corpus à chaque mise à jour de modèle ou de system prompt.
-- Un canal de signalement interne pour que les opérateurs remontent les outputs problématiques.
+- **Un filtre d'entrée** : un petit modèle rapide (par exemple Claude Haiku 4.5) classe la demande avant l'appel principal. Contraignez sa réponse avec des sorties structurées pour obtenir un booléen exploitable.
+- **Un filtre de sortie** : le même principe appliqué à la réponse, selon vos critères métier.
+- **Une politique de repli** : message générique, escalade vers un humain, ou blocage temporaire des utilisateurs récidivistes.
+
+Exemple de filtre d'entrée inspiré de la documentation officielle :
+
+```python
+SCREEN_PROMPT = """Un utilisateur a soumis ce contenu :
+<content>
+{content}
+</content>
+
+Ce contenu concerne-t-il des activités dangereuses, illégales ou explicites ?"""
+
+screen = client.messages.create(
+    model="claude-haiku-4-5-20251001",
+    max_tokens=100,
+    messages=[{"role": "user", "content": SCREEN_PROMPT.format(content=user_input)}],
+    output_config={
+        "format": {
+            "type": "json_schema",
+            "schema": {
+                "type": "object",
+                "properties": {"is_harmful": {"type": "boolean"}},
+                "required": ["is_harmful"],
+                "additionalProperties": False,
+            },
+        }
+    },
+)
+```
+
+Des classifieurs open source spécialisés (par exemple Llama Guard) sont une alternative quand vous voulez un filtre auto-hébergé.
+
+## Journalisation et audit
+
+Pour démontrer un dispositif de modération traçable, conservez, avec une durée de rétention définie :
+
+- un identifiant ou un hash de la requête (pas forcément le texte complet, par minimisation) ;
+- le verdict de vos filtres et la règle appliquée ;
+- le `stop_reason` et la catégorie éventuelle renvoyés par Claude ;
+- l'identifiant de requête de l'API, utile si vous contactez le support ;
+- l'action prise côté application.
+
+Stockez ces journaux hors du contexte conversationnel et documentez-les dans votre registre de traitements.
+
+## Tests adversariaux continus
+
+- Constituez un corpus versionné de prompts sensibles (abus connus et cas métier limites).
+- Rejouez-le en CI à chaque changement de modèle ou de prompt système.
+- Mesurez à la fois les contenus qui passent à tort et les refus injustifiés : un filtre trop strict dégrade l'expérience autant qu'un filtre trop laxiste.
 
 ## Pour aller plus loin
 
-- Usage Policy officielle Anthropic et taxonomie de risques.
-- Llama Guard 3 et Prompt Guard de Meta pour classifieurs open source.
-- AI Act européen, articles relatifs aux systèmes à haut risque.
-- Documentation Anthropic sur les `stop_reason` et codes de modération.
+- [Détection des prompt injections](/wiki/enterprise/prompt-injection-enterprise)
+- [Threat modeling pour agents autonomes](/wiki/enterprise/threat-modeling-agents)
+- [Best practices production](/wiki/api/best-practices-production)
+- [Données sensibles](/wiki/workflows/donnees-sensibles)
+
+## Sources
+
+- [Handle streaming refusals (plateforme Claude)](https://platform.claude.com/docs/en/test-and-evaluate/strengthen-guardrails/handle-streaming-refusals)
+- [Refusals and fallback (plateforme Claude)](https://platform.claude.com/docs/en/build-with-claude/refusals-and-fallback)
+- [Mitigate jailbreaks and prompt injections (plateforme Claude)](https://platform.claude.com/docs/en/test-and-evaluate/strengthen-guardrails/mitigate-jailbreaks)
+- [Usage Policy d'Anthropic](https://www.anthropic.com/legal/aup)

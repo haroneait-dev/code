@@ -1,73 +1,120 @@
 ---
-title: "Migrer depuis Cursor ou Copilot"
-description: "Comprendre les différences de paradigme et adopter Claude Code en venant de Cursor ou GitHub Copilot."
-updatedAt: "2026-05-19"
-readingMinutes: 8
+title: "Migrer depuis Cursor ou GitHub Copilot"
+description: "Importer vos règles et serveurs MCP avec /import et /init, faire correspondre les notions de Cursor et Copilot à celles de Claude Code, et changer de façon de travailler."
+updatedAt: "2026-10-03"
+readingMinutes: 7
 ---
 
-Cursor et GitHub Copilot sont des IDE qui intègrent un assistant IA. **Claude Code est un agent terminal** : il vit dans votre shell, exécute des commandes, modifie des fichiers et planifie des tâches multi-étapes. La transition demande un ajustement mental — moins d'autocomplétion inline, plus de délégation explicite.
+Vous utilisez Cursor ou GitHub Copilot et vous voulez essayer Claude Code ? Bonne nouvelle : Claude Code sait importer une partie de votre configuration, et il s'installe dans les mêmes éditeurs. Ce guide montre quoi récupérer, comment les notions se correspondent, et quelles habitudes changer.
 
-## Différences fondamentales
+## Ce qui change vraiment
 
-| Dimension | Copilot | Cursor | Claude Code |
-|-----------|---------|--------|-------------|
-| Interface | IDE | IDE | Terminal |
-| Mode dominant | Complétion inline | Chat + complétion | Agent autonome |
-| Exécution commandes | ❌ | ⚠️ partiel | ✅ natif |
-| Édition multi-fichiers | ❌ | ✅ | ✅ |
-| Sessions persistantes | ❌ | ❌ | ✅ (`/resume`) |
-| Hooks/automation | ❌ | ⚠️ | ✅ riche |
-| Modèles | GPT/Claude | GPT/Claude/Gemini | Claude uniquement |
+Cursor et Copilot ont aujourd'hui eux aussi des modes agent. La différence tient moins aux capacités qu'à l'organisation du travail :
 
-Là où Copilot complète une ligne, Claude Code fait toute la tâche : il lit le fichier, comprend le contexte, modifie plusieurs fichiers, lance les tests et corrige les erreurs.
+| | Cursor / Copilot | Claude Code |
+|---|---|---|
+| Point de départ | L'éditeur, avec un agent intégré | Un agent, disponible dans le terminal, l'IDE, l'application de bureau et le web |
+| Complétion ligne à ligne (Tab) | Oui, au cœur de l'outil | Non : Claude Code travaille par tâches |
+| Modèles | Plusieurs fournisseurs | Modèles Claude uniquement (Opus 5.5 par défaut) |
+| Configuration | Fichiers de règles de l'éditeur | `CLAUDE.md`, `.claude/settings.json`, skills, hooks, sous-agents, plugins |
+| Automatisation hors éditeur | Variable selon l'offre | Mode non interactif `claude -p`, GitHub Actions, routines cloud |
 
-## Changer ses habitudes
+Beaucoup de développeurs gardent d'ailleurs les deux : la complétion de leur éditeur pour la frappe, Claude Code pour les tâches de plusieurs fichiers.
 
-### Penser en tâches, pas en lignes
+## Étape 1 : importer votre configuration
 
-Plutôt que d'attendre l'autocomplétion, formulez une intention :
+### Depuis Cursor : `/import`
 
-```bash
-# Avant (Copilot mental model)
-# Tab tab tab pour générer ligne par ligne
+Dans une session Claude Code ouverte à la racine du projet :
 
-# Après (Claude Code)
-> Ajoute un endpoint POST /api/users qui valide l'email avec Zod
-> et insère dans Supabase. Mets aussi à jour le client TS.
+```text
+/import cursor --dry-run
 ```
 
-### Laisser Claude exécuter
+`--dry-run` affiche ce qui serait importé sans rien écrire. Relancez ensuite sans l'option pour confirmer. `/import` récupère les fichiers d'instructions, les serveurs MCP, les commandes, les sous-agents et les skills. La commande n'est pas disponible sur Bedrock, Vertex AI ou Foundry.
 
-Copilot ne touche pas votre shell. Claude Code lance vos tests, votre linter, vos migrations. Une vraie boucle : edit → run → fix → re-run.
+### Depuis Copilot (ou Cursor) : `/init`
 
-```bash
-> Lance les tests, corrige les rouges et relance jusqu'à ce que tout passe.
+```text
+/init
 ```
 
-### Utiliser le mode plan
+`/init` génère un `CLAUDE.md` en lisant votre code et reprend la partie utile des règles existantes :
 
-Pour les tâches lourdes, le mode plan affiche un plan d'action sans rien exécuter — vous validez avant que Claude bouge un doigt. C'est l'équivalent d'un design review automatique.
+- Cursor : `.cursor/rules/` ou `.cursorrules` ;
+- Copilot : `.github/copilot-instructions.md` ;
+- avec `CLAUDE_CODE_NEW_INIT=1` : aussi `AGENTS.md`, `.windsurf/rules/`, `.windsurfrules` et `.clinerules`.
 
-## Conserver ce qui marchait
+### Vous avez déjà un `AGENTS.md` ?
 
-Vous pouvez utiliser Claude Code **en parallèle** de votre IDE. Beaucoup de devs gardent Cursor/VS Code ouvert pour la navigation visuelle et utilisent Claude Code dans un terminal séparé pour les gros chantiers.
+Depuis septembre 2026, Claude Code lit directement `AGENTS.md` s'il n'y a pas de `CLAUDE.md`. Si vous voulez les deux (un fichier commun à tous vos outils, plus des consignes propres à Claude), importez-le en tête de `CLAUDE.md` :
 
-Si vous voulez la complétion inline en plus, l'extension **Claude pour VS Code/JetBrains** existe — elle complète l'agent CLI, pas le remplace.
+```markdown
+@AGENTS.md
 
-## Bénéfices à attendre
+## Claude Code
+- Utiliser le mode plan pour toute modification dans `src/billing/`.
+```
 
-- **Refactors multi-fichiers** : Claude Code excelle là où Copilot capitule (renommer un concept dans 40 fichiers, migrer une dépendance).
-- **Sessions reprenables** : `/resume` repart où vous vous êtes arrêté hier. Copilot n'a pas de mémoire.
-- **Workflows automatisés** : hooks `PreToolUse` et `PostToolUse` pour formatter, signer, auditer chaque modification.
+## Étape 2 : faire correspondre les notions
 
-## Pièges fréquents en migration
+| Vous utilisiez… | Dans Claude Code |
+|---|---|
+| Règles Cursor (`.cursor/rules/`) | `CLAUDE.md` pour les règles générales, `.claude/rules/*.md` avec `paths` pour les règles ciblées |
+| `.github/copilot-instructions.md` | `CLAUDE.md` |
+| Mode agent / Composer | Session Claude Code normale (mode `auto` par défaut) |
+| Mode « Ask » ou lecture seule | Mode `plan` (`Shift+Tab` ou `claude --permission-mode plan`) |
+| Serveurs MCP de l'éditeur | `.mcp.json` (partagé) ou `claude mcp add` |
+| Prompts enregistrés | Skills dans `.claude/skills/<nom>/SKILL.md`, appelés avec `/nom` |
+| Annuler les modifications de l'agent | `/rewind` (ou `Esc` deux fois) |
+| Historique des conversations | `/resume`, `claude --continue` |
 
-- Vouloir tout faire en une commande. Claude excelle en délégation **délimitée**. Décomposez.
-- Oublier `CLAUDE.md`. Ce fichier remplace les "Cursor rules" — c'est le contexte du projet que Claude lit à chaque session.
-- Désactiver les permissions par flemme (`bypassPermissions`) au lieu de configurer un allowlist propre.
+## Étape 3 : changer quelques habitudes
+
+### Décrire une tâche, pas une ligne
+
+```text
+Ajoute un endpoint POST /api/users qui valide l'e-mail avec Zod
+et insère l'utilisateur dans Supabase. Mets à jour le client TypeScript
+et ajoute un test Vitest.
+```
+
+Donnez le but, les contraintes et comment vérifier le résultat. Claude lit les fichiers, modifie, lance les tests et corrige.
+
+### Laisser Claude vérifier son travail
+
+Claude Code exécute vos commandes. Profitez-en :
+
+```text
+Lance les tests, corrige ceux qui échouent et relance jusqu'à ce que tout passe.
+Ne modifie pas les tests eux-mêmes.
+```
+
+### Planifier les gros chantiers
+
+Pour un refactoring ou une migration, commencez en mode `plan` : Claude explore et propose un plan, vous le corrigez, puis vous lancez l'exécution.
+
+### Garder le contexte propre
+
+Une conversation par tâche. Entre deux sujets, `/clear`. Pour une question rapide qui ne doit pas polluer la conversation, `/btw`.
+
+## Pièges fréquents
+
+- **Tout demander en une fois.** Découpez en tâches vérifiables.
+- **Oublier `CLAUDE.md`.** Sans lui, Claude redécouvre vos conventions à chaque session. Commencez par `/init`.
+- **Passer en `bypassPermissions` par confort.** Le mode `auto` réduit déjà les interruptions avec un filet de sécurité ; complétez-le par des règles `allow` précises.
+- **Chercher la complétion Tab.** Elle n'existe pas dans Claude Code : gardez celle de votre éditeur si vous y tenez.
+- **Une vieille `ANTHROPIC_API_KEY` dans le shell** (installée pour un autre outil) : Claude Code l'utiliserait à la place de votre abonnement. Vérifiez avec `/status`.
 
 ## Pour aller plus loin
 
-- Article : [Le fichier CLAUDE.md](/wiki/demarrer/claude-md)
-- Article : [Configurer les IDE](/wiki/demarrer/ide-vscode-cursor-windsurf)
-- Article : [Workflows production](/wiki/workflows/refactor-grande-echelle)
+- [Claude Code dans votre IDE](/wiki/demarrer/ide-vscode-cursor-windsurf)
+- [Le fichier CLAUDE.md](/wiki/demarrer/claude-md)
+- [Configurer un projet](/wiki/demarrer/configurer-projet)
+- [Refactoring à grande échelle](/wiki/workflows/refactor-grande-echelle)
+
+## Sources
+
+- [Commands : /import et /init](https://code.claude.com/docs/en/commands)
+- [Memory : AGENTS.md et migration depuis d'autres outils](https://code.claude.com/docs/en/memory)
+- [Use Claude Code in VS Code](https://code.claude.com/docs/en/vs-code)

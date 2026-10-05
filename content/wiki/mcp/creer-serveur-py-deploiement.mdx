@@ -1,105 +1,194 @@
 ---
-title: "Créer un serveur MCP Python : déploiement"
-description: "Packager et distribuer un serveur MCP Python : PyPI, Docker, scripts d'entrée et bonnes pratiques."
-updatedAt: "2026-05-19"
-readingMinutes: 6
+title: "Créer un serveur MCP en Python : déploiement"
+description: "Packager un serveur MCP Python (SDK v2) pour uvx et PyPI, le conteneuriser, le servir en Streamable HTTP derrière un vrai nom de domaine et le référencer dans le MCP Registry."
+updatedAt: "2026-10-03"
+readingMinutes: 8
 ---
 
-Construire un serveur MCP en Python est rapide grâce au SDK officiel `mcp`. Le vrai défi commence quand il faut le **distribuer** : utilisateurs sur macOS/Linux/Windows, runtimes Python différents, dépendances natives… Voici un parcours complet pour passer du prototype local à un serveur installable en une commande.
+Un serveur MCP Python qui tourne sur votre machine n'est qu'un début. Pour le partager, deux voies : le distribuer comme **outil local** (stdio, lancé par `uvx`) ou l'héberger comme **service distant** (Streamable HTTP). Cet article suppose le SDK Python v2 et sa classe `MCPServer`, présentés dans [l'article de setup](/wiki/mcp/creer-serveur-py-setup).
 
 ## Structurer le projet
 
-Un layout `src/` propre facilite le packaging :
+Un layout `src/` évite d'importer par erreur le code non installé :
 
 ```
-my-mcp-server/
+mcp-bibliotheque/
   pyproject.toml
-  src/my_mcp_server/
+  README.md
+  src/mcp_bibliotheque/
     __init__.py
-    __main__.py
     server.py
 ```
 
-Dans `pyproject.toml`, déclarez un **entry point console** pour que `pipx` ou `uvx` exposent une commande :
+Le module expose deux points d'entrée : `main()` pour stdio, `create_app()` pour HTTP.
+
+```python
+# src/mcp_bibliotheque/server.py
+import os
+
+from starlette.requests import Request
+from starlette.responses import JSONResponse, Response
+
+from mcp.server import MCPServer
+from mcp.server.transport_security import TransportSecuritySettings
+
+mcp = MCPServer("bibliotheque")
+
+
+@mcp.tool()
+def chercher_livres(requete: str) -> list[str]:
+    """Cherche des livres par titre ou auteur."""
+    return [t for t in ("Dune", "Neuromancien") if requete.lower() in t.lower()]
+
+
+@mcp.custom_route("/health", methods=["GET"])
+async def health(request: Request) -> Response:
+    return JSONResponse({"status": "ok"})
+
+
+def main() -> None:
+    """Point d'entrée console : serveur stdio pour uvx / pipx."""
+    if not os.environ.get("BIBLIO_API_KEY"):
+        raise SystemExit("BIBLIO_API_KEY est requis")
+    mcp.run()
+
+
+def create_app():
+    """Application ASGI pour un déploiement HTTP (uvicorn, gunicorn...)."""
+    host = os.environ["PUBLIC_HOST"]  # ex. mcp.monorg.com
+    security = TransportSecuritySettings(allowed_hosts=[host, f"{host}:*"])
+    return mcp.streamable_http_app(transport_security=security)
+```
+
+Validez les variables d'environnement au démarrage : un message clair sur stderr vaut mieux qu'un tool qui échoue au premier appel.
+
+## Déclarer le paquet
 
 ```toml
 [project]
-name = "my-mcp-server"
-version = "0.1.0"
-dependencies = ["mcp>=1.0", "httpx"]
+name = "mcp-bibliotheque"
+version = "1.0.0"
+requires-python = ">=3.10"
+dependencies = ["mcp>=2.3,<3"]
 
 [project.scripts]
-my-mcp-server = "my_mcp_server.server:main"
+mcp-bibliotheque = "mcp_bibliotheque.server:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 ```
 
-C'est ce binaire que Claude Desktop ou Claude Code lanceront via `command`.
+La section `[project.scripts]` crée la commande `mcp-bibliotheque`. C'est elle que les clients MCP lanceront. Bornez la version majeure du SDK (`<3`) : la v2 a déjà montré qu'une majeure change les imports.
 
-## Publier sur PyPI
-
-Le standard de fait pour les serveurs MCP Python est PyPI, car `uvx` peut alors **exécuter votre serveur sans installation préalable** :
+## Publier sur PyPI et lancer avec uvx
 
 ```bash
 uv build
-uv publish  # nécessite un token PyPI
+uv publish
 ```
 
-Côté utilisateur, la config devient triviale :
+Pour la CI, préférez la publication de confiance (*trusted publishing*) de PyPI depuis GitHub Actions à un jeton stocké en secret.
+
+Côté utilisateur, `uvx` télécharge le paquet dans un environnement isolé et le lance, sans installation globale :
+
+```bash
+claude mcp add bibliotheque --env BIBLIO_API_KEY=xxx -- uvx mcp-bibliotheque
+```
+
+Ou dans un `.mcp.json` partagé, avec une version épinglée et le secret lu dans l'environnement :
 
 ```json
 {
   "mcpServers": {
-    "my-server": {
+    "bibliotheque": {
       "command": "uvx",
-      "args": ["my-mcp-server"]
+      "args": ["mcp-bibliotheque==1.0.0"],
+      "env": { "BIBLIO_API_KEY": "${BIBLIO_API_KEY}" }
     }
   }
 }
 ```
 
-`uvx` crée un environnement isolé, télécharge le package, et lance le serveur. Aucun `pip install` global, aucun conflit de version.
+## Conteneuriser
 
-## Conteneuriser avec Docker
-
-Pour les déploiements serveur (mode HTTP/SSE) ou les environnements verrouillés, Docker reste roi :
+Docker sert deux cas : un serveur local avec des dépendances système lourdes, ou un service HTTP.
 
 ```dockerfile
 FROM python:3.12-slim
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 WORKDIR /app
-COPY . .
-RUN pip install --no-cache-dir .
-EXPOSE 8080
-CMD ["my-mcp-server", "--transport", "sse", "--port", "8080"]
+COPY pyproject.toml uv.lock README.md ./
+COPY src ./src
+RUN uv sync --frozen --no-dev
+ENV PATH="/app/.venv/bin:$PATH"
+USER 1000
+EXPOSE 8000
+HEALTHCHECK CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"
+CMD ["uvicorn", "--factory", "mcp_bibliotheque.server:create_app", "--host", "0.0.0.0", "--port", "8000"]
 ```
 
-Pensez à un utilisateur non-root (`USER 1000`) et à un `HEALTHCHECK` qui ping l'endpoint MCP. Pour la prod, publiez l'image sur GHCR ou Docker Hub et versionnez-la avec le tag PyPI correspondant.
+Pour utiliser la même image en stdio, remplacez la commande au lancement et gardez stdin ouvert : `docker run -i --rm -e BIBLIO_API_KEY monorg/mcp-bibliotheque mcp-bibliotheque`.
 
-## Gérer les dépendances natives
+## Servir en Streamable HTTP
 
-Certains serveurs MCP ont besoin de libs C (pillow, lxml, drivers DB). Trois règles :
+Pour un test rapide, `mcp.run(transport="streamable-http", port=8000)` suffit. En production, passez par l'application ASGI (`create_app()` ci-dessus) et un serveur comme uvicorn. Le transport SSE (`transport="sse"`) existe encore pour de vieux clients, mais il est déprécié depuis 2025 : ne construisez rien de neuf dessus.
 
-- **Wheels manylinux** : `uv build` produit des wheels portables si vos deps en publient.
-- **Lock files** : commitez `uv.lock` pour des installs reproductibles.
-- **Extras optionnels** : isolez les drivers lourds avec `[project.optional-dependencies]` pour ne pas alourdir le install par défaut.
+Trois réglages font la différence entre « ça marche sur ma machine » et « ça marche en production » :
 
-## Versionner et automatiser
+1. **Liste des hôtes autorisés.** Par défaut, l'application n'accepte que `localhost` (protection contre le DNS rebinding). Derrière un vrai domaine, sans `transport_security`, chaque requête est refusée avant même d'atteindre MCP. C'est la première chose à vérifier quand un serveur fraîchement déployé refuse tout.
+2. **Proxy TLS.** Si TLS se termine sur un reverse proxy, lancez uvicorn avec `--proxy-headers --forwarded-allow-ips='<adresse du proxy>'`. Sinon ses redirections pointent vers `http://` et le client les refuse.
+3. **Plusieurs workers.** Avec la révision 2026-07-28, chaque requête est autonome : n'importe quel worker peut la servir, sans sessions collantes. Les clients plus anciens (révisions 2025) ont en revanche une session gardée en mémoire d'un worker : il faut alors des sessions collantes, ou `stateless_http=True` (au prix des requêtes serveur vers client).
 
-Utilisez `hatch version` ou `bumpver` pour incrémenter, puis un workflow GitHub Actions qui publie sur tag :
+Un piège propre au protocole 2026 : si un tool demande une confirmation à l'utilisateur en cours d'appel (requête en plusieurs allers-retours), le jeton d'état est chiffré avec une clé générée par processus. Avec plusieurs workers, le second aller-retour peut atterrir ailleurs et échouer avec « Invalid or expired requestState ». La solution : partager la clé (`RequestStateSecurity(keys=[...])`) **et** garder le même nom de serveur sur toutes les instances.
 
-```yaml
-on: { push: { tags: ["v*"] } }
-jobs:
-  publish:
-    steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v3
-      - run: uv build && uv publish
-        env: { UV_PUBLISH_TOKEN: ${{ secrets.PYPI_TOKEN }} }
+Connexion depuis Claude Code :
+
+```bash
+claude mcp add --transport http bibliotheque https://mcp.monorg.com/mcp
 ```
 
-Ajoutez un job qui build et push l'image Docker en parallèle. Vos utilisateurs voient une nouvelle version disponible en quelques minutes.
+## Authentification
+
+Un serveur distant se protège avec des jetons OAuth : votre serveur MCP est un serveur de ressources qui vérifie les jetons, il n'en émet pas. Le SDK vous demande d'implémenter un `TokenVerifier` (une méthode `verify_token`) et de décrire votre fournisseur d'identité dans `AuthSettings`. Il publie alors automatiquement les métadonnées de ressource protégée (`/.well-known/oauth-protected-resource/mcp`) dont les clients ont besoin pour lancer le flux OAuth. Côté Claude Code, l'utilisateur s'authentifie via `/mcp`.
+
+## Référencer le serveur dans le MCP Registry
+
+Le registre officiel (en préversion) référence des paquets publiés ailleurs. Pour un paquet PyPI, la preuve de propriété est une mention dans le README publié :
+
+```markdown
+<!-- mcp-name: io.github.monorg/bibliotheque -->
+```
+
+Générez ensuite `server.json` et publiez avec l'outil `mcp-publisher` :
+
+```bash
+mcp-publisher init
+mcp-publisher login github
+mcp-publisher publish
+```
+
+Pour une image Docker, la preuve est un label : `LABEL io.modelcontextprotocol.server.name="io.github.monorg/bibliotheque"`.
+
+## Checklist de mise en production
+
+- `uv.lock` committé, version du SDK bornée.
+- Logs via `logging` (stderr), jamais `print()` en stdio.
+- `transport_security` configuré pour le domaine réel.
+- Route `/health` pour l'orchestrateur (elle n'est jamais authentifiée : n'y mettez rien de sensible).
+- Clé `RequestStateSecurity` partagée si plusieurs workers et des tools interactifs.
+- `CHANGELOG.md` lisible : renommer un tool est une rupture pour vos utilisateurs.
 
 ## Pour aller plus loin
 
-- Documentez un `CHANGELOG.md` lisible — les utilisateurs MCP épinglent souvent des versions.
-- Ajoutez un sous-commande `--check` qui valide la config et les credentials sans lancer le serveur.
-- Pour les serveurs commerciaux, regardez le transport HTTP/SSE + auth OAuth, désormais standardisé dans la spec MCP.
+- [Créer un serveur MCP Python : setup et primitives](/wiki/mcp/creer-serveur-py-setup)
+- [Transports MCP : stdio et Streamable HTTP](/wiki/mcp/transports-stdio-sse)
+- [Sécurité MCP](/wiki/mcp/securite-mcp)
+- [Déployer un serveur MCP TypeScript](/wiki/mcp/creer-serveur-ts-deploiement)
+
+## Sources
+
+- [SDK Python : exécuter, déployer et mettre à l'échelle](https://py.sdk.modelcontextprotocol.io/)
+- [SDK Python (dépôt GitHub)](https://github.com/modelcontextprotocol/python-sdk)
+- [MCP Registry : types de paquets et publication](https://github.com/modelcontextprotocol/registry)
+- [Claude Code : MCP](https://code.claude.com/docs/en/mcp)

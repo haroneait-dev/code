@@ -1,73 +1,129 @@
 ---
-title: "Données sensibles"
-description: "Travailler avec des données confidentielles avec Claude : PII, secrets, conformité RGPD et HDS."
-updatedAt: "2026-05-19"
-readingMinutes: 6
+title: "Travailler avec des données sensibles"
+description: "Utiliser Claude Code sur des projets qui manipulent des données personnelles ou confidentielles : ce qui est envoyé et conservé, anonymisation, règles de permission, sandbox et points de conformité RGPD."
+updatedAt: "2026-10-03"
+readingMinutes: 8
 ---
 
-Manipuler des données sensibles avec un assistant IA pose des questions juridiques, techniques et éthiques. PII (données personnelles identifiables), données de santé, données financières, secrets industriels : chaque catégorie a ses contraintes. La règle générale : minimiser, anonymiser, tracer.
+Données personnelles, santé, finance, secrets industriels : dès que votre projet en manipule, utiliser un assistant IA pose des questions juridiques et techniques. La règle générale tient en trois mots : minimiser, anonymiser, tracer. Cet article explique ce que Claude Code envoie et conserve, puis comment configurer un projet pour que les données réelles n'y entrent pas.
+
+## Ce qui part, et où ça reste
+
+Claude Code tourne sur votre machine, mais tout ce que Claude lit pour répondre (prompts, contenu des fichiers ouverts, sorties de commandes) est envoyé au modèle via l'API, chiffré en transit (TLS 1.2 ou plus). Conséquence directe : un fichier que Claude lit est un fichier envoyé.
+
+**Côté Anthropic** (documentation officielle, octobre 2026) :
+
+| Type de compte | Entraînement | Conservation |
+| :- | :- | :- |
+| Free, Pro, Max | Seulement si vous l'avez accepté dans vos réglages de confidentialité | 5 ans si l'entraînement est accepté, 30 jours sinon |
+| Team, Enterprise, API (conditions commerciales) | Non, sauf adhésion volontaire (Development Partner Program) | 30 jours en standard |
+| Enterprise avec Zero Data Retention | Non | Rien n'est conservé après la réponse, sauf obligation légale ou lutte contre les abus |
+
+La Zero Data Retention (ZDR) n'est pas incluse dans l'offre Enterprise standard : elle est accordée organisation par organisation par Anthropic, après vérification d'éligibilité. Elle couvre l'inférence de Claude Code, pas le chat claude.ai, Cowork, ni les données traitées par des serveurs MCP ou outils tiers. Elle désactive aussi les fonctions qui stockent des données côté serveur, comme les sessions cloud. Sur Amazon Bedrock, Google Cloud ou Microsoft Foundry, ce sont les politiques de conservation de ces plateformes qui s'appliquent.
+
+**Sur votre machine** : les transcriptions de session sont stockées en clair dans `~/.claude/projects/` pendant 30 jours par défaut, pour permettre `/resume`. Réduisez la durée avec `cleanupPeriodDays` dans vos réglages si des données sensibles risquent d'y passer.
+
+**Deux envois à surveiller** :
+
+- `/feedback` (et `/bug`, `/share`) envoie la conversation, code compris, conservée 5 ans. Désactivez-le avec `DISABLE_FEEDBACK_COMMAND=1` sur les postes concernés.
+- La télémétrie OpenTelemetry de votre organisation n'inclut pas le texte des prompts par défaut. Les variables `OTEL_LOG_USER_PROMPTS`, `OTEL_LOG_TOOL_DETAILS` et `OTEL_LOG_RAW_API_BODIES` l'ajoutent : ne les activez que si votre collecteur est lui-même traité comme un stockage de données sensibles.
 
 ## Cartographier ce qui est sensible
 
-Avant tout, dresse la liste de ce qui circule dans ton repo et dans tes prompts :
+Avant d'ouvrir Claude Code sur un projet, listez ce qui y circule :
 
-- **PII directes** : nom, email, téléphone, adresse, IP, identifiants nationaux
-- **PII indirectes** : combinaisons de champs qui ré-identifient (âge + code postal + profession)
-- **Données de catégorie spéciale RGPD** : santé, opinions politiques, orientation, biométrie
-- **Données financières** : IBAN, numéros de carte, soldes, transactions
-- **Secrets** : clés API, tokens, certificats, mots de passe (cf. l'article dédié)
-- **Propriété intellectuelle** : algorithmes brevetés, contrats, données clients sous NDA
+- **Données personnelles directes** : nom, e-mail, téléphone, adresse, IP, numéro de sécurité sociale.
+- **Données indirectement identifiantes** : combinaisons qui permettent de retrouver une personne (âge, code postal, profession).
+- **Catégories particulières au sens du RGPD** (article 9) : santé, opinions politiques, convictions religieuses, orientation sexuelle, données biométriques.
+- **Données financières** : IBAN, numéros de carte, transactions.
+- **Secrets techniques** : clés API, jetons, certificats (voir [l'article dédié](/wiki/workflows/secrets-env)).
+- **Informations confidentielles** : contrats, données clients sous accord de confidentialité, code propriétaire d'un tiers.
 
-Pour chaque catégorie, définis une politique : autorisée en clair, autorisée si anonymisée, ou totalement interdite à Claude.
+Pour chaque catégorie, décidez : autorisée en clair, autorisée seulement anonymisée, ou interdite à Claude.
 
-## Anonymiser avant d'envoyer
+## Garder les données réelles hors du contexte
 
-Ne colle jamais de données réelles dans un prompt. Construis un pipeline d'anonymisation systématique :
+### Travailler sur la structure, pas sur les valeurs
 
-- Remplace les emails par `user1@example.com`, `user2@example.com`
-- Hash les identifiants stables
-- Bucket les âges, agrège les codes postaux
-- Génère des datasets synthétiques avec Faker, Mockaroo ou Synthea pour le médical
-- Pour les logs de prod, utilise un outil comme `pii-codex` ou `Presidio` (Microsoft) pour détecter et masquer
+Neuf fois sur dix, pour déboguer, Claude a besoin de la forme des données, pas des vraies valeurs. Donnez-lui :
 
-Pour le debug, demande-toi toujours : « ai-je besoin de la vraie valeur ou juste de la structure ? ». 95% du temps, la structure suffit.
+- le schéma de la base (`pg_dump --schema-only`) plutôt qu'un dump complet ;
+- un exemple de payload avec des valeurs factices ;
+- des jeux de données synthétiques générés avec Faker, ou Synthea pour des dossiers médicaux fictifs.
 
-## Configurer Claude pour la conformité
+Pour des logs de production, masquez avant de les donner à Claude, par exemple avec Microsoft Presidio, qui détecte et remplace noms, e-mails, numéros de téléphone ou de carte. Mieux encore : demandez à Claude d'écrire le script de masquage, relisez-le, exécutez-le vous-même, puis donnez-lui le résultat.
 
-Plusieurs leviers techniques :
+### Interdire l'accès aux dossiers sensibles
 
-**Hébergement** : pour de la donnée européenne, privilégie les régions UE (Anthropic via AWS Bedrock Frankfurt/Paris, ou Vertex AI europe-west). Vérifie les engagements contractuels DPA (Data Processing Agreement).
+Rangez exports, dumps et sauvegardes dans des dossiers identifiés, puis bloquez-les dans `.claude/settings.json` :
 
-**Zero data retention** : sur les comptes Enterprise, active la rétention zéro pour que tes prompts ne soient pas conservés au-delà du temps de traitement. C'est souvent une condition pour les audits.
+```json
+{
+  "permissions": {
+    "deny": [
+      "Read(./exports/**)",
+      "Read(./dumps/**)",
+      "Read(./backups/**)",
+      "Read(**/*.sql.gz)",
+      "Read(./.env)",
+      "Read(./.env.*)"
+    ]
+  }
+}
+```
 
-**Logging local** : garde une trace de tout ce qui est envoyé à l'API, dans ton propre stockage, avec une politique de purge alignée sur ta DPIA. Tu dois pouvoir répondre à une demande d'accès RGPD.
+Ces règles bloquent les outils de fichiers de Claude et les commandes shell reconnues comme `cat` ou `head`. Elles n'arrêtent pas un script qui ouvre le fichier lui-même. Pour une garantie au niveau du système, activez la sandbox et ajoutez les mêmes dossiers dans `sandbox.filesystem.denyRead`.
 
-**Permissions restrictives** : empêche Claude d'accéder aux dossiers contenant des dumps de prod, des exports clients, des sauvegardes.
+### Bloquer l'accès direct à la base de production
+
+Le risque le plus courant n'est pas un fichier, c'est une requête. Si Claude peut lancer `psql` avec une URL de production, il peut lire des millions de lignes personnelles en une commande. Réglages conseillés :
+
+- ne chargez jamais d'URL de base de production dans le shell où tourne Claude ;
+- activez `CLAUDE_CODE_SUBPROCESS_ENV_SCRUB=1` pour retirer les identifiants reconnus de l'environnement des commandes ;
+- si Claude doit interroger une base, donnez-lui une copie anonymisée ou un utilisateur en lecture seule limité à quelques vues agrégées ;
+- avec la sandbox, n'autorisez pas l'hôte de la base de production dans `network.allowedDomains`.
+
+## Conformité : les points à vérifier
+
+Ce qui suit n'est pas un avis juridique ; faites valider par votre DPO.
+
+- **Base légale et information** : l'envoi de données personnelles à un sous-traitant d'IA doit reposer sur une base légale et figurer dans votre registre des traitements.
+- **Contrat** : vérifiez l'accord de traitement des données (DPA) de votre fournisseur, qu'il s'agisse d'Anthropic ou d'une plateforme cloud.
+- **Localisation** : si vos données doivent rester dans l'Union européenne, vérifiez pour chaque modèle les régions proposées par Bedrock, Google Cloud ou Microsoft Foundry ; les disponibilités changent.
+- **Analyse d'impact** (AIPD, article 35 du RGPD) : recommandée avant d'introduire un agent IA sur un nouveau périmètre de données personnelles, obligatoire pour les traitements à risque élevé.
+- **Secteurs régulés** : en France, l'hébergement de données de santé exige un hébergeur certifié HDS ; certains marchés publics demandent une qualification SecNumCloud. Vérifiez ce que couvre votre fournisseur avant de faire passer ces données par un modèle.
+- **Violation** : une fuite de données personnelles se notifie à la CNIL dans les 72 heures (article 33). Prévoyez la procédure à l'avance.
 
 ## Cadrer les usages par rôle
 
-Tous les développeurs n'ont pas besoin du même niveau d'accès. Mets en place une matrice :
+Tout le monde n'a pas besoin du même accès. Une matrice simple, documentée dans un `DATA_POLICY.md` référencé par le `CLAUDE.md` :
 
-- **Devs juniors** : Claude sur du code et des fixtures synthétiques uniquement
-- **Devs seniors** : accès à des sous-ensembles anonymisés pour le debug
-- **DPO / Security** : seuls habilités à manipuler des extraits réels, dans un environnement isolé
+| Profil | Ce que Claude peut voir |
+| :- | :- |
+| Développeurs | Code, schémas, données synthétiques |
+| Support niveau 2 | Extraits anonymisés pour reproduire un bug |
+| DPO, sécurité | Extraits réels, dans un environnement isolé et journalisé |
 
-Documente ces règles dans un fichier `DATA_POLICY.md` et fais signer chaque arrivant. La conformité est autant un problème de process que de technique.
+En entreprise, imposez les règles qui comptent avec les réglages gérés (managed settings) : les développeurs ne peuvent pas les assouplir dans leurs réglages personnels.
 
-## Auditer et prouver
+## Prouver ce qui a été fait
 
-En cas de contrôle (CNIL, ISO 27001, SOC 2, HDS), tu dois prouver :
-
-- Quelles données ont été envoyées à un sous-traitant IA
-- Sur quelle base légale
-- Pendant combien de temps elles ont été conservées
-- Quelles mesures de minimisation ont été appliquées
-
-Mets en place un journal d'audit immuable (append-only, signé), avec hash des prompts. Sur des secteurs régulés (santé, banque, défense), envisage un déploiement on-premise ou via un cloud souverain avec certification adéquate (HDS pour la santé en France, SecNumCloud pour le défense).
+En cas de contrôle (CNIL, ISO 27001, SOC 2, HDS), vous devez pouvoir dire quelles données ont été envoyées, sur quelle base, combien de temps elles ont été conservées et quelles mesures de minimisation étaient en place. La télémétrie OpenTelemetry de Claude Code donne la trace des actions (commandes, fichiers, décisions de permission) par utilisateur. La mise en place est décrite dans [Audit trail](/wiki/workflows/audit-trail).
 
 ## Pour aller plus loin
 
-- Réalise une AIPD (analyse d'impact) avant d'introduire Claude sur un nouveau périmètre de données
-- Forme l'équipe avec des cas concrets : « ce ticket Jira contient-il des PII ? »
-- Mets en place une procédure de notification de violation sous 72h, conforme RGPD
-- Revois la politique tous les 6 mois : les capacités des modèles et la réglementation évoluent vite
+- [Protéger ses secrets et fichiers .env](/wiki/workflows/secrets-env)
+- [Audit trail](/wiki/workflows/audit-trail)
+- [Confidentialité des données en entreprise](/wiki/enterprise/data-privacy)
+- [Hébergement souverain](/wiki/enterprise/sovereign-hosting)
+- [Confidentialité : les bases](/wiki/claude-bases/confidentialite)
+
+## Sources
+
+- [Data usage : training policy, data retention, data flow, documentation Claude Code](https://code.claude.com/docs/en/data-usage)
+- [Zero data retention, documentation Claude Code](https://code.claude.com/docs/en/zero-data-retention)
+- [Security : Working with sensitive code, documentation Claude Code](https://code.claude.com/docs/en/security)
+- [Configure permissions : Read and Edit, documentation Claude Code](https://code.claude.com/docs/en/permissions)
+- [Configure the sandboxed Bash tool, documentation Claude Code](https://code.claude.com/docs/en/sandboxing)
+- [Monitoring (OpenTelemetry), documentation Claude Code](https://code.claude.com/docs/en/monitoring-usage)
+- [Règlement général sur la protection des données, CNIL](https://www.cnil.fr/fr/reglement-europeen-protection-donnees)

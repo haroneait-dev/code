@@ -1,161 +1,150 @@
 ---
-title: "Bash injection : comment Claude Code se protège"
-description: "Mécanismes de protection contre l'injection de commandes dans les slash commands et bonnes pratiques."
-updatedAt: "2026-05-19"
-readingMinutes: 6
+title: "Injection de commandes : écrire des commandes personnalisées sûres"
+description: "Comprendre ce qui s'exécute vraiment dans un shell quand une commande /nom reçoit des arguments, et les protections (permissions, deny, sandbox) qui limitent les dégâts."
+updatedAt: "2026-10-03"
+readingMinutes: 7
 ---
 
-Une slash command qui prend des arguments utilisateur et les injecte dans une commande Bash, c'est exactement le scénario classique d'injection shell. Claude Code applique plusieurs couches de protection — sandboxing, allowlist par pattern, demande de confirmation — mais aucune n'est magique. Comprendre ces mécanismes permet d'écrire des commandes sûres et d'éviter les pièges.
+Une commande personnalisée qui reçoit des arguments et touche au shell pose la question classique de l'injection de commandes. Claude Code a plusieurs garde-fous, mais leur portée est souvent mal comprise : `allowed-tools` n'interdit rien, et les blocs `` !`…` `` s'exécutent sans demande de confirmation. Cet article distingue ce qui part réellement dans un shell et donne les règles pour écrire des commandes sûres.
 
-## Le risque
+## Deux chemins vers le shell
 
-Imaginez une commande naïve, `.claude/commands/grep-todo.md` :
+Dans une commande (skill ou fichier `.claude/commands/`), il existe deux façons très différentes d'exécuter du shell.
+
+| | Instruction dans le texte | Injection `` !`…` `` |
+| --- | --- | --- |
+| Exemple | ``Lancez `npm test` `` | `` !`git diff HEAD` `` |
+| Qui exécute | Claude, via l'outil Bash | Claude Code, avant que Claude lise le skill |
+| Quand | Pendant la réponse | Au moment de l'invocation |
+| Demande de confirmation | Oui, selon vos règles et votre mode | Jamais : autorisé ou invocation annulée |
+| Claude peut refuser | Oui | Non, Claude ne voit que la sortie |
+
+### Chemin 1 : le texte du prompt
+
+`$ARGUMENTS`, `$0`, `$1` sont remplacés dans le **texte envoyé à Claude**, pas dans un shell. Si vous tapez `/grep-todo "fichier.txt; rm -rf ~"`, Claude lit cette chaîne. C'est lui qui décide ensuite d'appeler l'outil Bash, et cet appel passe par le système de permissions comme n'importe quel autre.
+
+C'est une barrière réelle, mais pas une garantie : un modèle peut être trompé, notamment par du contenu lu dans un fichier ou une page web (injection de prompt).
+
+### Chemin 2 : l'injection dynamique
+
+Une ligne `` !`commande` `` (ou un bloc de code ouvert par ` ```! `) est exécutée par Claude Code **avant** l'envoi du skill à Claude. La sortie remplace la ligne.
 
 ```md
 ---
-description: "Cherche un TODO dans un fichier"
+description: Résume les changements non commités
 ---
 
-Lance `grep TODO $ARGUMENTS`
+## Changements
+!`git diff HEAD`
+
+Résumez ces changements en trois points.
 ```
 
-Si l'utilisateur tape :
+Ce mécanisme ne demande jamais de confirmation. Chaque commande injectée est vérifiée contre vos règles de permission :
 
-```bash
-> /grep-todo "myfile.txt; rm -rf /"
+- une règle `deny` correspondante annule toute l'invocation ;
+- hors mode `auto`, une commande qui n'est pas explicitement autorisée (par vos règles ou par `allowed-tools`) annule aussi l'invocation ;
+- en mode `auto`, le skill se charge avec une consigne demandant à Claude d'exécuter la commande lui-même, et cet appel passe par le classifieur.
+
+## Règle n° 1 : jamais d'argument dans un bloc `!`
+
+La documentation ne garantit pas que les arguments soient tenus à l'écart des commandes injectées. Ne prenez pas le risque : n'écrivez jamais ceci.
+
+```md
+<!-- À NE PAS FAIRE -->
+Contenu du fichier : !`cat $ARGUMENTS`
 ```
 
-Sans protection, `$ARGUMENTS` est substitué tel quel, le shell découpe par `;` et exécute `rm -rf /`. C'est l'injection classique.
+Faites lire le fichier à Claude, qui passera par l'outil Read et ses permissions :
 
-## Couche 1 : pas d'exécution directe
+```md
+Lisez le fichier $ARGUMENTS avec l'outil Read.
+Refusez s'il est hors du projet (chemin absolu ou contenant `..`).
+```
 
-Premier point clé : `$ARGUMENTS` est substitué dans le **prompt envoyé à Claude**, pas dans un shell. Le fichier `.md` n'est pas un script. Quand Claude lit "Lance `grep TODO $ARGUMENTS`", il voit un texte ; c'est lui qui décide ensuite d'appeler le tool `Bash` avec un argument. Ce niveau d'indirection bloque les injections les plus naïves : Claude comprend que `; rm -rf /` n'a rien à faire là et soit l'ignore, soit demande confirmation.
+Les blocs `!` doivent contenir des commandes fixes, en lecture seule : `git status --short`, `git log --oneline -10`, `node --version`. Pour appeler un script livré avec le skill, utilisez `${CLAUDE_SKILL_DIR}`, qui pointe toujours vers le dossier du skill.
 
-Mais ce n'est pas une garantie : un modèle peut être convaincu par un prompt malicieux. D'où les couches suivantes.
+## Règle n° 2 : `allowed-tools` ouvre, il ne ferme pas
 
-## Couche 2 : allowed-tools par pattern
-
-Le frontmatter `allowed-tools` restreint les commandes Bash exécutables à des patterns précis :
+`allowed-tools` **pré-autorise** des outils pendant le tour de l'invocation. Il ne bloque aucun autre outil.
 
 ```yaml
----
-allowed-tools: [Bash(grep:*)]
----
+allowed-tools: Bash(grep *)
 ```
 
-Avec cette restriction, Claude ne peut appeler `Bash` que pour des commandes commençant par `grep `. Une tentative d'appeler `rm` est refusée par le harness avant même d'atteindre le shell.
+Avec cette ligne, `grep` passe sans confirmation. Un `rm` reste possible : il déclenche simplement la demande de confirmation habituelle (ou l'évaluation du classifieur en mode `auto`). Pour interdire, utilisez :
 
-Patterns courants et sûrs :
+- **`disallowed-tools`** dans le frontmatter, qui retire des outils tant que la commande est active ;
+- **des règles `deny`** dans `settings.json`, qui s'appliquent partout et l'emportent sur toute autorisation.
 
-```yaml
-allowed-tools: [Bash(npm test:*)]        # npm test et ses variantes
-allowed-tools: [Bash(git status)]        # uniquement git status, sans args
-allowed-tools: [Bash(gh pr view:*)]      # gh pr view avec n'importe quels args
-allowed-tools: [Bash(supabase migration:*)]
+```json
+{
+  "permissions": {
+    "deny": ["Bash(rm -rf *)", "Bash(git push --force *)", "Bash(curl *)"]
+  }
+}
 ```
 
-Pattern dangereux à éviter :
+Une règle `deny` correspond à la commande telle qu'elle est écrite. Pour une protection qui ne dépend pas du texte de la commande, activez le [sandbox](/wiki/demarrer/permissions-sandbox) avec `/sandbox`.
 
-```yaml
-allowed-tools: [Bash(*)]                 # autorise TOUT
-allowed-tools: [Bash(sh:*), Bash(bash:*)] # ouvre une porte
-```
+Point à surveiller : `allowed-tools` d'un skill de projet s'applique même dans un dossier que vous n'avez jamais approuvé, y compris en `claude -p`. Relisez les `allowed-tools` des skills d'un dépôt cloné avant d'y lancer Claude Code.
 
-## Couche 3 : sandbox et prompt de confirmation
+## Ce que Claude Code fait pour vous
 
-Pour les commandes hors allowlist, Claude Code demande confirmation à l'utilisateur :
+- **Commandes non analysables** : en mode par défaut, Claude Code demande confirmation pour une commande Bash qu'il ne sait pas décomposer entièrement, même si une règle comme `Bash(git *)` en autorise une partie.
+- **Commandes réseau** : `curl` et `wget` ne sont jamais auto-approuvés par défaut.
+- **Sous-commandes** : une règle `Bash(npm test *)` ne couvre pas `npm test && rm -rf build` : chaque partie est vérifiée.
+- **Skills synchronisés depuis claude.ai** : leurs blocs `!` ne sont jamais exécutés sur votre machine.
 
-```
-Claude wants to run:
-  rm -rf node_modules
+## Une commande défensive complète
 
-Approve? (y/n/always)
-```
-
-Le mode `always` ajoute la commande au allowlist persistant via `/permissions`. À utiliser avec parcimonie : "always" sur `Bash(rm:*)` n'est jamais une bonne idée.
-
-Sur les versions récentes, certaines commandes destructrices sont **toujours** confirmées même si autorisées (`rm -rf`, `git push --force`, `git reset --hard`...). C'est une protection garde-fou non désactivable.
-
-## Couche 4 : protections explicites côté commande
-
-En tant qu'auteur de commande, vous pouvez ajouter des protections dans le prompt lui-même :
+`.claude/skills/chercher/SKILL.md` :
 
 ```md
 ---
-description: "Cherche un pattern dans un fichier"
-argument-hint: "<pattern> <fichier>"
-allowed-tools: [Bash(grep:*)]
+description: Cherche un motif dans un fichier du projet
+argument-hint: <motif> <fichier>
+arguments: [motif, fichier]
+allowed-tools: Grep Read
+disallowed-tools: Bash Edit Write
 ---
 
-L'utilisateur veut chercher : $ARGUMENTS
+Cherchez le motif « $motif » dans le fichier « $fichier ».
 
-Avant d'exécuter :
-- Vérifie que `$ARGUMENTS` ne contient pas de caractères shell suspects
-  (; & | $ ` < > newline)
-- Si suspect, refuse poliment et explique pourquoi
-- Sinon, lance `grep` proprement avec les arguments séparés
+Règles :
+- Utilisez uniquement l'outil Grep, jamais le shell.
+- Refusez si le fichier est hors du projet (chemin absolu, `..`).
+- Si le motif ou le fichier est vide, demandez la valeur manquante.
 ```
 
-Vous demandez explicitement à Claude de jouer le rôle d'un filtre. Combiné aux autres couches, c'est très solide.
+Ici, le shell est retiré (`disallowed-tools: Bash`), la recherche passe par l'outil Grep qui n'interprète pas les caractères spéciaux du shell, et les deux outils utiles sont pré-autorisés.
 
-## Patterns recommandés
+## Ce que ces protections ne couvrent pas
 
-**Argument utilisé dans un chemin** :
+- **Vos propres validations** : si vous acceptez une commande dangereuse dans la demande de confirmation, elle s'exécute.
+- **Le contenu lu** : un fichier, une issue GitHub ou une page web peut contenir des instructions malveillantes. Méfiez-vous des commandes qui lisent du contenu externe puis agissent.
+- **Les serveurs MCP** : un serveur compromis peut renvoyer du contenu piégé. Limitez-vous à des serveurs de confiance.
+- **`bypassPermissions`** : dans ce mode, aucune confirmation n'est demandée. Réservez-le à un conteneur isolé.
 
-```md
----
-allowed-tools: [Read]
----
+## Checklist avant de partager une commande
 
-Lis le fichier suivant : $ARGUMENTS
+- [ ] Aucun `$ARGUMENTS`, `$0` ou argument nommé dans un bloc `` !`…` ``
+- [ ] Les blocs `!` sont fixes et en lecture seule
+- [ ] `allowed-tools` est précis (jamais `Bash` seul ni `Bash(*)`)
+- [ ] Les outils inutiles sont retirés avec `disallowed-tools`
+- [ ] `disable-model-invocation: true` sur toute commande à effets de bord
+- [ ] Testée avec des arguments hostiles : `; rm`, `$(…)`, backticks, `../../`
 
-Refuse si le chemin contient `..` (traversée de répertoire)
-ou commence par `/` (chemin absolu hors projet).
-```
-
-**Argument passé à git** :
-
-```md
----
-allowed-tools: [Bash(git log:*), Bash(git show:*)]
----
-
-Affiche l'historique pour : $ARGUMENTS
-
-Si $ARGUMENTS contient des espaces ou caractères spéciaux, échappe-les
-correctement ou refuse.
-```
-
-**Argument envoyé à un endpoint web** :
-
-```md
----
-allowed-tools: [WebFetch(https://api.exemple.com/*)]
----
-
-Récupère les données pour ID : $ARGUMENTS
-
-L'ID doit être numérique. Refuse sinon.
-```
-
-## Ce que ces couches ne protègent pas
-
-- **L'utilisateur lui-même** : si vous tapez `/dangereux "rm -rf /"` et que vous validez le prompt, c'est sur vous.
-- **Le contenu lu depuis le système de fichiers** : un fichier malveillant lu via `Read` peut contenir des instructions de prompt injection. Toujours vérifier la source des fichiers consommés.
-- **Les MCPs externes** : un MCP compromis peut renvoyer du contenu malveillant. Restreignez les MCPs aux serveurs de confiance.
-
-## Checklist d'auteur de slash command
-
-Avant de publier une commande qui injecte `$ARGUMENTS` dans Bash :
-
-- [ ] `allowed-tools` est précis (pas de `Bash(*)`)
-- [ ] Le prompt demande à Claude de valider les arguments
-- [ ] Aucun chemin absolu hors projet n'est accepté sans contrôle
-- [ ] Les opérations destructrices nécessitent confirmation
-- [ ] La commande est testée avec des arguments malicieux : `; rm`, `$(curl ...)`, backticks, etc.
+Pour automatiser l'interdiction d'une commande précise (même tapée à la main), un hook `UserPromptExpansion` peut bloquer l'expansion : voir [Hooks et commandes personnalisées](/wiki/slash-commands/slash-dans-hooks).
 
 ## Pour aller plus loin
 
-- Doc officielle : https://docs.claude.com/en/docs/claude-code/slash-commands
-- Doc permissions : https://docs.claude.com/en/docs/claude-code/iam
-- Lire le code de `/security-review` pour s'inspirer des patterns défensifs
+- [Le frontmatter des commandes](/wiki/slash-commands/markdown-frontmatter)
+- [Permissions et MCP dans les commandes](/wiki/slash-commands/mcp-permissions)
+- [Sécurité des hooks](/wiki/hooks/securite-rce)
+
+## Sources
+
+- [Skills : inject dynamic context](https://code.claude.com/docs/en/skills)
+- [Permissions](https://code.claude.com/docs/en/permissions)
+- [Security](https://code.claude.com/docs/en/security)

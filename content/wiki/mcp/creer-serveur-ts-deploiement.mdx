@@ -1,159 +1,255 @@
 ---
-title: "Créer un serveur MCP TypeScript : déploiement"
-description: "NPM publish, Docker, variables d'env, distribution."
-updatedAt: "2026-05-19"
-readingMinutes: 6
+title: "Créer un serveur MCP en TypeScript : déploiement"
+description: "Distribuer un serveur MCP TypeScript (SDK v2) : paquet npm lancé par npx, image Docker, endpoint Streamable HTTP avec Express ou Workers, authentification et MCP Registry."
+updatedAt: "2026-10-03"
+readingMinutes: 9
 ---
 
-Une fois votre serveur MCP TypeScript fonctionnel en local, l'étape suivante consiste à le distribuer pour que vos collègues (ou la communauté) puissent l'installer en une commande. Trois canaux dominent : **npm** pour la simplicité, **Docker** pour l'isolation, et le **transport HTTP/SSE** pour les déploiements cloud. Ce guide couvre les trois.
+Votre serveur fonctionne en local. Il reste à le rendre installable par d'autres. Deux familles de déploiement existent : le serveur **local** (stdio), que chaque utilisateur lance sur sa machine via `npx` ou Docker, et le serveur **distant** (Streamable HTTP), hébergé une fois et partagé. Ce guide suppose le SDK TypeScript v2 présenté dans [l'article de setup](/wiki/mcp/creer-serveur-ts-setup).
 
-## Préparer le package npm
+## Une factory, deux points d'entrée
 
-Le moyen le plus simple de distribuer un serveur MCP est de le publier sur npm avec un binaire exécutable via `npx`. Configurez le `package.json` pour pointer vers un script exécutable.
+Isolez la construction du serveur dans un module. Le même code sert ensuite stdio et HTTP sans duplication.
 
-```json
-{
-  "name": "@monorg/mcp-mon-serveur",
-  "version": "1.0.0",
-  "type": "module",
-  "bin": {
-    "mcp-mon-serveur": "./dist/index.js"
-  },
-  "files": ["dist"],
-  "scripts": {
-    "build": "tsc",
-    "prepublishOnly": "npm run build"
-  }
+```ts
+// src/server.ts
+import { McpServer } from "@modelcontextprotocol/server";
+import * as z from "zod/v4";
+
+export function createServer(): McpServer {
+  const server = new McpServer({ name: "devises", version: "1.0.0" });
+  server.registerTool(
+    "convertir_devise",
+    {
+      description: "Convertit un montant entre deux devises",
+      inputSchema: z.object({ montant: z.number(), de: z.string(), vers: z.string() }),
+    },
+    async ({ montant, de, vers }) => ({
+      content: [{ type: "text", text: `${montant} ${de} -> ${vers}` }],
+    })
+  );
+  return server;
 }
 ```
 
-Ajoutez impérativement le shebang en tête de `src/index.ts` :
+## Serveur local : publier sur npm
+
+C'est le canal le plus simple : l'utilisateur n'installe rien, `npx` télécharge et lance le paquet.
+
+Le point d'entrée stdio commence par un shebang et valide ses variables d'environnement au démarrage, pour échouer vite avec un message clair sur stderr :
 
 ```ts
 #!/usr/bin/env node
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-// ...
+// src/stdio.ts
+import { serveStdio } from "@modelcontextprotocol/server/stdio";
+import { createServer } from "./server.js";
+
+const API_KEY = process.env.DEVISES_API_KEY;
+if (!API_KEY) {
+  console.error("DEVISES_API_KEY est requis");
+  process.exit(1);
+}
+
+serveStdio(createServer);
 ```
 
-Publiez ensuite :
+Le `package.json` déclare le binaire, limite les fichiers publiés et compile avant publication :
+
+```json
+{
+  "name": "@monorg/mcp-devises",
+  "version": "1.0.0",
+  "type": "module",
+  "bin": { "mcp-devises": "./dist/stdio.js" },
+  "files": ["dist"],
+  "engines": { "node": ">=20" },
+  "mcpName": "io.github.monorg/devises",
+  "scripts": {
+    "build": "tsc",
+    "prepublishOnly": "npm run build"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/server": "^2.3.0",
+    "zod": "^4.2.0"
+  }
+}
+```
 
 ```bash
 npm login
 npm publish --access public
 ```
 
-L'utilisateur final l'installe directement dans sa config Claude :
-
-```json
-{
-  "mcpServers": {
-    "mon-serveur": {
-      "command": "npx",
-      "args": ["-y", "@monorg/mcp-mon-serveur@latest"]
-    }
-  }
-}
-```
-
-## Gérer les variables d'environnement
-
-La plupart des serveurs ont besoin de tokens (API keys, DB URLs). Lisez-les via `process.env` et validez au démarrage pour échouer vite.
-
-```ts
-const API_KEY = process.env.MON_API_KEY;
-if (!API_KEY) {
-  console.error("MON_API_KEY est requis");
-  process.exit(1);
-}
-```
-
-Côté client, les variables sont passées dans le champ `env` de la config :
-
-```json
-{
-  "mcpServers": {
-    "mon-serveur": {
-      "command": "npx",
-      "args": ["-y", "@monorg/mcp-mon-serveur"],
-      "env": { "MON_API_KEY": "sk-xxxxx" }
-    }
-  }
-}
-```
-
-Pour éviter de stocker des secrets en clair, beaucoup d'utilisateurs branchent un secret manager : `op read op://Personal/api/token` ou `pass show api/token`.
-
-## Distribuer via Docker
-
-Pour des serveurs avec dépendances natives (Playwright, FFmpeg, drivers DB), Docker isole proprement l'exécution.
+Côté utilisateur, dans Claude Code :
 
 ```bash
-# Dockerfile
+claude mcp add devises --env DEVISES_API_KEY=sk-xxx -- npx -y @monorg/mcp-devises
+```
+
+Ou dans un `.mcp.json` versionné à la racine du projet, sans secret en clair grâce à l'expansion de variables :
+
+```json
+{
+  "mcpServers": {
+    "devises": {
+      "command": "npx",
+      "args": ["-y", "@monorg/mcp-devises@1"],
+      "env": { "DEVISES_API_KEY": "${DEVISES_API_KEY}" }
+    }
+  }
+}
+```
+
+Épinglez au moins la version majeure (`@1`) plutôt que `@latest` : une montée de version ne doit pas casser silencieusement les postes de vos utilisateurs.
+
+## Serveur local : distribuer une image Docker
+
+Docker se justifie quand le serveur a des dépendances natives (navigateur headless, FFmpeg, pilotes de base de données).
+
+```dockerfile
+FROM node:22-alpine AS build
+WORKDIR /app
+COPY package*.json tsconfig.json ./
+RUN npm ci
+COPY src ./src
+RUN npm run build
+
 FROM node:22-alpine
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci --omit=dev
-COPY dist ./dist
-ENTRYPOINT ["node", "dist/index.js"]
+COPY --from=build /app/dist ./dist
+USER node
+ENTRYPOINT ["node", "dist/stdio.js"]
 ```
 
-Build et publication :
+Le flag `-i` est indispensable : il garde stdin ouvert, sinon le serveur stdio s'arrête aussitôt.
 
 ```bash
-docker build -t monorg/mcp-mon-serveur:1.0.0 .
-docker push monorg/mcp-mon-serveur:1.0.0
+claude mcp add devises --env DEVISES_API_KEY=sk-xxx -- \
+  docker run -i --rm -e DEVISES_API_KEY monorg/mcp-devises:1.0.0
 ```
 
-Config client correspondante :
+`-e DEVISES_API_KEY` sans valeur transmet au conteneur la variable que Claude Code a placée dans l'environnement du processus `docker`.
 
-```json
-{
-  "mcpServers": {
-    "mon-serveur": {
-      "command": "docker",
-      "args": [
-        "run", "-i", "--rm",
-        "-e", "MON_API_KEY",
-        "monorg/mcp-mon-serveur:1.0.0"
-      ],
-      "env": { "MON_API_KEY": "sk-xxxxx" }
-    }
-  }
-}
+## Serveur distant : Streamable HTTP avec Express
+
+Pour un serveur partagé, utilisez Streamable HTTP. Le transport SSE autonome est déprécié : ne l'utilisez plus pour un nouveau serveur.
+
+```bash
+npm install @modelcontextprotocol/express @modelcontextprotocol/node express
 ```
-
-## Transport HTTP/SSE pour le cloud
-
-Pour un serveur multi-utilisateurs hébergé (ex : Vercel, Cloudflare Workers), utilisez le transport HTTP plutôt que stdio.
 
 ```ts
-import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
-import express from "express";
+// src/http.ts
+import { createMcpExpressApp } from "@modelcontextprotocol/express";
+import { toNodeHandler } from "@modelcontextprotocol/node";
+import { createMcpHandler } from "@modelcontextprotocol/server";
+import { createServer } from "./server.js";
 
-const app = express();
-app.use(express.json());
+const PORT = Number(process.env.PORT ?? 3000);
+const PUBLIC_HOST = process.env.PUBLIC_HOST; // ex. mcp.monorg.com
 
-app.post("/mcp", async (req, res) => {
-  const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
-  await server.connect(transport);
-  await transport.handleRequest(req, res, req.body);
+const handler = createMcpHandler(createServer);
+const app = PUBLIC_HOST
+  ? createMcpExpressApp({ host: "0.0.0.0", allowedHosts: [PUBLIC_HOST] })
+  : createMcpExpressApp();
+const node = toNodeHandler(handler);
+
+app.all("/mcp", (req, res) => void node(req, res, req.body));
+app.get("/health", (_req, res) => {
+  res.json({ ok: true });
 });
 
-app.listen(3000);
+app.listen(PORT, PUBLIC_HOST ? "0.0.0.0" : "127.0.0.1", () => {
+  console.error(`Serveur MCP HTTP sur le port ${PORT}`);
+});
+
+process.on("SIGTERM", async () => {
+  await handler.close();
+  process.exit(0);
+});
 ```
 
-L'utilisateur s'y connecte ainsi :
+Trois points à comprendre :
+
+- **Une instance par requête.** `createMcpHandler` appelle votre factory à chaque requête HTTP. Le serveur est donc sans état et se met à l'échelle horizontalement sans sessions collantes. Créez les pools de connexions et caches au niveau du module, pas dans la factory.
+- **Protection DNS rebinding.** `createMcpExpressApp` valide les en-têtes `Host` et `Origin`. Par défaut il n'accepte que localhost ; derrière un vrai nom de domaine, déclarez-le dans `allowedHosts`, sinon toutes les requêtes sont refusées.
+- **Clients anciens.** Par défaut, le handler sert aussi les clients qui parlent une révision 2025 du protocole, en mode sans état. L'option `legacy: 'reject'` le réserve à la révision 2026-07-28.
+
+Testez à la main :
 
 ```bash
-claude mcp add mon-serveur --transport http https://mcp.monorg.com/mcp
+curl -s -X POST http://127.0.0.1:3000/mcp \
+  -H 'Content-Type: application/json' \
+  -H 'Accept: application/json, text/event-stream' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
 ```
 
-## CI/CD et versioning
+Puis connectez Claude Code :
 
-Automatisez les releases avec GitHub Actions : tag git → publish npm + push Docker. Respectez le SemVer strict, le SDK MCP évolue vite et certaines breaking changes sont silencieuses (validation Zod plus stricte, format de réponse).
+```bash
+claude mcp add --transport http devises https://mcp.monorg.com/mcp
+```
+
+## Serveur distant : Cloudflare Workers, Deno, Bun
+
+Sur un runtime « web standard », le handler s'exporte tel quel, sans adaptateur Node :
+
+```ts
+import { createMcpHandler } from "@modelcontextprotocol/server";
+import { createServer } from "./server.js";
+
+export default createMcpHandler(createServer);
+```
+
+Sur ces runtimes, aucune validation `Host` / `Origin` n'est faite pour vous : placez `hostHeaderValidationResponse` et `originValidationResponse` (exportés par `@modelcontextprotocol/server`) devant `fetch`.
+
+## Authentifier un serveur distant
+
+Un serveur MCP distant est un **serveur de ressources OAuth** : il vérifie des jetons émis par un fournisseur d'identité, il n'en émet pas. Le SDK fournit `requireBearerAuth` (dans `@modelcontextprotocol/express` pour Express, dans `@modelcontextprotocol/server` pour les runtimes web) : vous écrivez seulement la fonction `verifyAccessToken`. Un jeton absent ou expiré reçoit un `401` avec un en-tête `WWW-Authenticate` qui pointe vers les métadonnées de la ressource protégée, ce qui déclenche le flux OAuth côté client. Dans Claude Code, l'utilisateur se connecte ensuite avec `/mcp` ou `claude mcp login <nom>`.
+
+Pour un usage interne simple, un en-tête statique suffit :
+
+```bash
+claude mcp add --transport http devises https://mcp.monorg.com/mcp \
+  --header "Authorization: Bearer $DEVISES_TOKEN"
+```
+
+## Référencer le serveur dans le MCP Registry
+
+Le registre officiel (`registry.modelcontextprotocol.io`, encore en préversion) référence les serveurs publiés ailleurs (npm, PyPI, Docker, URL distante). Pour un paquet npm :
+
+1. Ajoutez `mcpName` dans `package.json` (déjà fait plus haut). Avec une connexion GitHub, il doit commencer par `io.github.<votre-compte>/`.
+2. Publiez le paquet sur npm.
+3. Installez l'outil `mcp-publisher` (par exemple `brew install mcp-publisher`), puis :
+
+```bash
+mcp-publisher init          # génère server.json
+mcp-publisher login github
+mcp-publisher publish
+```
+
+Le champ `name` de `server.json` doit être identique au `mcpName` du paquet.
+
+## Versionner sans casser vos utilisateurs
+
+- Suivez SemVer : renommer un tool, retirer un argument ou changer la forme d'un résultat est une rupture (version majeure).
+- Gardez les noms de tools stables : les utilisateurs les mentionnent dans leurs règles de permission (`mcp__devises__convertir_devise`).
+- Automatisez la publication sur tag Git (GitHub Actions : `npm publish` et `docker push` en parallèle).
+- Si vous migrez depuis le SDK v1, lancez `npx @modelcontextprotocol/codemod@latest v1-to-v2 .` puis traitez les marqueurs `@mcp-codemod-error`.
 
 ## Pour aller plus loin
 
-- Smithery.ai : registre communautaire qui packagent automatiquement les serveurs MCP en Docker
-- MCP Registry officiel : soumettre votre serveur via PR
-- Article suivant : créer un serveur MCP en Python avec FastMCP
+- [Créer un serveur MCP TypeScript : setup et primitives](/wiki/mcp/creer-serveur-ts-setup)
+- [Transports MCP : stdio et Streamable HTTP](/wiki/mcp/transports-stdio-sse)
+- [Sécurité MCP](/wiki/mcp/securite-mcp)
+- [Installer un serveur MCP dans Claude Code](/wiki/mcp/installer-serveur-mcp)
+
+## Sources
+
+- [SDK TypeScript : servir en HTTP, Express, runtimes web, autorisation](https://ts.sdk.modelcontextprotocol.io/v2/)
+- [SDK TypeScript (dépôt GitHub)](https://github.com/modelcontextprotocol/typescript-sdk)
+- [MCP Registry : guide de publication](https://github.com/modelcontextprotocol/registry)
+- [Spécification MCP : transports](https://modelcontextprotocol.io/specification/2026-07-28/basic/transports)
+- [Claude Code : MCP](https://code.claude.com/docs/en/mcp)

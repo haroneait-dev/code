@@ -1,59 +1,93 @@
 ---
 title: "Qu'est-ce que MCP ?"
-description: "Définition, philosophie et problème résolu par le Model Context Protocol d'Anthropic."
-updatedAt: "2026-05-19"
-readingMinutes: 6
+description: "Le Model Context Protocol expliqué simplement : le problème qu'il résout, ses trois briques (tools, resources, prompts) et sa place dans Claude Code en 2026."
+updatedAt: "2026-10-03"
+readingMinutes: 5
 ---
 
-Le **Model Context Protocol** (MCP) est un standard ouvert publié par Anthropic à la fin de 2024. Son objectif : offrir un moyen universel de connecter un modèle de langage (comme Claude) à des sources de données, des outils et des systèmes externes. En d'autres termes, MCP est au LLM ce que l'**USB-C** est aux périphériques : un connecteur unique, normalisé, qui remplace une myriade d'intégrations propriétaires.
+Le **Model Context Protocol** (MCP) est un standard ouvert qui permet à une application d'IA (Claude Code, l'application Claude, un IDE) de se connecter à des outils et à des données externes : fichiers, bases de données, GitHub, Notion, Sentry, etc. La documentation officielle le compare à un **port USB-C** : une prise unique et normalisée, à la place d'une intégration sur mesure pour chaque service.
 
 ## Le problème que MCP résout
 
-Avant MCP, chaque application LLM devait réimplémenter sa propre couche d'intégration. Vous vouliez que Claude lise vos fichiers ? Il fallait coder un wrapper. L'interroger sur votre base Postgres ? Un autre wrapper. Y connecter Slack, Linear ou Notion ? Encore d'autres wrappers, tous incompatibles entre eux. Cette fragmentation produisait le fameux problème **M × N** : M modèles à connecter à N outils, soit M×N intégrations à maintenir.
+Sans standard, chaque application d'IA doit coder sa propre intégration pour chaque service. Avec M applications et N services, on obtient M × N connecteurs à maintenir, tous incompatibles entre eux.
 
-MCP transforme l'équation en **M + N** : chaque modèle parle MCP, chaque outil expose un serveur MCP, et tout le monde se comprend.
+MCP ramène l'équation à **M + N** :
 
-## La philosophie : ouvert, local-first, composable
+- chaque application implémente une fois le côté **client** MCP ;
+- chaque service expose une fois un **serveur** MCP ;
+- n'importe quel client peut alors parler à n'importe quel serveur.
 
-Trois principes guident la conception du protocole :
+Résultat concret : le même serveur Sentry ou GitHub fonctionne dans Claude Code, dans Claude Desktop, dans VS Code ou dans Cursor.
 
-- **Ouvert** : la spécification est publique, sous licence permissive, et n'importe qui peut écrire un client ou un serveur.
-- **Local-first** : par défaut, un serveur MCP tourne sur la machine de l'utilisateur. Vos données ne transitent pas par un tiers.
-- **Composable** : on peut brancher plusieurs serveurs à un même client, et un même serveur à plusieurs clients (Claude Desktop, Claude Code, Cursor, Zed, etc.).
+## Ce qu'un serveur MCP peut offrir
 
-## Comparaison avec les "plugins LLM" classiques
+Un serveur expose trois types de briques, appelées **primitives** :
 
-Les plugins ChatGPT (2023) ou les "GPTs" reposaient sur des APIs HTTP hébergées, propriétaires, validées par un app store. MCP prend le contre-pied :
-
-| Aspect | Plugins LLM classiques | MCP |
+| Primitive | Rôle | Exemple |
 |---|---|---|
-| Transport | HTTP distant | stdio local ou SSE |
-| Gouvernance | App store fermé | Open source |
-| Hébergement | Cloud du fournisseur | Machine de l'utilisateur |
-| Auth | OAuth obligatoire | Optionnel, contextuel |
-| Découverte | Marketplace | Fichier de config local |
+| **Tools** | Actions que le modèle peut déclencher | créer une issue, exécuter une requête SQL |
+| **Resources** | Données que l'on peut lire et joindre au contexte | un schéma de base, un fichier, un ticket |
+| **Prompts** | Modèles de requêtes réutilisables | « revue de PR », « résumé d'incident » |
 
-Résultat : MCP donne à l'utilisateur le contrôle total sur les données partagées et les outils exposés au modèle.
+Côté client, la spécification définit aussi l'**élicitation** : le serveur peut demander une information à l'utilisateur en cours de tâche (un formulaire, une connexion dans le navigateur).
 
-## Un exemple concret
+Le détail de chaque primitive est dans [Resources, Tools, Prompts](/wiki/mcp/primitives-resources-tools-prompts).
 
-Imaginons que vous demandiez à Claude : "Résume les tickets Linear ouverts cette semaine et crée un brouillon de release notes dans Notion." Sans MCP, ce workflow nécessite un agent custom branché manuellement aux deux APIs. Avec MCP, il suffit que Claude Code voie deux serveurs déclarés — `linear` et `notion` — et il peut appeler leurs outils via un format JSON-RPC standardisé.
+## Local ou distant
 
-```json
-{
-  "mcpServers": {
-    "linear": { "command": "npx", "args": ["-y", "@linear/mcp-server"] },
-    "notion": { "command": "npx", "args": ["-y", "@notion/mcp-server"] }
-  }
-}
+Un serveur MCP peut tourner à deux endroits :
+
+- **en local**, lancé par le client comme sous-processus (transport **stdio**). Exemple : le serveur Filesystem qui lit un dossier de votre machine ;
+- **à distance**, hébergé par l'éditeur du service (transport **Streamable HTTP**, souvent avec OAuth). Exemple : `https://mcp.notion.com/mcp` ou `https://mcp.sentry.dev/mcp`.
+
+L'ancien transport HTTP+SSE est déprécié. En 2026, la plupart des grands services proposent un serveur distant officiel.
+
+## Un exemple dans Claude Code
+
+Ajoutez deux serveurs distants :
+
+```bash
+claude mcp add --transport http notion https://mcp.notion.com/mcp
+claude mcp add --transport http sentry https://mcp.sentry.dev/mcp
 ```
 
-## Pourquoi cela change la donne
+Lancez `claude`, tapez `/mcp` pour vous connecter (OAuth dans le navigateur), puis demandez :
 
-MCP repositionne le LLM comme un **orchestrateur** plutôt qu'un silo. Le modèle ne contient plus la logique métier : il la **délègue** à des serveurs spécialisés qui savent parler à un système particulier. On peut auditer chaque serveur séparément, le versionner, le remplacer. C'est l'esprit Unix appliqué à l'IA : faire une chose, bien la faire, et composer.
+```text
+Trouve les 3 erreurs Sentry les plus fréquentes de cette semaine
+et crée une page Notion qui les résume avec un plan de correction.
+```
+
+Claude choisit lui-même les outils des deux serveurs (`mcp__sentry__…`, `mcp__notion__…`) et vous demande l'autorisation selon votre mode de permission.
+
+## Où en est le protocole en octobre 2026
+
+- **Origine** : publié par Anthropic en novembre 2024, sous licence open source. La spécification, les SDK et les serveurs de référence sont sur GitHub (`modelcontextprotocol`).
+- **Version courante de la spécification** : **2026-07-28**. Elle rend le protocole sans état : plus de poignée de main `initialize`, chaque requête porte sa version et ses capacités, et une méthode `server/discover` décrit le serveur.
+- **Fonctions dépréciées** dans cette version : Roots, Sampling et Logging (toujours utilisables pendant au moins 12 mois).
+- **Extensions officielles** : Tasks (opérations longues) et MCP Apps (interfaces interactives affichées dans la conversation).
+- **Écosystème** : Claude, ChatGPT, VS Code, Cursor et de nombreux autres clients supportent MCP. Le [registre officiel](https://registry.modelcontextprotocol.io/) liste les serveurs publiés.
+
+Claude Code gère les deux générations du protocole : il utilise la révision 2026-07-28 avec les serveurs qui la supportent et l'ancienne poignée de main avec les autres.
+
+## MCP, skill ou plugin ?
+
+- **MCP** donne à Claude un **accès** : un service, une API, une base.
+- Une **skill** lui donne une **méthode** : des instructions et des scripts pour une tâche.
+- Un **plugin** **regroupe** skills, agents, hooks et serveurs MCP pour les installer en une fois.
+
+Voir [Skill, agent ou MCP ?](/wiki/skills/skill-vs-agent-vs-mcp) pour choisir.
 
 ## Pour aller plus loin
 
-- Spécification officielle : [modelcontextprotocol.io](https://modelcontextprotocol.io)
-- Annonce d'Anthropic (nov. 2024) : "Introducing the Model Context Protocol"
-- Article suivant : **Architecture client/serveur** pour comprendre comment Claude dialogue concrètement avec un serveur MCP
+- [Architecture client/serveur de MCP](/wiki/mcp/architecture-client-serveur)
+- [Installer un serveur MCP dans Claude Code](/wiki/mcp/installer-serveur-mcp)
+- [Sécurité des serveurs MCP](/wiki/mcp/securite-mcp)
+- [MCP en 2026](/wiki/mcp/evolution-2026-apps-elicitation)
+
+## Sources
+
+- Introduction officielle : https://modelcontextprotocol.io/docs/getting-started/intro
+- Spécification 2026-07-28 et changelog : https://modelcontextprotocol.io/specification/2026-07-28/changelog
+- MCP dans Claude Code : https://code.claude.com/docs/en/mcp
+- Registre des serveurs : https://registry.modelcontextprotocol.io/

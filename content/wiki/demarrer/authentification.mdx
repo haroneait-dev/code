@@ -1,156 +1,191 @@
 ---
 title: "Authentification et clés API"
-description: "Configurer son compte Claude Code et gérer les clés API Anthropic en toute sécurité."
-updatedAt: "2026-05-19"
-readingMinutes: 6
+description: "Se connecter à Claude Code avec un abonnement, la Console ou un cloud, comprendre l'ordre de priorité des identifiants et protéger ses clés."
+updatedAt: "2026-10-03"
+readingMinutes: 7
 ---
 
-Claude Code supporte plusieurs méthodes d'authentification : OAuth via votre compte Claude (Pro/Max/Team), clé API Anthropic Console, ou intégration cloud (AWS Bedrock, Google Vertex AI). Ce guide explique comment choisir et configurer chaque option en respectant les bonnes pratiques de sécurité.
+Claude Code a besoin d'un identifiant pour appeler le modèle : votre abonnement Claude, un compte Claude Console (facturation à l'usage) ou un fournisseur cloud. Cet article explique comment choisir, comment vérifier lequel est réellement utilisé, et comment éviter les fuites de clés.
 
 ## Les méthodes d'authentification
 
 | Méthode | Pour qui ? | Facturation |
 |---|---|---|
-| **OAuth Claude.ai** | Particuliers Pro/Max | Incluse dans l'abonnement |
-| **OAuth Team/Enterprise** | Équipes | Plan Team/Enterprise |
-| **API Key Console** | Développeurs/startups | Pay-as-you-go (tokens) |
-| **AWS Bedrock** | Entreprises AWS | Facturation AWS |
-| **Google Vertex AI** | Entreprises GCP | Facturation GCP |
+| **Compte Claude (Pro, Max)** | Particuliers, freelances | Incluse dans l'abonnement |
+| **Claude for Teams / Enterprise** | Équipes et organisations | Abonnement de l'organisation |
+| **Claude Console** | Développeurs, startups, usage API | À l'usage (tokens) |
+| **Amazon Bedrock, Google Cloud Agent Platform (Vertex AI), Microsoft Foundry** | Entreprises déjà sur un cloud | Facture du fournisseur cloud |
+| **Passerelle (gateway) d'entreprise** | Organisations avec SSO et passerelle auto-hébergée | Selon la configuration de l'organisation |
 
-## Première connexion — OAuth (recommandée)
+## Première connexion
 
-Au premier lancement, Claude Code propose l'authentification OAuth :
+Après l'[installation](/wiki/demarrer/installation), lancez simplement :
 
 ```bash
 claude
-# → "Welcome to Claude Code. Press Enter to log in..."
 ```
 
-Un navigateur s'ouvre, vous vous connectez à votre compte Claude, autorisez l'accès, et le CLI capture le token automatiquement. Aucune clé à copier-coller.
+Au premier lancement, un navigateur s'ouvre pour vous connecter. Quelques détails pratiques :
 
-> Les tokens OAuth sont stockés dans `~/.claude/` avec des permissions restrictives (`chmod 600`). Ne committez jamais ce dossier.
+- si le navigateur ne s'ouvre pas, appuyez sur `c` pour copier l'URL de connexion ;
+- si le navigateur affiche un code au lieu de revenir au terminal (fréquent en WSL2, SSH ou conteneur), collez-le à l'invite `Paste code here if prompted` ;
+- le terminal affiche `Login successful`, puis appuyez sur Entrée.
 
-## Utiliser une clé API Anthropic
+Dans une session, trois commandes servent à gérer la connexion :
 
-Si vous préférez la facturation à l'usage (sans abonnement Claude.ai), générez une clé sur [console.anthropic.com](https://console.anthropic.com) :
+```text
+/login    # se connecter ou changer de compte (et renouveler une connexion qui expire)
+/logout   # se déconnecter (réinitialise aussi l'assistant de premier lancement)
+/status   # voir la méthode active, l'organisation, l'e-mail et les fichiers de réglages chargés
+```
 
-1. Connectez-vous à la Console
-2. Allez dans **Settings → API Keys**
-3. Cliquez **Create Key**
-4. Copiez la clé (commence par `sk-ant-api03-...`)
+Quand votre connexion expire dans moins de trois jours, Claude Code l'indique au démarrage : relancez `/login`. C'est important pour les sessions longues (agents en arrière-plan, Remote Control), qui s'arrêtent si l'identifiant expire.
 
-Configurez-la via variable d'environnement :
+## Où sont stockés les identifiants ?
+
+| Système | Emplacement |
+|---|---|
+| macOS | Trousseau (Keychain) chiffré ; repli sur `~/.claude/.credentials.json` (mode `0600`) si le trousseau est verrouillé, par exemple en SSH |
+| Linux | `~/.claude/.credentials.json` (mode `0600`) |
+| Windows | `%USERPROFILE%\.claude\.credentials.json` |
+
+Ne copiez jamais ce fichier dans un dépôt ou une image Docker partagée.
+
+## Utiliser une clé API Claude Console
+
+Pour une facturation à l'usage, créez une clé dans la Console ([platform.claude.com](https://platform.claude.com)), section **API Keys**, puis exportez-la :
 
 ```bash
-export ANTHROPIC_API_KEY="sk-ant-api03-XXXXXX"
+export ANTHROPIC_API_KEY="sk-ant-..."
 claude
 ```
 
-Pour la rendre permanente, ajoutez la ligne dans `~/.zshrc` ou `~/.bashrc` :
+En mode interactif, Claude Code vous demande une seule fois d'approuver la clé et retient votre choix (modifiable ensuite avec le réglage « Use custom API key » de `/config`). En mode non interactif (`claude -p`), la clé est toujours utilisée si elle est présente.
+
+Depuis 2026, vous pouvez aussi choisir le compte Console au `/login` et vous connecter **sans créer de clé** (option « Sign in with your Console account », recommandée) : Claude Code garde alors un jeton OAuth renouvelé automatiquement au lieu d'une clé statique.
+
+> Piège fréquent : vous avez un abonnement Pro ou Max, mais une vieille variable `ANTHROPIC_API_KEY` traîne dans votre `~/.zshrc`. Claude Code utilise alors la clé (et la facture à l'usage). Faites `unset ANTHROPIC_API_KEY`, supprimez la ligne du fichier, puis vérifiez avec `/status`.
+
+## L'ordre de priorité des identifiants
+
+Quand plusieurs identifiants sont présents, Claude Code prend le premier de cette liste :
+
+1. Fournisseur cloud, si `CLAUDE_CODE_USE_BEDROCK`, `CLAUDE_CODE_USE_VERTEX` ou `CLAUDE_CODE_USE_FOUNDRY` est défini.
+2. `ANTHROPIC_AUTH_TOKEN` (envoyé en `Authorization: Bearer`, utile derrière une passerelle LLM ou un proxy).
+3. `ANTHROPIC_API_KEY` (envoyé en `X-Api-Key`).
+4. La sortie du script `apiKeyHelper` (identifiants dynamiques, par exemple tirés d'un coffre-fort).
+5. `CLAUDE_CODE_OAUTH_TOKEN` (jeton longue durée, voir plus bas).
+6. Les profils Anthropic et identifiants de fédération (Workload Identity Federation, CLI `ant`).
+7. La connexion par abonnement faite avec `/login`.
+
+Une session de passerelle d'entreprise connectée passe avant tout le reste. Les sessions cloud (claude.ai/code) utilisent toujours votre abonnement.
+
+## Plusieurs comptes sur la même machine
+
+Pour garder un compte personnel et un compte professionnel connectés en parallèle, donnez à chacun son propre dossier de configuration avec `CLAUDE_CONFIG_DIR` :
 
 ```bash
-echo 'export ANTHROPIC_API_KEY="sk-ant-api03-XXXXXX"' >> ~/.zshrc
-source ~/.zshrc
+# Dans ~/.zshrc ou ~/.bashrc
+alias claude-pro='CLAUDE_CONFIG_DIR=~/.claude-pro claude'
 ```
 
-> Ne committez **jamais** une clé API dans un repo. Utilisez `.env` (ignoré par git) ou un gestionnaire de secrets comme 1Password CLI, doppler, ou Vault.
+`claude` garde votre compte personnel, `claude-pro` a ses propres réglages, son historique et sa connexion.
 
-## Vérifier le statut d'authentification
+Pour changer de clé selon le projet, `direnv` reste pratique :
 
-Dans le REPL, tapez :
-
-```text
-/status
+```bash
+# .envrc à la racine du projet (à ajouter au .gitignore)
+export ANTHROPIC_API_KEY="sk-ant-..."
 ```
 
-Vous voyez le compte connecté, le mode (OAuth/API key), le modèle actif, et le solde si applicable. Pour basculer entre méthodes :
-
-```text
-/login    # nouvelle session OAuth
-/logout   # supprime le token local
+```bash
+direnv allow
 ```
 
-## Authentification via AWS Bedrock
+## Clés dynamiques avec `apiKeyHelper`
 
-Pour les organisations qui exécutent Claude sur AWS Bedrock :
+Si votre entreprise distribue des clés courtes depuis un coffre-fort, déclarez un script dans `~/.claude/settings.json`. Il doit afficher la clé sur la sortie standard :
+
+```json
+{
+  "apiKeyHelper": "~/bin/recuperer-cle-claude.sh"
+}
+```
+
+Si le script met plus de 10 secondes, un avertissement s'affiche. S'il échoue ou n'affiche rien, les requêtes échouent avec `Your apiKeyHelper script is failing`.
+
+## Amazon Bedrock
 
 ```bash
 export CLAUDE_CODE_USE_BEDROCK=1
-export AWS_REGION=us-west-2
+export AWS_REGION=us-east-1
 export AWS_PROFILE=mon-profil
 claude
 ```
 
-Claude Code utilise vos credentials AWS standards (IAM role, profile, ou variables `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY`). Vérifiez que votre rôle a la permission `bedrock:InvokeModel` sur les modèles Claude activés dans votre région.
+Claude Code utilise vos identifiants AWS habituels (profil, rôle IAM ou variables `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY`). Votre rôle doit pouvoir invoquer les modèles Claude activés dans la région. Au `/login`, l'option **3rd-party platform** lance aussi un assistant de configuration pour Bedrock et Vertex AI. Détails : [Claude Code sur AWS Bedrock](/wiki/enterprise/aws-bedrock).
 
-## Authentification via Google Vertex AI
-
-Sur GCP avec Vertex AI :
+## Google Cloud (Vertex AI)
 
 ```bash
 export CLAUDE_CODE_USE_VERTEX=1
-export CLOUD_ML_REGION=us-east5
+export CLOUD_ML_REGION=global
 export ANTHROPIC_VERTEX_PROJECT_ID=mon-projet-gcp
 gcloud auth application-default login
 claude
 ```
 
-Vous devez avoir activé les modèles Anthropic dans Vertex Model Garden et disposer du rôle `roles/aiplatform.user`.
+Les modèles Anthropic doivent être activés dans le Model Garden du projet. Détails : [Google Cloud Vertex AI](/wiki/enterprise/gcp-vertex).
 
-## Gérer plusieurs comptes/projets
+## Authentification en CI/CD
 
-Pour basculer entre clés selon le projet, utilisez un outil comme `direnv` :
+Deux options selon la facturation voulue :
 
-```bash
-# .envrc à la racine du projet
-export ANTHROPIC_API_KEY="sk-ant-api03-clé-spécifique-projet"
+- **Clé API Console** : variable `ANTHROPIC_API_KEY` stockée en secret.
+- **Abonnement** : générez un jeton valable un an avec `claude setup-token`, puis stockez-le en secret sous le nom `CLAUDE_CODE_OAUTH_TOKEN`. Ce jeton ne sert qu'aux requêtes modèle (pas de Remote Control ni de connecteurs claude.ai).
+
+Exemple GitHub Actions :
+
+```yaml
+- name: Revue avec Claude Code
+  env:
+    ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+  run: |
+    curl -fsSL https://claude.ai/install.sh | bash
+    ~/.local/bin/claude -p "Relis le diff de cette PR et liste les bugs probables" --permission-mode plan
 ```
 
-Puis :
+Pour un usage plus complet sur GitHub (commentaires de PR, mentions `@claude`), voyez [Claude Code en CI/CD](/wiki/cli/cicd-execution).
 
-```bash
-direnv allow
-claude
-```
-
-Chaque fois que vous entrez dans le dossier, la bonne clé est chargée automatiquement.
+> Le mode `--bare` ne lit pas `CLAUDE_CODE_OAUTH_TOKEN` : utilisez alors `ANTHROPIC_API_KEY` ou `apiKeyHelper`.
 
 ## Bonnes pratiques de sécurité
 
 | Pratique | Pourquoi |
 |---|---|
-| Ne jamais committer `.env` ou clés en clair | Une clé fuite = facturation tierce |
-| Utiliser une clé par environnement (dev/staging/prod) | Limite le rayon d'impact en cas de fuite |
-| Activer un **spending limit** sur la Console | Plafond de dépenses mensuel |
-| Régénérer les clés tous les 90 jours | Hygiène standard |
-| Auditer les clés via la Console | Detect usage anormal |
+| Ne jamais committer `.env`, `.envrc` ou une clé en clair | Une clé publiée est exploitée en quelques minutes |
+| Une clé par environnement (dev, CI, prod) | Limite les dégâts si l'une fuit |
+| Définir une limite de dépenses dans la Console | Plafond en cas d'abus |
+| Bloquer la lecture des secrets par Claude (`Read(./.env)` en `deny`) | Évite qu'un secret finisse dans le contexte |
+| Vérifier `/status` après tout changement | Savoir quel identifiant est réellement utilisé |
 
-## Que faire si une clé fuite ?
+## Que faire si une clé fuit ?
 
-1. Allez immédiatement sur [console.anthropic.com → API Keys](https://console.anthropic.com/settings/keys)
-2. Cliquez sur la clé compromise → **Revoke**
-3. Générez une nouvelle clé
-4. Mettez à jour vos environnements (`.env`, secrets manager, CI)
-5. Vérifiez les logs d'usage pour repérer un abus
-
-## Authentification en CI/CD
-
-En GitHub Actions, stockez la clé en secret puis :
-
-```yaml
-- name: Run Claude Code
-  env:
-    ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-  run: |
-    npm install -g @anthropic-ai/claude-code
-    claude -p "Revue de code du PR" --permission-mode plan
-```
-
-En GitLab CI, utilisez les variables protégées. En Vercel, ajoutez `ANTHROPIC_API_KEY` dans Project Settings → Environment Variables.
+1. Révoquez-la immédiatement dans la Console, section **API Keys**.
+2. Créez une nouvelle clé.
+3. Mettez à jour vos environnements (`.env`, gestionnaire de secrets, CI).
+4. Consultez l'usage dans la Console pour repérer une consommation anormale.
+5. Purgez la clé de l'historique git si elle y a été committée (la révocation reste la priorité).
 
 ## Pour aller plus loin
 
-- [Console Anthropic](https://console.anthropic.com) — gestion des clés et facturation
-- [Installation de Claude Code](/wiki/demarrer/installation) — prérequis
-- [Configurer un projet](/wiki/demarrer/configurer-projet) — bonnes pratiques par repo
-- [Documentation auth officielle](https://docs.claude.com/claude-code/auth) — référence complète
+- [Installer Claude Code](/wiki/demarrer/installation)
+- [Dépannage de l'installation et de la connexion](/wiki/demarrer/troubleshooting-installation)
+- [Variables d'environnement](/wiki/cli/variables-env)
+- [Gérer les secrets dans un projet](/wiki/workflows/secrets-env)
+
+## Sources
+
+- [Authentication (documentation Claude Code)](https://code.claude.com/docs/en/authentication)
+- [Settings (documentation Claude Code)](https://code.claude.com/docs/en/settings)
+- [Claude Console](https://platform.claude.com)

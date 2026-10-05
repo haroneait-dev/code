@@ -1,105 +1,150 @@
 ---
-title: "Le fichier de config globale"
-description: "Anatomie de la config utilisateur en ~/.claude/settings.json (hors CLAUDE.md projet)."
-updatedAt: "2026-05-19"
-readingMinutes: 6
+title: "La configuration globale (~/.claude/settings.json)"
+description: "Ce que contient votre fichier de réglages personnel, comment il se combine avec les réglages de projet, et un modèle commenté prêt à adapter."
+updatedAt: "2026-10-03"
+readingMinutes: 7
 ---
 
-Le fichier `~/.claude/settings.json` est le point central de la configuration utilisateur de Claude Code. Contrairement à `CLAUDE.md`, qui décrit le contexte d'un projet, ce fichier pilote le comportement du harness lui-même : modèle par défaut, permissions globales, variables d'environnement, hooks, et intégrations MCP. Bien le configurer évite la majorité des prompts répétitifs et harmonise vos sessions entre machines.
+Le fichier `~/.claude/settings.json` règle le comportement de Claude Code dans **tous vos projets** : modèle, permissions, variables d'environnement, hooks, thème, ligne de statut. Il ne remplace pas `CLAUDE.md`, qui donne des instructions au modèle : ici, vous configurez l'outil lui-même.
 
-## Localisation et précédence
+## Où sont les fichiers et qui gagne ?
 
-Claude Code lit plusieurs fichiers de settings dans cet ordre, du plus général au plus spécifique :
+| Niveau (du plus fort au plus faible) | Fichier | Portée |
+|---|---|---|
+| 1. Réglages gérés | `managed-settings.json`, MDM ou console d'administration claude.ai | Toute l'organisation, non modifiable |
+| 2. Ligne de commande | `claude --settings '{...}'`, `--model`… | Cette session uniquement |
+| 3. Projet local | `.claude/settings.local.json` | Vous, dans ce projet |
+| 4. Projet partagé | `.claude/settings.json` | Toute l'équipe (committé) |
+| 5. Utilisateur | `~/.claude/settings.json` | Vous, dans tous vos projets |
 
-| Fichier                                    | Portée               | Versionné ? |
-|--------------------------------------------|----------------------|-------------|
-| `~/.claude/settings.json`                  | Utilisateur global   | Non         |
-| `<repo>/.claude/settings.json`             | Projet (équipe)      | Oui         |
-| `<repo>/.claude/settings.local.json`       | Projet (personnel)   | Non         |
-| Flags CLI (`--model`, `--allowed-tools`)   | Session              | —           |
+Deux règles à retenir :
 
-Les niveaux suivants surchargent les précédents clé par clé. Une permission ajoutée au niveau projet s'ajoute à la liste utilisateur, elle ne la remplace pas.
+- pour une clé simple (`model`, `theme`), **le niveau le plus haut gagne** ;
+- pour les listes (`permissions.allow`, `permissions.deny`), **les niveaux s'additionnent**. Et un `deny` posé à n'importe quel niveau bloque, même si un autre niveau autorise.
 
-## Squelette commenté
+Sous Windows, `~/.claude` correspond à `%USERPROFILE%\.claude`. Pour placer vos réglages ailleurs (ou séparer deux comptes), utilisez la variable `CLAUDE_CONFIG_DIR`.
+
+### Et `~/.claude.json` ?
+
+C'est un autre fichier, géré par Claude Code lui-même : connexion, serveurs MCP de portée utilisateur ou locale, décisions de confiance par projet, et quelques préférences d'interface (`verbose`, `autoConnectIde`, `diffTool`…). Vous n'avez normalement pas à l'éditer : passez par `/config` et `claude mcp add`.
+
+## Modèle commenté
+
+Les fichiers de réglages sont du **JSON strict** : pas de commentaires, pas de virgule finale. Les explications sont donc sous le bloc.
 
 ```json
 {
-  "model": "claude-sonnet-5-5",
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "model": "opus",
+  "effortLevel": "high",
+  "language": "french",
   "theme": "dark",
+  "autoUpdatesChannel": "stable",
+  "cleanupPeriodDays": 60,
   "env": {
-    "EDITOR": "code --wait",
-    "PAGER": "less -R"
+    "EDITOR": "code --wait"
   },
   "permissions": {
+    "defaultMode": "auto",
     "allow": [
-      "Bash(git status:*)",
-      "Bash(npm run *)",
-      "Read(//Users/harone/**)"
+      "Bash(git status)",
+      "Bash(git diff *)",
+      "Bash(gh pr view *)"
     ],
     "deny": [
-      "Bash(rm -rf *)",
-      "WebFetch(domain:internal.corp)"
+      "Read(./.env)",
+      "Read(./.env.*)",
+      "Read(~/.ssh/**)",
+      "Read(~/.aws/**)"
     ]
+  },
+  "attribution": {
+    "commit": "",
+    "pr": ""
   },
   "hooks": {
     "Stop": [
-      { "command": "afplay /System/Library/Sounds/Glass.aiff" }
-    ]
-  }
-}
-```
-
-## Permissions : allow / deny / ask
-
-Trois listes cohabitent. `allow` autorise sans prompt, `deny` bloque sans recours, `ask` force la demande même si l'outil serait sinon silencieux. Les motifs supportent les wildcards (`*`) et les sélecteurs spécifiques par outil :
-
-```json
-{
-  "permissions": {
-    "allow": ["Bash(gh pr view:*)", "Edit(//Users/harone/claude-code/**)"],
-    "deny":  ["Bash(curl http://*)"],
-    "ask":   ["Write(//etc/**)"]
-  }
-}
-```
-
-Astuce : la skill `fewer-permission-prompts` scanne vos transcripts pour proposer une allowlist optimale en quelques secondes.
-
-## Hooks pour automatiser
-
-Les hooks sont des commandes shell déclenchées par le harness à des évènements précis (`PreToolUse`, `PostToolUse`, `Stop`, `SubagentStop`). Ils sont indispensables dès que vous voulez un comportement systématique — les préférences en mémoire ne suffisent pas, c'est le harness qui orchestre.
-
-```json
-{
-  "hooks": {
-    "PostToolUse": [
       {
-        "matcher": "Edit|Write",
-        "command": "jq -r '.tool_input.file_path' | xargs npx prettier --write"
+        "hooks": [
+          { "type": "command", "command": "afplay /System/Library/Sounds/Glass.aiff" }
+        ]
       }
     ]
   }
 }
 ```
 
+| Clé | Rôle |
+|---|---|
+| `$schema` | Autocomplétion et validation dans VS Code, Cursor et tout éditeur compatible JSON Schema |
+| `model` | Modèle des nouvelles sessions : alias (`opus`, `sonnet`, `haiku`) ou identifiant complet (`claude-opus-5-5`) |
+| `effortLevel` | Effort par défaut : `low`, `medium`, `high` ou `xhigh` (`max` ne se règle que pour une session) |
+| `language` | Langue des réponses de Claude |
+| `theme` | Thème de l'interface |
+| `autoUpdatesChannel` | `latest` (par défaut) ou `stable` (version d'environ une semaine, sans régression majeure) |
+| `cleanupPeriodDays` | Durée de conservation des transcriptions de session |
+| `env` | Variables d'environnement injectées dans chaque session et ses sous-processus |
+| `permissions` | Mode de départ et règles `allow` / `ask` / `deny` |
+| `attribution` | Texte ajouté aux commits et PR (une chaîne vide le masque) ; remplace l'ancien `includeCoAuthoredBy` |
+| `hooks` | Commandes lancées à des moments précis (ici, un son quand Claude a fini) |
+
+Autres clés utiles : `statusLine` (ligne de statut personnalisée), `outputStyle` (style de réponse), `spinnerTipsEnabled` (masquer les astuces), `editorMode` (`"vim"`), `sandbox` (voir [Permissions et sandbox](/wiki/demarrer/permissions-sandbox)), `apiKeyHelper` (voir [Authentification](/wiki/demarrer/authentification)), `enabledPlugins`, `fallbackModel`.
+
+## Permissions globales : rester raisonnable
+
+Au niveau utilisateur, mettez surtout des **interdictions** valables partout (secrets, clés SSH, identifiants cloud) et des autorisations pour des commandes en lecture seule. Les autorisations spécifiques à un projet (`npm run test *`, scripts maison) vont dans le `.claude/settings.json` du projet.
+
+Attention aux chemins dans le fichier utilisateur : `Read(/secrets/**)` y désigne `~/.claude/secrets/**`, pas un dossier de votre projet. Utilisez `~/` ou `//` (chemin absolu) pour viser un emplacement précis.
+
 ## Variables d'environnement
 
-Le bloc `env` injecte des variables dans chaque session. Pratique pour pointer vers un proxy d'entreprise, fixer `ANTHROPIC_API_KEY` (déconseillé en clair, préférez le keychain), ou activer un mode debug :
+Le bloc `env` évite de surcharger votre `~/.zshrc`. Exemples fréquents :
 
-```bash
-# Vérifier ce qui a été chargé
-claude --print-env
+```json
+{
+  "env": {
+    "HTTPS_PROXY": "http://proxy.example.com:8080",
+    "NODE_EXTRA_CA_CERTS": "/chemin/vers/ca-entreprise.pem",
+    "DISABLE_AUTOUPDATER": "1"
+  }
+}
 ```
+
+Évitez d'y mettre une `ANTHROPIC_API_KEY` en clair : préférez `/login` ou un `apiKeyHelper` qui lit un gestionnaire de secrets. Liste complète : [Variables d'environnement](/wiki/cli/variables-env).
+
+## Modifier sans se tromper
+
+- **`/config`** ouvre un panneau pour les réglages personnels courants (thème, mode d'édition, canal de mise à jour…) et les enregistre au bon endroit. Forme directe : `/config theme=dark`.
+- **`/permissions`** gère les règles sans éditer de JSON.
+- **`/model`** change le modèle et l'enregistre comme défaut (touche `s` dans le sélecteur pour ne changer que la session en cours).
+- **Pour tester sans rien écrire** : `claude --settings '{"model": "sonnet"}'`.
+
+Claude Code recharge les fichiers modifiés en cours de session (permissions, hooks, `apiKeyHelper`). Exceptions : `model` et `effortLevel` sont lus au démarrage ; utilisez `/model` et `/effort` pour changer en cours de route.
+
+## Vérifier ce qui est chargé
+
+```text
+/status
+```
+
+La ligne « Setting sources » liste les fichiers lus. Si un fichier contient une erreur de JSON, Claude Code l'annonce au démarrage (« Settings Error ») et propose de le corriger. En dehors d'une session, `claude doctor` liste les entrées rejetées.
 
 ## Bonnes pratiques
 
-- Gardez `settings.json` minimal et lisible — déplacez le bruit dans `settings.local.json`.
-- Ne committez jamais de clés API ; utilisez plutôt `op run` (1Password CLI) ou `gh auth token`.
-- Versionnez le `.claude/settings.json` du projet pour partager permissions et hooks avec l'équipe.
-- Avant de modifier à la main, utilisez la commande `/config` ou la skill `update-config` qui valide la syntaxe.
+- Gardez le fichier court : seulement ce qui vaut pour tous vos projets.
+- Ne committez jamais de secret, ni ici ni dans un fichier de projet.
+- Sauvegardez `~/.claude/settings.json` (dépôt de dotfiles privé) pour retrouver votre configuration sur une autre machine.
+- Relisez de temps en temps vos `.claude/settings.local.json` : les « don't ask again » s'y accumulent.
 
 ## Pour aller plus loin
 
-- [Référence settings.json officielle](https://docs.claude.com/claude-code/settings)
-- [Catalogue de hooks communautaires](https://github.com/anthropics/claude-code/tree/main/examples/hooks)
-- [Article wiki — Permissions et sandbox](/wiki/demarrer/permissions-sandbox)
+- [Configurer un projet](/wiki/demarrer/configurer-projet)
+- [Le fichier settings.json en détail](/wiki/cli/settings-json)
+- [Personnaliser la ligne de statut](/wiki/cli/status-line-custom)
+- [Introduction aux hooks](/wiki/hooks/introduction-hooks)
+
+## Sources
+
+- [Settings files and precedence](https://code.claude.com/docs/en/settings)
+- [Settings reference](https://code.claude.com/docs/en/settings-reference)
+- [Configure permissions](https://code.claude.com/docs/en/permissions)

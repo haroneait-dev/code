@@ -1,19 +1,81 @@
 ---
-title: "Audit trail"
-description: "Tracer toutes les actions de Claude pour la compliance via hooks JSONL et export vers un SIEM."
-updatedAt: "2026-05-19"
-readingMinutes: 6
+title: "Audit trail : tracer les actions de Claude Code"
+description: "Construire une piste d'audit des commandes, fichiers et décisions de permission de Claude Code avec les événements OpenTelemetry envoyés vers un SIEM, complétés par des hooks JSONL locaux."
+updatedAt: "2026-10-03"
+readingMinutes: 8
 ---
 
-En contexte régulé (banque, santé, défense), chaque action automatisée doit être traçable. Quand Claude Code écrit du code, exécute des commandes ou appelle des outils, il faut conserver un journal infalsifiable de ces événements. Les hooks Claude Code offrent un point d'extension natif pour produire ce journal, le stocker au format JSONL puis l'expédier vers un SIEM (Splunk, Elastic, Datadog, Sentinel).
+Dans un contexte régulé (banque, santé, secteur public), chaque action automatisée doit être traçable : qui a lancé l'agent, quelle commande a tourné, quel fichier a changé, qui a autorisé l'action. Claude Code fournit deux mécanismes complémentaires : les événements OpenTelemetry, que la documentation présente comme la source de données d'audit officielle, et les hooks, pour un journal local sur mesure.
 
-## Pourquoi un audit trail dédié
+## Quel mécanisme pour quel besoin ?
 
-Les logs standards (terminal, historique shell) ne suffisent pas. Un auditeur attend une chaîne de preuve continue : qui a lancé Claude, quel prompt a été envoyé, quels fichiers ont été modifiés, quelles commandes ont été exécutées, à quel horodatage. Sans cela, impossible de répondre à un contrôle PCI-DSS, HDS ou SOC 2. Le hook `PostToolUse` capture exactement le bon niveau de granularité : un événement par appel d'outil, avec contexte structuré.
+| Besoin | OpenTelemetry | Hooks |
+| :- | :- | :- |
+| Centraliser l'activité de toute une organisation | Oui, via les réglages gérés | Possible, mais à déployer sur chaque poste |
+| Identité de l'utilisateur sur chaque événement | Oui (`user.email`, `user.account_uuid`, `organization.id`) | À ajouter vous-même |
+| Décisions de permission (acceptée, refusée, par qui) | Oui (`tool_decision`) | Partiellement |
+| Changement de mode de permission | Oui (`permission_mode_changed`) | Non |
+| Format et champs entièrement sur mesure | Non | Oui |
+| Bloquer une action | Non, observation seulement | Oui (`PreToolUse`) |
 
-## Logger JSONL minimal
+En pratique : OpenTelemetry pour la piste d'audit centrale, hooks pour un besoin précis (empreinte des fichiers modifiés, journal local inaltérable, blocage).
 
-Configurez un hook dans `.claude/settings.json` qui pipe chaque événement vers un fichier append-only :
+## Option 1 : OpenTelemetry vers votre SIEM
+
+Claude Code exporte des métriques et des événements (journaux) au format OpenTelemetry. N'importe quel SIEM doté d'un récepteur OTLP (ou un OpenTelemetry Collector qui relaie vers Splunk, Elastic, Datadog, Sentinel) peut les ingérer.
+
+Pour toute l'organisation, déployez la configuration dans les réglages gérés (managed settings). Exemple de la documentation, qui n'exporte que les événements, avec le détail des outils :
+
+```json
+{
+  "env": {
+    "CLAUDE_CODE_ENABLE_TELEMETRY": "1",
+    "OTEL_LOGS_EXPORTER": "otlp",
+    "OTEL_LOG_TOOL_DETAILS": "1",
+    "OTEL_EXPORTER_OTLP_LOGS_PROTOCOL": "http/protobuf",
+    "OTEL_EXPORTER_OTLP_LOGS_ENDPOINT": "https://siem.exemple.fr:4318/v1/logs",
+    "OTEL_EXPORTER_OTLP_HEADERS": "Authorization=Bearer votre-jeton-siem"
+  }
+}
+```
+
+Points importants :
+
+- **Un dépôt ne peut pas activer la télémétrie** : Claude Code ignore les variables d'export OpenTelemetry placées dans `.claude/settings.json` d'un projet. Utilisez les réglages gérés, ou le shell et `~/.claude/settings.json` de chaque développeur.
+- **La destination est verrouillée** : quand les réglages gérés fixent `OTEL_EXPORTER_OTLP_ENDPOINT`, Claude Code supprime au démarrage les points de terminaison définis par le développeur. Fixez aussi les sélecteurs (`OTEL_LOGS_EXPORTER`) dans les réglages gérés, sinon un développeur peut désactiver un signal.
+- **`OTEL_LOG_TOOL_DETAILS=1` est indispensable pour l'audit** : sans lui, les commandes Bash, les noms de serveurs et d'outils MCP et les arguments ne sont pas exportés. Avec lui, une commande qui contient un secret part telle quelle dans le SIEM : traitez le SIEM comme un stockage sensible.
+- **Le contenu des prompts reste exclu par défaut.** `OTEL_LOG_USER_PROMPTS=1` l'ajoute si votre politique l'exige.
+- **Vérification** : envoyez un prompt et cherchez l'événement `claude_code.user_prompt` dans le SIEM. Si rien n'arrive, lancez `claude --debug-file /tmp/claude-debug.log` et cherchez les erreurs `[3P telemetry]`.
+
+### Les événements utiles pour l'audit
+
+| Question d'audit | Événement | Attributs clés |
+| :- | :- | :- |
+| Quelle commande a tourné, quel fichier a changé ? | `tool_result` | `tool_name`, `tool_parameters`, `tool_input`, `success` |
+| Qu'est-ce qui a été refusé, et par qui ? | `tool_decision` | `decision`, `source` (`config`, `hook`, `user_permanent`, `user_temporary`, `user_reject`, `user_abort`) |
+| Quelqu'un est-il passé en mode moins restrictif ? | `permission_mode_changed` | `from_mode`, `to_mode`, `trigger` |
+| Un hook de politique a-t-il bloqué une action ? | `hook_execution_complete` | `hook_event`, `num_blocking` |
+| Quels serveurs MCP se sont connectés ? | `mcp_server_connection` | `status`, `server_name` |
+| Quels plugins ont été installés ? | `plugin_installed` | `plugin.name`, `marketplace.name` |
+| Connexions et échecs d'authentification | `auth` | `action`, `success` |
+
+Chaque événement porte `session.id` et `prompt.id` : filtrer sur un `prompt.id` reconstitue tout ce qu'une demande a déclenché. Les agents d'un dynamic workflow portent en plus `workflow.run_id`. Après un `git commit` réussi, `tool_result` contient le SHA du commit, ce qui relie l'action de Claude à l'historique git.
+
+**Identité.** Avec un compte Claude, l'e-mail et l'identifiant de compte sont joints automatiquement. Avec une clé API directe, Bedrock, Google Cloud ou Microsoft Foundry, seuls `user.id` (identifiant d'installation anonyme) et `session.id` sont remplis : ajoutez l'identité vous-même, par utilisateur, dans les réglages gérés ou un script de lancement :
+
+```bash
+export OTEL_RESOURCE_ATTRIBUTES="enduser.id=jdupont,department=finance"
+```
+
+Pas d'espace dans les valeurs : utilisez des underscores ou l'encodage `%20`.
+
+**Ce que Claude Code ne fait pas** : il émet le flux d'événements brut. La détection d'anomalies, les corrélations entre sessions et les alertes sont à construire dans votre SIEM.
+
+## Option 2 : un journal local avec des hooks
+
+Un hook `PostToolUse` reçoit sur son entrée standard un JSON avec `session_id`, `prompt_id`, `cwd`, `permission_mode`, `tool_name`, `tool_input`, `tool_response` et `tool_use_id`. Le `tool_use_id` est le même que dans les événements OpenTelemetry : les deux sources se recoupent.
+
+Configuration (dans les réglages gérés pour l'imposer, ou dans `~/.claude/settings.json`) :
 
 ```json
 {
@@ -22,7 +84,7 @@ Configurez un hook dans `.claude/settings.json` qui pipe chaque événement vers
       {
         "matcher": "*",
         "hooks": [
-          { "type": "command", "command": "/usr/local/bin/claude-audit.sh" }
+          { "type": "command", "command": "/usr/local/bin/claude-audit.sh", "async": true }
         ]
       }
     ]
@@ -30,23 +92,67 @@ Configurez un hook dans `.claude/settings.json` qui pipe chaque événement vers
 }
 ```
 
-Le script `claude-audit.sh` lit l'événement sur stdin, l'enrichit (utilisateur OS, hostname, hash du repo Git, session ID) et l'écrit dans `/var/log/claude/audit-$(date +%F).jsonl`. Une ligne par événement, format JSON strict, jamais de mutation a posteriori. Le fichier doit être en append-only (`chattr +a` sous Linux) pour résister à un attaquant qui voudrait effacer ses traces.
+`async: true` exécute le hook en arrière-plan : la journalisation ne ralentit jamais Claude.
 
-## Champs à journaliser
+Le script `/usr/local/bin/claude-audit.sh` :
 
-Au minimum : `timestamp` ISO 8601 UTC, `session_id`, `user`, `tool_name`, `tool_input` (tronqué si > 8 ko), `tool_output_summary`, `cwd`, `git_commit`, `exit_code`. Pour les commandes Bash, conservez la commande exacte. Pour Edit/Write, conservez le chemin et un hash SHA-256 du contenu avant/après. Évitez de logger les secrets : filtrez les variables d'environnement sensibles (`AWS_SECRET_*`, `*_TOKEN`, `*_KEY`) avant écriture.
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+input=$(cat)
+log_dir=/var/log/claude
+mkdir -p "$log_dir"
+cwd=$(jq -r '.cwd' <<<"$input")
+commit=$(git -C "$cwd" rev-parse HEAD 2>/dev/null || echo none)
+# Empreinte de l'entrée de l'outil plutôt que son contenu (Write et Edit contiennent le fichier entier)
+input_hash=$(jq -c '.tool_input' <<<"$input" | sha256sum | cut -d' ' -f1)
 
-## Expédition vers le SIEM
+jq -c \
+  --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+  --arg user "$(id -un)" \
+  --arg host "$(hostname)" \
+  --arg commit "$commit" \
+  --arg input_sha256 "$input_hash" \
+  '{
+     timestamp: $ts, user: $user, host: $host, git_commit: $commit,
+     session_id, prompt_id, tool_use_id, cwd, permission_mode, tool_name,
+     command: (.tool_input.command // null),
+     file_path: (.tool_input.file_path // null),
+     input_sha256: $input_sha256
+   }' <<<"$input" >> "$log_dir/audit-$(date -u +%F).jsonl"
+```
 
-Deux options. Soit l'agent local (Splunk Universal Forwarder, Filebeat, Datadog Agent) lit le fichier JSONL et l'expédie en continu. Soit le hook lui-même envoie via HTTPS vers un endpoint HEC. La première approche est plus robuste : si le réseau tombe, l'agent réessaye et Claude n'est jamais bloqué. Côté SIEM, créez un index dédié `claude_code` avec une rétention conforme à votre politique (souvent 13 mois glissants).
+Le journal garde la commande exacte pour Bash et le chemin pour les outils de fichiers, mais seulement une empreinte SHA-256 du reste : vous prouvez ce qui a été fait sans recopier le contenu des fichiers (ni d'éventuels secrets) dans le journal.
 
-## Alertes et tableaux de bord
+Rendez le journal difficile à altérer : attribut append-only sous Linux (`chattr +a`, posé par root), propriétaire différent de l'utilisateur qui lance Claude, expédition continue par un agent (Filebeat, Splunk Universal Forwarder, Datadog Agent). Si le réseau tombe, l'agent réessaie et Claude n'est jamais bloqué.
 
-Une fois les événements indexés, créez des règles de détection : commande `rm -rf` sur un chemin sensible, modification d'un fichier `.env` en production, appel d'un outil MCP non autorisé, volume anormal d'écritures sur une courte fenêtre. Un dashboard "activité Claude par utilisateur" rassure les RSSI et facilite les revues trimestrielles. Pour la conformité, exportez mensuellement un rapport signé numériquement qui agrège ces métriques.
+## Compléter la piste d'audit
+
+- **Changements de configuration** : un hook `ConfigChange` se déclenche quand un fichier de réglages ou une skill change pendant la session. Il peut journaliser, ou bloquer, une modification des permissions en cours de route.
+- **Fin de session** : un hook `SessionEnd` reçoit la raison de la fin (`clear`, `logout`, `prompt_input_exit`...) et le chemin de la transcription, utile pour l'archiver.
+- **Transcriptions locales** : chaque session est stockée dans `~/.claude/projects/` pendant 30 jours par défaut (`cleanupPeriodDays`). C'est la trace la plus complète, mais elle est locale, en clair et modifiable par l'utilisateur : ce n'est pas une preuve d'audit à elle seule.
+- **Sessions cloud** : sur claude.ai/code, toutes les opérations sont journalisées par Anthropic à des fins de conformité et d'audit.
+
+## Règles de détection à créer
+
+- Passage en `bypassPermissions` (`permission_mode_changed` avec `to_mode` égal à `bypassPermissions`). En entreprise, interdisez-le directement avec `permissions.disableBypassPermissionsMode` dans les réglages gérés.
+- Commande destructrice (`rm -rf`, `git push --force`, `DROP TABLE`) dans `tool_parameters`.
+- Connexion d'un serveur MCP absent de votre liste approuvée.
+- Volume inhabituel d'écritures ou de refus sur une courte période.
+- Écriture dans `.github/workflows/`, `.claude/settings.json` ou les fichiers de déploiement.
 
 ## Pour aller plus loin
 
-- Documentation officielle des hooks Claude Code et de leurs payloads JSON.
-- Spécifications HEC (HTTP Event Collector) de Splunk et équivalents Elastic/Datadog.
-- Guides ANSSI sur la journalisation et la traçabilité dans les SI sensibles.
-- Mettre en place une rotation et un archivage chiffré (GPG + S3 Object Lock) pour répondre aux exigences WORM.
+- [Observabilité avec OpenTelemetry](/wiki/hooks/observabilite-otel)
+- [Hooks PreToolUse et PostToolUse](/wiki/hooks/pre-post-tool-use)
+- [Cycle de vie des hooks](/wiki/hooks/hook-lifecycle)
+- [Travailler avec des données sensibles](/wiki/workflows/donnees-sensibles)
+- [Threat modeling des agents](/wiki/enterprise/threat-modeling-agents)
+
+## Sources
+
+- [Monitoring : Audit security events, Send events to a SIEM, documentation Claude Code](https://code.claude.com/docs/en/monitoring-usage)
+- [Hooks reference : common input fields, PostToolUse, ConfigChange, SessionEnd, async hooks, documentation Claude Code](https://code.claude.com/docs/en/hooks)
+- [Security : Team security, Cloud execution security, documentation Claude Code](https://code.claude.com/docs/en/security)
+- [Data usage : local caching, documentation Claude Code](https://code.claude.com/docs/en/data-usage)
+- [Permission modes, documentation Claude Code](https://code.claude.com/docs/en/permission-modes)

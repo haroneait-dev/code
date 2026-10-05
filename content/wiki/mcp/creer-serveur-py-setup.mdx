@@ -1,158 +1,227 @@
 ---
-title: "Créer un serveur MCP Python : setup & primitives"
-description: "mcp SDK Python, démarrer un serveur, FastMCP."
-updatedAt: "2026-05-19"
-readingMinutes: 6
+title: "Créer un serveur MCP en Python : setup et primitives"
+description: "Créer un serveur MCP avec le SDK Python officiel v2 (MCPServer, ex-FastMCP) : tools typés, resources, prompts, progression, tests et branchement sur Claude Code."
+updatedAt: "2026-10-03"
+readingMinutes: 8
 ---
 
-Le SDK Python officiel `mcp` propose une API très ergonomique baptisée **FastMCP**, inspirée de FastAPI : on déclare ses tools et resources avec des décorateurs, le SDK s'occupe du protocole. C'est souvent le moyen le plus rapide de transformer un script Python existant en serveur MCP utilisable par Claude.
+Le SDK Python officiel (`mcp` sur PyPI) transforme des fonctions Python annotées en serveur MCP : un décorateur par primitive, et les types servent de schéma. C'est souvent le chemin le plus court pour exposer un script ou une API interne à Claude.
+
+## FastMCP est devenu MCPServer
+
+La version 2 du SDK, sortie avec la révision 2026-07-28 du protocole, a renommé la classe haut niveau. Les tutoriels plus anciens utilisent donc un import qui n'existe plus :
+
+| | SDK v1 | SDK v2 (actuel) |
+|---|---|---|
+| Import | `from mcp.server.fastmcp import FastMCP` | `from mcp.server import MCPServer` |
+| Création | `FastMCP("demo")` | `MCPServer("demo")` |
+| Sous-modules | `mcp.server.fastmcp.*` | `mcp.server.mcpserver.*` |
+| Contexte | `get_context()` ou paramètre `ctx` | paramètre `ctx: Context` uniquement |
+| Options HTTP (`port`, `host`…) | dans le constructeur | dans `mcp.run(...)` |
+
+Les décorateurs `@mcp.tool()`, `@mcp.resource()` et `@mcp.prompt()` fonctionnent comme avant. À ne pas confondre : **FastMCP** désigne aussi un framework tiers indépendant (paquet `fastmcp`), qui a sa propre API. Cet article couvre uniquement le SDK officiel.
 
 ## Installation
 
-FastMCP requiert Python 3.10+. L'outil officiel `uv` (rapide, géré par Astral) est recommandé pour gérer l'environnement.
+Il faut Python 3.10 ou plus. `uv` est l'outil recommandé par la documentation officielle.
 
 ```bash
-uv init mcp-mon-serveur
-cd mcp-mon-serveur
-uv add "mcp[cli]" httpx
+uv init mcp-bibliotheque
+cd mcp-bibliotheque
+uv add "mcp[cli]"
 ```
 
-Pour les utilisateurs plus traditionnels :
+Avec pip : `pip install "mcp[cli]"`. L'extra `cli` ajoute la commande `mcp` (`mcp dev`, `mcp run`, `mcp install`).
 
-```bash
-pip install "mcp[cli]" httpx
-```
-
-L'extra `[cli]` fournit la commande `mcp` qui inclut l'inspecteur et le lanceur de dev.
-
-## Squelette FastMCP
-
-Tout tient dans un seul fichier au départ. L'API est volontairement minimaliste.
+## Le squelette
 
 ```python
-from mcp.server.fastmcp import FastMCP
+# server.py
+from mcp.server import MCPServer
 
-mcp = FastMCP("mon-serveur")
+mcp = MCPServer("bibliotheque")
+
+# tools, resources et prompts ici
 
 if __name__ == "__main__":
     mcp.run()
 ```
 
-Démarrez en mode dev (avec l'inspecteur web) :
+Sans argument, `mcp.run()` démarre en **stdio** et bloque. Le garde `if __name__ == "__main__"` est important : `mcp dev`, `mcp run` et vos tests **importent** le fichier, ils ne doivent pas lancer le serveur à l'import.
+
+## Déclarer des tools
+
+Un tool est une fonction que le modèle décide d'appeler. Le nom vient de la fonction, la description de la docstring, le schéma des annotations de type.
+
+```python
+import logging
+from typing import Annotated
+
+from pydantic import BaseModel, Field
+
+from mcp.server.mcpserver.exceptions import ToolError
+
+logger = logging.getLogger(__name__)
+
+CATALOGUE = {
+    "Dune": "Frank Herbert",
+    "Neuromancien": "William Gibson",
+    "La Main gauche de la nuit": "Ursula K. Le Guin",
+}
+
+
+@mcp.tool()
+def chercher_livres(
+    requete: Annotated[str, Field(description="Titre ou auteur recherché")],
+    limite: Annotated[int, Field(ge=1, le=50, description="Nombre maximum de résultats")] = 10,
+) -> list[str]:
+    """Cherche des livres du catalogue par titre ou par auteur."""
+    logger.info("Recherche : %s", requete)
+    besoin = requete.lower()
+    trouves = [t for t, a in CATALOGUE.items() if besoin in t.lower() or besoin in a.lower()]
+    return trouves[:limite]
+
+
+@mcp.tool()
+def auteur_de(titre: str) -> str:
+    """Donne l'auteur d'un livre du catalogue."""
+    if titre not in CATALOGUE:
+        raise ToolError(f"Aucun livre intitulé {titre!r}. Titres connus : {', '.join(CATALOGUE)}")
+    return CATALOGUE[titre]
+```
+
+Les règles utiles :
+
+- **`Annotated[..., Field(...)]`** ajoute une description par argument et des contraintes (`ge`, `le`) qui apparaissent dans le JSON Schema.
+- **Valeur par défaut** : l'argument devient optionnel.
+- **`ToolError`** : son message arrive au modèle comme un résultat en erreur (`is_error`), qu'il peut lire pour se corriger. Toute autre exception est réduite à `Error executing tool <nom>` côté modèle, le détail restant dans vos logs.
+- **Fonctions `def` synchrones** : depuis la v2, elles tournent dans un thread et ne bloquent plus la boucle asyncio.
+
+Pour un résultat structuré, annotez le retour avec un modèle Pydantic. Le SDK publie le `outputSchema` et renvoie `structuredContent` :
+
+```python
+class Fiche(BaseModel):
+    titre: str
+    auteur: str
+    disponible: bool
+
+
+@mcp.tool()
+def fiche_livre(titre: str) -> Fiche:
+    """Renvoie la fiche structurée d'un livre."""
+    return Fiche(titre=titre, auteur=CATALOGUE.get(titre, "inconnu"), disponible=titre in CATALOGUE)
+```
+
+## Déclarer des resources
+
+Une resource est une donnée en lecture seule identifiée par une URI. C'est l'application qui la charge (dans Claude Code, l'utilisateur la mentionne avec `@`). Un paramètre entre accolades crée un **template** de resource.
+
+```python
+@mcp.resource("catalogue://titres")
+def titres() -> str:
+    """Tous les titres du catalogue, un par ligne."""
+    return "\n".join(sorted(CATALOGUE))
+
+
+@mcp.resource("catalogue://auteurs/{auteur}")
+def livres_de(auteur: str) -> str:
+    """Les livres d'un auteur donné."""
+    return "\n".join(t for t, a in CATALOGUE.items() if a == auteur) or "Aucun livre."
+```
+
+Les templates suivent désormais strictement la RFC 6570 et rejettent par défaut les tentatives de remontée de chemin (`..`) dans les valeurs extraites.
+
+## Déclarer des prompts
+
+Un prompt est un modèle de messages déclenché par l'utilisateur. Claude Code l'affiche comme commande `/bibliotheque:resume_livre (MCP)`.
+
+```python
+from typing import Literal
+
+from mcp.server.mcpserver.prompts.base import Message, UserMessage
+
+
+@mcp.prompt()
+def resume_livre(titre: str, ton: Literal["neutre", "enthousiaste"] = "neutre") -> str:
+    """Demande un résumé d'un livre du catalogue."""
+    return f"Résume le livre « {titre} » en cinq phrases, sur un ton {ton}."
+
+
+@mcp.prompt()
+def deboguer(erreur: str) -> list[Message]:
+    """Lance une session de débogage à partir d'un message d'erreur."""
+    return [
+        UserMessage(f"J'ai cette erreur : {erreur}"),
+        UserMessage("Propose trois hypothèses, de la plus probable à la moins probable."),
+    ]
+```
+
+Une chaîne renvoyée devient un message `user`. Une liste permet d'enchaîner plusieurs messages.
+
+## Contexte, progression et logs
+
+Ajoutez un paramètre typé `Context` pour accéder aux services de la requête, par exemple la progression :
+
+```python
+from mcp.server.mcpserver import Context
+
+
+@mcp.tool()
+async def importer(urls: list[str], ctx: Context) -> str:
+    """Importe des notices depuis une liste d'URL."""
+    for i, url in enumerate(urls, start=1):
+        # ... téléchargement et analyse de url ...
+        await ctx.report_progress(i, total=len(urls), message=f"Importé : {url}")
+    return f"{len(urls)} notices importées."
+```
+
+Le paramètre `ctx` n'apparaît pas dans le schéma vu par le modèle. Pour les logs, utilisez le module `logging` standard : il écrit sur stderr, ce qui ne perturbe pas le canal stdio. La journalisation via le protocole (`ctx.info()` et consorts) est dépréciée depuis la révision 2026-07-28. Évitez `print()` : stdout appartient au protocole.
+
+## Tester
+
+L'Inspector MCP lance le serveur et propose un onglet par primitive :
 
 ```bash
 uv run mcp dev server.py
 ```
 
-Vous obtenez une URL locale qui ouvre une UI pour tester vos tools manuellement.
-
-## Déclarer un tool
-
-Un tool est une fonction Python décorée avec `@mcp.tool()`. Les annotations de type servent à générer le schéma JSON automatiquement. Une docstring claire aide Claude à choisir le bon tool.
+Pour des tests automatisés, passez directement l'objet serveur au client, sans transport ni port :
 
 ```python
-@mcp.tool()
-async def get_meteo(ville: str, unite: str = "celsius") -> str:
-    """Récupère la météo actuelle d'une ville.
+import asyncio
 
-    Args:
-        ville: Nom de la ville (ex: "Paris")
-        unite: "celsius" ou "fahrenheit"
-    """
-    async with httpx.AsyncClient() as client:
-        r = await client.get(f"https://api.meteo.com/{ville}")
-        data = r.json()
-    return f"{data['temp']}° à {ville}"
+from mcp import Client
+
+from server import mcp
+
+
+async def main() -> None:
+    async with Client(mcp) as client:
+        resultat = await client.call_tool("chercher_livres", {"requete": "dune"})
+        print(resultat.structured_content)  # {'result': ['Dune']}
+
+
+asyncio.run(main())
 ```
 
-Les types complexes fonctionnent aussi via Pydantic :
-
-```python
-from pydantic import BaseModel
-
-class Adresse(BaseModel):
-    rue: str
-    ville: str
-    code_postal: str
-
-@mcp.tool()
-def valider_adresse(adresse: Adresse) -> bool:
-    """Valide une adresse postale française."""
-    return len(adresse.code_postal) == 5
-```
-
-## Déclarer une resource
-
-Les resources sont des données lisibles, identifiées par URI. Le décorateur `@mcp.resource()` accepte des templates avec paramètres.
-
-```python
-@mcp.resource("config://app")
-def get_config() -> str:
-    """Configuration applicative."""
-    return '{"version": "1.0", "env": "prod"}'
-
-@mcp.resource("user://{user_id}")
-def get_user(user_id: str) -> str:
-    """Profil d'un utilisateur."""
-    return fetch_user_from_db(user_id)
-```
-
-La différence clé avec un tool : une resource est conçue pour être **lue** (sans effet de bord), un tool pour **agir**. Cette distinction aide Claude à raisonner sur quand l'invoquer.
-
-## Déclarer un prompt
-
-Les prompts sont des templates réutilisables, exposés comme slash commands dans Claude Code.
-
-```python
-from mcp.server.fastmcp.prompts import base
-
-@mcp.prompt()
-def debug_erreur(message: str) -> list[base.Message]:
-    """Analyse une erreur et propose des pistes."""
-    return [
-        base.UserMessage(f"J'ai cette erreur : {message}"),
-        base.UserMessage("Analyse-la et propose 3 hypothèses."),
-    ]
-```
-
-## Brancher à Claude Code
-
-Une fois le serveur prêt, ajoutez-le à votre config :
+## Brancher sur Claude Code
 
 ```bash
-claude mcp add mon-serveur -- uv run --directory /chemin/vers/projet server.py
+claude mcp add bibliotheque -- uv run --directory /chemin/absolu/mcp-bibliotheque server.py
 ```
 
-Ou manuellement dans `~/.claude/mcp.json` :
-
-```json
-{
-  "mcpServers": {
-    "mon-serveur": {
-      "command": "uv",
-      "args": ["run", "--directory", "/chemin/vers/projet", "server.py"]
-    }
-  }
-}
-```
-
-## Logging et debug
-
-FastMCP expose un logger via le contexte. Injectez `Context` dans n'importe quel tool pour logger ou envoyer des progressions.
-
-```python
-from mcp.server.fastmcp import Context
-
-@mcp.tool()
-async def long_traitement(items: list[str], ctx: Context) -> str:
-    for i, item in enumerate(items):
-        await ctx.info(f"Traitement {item}")
-        await ctx.report_progress(i + 1, len(items))
-    return "Terminé"
-```
+Tout ce qui suit `--` est la commande de lancement. Vérifiez avec `/mcp` dans une session. Par défaut le serveur est enregistré en portée locale (dans `~/.claude.json`, pour ce projet seulement) ; `--scope project` l'écrit dans `.mcp.json` à la racine du dépôt pour le partager. Utilisez toujours des chemins absolus.
 
 ## Pour aller plus loin
 
-- Doc officielle : github.com/modelcontextprotocol/python-sdk
-- Exemples : `mcp.server.fastmcp.examples` contient une dizaine de serveurs prêts à étudier
-- Déploiement Python : packager avec `uv build` puis publier sur PyPI, ou conteneuriser avec Docker
+- [Déployer un serveur MCP Python](/wiki/mcp/creer-serveur-py-deploiement)
+- [Les primitives : resources, tools et prompts](/wiki/mcp/primitives-resources-tools-prompts)
+- [Déboguer avec l'Inspector](/wiki/mcp/debugging-inspector)
+- [Créer un serveur MCP en TypeScript](/wiki/mcp/creer-serveur-ts-setup)
+
+## Sources
+
+- [SDK Python officiel (dépôt GitHub)](https://github.com/modelcontextprotocol/python-sdk)
+- [Documentation du SDK Python v2](https://py.sdk.modelcontextprotocol.io/)
+- [Nouveautés de la v2 et guide de migration](https://py.sdk.modelcontextprotocol.io/whats-new/)
+- [Claude Code : MCP](https://code.claude.com/docs/en/mcp)

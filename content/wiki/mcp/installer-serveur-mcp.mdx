@@ -1,108 +1,214 @@
 ---
-title: "Installer un serveur MCP"
-description: "Ajouter un serveur MCP à Claude Code avec claude mcp add, .mcp.json et les scopes user/project/local."
-updatedAt: "2026-05-19"
-readingMinutes: 6
+title: "Installer un serveur MCP dans Claude Code"
+description: "Ajouter un serveur MCP distant ou local avec claude mcp add, choisir le bon scope, partager un .mcp.json, gérer l'authentification OAuth et dépanner une connexion."
+updatedAt: "2026-10-03"
+readingMinutes: 9
 ---
 
-Installer un serveur MCP dans Claude Code prend moins d'une minute. Deux chemins existent : la commande CLI `claude mcp add`, ou l'édition manuelle d'un fichier `.mcp.json`. Choisir l'un ou l'autre dépend du **scope** souhaité : voulez-vous ce serveur disponible partout, uniquement dans ce projet, ou seulement pour vous sur cette machine ?
+Ajouter un serveur MCP à Claude Code prend une commande. Les vraies questions sont ailleurs : serveur distant ou local, pour vous seul ou pour toute l'équipe, et comment gérer les secrets. Cet article couvre ces choix, puis la gestion et le dépannage.
 
-## La commande `claude mcp add`
+## Premier test en 30 secondes
 
-C'est le moyen le plus rapide. La syntaxe générale :
-
-```bash
-claude mcp add <nom> <commande> [arguments...]
-```
-
-Par exemple, pour ajouter le serveur Filesystem officiel et lui donner accès à `~/Documents` :
+Le serveur de la documentation Claude Code ne demande aucun compte. Il est idéal pour vérifier votre installation. Lancez ces commandes dans votre terminal, pas dans une session `claude` :
 
 ```bash
-claude mcp add filesystem npx -y @modelcontextprotocol/server-filesystem ~/Documents
+claude mcp add --transport http claude-code-docs https://code.claude.com/docs/mcp
+claude mcp list
 ```
 
-Pour un serveur Python lancé via `uvx` :
+`claude mcp list` doit afficher `✔ Connected`. Ouvrez ensuite `claude` et demandez : « Cherche dans la doc comment fonctionne le mode auto ».
+
+## Les quatre façons d'ajouter un serveur
+
+### 1. Serveur distant HTTP (recommandé)
+
+C'est le transport Streamable HTTP. La plupart des services officiels l'utilisent.
 
 ```bash
-claude mcp add git uvx mcp-server-git --repository /chemin/vers/repo
+# Syntaxe
+claude mcp add --transport http <nom> <url>
+
+# Exemples
+claude mcp add --transport http notion https://mcp.notion.com/mcp
+claude mcp add --transport http sentry https://mcp.sentry.dev/mcp
+
+# Avec un jeton fixe dans un en-tête
+claude mcp add --transport http mon-api https://api.exemple.com/mcp \
+  --header "Authorization: Bearer VOTRE_JETON"
 ```
 
-La commande accepte aussi des variables d'environnement avec `-e` :
+### 2. Serveur distant SSE (déprécié)
+
+Le transport SSE est déprécié. Depuis la v2.1.265, `--transport http` bascule tout seul sur SSE si le serveur ne connaît que ce transport. Sur une version plus ancienne, utilisez `--transport sse` :
 
 ```bash
-claude mcp add github -e GITHUB_TOKEN=ghp_xxx -- npx -y @modelcontextprotocol/server-github
+claude mcp add --transport sse asana https://mcp.asana.com/sse
 ```
 
-Le `--` sépare les options de `claude mcp add` de la commande qui lance le serveur.
+### 3. Serveur local stdio
 
-## Les trois scopes
-
-Lors de l'ajout, vous précisez un scope avec `--scope` (ou `-s`) :
-
-- **`local`** (défaut) — Stocké dans `~/.claude.json`, propre à votre machine et au répertoire courant. Idéal pour des expérimentations ou des credentials personnels.
-- **`project`** — Écrit dans `.mcp.json` à la racine du projet. **Versionné dans git**, partagé avec toute l'équipe. Parfait pour les serveurs métier du projet (base de données de staging, API interne, etc.).
-- **`user`** — Stocké dans `~/.claude.json` sous une section globale. Disponible dans **tous vos projets**. Bon pour les serveurs transverses (Linear perso, Notion perso…).
+Claude Code lance le serveur comme sous-processus. Tout ce qui suit `--` est la commande du serveur, transmise telle quelle :
 
 ```bash
-claude mcp add --scope project postgres npx -y @modelcontextprotocol/server-postgres
+# Syntaxe
+claude mcp add [options] <nom> -- <commande> [arguments...]
+
+# Navigateur piloté par Playwright (Node.js requis)
+claude mcp add playwright -- npx -y @playwright/mcp@latest
+
+# Serveur Git de référence (Python, via uvx)
+claude mcp add git -- uvx mcp-server-git --repository /chemin/vers/depot
+
+# Avec une variable d'environnement
+claude mcp add airtable --env AIRTABLE_API_KEY=VOTRE_CLE -- npx -y airtable-mcp-server
 ```
 
-Lorsqu'un serveur figure dans `.mcp.json` (scope project), Claude Code demande votre **consentement explicite** à la première utilisation, pour éviter qu'un dépôt malveillant injecte un serveur arbitraire.
+Deux pièges fréquents :
 
-## La structure du fichier `.mcp.json`
+- **Oublier `--`** : Claude Code essaie alors de lire les options du serveur (`-y`, `--port`…) comme les siennes.
+- **Placer le nom juste après `--env`** : `--env` accepte plusieurs paires `CLE=valeur` et prend le nom pour une paire de plus. Mettez le nom avant `--env`, comme ci-dessus.
 
-Le format est volontairement simple :
+Claude Code définit `CLAUDE_PROJECT_DIR` (racine du projet) dans l'environnement du serveur.
+
+### 4. Serveur WebSocket
+
+Pour les serveurs qui poussent des événements. Pas de flag `--transport ws` ni d'OAuth : passez par `add-json` et un en-tête.
+
+```bash
+claude mcp add-json events '{"type":"ws","url":"wss://mcp.exemple.com/socket","headers":{"Authorization":"Bearer VOTRE_JETON"}}'
+```
+
+## Choisir le scope
+
+| Scope | Actif dans | Partagé avec l'équipe | Stocké dans |
+|---|---|---|---|
+| `local` (défaut) | le projet courant | non | `~/.claude.json`, sous le chemin du projet |
+| `project` | le projet courant | oui, via Git | `.mcp.json` à la racine du projet |
+| `user` | tous vos projets | non | `~/.claude.json`, section globale |
+
+```bash
+claude mcp add --scope user --transport http github https://api.githubcopilot.com/mcp/ \
+  --header "Authorization: Bearer VOTRE_PAT"
+claude mcp add --scope project --transport http sentry https://mcp.sentry.dev/mcp
+```
+
+Pour changer de scope, supprimez puis rajoutez : `claude mcp remove <nom> --scope local`, puis `claude mcp add --scope user …`.
+
+**Priorité** quand un même serveur est défini plusieurs fois : local, puis project, puis user, puis plugins, puis connecteurs claude.ai. L'entrée gagnante est utilisée en entier, sans fusion des champs.
+
+**Attention** : Claude Code ne lit pas `~/.claude/mcp.json` ni `~/.claude/.mcp.json`. Les seuls fichiers valides sont `~/.claude.json` et `<projet>/.mcp.json`.
+
+## Le fichier `.mcp.json` partagé
 
 ```json
 {
   "mcpServers": {
-    "filesystem": {
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-filesystem", "./src"]
+    "sentry": {
+      "type": "http",
+      "url": "https://mcp.sentry.dev/mcp"
     },
-    "postgres": {
+    "api-interne": {
+      "type": "http",
+      "url": "${API_BASE_URL:-https://api.exemple.com}/mcp",
+      "headers": { "Authorization": "Bearer ${API_KEY}" }
+    },
+    "playwright": {
+      "type": "stdio",
       "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-postgres"],
-      "env": {
-        "DATABASE_URL": "postgresql://localhost/mydb"
-      }
+      "args": ["-y", "@playwright/mcp@latest"]
     }
   }
 }
 ```
 
-Chaque entrée décrit comment **lancer** le serveur. Claude Code spawn le processus, ouvre les pipes stdio, et la session démarre.
+À retenir :
 
-## Vérifier que tout fonctionne
+- **Toujours un `type`** pour un serveur distant (`http`, `sse` ou `ws`). Une entrée avec `url` mais sans `type` est lue comme stdio et ignorée avec une erreur. `streamable-http` est accepté comme alias de `http`.
+- **Variables `${VAR}` et `${VAR:-défaut}`** dans `command`, `args`, `env`, `url` et `headers`. Chacun garde ainsi ses secrets dans son environnement, pas dans Git.
+- **Protection des identifiants** : dans `url` et `headers` d'un serveur distant, les variables sensibles de Claude Code (`ANTHROPIC_API_KEY`, `ANTHROPIC_AUTH_TOKEN`, identifiants cloud, `NPM_TOKEN`…) sont lues comme vides. Un `.mcp.json` piégé ne peut pas les envoyer à un serveur tiers.
+- **Approbation** : à la première ouverture du projet, Claude Code vous demande d'approuver chaque serveur de `.mcp.json`. Pour revenir sur vos choix : `claude mcp reset-project-choices`.
+- **Délai d'attente** : un outil peut avoir son propre `"timeout"` en millisecondes dans son entrée.
 
-Plusieurs commandes utiles :
+Claude Code lit `.mcp.json` au démarrage : relancez la session après modification.
 
-```bash
-claude mcp list              # Liste tous les serveurs configurés
-claude mcp get filesystem    # Détails d'un serveur particulier
-claude mcp remove filesystem # Supprime un serveur
-```
-
-Dans une session Claude Code, tapez `/mcp` pour voir le statut de chaque connexion (connecté, erreur, en cours d'auth) et la liste des outils exposés.
-
-## Serveurs distants (HTTP / SSE)
-
-Depuis 2025, Claude Code supporte aussi les serveurs distants via Streamable HTTP :
+## Autres façons d'importer
 
 ```bash
-claude mcp add --transport http monserveur https://mcp.exemple.com/api
+# Depuis un bloc JSON (l'objet à l'intérieur de "mcpServers", pas l'enveloppe)
+claude mcp add-json local-weather '{"type":"stdio","command":"/chemin/weather-cli","args":["--verbose"]}'
+
+# Depuis Claude Desktop (macOS et WSL), avec sélection interactive
+claude mcp add-from-claude-desktop
 ```
 
-Ces serveurs peuvent nécessiter une **authentification OAuth**, gérée automatiquement par Claude Code via un flow navigateur.
+Les **connecteurs** ajoutés sur [claude.ai/customize/connectors](https://claude.ai/customize/connectors) apparaissent automatiquement dans Claude Code si vous êtes connecté avec ce compte claude.ai (pas avec une clé API). Les **plugins** peuvent aussi fournir des serveurs : ils démarrent quand le plugin est activé.
+
+## Authentification OAuth
+
+Beaucoup de serveurs distants demandent une connexion. Claude Code affiche un avis au démarrage quand un serveur attend une authentification.
+
+- Dans une session : `/mcp`, sélectionnez le serveur, **Authenticate**. Le navigateur s'ouvre.
+- Depuis le shell : `claude mcp login sentry` (ajoutez `--no-browser` en SSH, puis collez l'URL de redirection). `claude mcp logout sentry` efface les jetons.
+- Port de callback imposé par le serveur : `--callback-port 8080` lors du `claude mcp add`.
+
+Les jetons sont stockés de façon sécurisée et rafraîchis automatiquement. Certains connecteurs hébergés par Anthropic (Gmail, Google Calendar, Microsoft 365) ne se connectent que depuis claude.ai.
+
+## Gérer vos serveurs
+
+```bash
+claude mcp list                  # tous les serveurs et leur état
+claude mcp get sentry            # détail d'un serveur, avec la cause d'un échec
+claude mcp remove sentry         # suppression (efface aussi les jetons OAuth)
+```
+
+Dans une session :
+
+- `/mcp` : état de chaque serveur, nombre d'outils, authentification, activation ou désactivation par projet sans supprimer la configuration ;
+- `/mcp reconnect all` : relance tous les serveurs en échec ou en attente d'authentification ;
+- les prompts d'un serveur deviennent des commandes `/serveur:prompt` ;
+- les resources se citent avec `@`, par exemple `@github:issue://123`.
+
+## Réglages utiles
+
+| Variable | Effet |
+|---|---|
+| `MCP_TIMEOUT` | délai de démarrage d'un serveur en ms (30 s par défaut) |
+| `MCP_TOOL_TIMEOUT` | durée maximale d'un appel d'outil en ms |
+| `MAX_MCP_OUTPUT_TOKENS` | taille maximale d'une réponse d'outil (25 000 tokens par défaut, avertissement dès 10 000) |
+| `ENABLE_TOOL_SEARCH` | `false` pour charger toutes les définitions d'outils au démarrage |
+
+Un appel d'outil qui dépasse deux minutes passe en tâche de fond, visible dans `/tasks`.
+
+## Dépannage rapide
+
+| Symptôme | Cause probable | Solution |
+|---|---|---|
+| `No MCP servers configured` | serveur ajouté en `local` depuis un autre dossier | rajoutez-le ici ou en `--scope user` |
+| `✘ Failed to connect` (stdio) | commande ou dépendance manquante | lancez la commande du serveur à la main pour voir l'erreur |
+| `✘ Failed to connect` (HTTP) | mauvaise URL ou jeton refusé | `claude mcp get <nom>` affiche le code HTTP |
+| `! Needs authentication` | OAuth non fait ou expiré | `/mcp` puis Authenticate, ou `claude mcp login` |
+| `⏸ Pending approval` | serveur de `.mcp.json` pas encore approuvé | lancez `claude` dans le projet et approuvez |
+| Délai dépassé au premier lancement | `npx` télécharge le paquet | `MCP_TIMEOUT=60000 claude` |
+| Connecté mais aucun outil | variable d'environnement manquante | ajoutez-la avec `--env` ou dans `env` |
+
+Pour voir les échanges en détail : `claude --debug='mcp'`, ou testez le serveur seul avec [MCP Inspector](/wiki/mcp/debugging-inspector).
 
 ## Bonnes pratiques
 
-- Commitez `.mcp.json` quand le serveur est nécessaire à l'équipe (base de données, API interne).
-- Utilisez `local` pour vos credentials personnels — ne les mettez **jamais** dans `.mcp.json` versionné.
-- Préférez `npx -y` ou `uvx` plutôt que des installations globales : cela garantit que la version est figée et lisible.
-- Activez le serveur en mode debug avec `claude --mcp-debug` pour voir les échanges JSON-RPC bruts.
+- Commitez `.mcp.json` pour les serveurs utiles à toute l'équipe, avec des `${VAR}` à la place des secrets.
+- Gardez vos jetons personnels en scope `local` ou `user`, jamais en dur dans un fichier versionné.
+- Préférez le serveur **officiel** de l'éditeur, distant si possible.
+- Limitez les droits de chaque jeton (lecture seule, un seul projet). Voir [Sécurité des serveurs MCP](/wiki/mcp/securite-mcp).
 
 ## Pour aller plus loin
 
-- Documentation officielle : `docs.anthropic.com/claude-code/mcp`
-- Article suivant : **Serveurs officiels** — tour d'horizon des serveurs maintenus par Anthropic et la communauté
+- [Serveurs MCP officiels](/wiki/mcp/serveurs-officiels)
+- [Serveurs populaires : Supabase, Vercel, Linear…](/wiki/mcp/serveurs-populaires)
+- [Permissions des outils MCP](/wiki/slash-commands/mcp-permissions)
+- [Variables d'environnement de Claude Code](/wiki/cli/variables-env)
+
+## Sources
+
+- Connecter des serveurs MCP (quickstart) : https://code.claude.com/docs/en/mcp-quickstart
+- Référence MCP de Claude Code : https://code.claude.com/docs/en/mcp
+- Référence CLI : https://code.claude.com/docs/en/cli-reference

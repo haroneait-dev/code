@@ -1,51 +1,129 @@
 ---
 title: "Migration de stack"
-description: "Faire migrer un codebase d'un framework à un autre (Vue → React, Express → Hono) avec Claude Code."
-updatedAt: "2026-05-19"
-readingMinutes: 6
+description: "Faire passer un codebase d'un framework à un autre (Vue vers React, Express vers Hono) avec Claude Code : inventaire, plan par couches, lots vérifiés en parallèle avec /batch ou un dynamic workflow."
+updatedAt: "2026-10-03"
+readingMinutes: 7
 ---
 
-Migrer un codebase d'un framework à un autre est un travail long, fastidieux et plein de pièges. Claude Code transforme cette corvée en pipeline orchestré : analyse, plan, exécution incrémentale, vérification. La clé n'est pas de demander « réécris en React » d'un coup, mais de découper le travail en couches isolées et vérifiables.
+Migrer un codebase d'un framework à un autre (Vue vers React, Express vers Hono, Webpack vers Vite) est long et plein de pièges. Claude Code ne rend pas la migration magique, mais il permet de la découper en lots vérifiables et de les exécuter en parallèle. La règle d'or : ne jamais demander « réécris tout en React » d'un coup.
 
-## Cartographier l'existant
+## Étape 1 : cartographier l'existant
 
-Avant toute ligne de code, demande à Claude de produire un inventaire structuré. Par exemple : `Liste tous les composants Vue dans src/, leur props, leurs émissions d'événements et leurs dépendances`. Tu obtiens une carte qui sert de base au plan de migration. Pose les questions qui font mal : quels composants partagent du state ? Lesquels utilisent des plugins spécifiques (Vue Router, Pinia) ? Quels patterns sont idiomatiques côté source mais étrangers à la cible ?
+Commencez en mode plan (`Shift+Tab` jusqu'à « plan mode on ») : Claude lit et analyse sans rien modifier.
 
-C'est aussi le bon moment pour identifier les zones grises : code mort, abstractions inutiles, tests absents. Une migration est l'occasion parfaite pour faire le ménage, mais consigne ces décisions à part pour ne pas mélanger refacto et portage.
+```text
+Fais l'inventaire de src/ pour une migration de Vue 3 vers React 19 :
+- chaque composant, ses props, ses événements émis et ses dépendances ;
+- les plugins utilisés (Vue Router, Pinia, directives custom) ;
+- les composants qui partagent de l'état ;
+- les patterns idiomatiques Vue sans équivalent direct en React (v-model, slots nommés, provide/inject).
+Écris le résultat dans MIGRATION_INVENTORY.md, sans modifier le code.
+```
 
-## Construire un plan par couches
+Pour un gros dépôt, demandez à Claude de déléguer l'exploration à des sous-agents (« utilise des sous-agents pour explorer chaque dossier de src/ ») : chaque sous-agent lit dans son propre contexte et ne renvoie qu'un résumé, ce qui garde votre conversation légère.
 
-Un bon plan de migration ressemble à un oignon : on part de la couche la plus stable (utilitaires, types) vers la plus volatile (UI, état global). Demande à Claude un plan en phases, par exemple :
+Profitez-en pour repérer le code mort et les zones sans tests, mais notez ces décisions à part : mélanger nettoyage et portage rend chaque diff plus difficile à relire.
 
-1. Outils de build et configuration TypeScript
-2. Modèles de données et helpers purs
-3. Couche réseau (axios → fetch wrapper, Express routes → Hono routes)
-4. Composants feuilles sans état
-5. Composants conteneurs
-6. Routing et navigation
-7. State management global
+## Étape 2 : un plan par couches
 
-Chaque phase doit produire un commit vert, c'est-à-dire qui build et passe les tests existants (même partiellement). Évite la tentation du big bang : un PR de 8000 lignes est invérifiable.
+Partez de la couche la plus stable vers la plus volatile :
 
-## Exécuter par lots vérifiables
+1. Outils de build et configuration TypeScript.
+2. Types, modèles de données et fonctions pures.
+3. Couche réseau (client HTTP, routes Express vers routes Hono).
+4. Composants feuilles sans état.
+5. Composants conteneurs.
+6. Routing et navigation.
+7. État global.
 
-Pour chaque phase, alimente Claude avec un contexte précis : `Migre uniquement les composants du dossier src/widgets/, garde l'API publique identique, écris un test Vitest pour chaque composant migré`. Laisse-le proposer un diff, relis, ajuste. Utilise les subagents pour paralléliser : un agent par dossier, chacun avec sa todo-list.
+Chaque phase doit aboutir à un commit vert : le build passe et les tests existants aussi. Une pull request de 8 000 lignes ne se relit pas ; dix PR de 800 lignes, si.
 
-Mets en place un script de comparaison comportementale quand c'est possible. Sur une API Express → Hono, lance les deux versions côte à côte et rejoue les mêmes requêtes avec `curl` ou un script de diff JSON. Sur du front, un Storybook avec snapshots visuels capture les régressions silencieuses.
+Demandez à Claude d'écrire ce plan dans `MIGRATION_PLAN.md`, avec pour chaque lot la commande de vérification. Ce fichier sert ensuite de référence à tous les agents.
 
-## Gérer les divergences sémantiques
+## Étape 3 : fixer les conventions dans un fichier
 
-Tous les frameworks ne sont pas équivalents : `v-model` n'a pas de pendant exact en React, les middlewares Hono diffèrent d'Express sur le typage des contextes. Documente ces points dans un fichier `MIGRATION_NOTES.md` que tu places dans le repo et que tu cites systématiquement dans tes prompts. Claude appliquera les conventions définies plutôt que d'improviser à chaque fichier.
+Les frameworks ne sont pas équivalents. `v-model` n'a pas d'équivalent exact en React, le contexte typé de Hono ne fonctionne pas comme `req`/`res` d'Express. Si vous laissez Claude improviser fichier par fichier, vous obtenez cinq solutions différentes au même problème.
 
-Pour les fonctionnalités sans équivalent direct, demande à Claude trois options avec leurs trade-offs avant de coder. Tu gardes la main sur l'architecture pendant que l'IA gère le grunt work.
+Créez `MIGRATION_NOTES.md` et référencez-le depuis votre `CLAUDE.md` :
 
-## Verrouiller la non-régression
+```markdown
+# Conventions de migration Vue → React
 
-Avant de merger la dernière phase, fais générer par Claude une suite de tests E2E qui couvrent les parcours critiques. Compare les métriques de production (latence, taille de bundle, time-to-interactive) entre l'ancien et le nouveau. Une migration réussie ne se prouve pas par « ça compile », elle se prouve par des chiffres.
+- v-model sur un input : état contrôlé `value` + `onChange`, jamais de ref non contrôlée.
+- Slots nommés : props `header`, `footer` de type ReactNode.
+- provide/inject : un Context React par domaine, dans src/contexts/.
+- Pinia : Zustand, un store par fichier dans src/stores/.
+- Ne pas changer l'API publique d'un composant pendant le portage.
+```
+
+Pour une fonctionnalité sans équivalent direct, demandez d'abord trois options avec leurs compromis, choisissez, puis ajoutez la décision au fichier.
+
+## Étape 4 : exécuter par lots, en parallèle si possible
+
+Faites toujours le premier lot à la main, dans votre session, et relisez-le entièrement. C'est lui qui révèle ce que le plan a oublié. Corrigez `MIGRATION_NOTES.md`, puis passez à l'échelle avec l'un de ces outils :
+
+| Outil | Quand l'utiliser |
+| :- | :- |
+| Une session, lot par lot | Petit projet, ou lots qui se touchent beaucoup |
+| `/batch <instruction>` | Lots indépendants : Claude découpe le travail en 5 à 30 unités, vous montre le plan, puis lance un sous-agent d'arrière-plan par unité, chacun dans son propre worktree |
+| Dynamic workflow (« utilise un workflow » ou mot-clé `ultracode`) | Plusieurs centaines de fichiers, besoin d'une vérification croisée par des agents indépendants |
+| Boucle `claude -p` | Vous voulez piloter vous-même le découpage, par exemple en CI |
+
+Exemple avec `/batch` :
+
+```text
+/batch migre les composants de src/widgets/ de Vue vers React selon
+MIGRATION_PLAN.md et MIGRATION_NOTES.md. Chaque unité garde l'API publique
+identique, ajoute un test Vitest par composant migré et doit passer
+`npm run build` et `npx vitest run src/widgets`.
+```
+
+Exemple avec un dynamic workflow :
+
+```text
+ultracode: migre chaque route de server/routes/ d'Express vers Hono, chacune
+dans sa propre copie isolée. Vérifie chaque route avec `npm run test:api`,
+puis fais relire par un agent indépendant les routes qui touchent à l'auth.
+```
+
+Un workflow ne s'interrompt pas pour vous demander votre avis : si vous voulez valider entre deux couches, lancez chaque couche comme un workflow séparé. Suivez l'avancement avec `/workflows`. Le détail des deux outils est dans [Refactor à grande échelle](/wiki/workflows/refactor-grande-echelle).
+
+## Étape 5 : prouver l'équivalence
+
+« Ça compile » ne prouve rien. Donnez à Claude un moyen de vérifier lui-même le comportement :
+
+- **API** : lancez l'ancienne et la nouvelle version côte à côte et rejouez les mêmes requêtes. Demandez à Claude d'écrire le script qui compare les réponses JSON (statut, corps, en-têtes importants).
+- **Front** : tests de composants (Vitest + Testing Library) écrits avant le portage sur la version Vue, puis réutilisés sur la version React ; captures visuelles avec Playwright ou Storybook pour les régressions silencieuses.
+- **Parcours critiques** : tests end-to-end sur l'inscription, le paiement, l'authentification.
+
+Pour que la règle tienne sans dépendre de la mémoire de Claude, fixez une condition d'arrêt avec `/goal` (« le build, les tests unitaires et les tests e2e passent ») ou un hook `Stop` qui lance la suite de tests.
+
+## Étape 6 : revue et bascule
+
+- Faites relire chaque lot par un contexte neuf : `/code-review` sur la branche, ou `/code-review ultra` avant le merge final d'un gros diff.
+- Comparez les métriques avant et après : taille du bundle, temps de réponse, Core Web Vitals.
+- Basculez progressivement derrière un feature flag plutôt qu'en une fois.
+- Gardez une revue humaine sur les zones sensibles (auth, paiement). Claude respecte les conventions, il ne connaît pas toujours l'intention métier.
+- Gardez l'ancien code accessible (tag git ou branche) le temps de valider en production.
+
+## Pièges fréquents
+
+- **Lots qui se chevauchent.** Deux sous-agents qui modifient le même `index.ts` ou le même store produisent des conflits. Traitez ces fichiers centraux à part, avant ou après la parallélisation.
+- **Checkpoints mal compris.** `/rewind` n'annule que les modifications faites par les outils d'édition de Claude dans la session, pas celles des commandes shell ni des sous-agents en arrière-plan. Votre filet de sécurité, c'est git : une branche dédiée et un commit par lot.
+- **Conventions qui dérivent.** Si un lot invente une nouvelle façon de faire, ajoutez la règle dans `MIGRATION_NOTES.md` immédiatement, sinon les lots suivants divergeront.
+- **Coût sous-estimé.** Un workflow lance beaucoup d'agents. Testez sur un dossier avant de lancer tout le dépôt, et surveillez la consommation dans `/workflows` et `/usage`.
 
 ## Pour aller plus loin
 
-- Tiens un journal de migration par PR : décisions, surprises, dette créée volontairement
-- Utilise un feature flag pour basculer progressivement entre l'ancienne et la nouvelle stack en prod
-- Fais relire les phases sensibles (auth, paiement) par un humain ; n'automatise pas tout
-- Garde l'ancien code dans une branche `legacy/` pendant 3 à 6 mois après le cutover
+- [Refactor à grande échelle](/wiki/workflows/refactor-grande-echelle)
+- [Dynamic workflows et agents en arrière-plan](/wiki/cli/dynamic-workflows-agents-arriere-plan)
+- [Paralléliser avec les sous-agents](/wiki/subagents/parallelisation)
+- [Génération de tests](/wiki/workflows/generation-tests)
+- [Migration de bases de données](/wiki/workflows/migration-db)
+
+## Sources
+
+- [Best practices : Explore first, then plan, then code ; Fan out across files, documentation Claude Code](https://code.claude.com/docs/en/best-practices)
+- [Common workflows : Refactor code, documentation Claude Code](https://code.claude.com/docs/en/common-workflows)
+- [Orchestrate subagents at scale with dynamic workflows, documentation Claude Code](https://code.claude.com/docs/en/workflows)
+- [Commands (`/batch`, `/code-review`), documentation Claude Code](https://code.claude.com/docs/en/commands)

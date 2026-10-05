@@ -1,116 +1,190 @@
 ---
-title: "Best practices production"
-description: "Retries, observability, fallbacks, timeouts, monitoring et alertes pour mettre l'API Claude en production sereinement."
-updatedAt: "2026-05-19"
-readingMinutes: 6
+title: "Mettre l'API Claude en production : bonnes pratiques"
+description: "Retries, timeouts, streaming, gestion des refus et des surcharges, logs structurés et alertes : la check-list pour une intégration de l'API Claude robuste en production."
+updatedAt: "2026-10-03"
+readingMinutes: 8
 ---
 
-Passer un POC Claude en production demande bien plus qu'un simple `client.messages.create()`. Un appel API peut échouer pour des dizaines de raisons : rate limit, timeout réseau, overload côté Anthropic, modèle qui rate son JSON. Voici la checklist battle-tested pour bâtir une intégration robuste.
+Passer d'un prototype à un service en production demande plus qu'un `client.messages.create()`. Un appel peut échouer (limite de débit, surcharge, coupure réseau), réussir sans produire la réponse attendue (refus, réponse tronquée) ou coûter bien plus que prévu. Voici les réglages et réflexes qui évitent la plupart des incidents.
 
-## Retries avec backoff exponentiel et jitter
+## 1. Connaître les erreurs et savoir lesquelles relancer
 
-Les SDK Anthropic officiels font déjà 2 retries par défaut, mais c'est rarement suffisant en production. Configurez explicitement votre stratégie et **ajoutez du jitter** pour éviter les thundering herds.
+| Code | Type | Relancer ? |
+|---|---|---|
+| 400 | `invalid_request_error` (requête invalide, ou plafond de dépense atteint) | Non : corrigez la requête |
+| 401 | `authentication_error` | Non : clé absente, révoquée ou expirée |
+| 402 | `billing_error` | Non : problème de facturation |
+| 403 | `permission_error` | Non |
+| 404 | `not_found_error` | Non |
+| 409 | `conflict_error` | Oui, après résolution du conflit |
+| 413 | `request_too_large` (32 Mo pour Messages) | Non : réduisez la requête |
+| 429 | `rate_limit_error` | Oui, après le délai `retry-after` |
+| 500 | `api_error` | Oui, avec backoff |
+| 504 | `timeout_error` | Oui, et passez en streaming |
+| 529 | `overloaded_error` (surcharge globale de l'API) | Oui, avec backoff |
+
+Attention à un cas particulier : un 429 dû au **plafond mensuel de votre niveau de dépense** n'a pas d'en-tête `retry-after` et échouera tant que l'accès n'est pas rétabli. Ne le relancez pas en boucle.
+
+## 2. Laisser les SDK gérer les retries
+
+Les SDK officiels relancent déjà automatiquement les erreurs de connexion, 408, 409, 429 et 5xx, **2 fois par défaut**, avec backoff exponentiel et respect de `retry-after`. Ajustez plutôt que de réécrire :
 
 ```python
 import anthropic
-from anthropic import APIStatusError
 
 client = anthropic.Anthropic(
-    max_retries=5,
-    timeout=60.0,  # secondes
+    max_retries=4,   # au lieu de 2
+    timeout=120.0,   # secondes en Python
 )
-
-# Pour un contrôle fin, désactivez les retries SDK et faites-le vous-même
-try:
-    resp = client.with_options(max_retries=0).messages.create(...)
-except APIStatusError as e:
-    if e.status_code in (429, 529, 500, 502, 503, 504):
-        # backoff + jitter + retry
-        ...
 ```
-
-Règles d'or : retry uniquement sur `429`, `5xx` et `529 overloaded`. **Jamais** sur `4xx` (sauf 429) — ce sont des erreurs de votre côté, retry empire la situation.
-
-## Timeouts : connect, read, total
-
-Distinguez le timeout de connexion (5 s suffisent) du timeout de lecture (long, surtout en streaming). Une réponse Claude Sonnet peut prendre 30-60 s sur un long output. En streaming, le bon timeout est entre les chunks, pas global.
 
 ```ts
 import Anthropic from "@anthropic-ai/sdk";
 
 const client = new Anthropic({
-  timeout: 120_000,   // 2 min global
   maxRetries: 4,
+  timeout: 120_000, // millisecondes en TypeScript
 });
-
-// Par requête, vous pouvez surcharger
-const resp = await client.messages.create(
-  { model: "claude-sonnet-5-5", max_tokens: 4096, messages },
-  { timeout: 180_000 }
-);
 ```
 
-## Fallbacks multi-modèles
-
-Quand `claude-sonnet-5-5` est overloaded (status 529), basculer automatiquement sur Haiku ou sur une version précédente évite l'incident utilisateur. Implémentez une **cascade** :
+Pour gérer les erreurs restantes, attrapez les classes typées du plus précis au plus général, jamais en comparant des messages texte :
 
 ```python
-MODEL_CASCADE = [
-    "claude-sonnet-5-5",
-    "claude-sonnet-5",
-    "claude-haiku-4-5",
-]
-
-def resilient_call(messages):
-    for model in MODEL_CASCADE:
-        try:
-            return client.messages.create(model=model, max_tokens=1024, messages=messages)
-        except anthropic.APIStatusError as e:
-            if e.status_code == 529 and model != MODEL_CASCADE[-1]:
-                continue
-            raise
+try:
+    response = client.messages.create(...)
+except anthropic.RateLimitError as e:
+    planifier_plus_tard(e.response.headers.get("retry-after"))
+except anthropic.BadRequestError as e:
+    log.error("Requête invalide", extra={"request_id": e.request_id, "msg": e.message})
+    raise
+except anthropic.APIStatusError as e:
+    log.error("Erreur API %s", e.status_code)
+    raise
+except anthropic.APIConnectionError:
+    log.warning("Réseau indisponible")
+    raise
 ```
 
-Versionnez le modèle utilisé dans votre réponse pour pouvoir l'auditer a posteriori.
+Le délai total peut atteindre `timeout × (max_retries + 1)` : dimensionnez vos timeouts côté serveur web en conséquence.
 
-## Observability : logs structurés et traces
+## 3. Streamer les réponses longues
 
-Tracez chaque appel avec ces champs minimum : `request_id` (header `request-id` de la réponse), modèle, `input_tokens`, `output_tokens`, latence, statut, et un hash du prompt pour le debug sans logger de PII.
+Une requête non streamée avec un gros `max_tokens` risque d'être coupée par un proxy ou un réseau qui ferme les connexions inactives. Les SDK refusent d'ailleurs les requêtes non streamées qui pourraient dépasser 10 minutes. Règle simple : **streaming dès que la sortie peut être longue**, même si vous n'affichez rien en direct.
+
+```python
+with client.messages.stream(
+    model="claude-opus-5-5",
+    max_tokens=64000,
+    messages=[{"role": "user", "content": "Rédige la documentation complète du module..."}],
+) as stream:
+    message = stream.get_final_message()
+```
+
+En streaming, une erreur peut survenir **après** le statut HTTP 200, sous forme d'événement `error` dans le flux. Prévoyez ce cas (voir [Streaming](/wiki/api/streaming)). Pour les traitements non urgents, l'[API Batch](/wiki/api/batch-api) évite complètement ces problèmes.
+
+## 4. Toujours vérifier `stop_reason`
+
+Une réponse HTTP 200 n'est pas forcément une bonne réponse :
+
+| `stop_reason` | Que faire |
+|---|---|
+| `end_turn` | Cas normal |
+| `max_tokens` | Réponse tronquée : augmentez `max_tokens` ou demandez une suite |
+| `tool_use` | Exécutez l'outil et renvoyez un `tool_result` |
+| `pause_turn` | Un outil serveur a mis le tour en pause : renvoyez la réponse pour continuer |
+| `refusal` | Requête déclinée par les classifieurs : lisez `stop_details.category` |
+| `stop_sequence` | Une séquence d'arrêt a été atteinte |
+
+Sur Opus 5.5, la réflexion est toujours active et consomme aussi `max_tokens`. Ne mettez pas des plafonds trop bas (comptez au moins quelques milliers de tokens), et filtrez toujours les blocs sur `type == "text"`.
+
+## 5. Gérer les refus avec un modèle de repli
+
+Opus 5.5 et Sonnet 5.5 embarquent des classifieurs de sécurité qui peuvent décliner une requête légitime (faux positifs en cybersécurité ou en biologie, par exemple). Le refus arrive en **HTTP 200** : votre monitoring d'erreurs ne le voit pas.
+
+Sur l'API Claude, le plus simple est le repli côté serveur (bêta) : l'API relance la requête sur le modèle recommandé pour la catégorie du refus, dans le même appel.
+
+```python
+response = client.beta.messages.create(
+    model="claude-opus-5-5",
+    max_tokens=4096,
+    messages=messages,
+    fallbacks="default",
+    betas=["server-side-fallback-2026-07-01"],
+)
+
+if response.stop_reason == "refusal":
+    # toute la chaîne a refusé : message propre à l'utilisateur
+    afficher_refus(response.stop_details)
+else:
+    print("Servi par", response.model)
+```
+
+Sur Bedrock, Google Cloud ou Foundry (où `fallbacks` n'existe pas), utilisez le middleware de repli des SDK. Le paramètre n'est pas accepté non plus dans l'API Batch. Comptez les refus comme un indicateur à part entière dans vos tableaux de bord.
+
+## 6. Ne pas utiliser de « cascade » de modèles contre les 529
+
+Basculer automatiquement d'Opus vers Sonnet puis Haiku à chaque erreur 529 semble prudent, mais a des coûts cachés : chaque modèle a son propre cache (le prompt caching repart de zéro), la qualité varie d'une réponse à l'autre, et les blocs de réflexion d'un modèle ne sont pas lus par un autre. Préférez :
+
+- les retries du SDK avec backoff ;
+- une file d'attente pour lisser les pics ;
+- un repli explicite, testé et documenté, uniquement pour les routes critiques ;
+- un **disjoncteur** (circuit breaker) qui coupe vite les appels quand l'API est indisponible et affiche un message clair.
+
+Si vous montez en charge brutalement, vous pouvez aussi recevoir des 429 liés aux limites d'accélération : augmentez le trafic progressivement.
+
+## 7. Journaliser chaque appel
+
+Champs minimaux à enregistrer pour chaque requête :
 
 ```ts
 const start = Date.now();
-const resp = await client.messages.create(payload);
-logger.info({
-  request_id: resp._request_id,
-  model: resp.model,
-  input_tokens: resp.usage.input_tokens,
-  output_tokens: resp.usage.output_tokens,
-  cache_read: resp.usage.cache_read_input_tokens,
-  latency_ms: Date.now() - start,
-  stop_reason: resp.stop_reason,
-}, "claude_call");
+const response = await client.messages.create(payload);
+
+logger.info(
+  {
+    request_id: response._request_id, // à fournir au support Anthropic
+    model: response.model,
+    stop_reason: response.stop_reason,
+    input_tokens: response.usage.input_tokens,
+    cache_read: response.usage.cache_read_input_tokens,
+    cache_write: response.usage.cache_creation_input_tokens,
+    output_tokens: response.usage.output_tokens,
+    latency_ms: Date.now() - start,
+  },
+  "claude_call",
+);
 ```
 
-Branchez ça sur Datadog, Grafana ou OpenTelemetry. Le `request_id` est l'identifiant à fournir au support Anthropic en cas de bug.
+Ne journalisez pas les prompts bruts s'ils contiennent des données personnelles : un hash ou un identifiant de template suffit pour déboguer. Pour attribuer les appels à vos utilisateurs sans données personnelles, voir [metadata.user_id](/wiki/api/metadata-user-id).
 
-## Monitoring et alertes
+## 8. Alertes utiles
 
-Mettez en place quatre alertes minimum :
+1. **Taux d'erreurs 5xx et 529** au-dessus de votre ligne de base sur 5 minutes.
+2. **Taux de 429** : vous approchez de vos limites (voir [les en-têtes de rate limit](/wiki/api/rate-limit-headers)).
+3. **Taux de refus** (`stop_reason == "refusal"`) et taux de `max_tokens`.
+4. **Latence p95** et **time-to-first-token** (voir [TTFT](/wiki/api/ttft-tuning)).
+5. **Coût par heure** au-delà du budget, et chute du taux de lecture du cache.
 
-1. **Taux d'erreur > 1 %** sur une fenêtre de 5 min → quelque chose se passe.
-2. **Latence p95 > 10 s** → soit Anthropic, soit vos prompts ont grossi.
-3. **Coût/heure > budget** → fuite ou prompt qui explose en tokens.
-4. **Cache hit rate < 70 %** (si vous utilisez le cache) → invalidations involontaires.
+Dans la Console, fixez aussi des **plafonds de dépense** par workspace : au-delà, l'API renvoie une erreur 400 au lieu de continuer à facturer.
 
-Surveillez aussi le ratio `cache_read_input_tokens / input_tokens` : c'est l'indicateur le plus rentable à optimiser.
+## 9. Sécurité de base
 
-## Idempotence et déduplication
-
-Utilisez le header `Idempotency-Key` (UUID v4) pour garantir qu'un retry ne crée pas un double appel facturé. Particulièrement critique pour les opérations longues ou batch.
+- Clé API en variable d'environnement ou gestionnaire de secrets, jamais dans le code ni côté navigateur.
+- Une clé par environnement (dev, staging, prod) et par workspace, avec date d'expiration.
+- Ne passez jamais à l'API un `file_id` ou un identifiant fourni par l'utilisateur sans contrôle.
+- Validez les sorties d'outils et les JSON produits avant de les exécuter.
 
 ## Pour aller plus loin
 
-- Activez le **prompt caching** dès qu'un prompt système dépasse 1 024 tokens — 90 % d'économie sur les hits.
-- Pour les workloads asynchrones non-urgents, utilisez la **Message Batches API** : -50 % de coût, latence sous 24 h.
-- Implémentez un **circuit breaker** (lib `pybreaker` ou `opossum` en JS) pour couper rapidement quand Anthropic est down.
-- Loggez systématiquement les `stop_reason` : `max_tokens` vs `end_turn` vs `tool_use` vous dit beaucoup sur la santé de vos prompts.
+- [Les en-têtes de rate limit](/wiki/api/rate-limit-headers)
+- [Budgéter ses tokens](/wiki/api/token-budgeting)
+- [Implémenter le prompt caching](/wiki/api/prompt-caching-implementation)
+- [Évals automatisées](/wiki/api/evals-automatisees)
+- [Streaming](/wiki/api/streaming)
+
+## Sources
+
+- Errors : https://platform.claude.com/docs/en/api/errors
+- Refusals and fallback : https://platform.claude.com/docs/en/build-with-claude/refusals-and-fallback
+- Rate limits : https://platform.claude.com/docs/en/api/rate-limits
+- Streaming : https://platform.claude.com/docs/en/build-with-claude/streaming
