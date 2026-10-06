@@ -1,35 +1,165 @@
 ---
-title: "Migration de bases de données automatisée"
-description: "Transformer un schéma SQL en migration Prisma ou Liquibase avec script de rollback généré par Claude."
-updatedAt: "2026-05-19"
-readingMinutes: 6
+title: "Migrations de base de données avec Claude Code"
+description: "Faire générer par Claude Code des migrations Prisma ou Liquibase sûres, avec rollback, test sur une base jetable et hook qui bloque tout déploiement en production non validé."
+updatedAt: "2026-10-03"
+readingMinutes: 7
 ---
 
-Les migrations de base de données restent l'une des opérations les plus risquées d'un déploiement. Un `ALTER TABLE` mal pensé peut bloquer une table en production pendant des heures. Claude Code, branché sur le schéma source et la documentation de votre ORM, peut générer des migrations idempotentes accompagnées systématiquement d'un script de rollback testé.
+Une migration de base de données reste l'une des opérations les plus risquées d'un déploiement : un `ALTER TABLE` mal pensé peut verrouiller une table de production ou détruire des données. Claude Code peut rédiger la migration, son rollback et le plan de test, à condition de lui donner le bon contexte et de garder vous-même la main sur l'exécution en production. Voici un workflow complet.
 
-## Préparer le contexte
+## 1. Préparer le contexte
 
-Avant de demander quoi que ce soit, fournissez à Claude trois éléments. Le schéma actuel, idéalement exporté via `pg_dump --schema-only` ou `prisma db pull`. Le diff souhaité, formulé en langage naturel ou via un fichier SQL cible. Les contraintes opérationnelles : fenêtre de maintenance, volumétrie, tolérance au lock, dialecte (Postgres, MySQL, SQL Server). Sans ces données, la migration générée sera plausible mais dangereuse.
+Sans contexte, Claude produit une migration plausible mais potentiellement dangereuse. Fournissez-lui :
 
-## Génération avec Prisma
+- **le schéma actuel** : `pg_dump --schema-only`, `prisma db pull` ou votre dernier changelog ;
+- **le changement voulu**, en langage naturel ou sous forme de schéma cible ;
+- **les contraintes** : moteur et version (PostgreSQL 17, MySQL 8…), volumétrie des tables concernées, tolérance aux verrous, fenêtre de maintenance.
 
-Pour un projet Prisma, le workflow type est le suivant. Vous modifiez `schema.prisma`, puis demandez à Claude de produire la migration équivalente avec `prisma migrate diff --from-schema-datasource --to-schema-datamodel`. Claude relit le SQL généré, le réorganise pour minimiser les locks (par exemple en ajoutant `CREATE INDEX CONCURRENTLY` pour Postgres), puis écrit le fichier dans `prisma/migrations/<timestamp>_<nom>/migration.sql`. Demandez explicitement de séparer les changements destructifs (DROP COLUMN) des changements additifs pour pouvoir déployer en plusieurs phases.
+Les contraintes durables vont dans `CLAUDE.md`, pour ne pas les répéter à chaque session :
 
-## Génération avec Liquibase
+```markdown
+## Base de données
+- PostgreSQL 17, ORM Prisma. Migrations dans prisma/migrations/.
+- Table `events` : 400 M de lignes. Jamais d'ALTER bloquant dessus.
+- Toute migration destructive se fait en deux déploiements (expand / contract).
+- Ne jamais lancer `prisma migrate deploy` : c'est la CI qui déploie.
+```
 
-Liquibase impose un format changelog XML ou YAML avec rollback déclaratif. Claude excelle ici car chaque `changeSet` doit contenir son bloc `<rollback>` correspondant. Donnez-lui un exemple de votre convention (préfixe d'auteur, format de l'ID, tags) et il produira des changelogs cohérents avec votre historique. Le préchecks `preConditions` est crucial : Claude doit ajouter `<tableExists>` ou `<columnExists>` pour rendre les migrations rejouables sans erreur.
+## 2. Commencer en mode plan
 
-## Script de rollback systématique
+Pour une migration non triviale, demandez d'abord un plan (`Shift+Tab` jusqu'au mode plan, ou `claude --permission-mode plan`). Exemple de demande :
 
-Pour chaque migration, exigez un script `down.sql` ou un bloc `rollback` capable d'annuler le changement. Cas faciles : `CREATE TABLE` se rollback par `DROP TABLE`. Cas piégeux : un `DROP COLUMN` ne peut pas restaurer les données. Dans ces situations, Claude doit générer un script en deux temps qui dumpe d'abord les données dans une table de sauvegarde (`<table>_backup_<date>`), puis effectue l'opération destructive. Le rollback consiste alors à recréer la colonne et réinjecter depuis la table de backup.
+> Je veux renommer la colonne `users.name` en `full_name` sans interruption de service. Proposez un plan expand / contract en plusieurs déploiements, avec le SQL de chaque étape, le rollback de chaque étape et les risques de verrou.
 
-## Vérification avant production
+Relisez le plan avant de laisser Claude écrire le moindre fichier. C'est ici que vous repérez un `DROP` caché ou une réécriture complète de table.
 
-Ne déployez jamais directement. Demandez à Claude de lancer la migration sur une base éphémère reconstruite à partir d'un snapshot de production anonymisé. Mesurez le temps d'exécution, les locks pris, l'évolution du plan d'exécution sur les requêtes critiques. Un hook `PreToolUse` peut bloquer toute commande `prisma migrate deploy` qui n'aurait pas son rapport de test associé.
+## 3. Générer la migration avec Prisma
+
+Modifiez `schema.prisma` (ou laissez Claude le faire), puis demandez-lui de créer la migration **sans l'appliquer** :
+
+```bash
+npx prisma migrate dev --create-only --name rename_user_name
+```
+
+Claude relit ensuite le fichier `prisma/migrations/<horodatage>_rename_user_name/migration.sql` et l'adapte :
+
+- Prisma génère un renommage sous forme de `DROP` + `ADD` : Claude doit le remplacer par un `RENAME COLUMN` ou une stratégie expand / contract ;
+- sur PostgreSQL, un index sur une grosse table se crée avec `CREATE INDEX CONCURRENTLY`, qui ne peut pas tourner dans une transaction : placez-le dans une migration à part ;
+- séparez les changements additifs (nouvelle colonne, nouvelle table) des changements destructifs (`DROP COLUMN`), pour les déployer à des moments différents.
+
+## 4. Générer la migration avec Liquibase
+
+Liquibase utilise des changelogs (XML, YAML, JSON ou SQL formaté) composés de `changeSet`. Donnez à Claude un changelog existant comme modèle (convention d'`id`, d'`author`, de tags) et exigez pour chaque `changeSet` :
+
+- un bloc `rollback` explicite ;
+- des `preConditions` (`tableExists`, `columnExists`…) avec `onFail="MARK_RAN"` pour que le changelog reste rejouable.
+
+```yaml
+databaseChangeLog:
+  - changeSet:
+      id: 2026-10-03-add-full-name
+      author: equipe-back
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: users
+                columnName: full_name
+      changes:
+        - addColumn:
+            tableName: users
+            columns:
+              - column:
+                  name: full_name
+                  type: varchar(255)
+      rollback:
+        - dropColumn:
+            tableName: users
+            columnName: full_name
+```
+
+## 5. Exiger un rollback pour chaque étape
+
+Certains rollbacks sont simples : un `CREATE TABLE` s'annule par un `DROP TABLE`. D'autres sont impossibles sans précaution : un `DROP COLUMN` perd les données. Dans ce cas, demandez à Claude :
+
+1. une copie préalable des données concernées (table `<table>_backup_<date>` ou export) ;
+2. l'opération destructive dans une migration séparée, déployée après vérification ;
+3. un script de rollback qui recrée la colonne et la remplit depuis la sauvegarde.
+
+Avec Prisma, qui ne génère pas de migration descendante, faites écrire ce script à côté (par exemple `down.sql`) et testez-le aussi.
+
+## 6. Tester sur une base jetable
+
+Ne laissez jamais une migration toucher la production sans test. Demandez à Claude de :
+
+- lancer une base éphémère (conteneur Docker, branche de base de données Neon ou Supabase) à partir d'un instantané anonymisé ;
+- appliquer la migration, puis le rollback, puis de nouveau la migration ;
+- mesurer la durée, les verrous pris et le plan d'exécution (`EXPLAIN`) des requêtes critiques ;
+- écrire un court rapport dans la PR.
+
+## 7. Bloquer les commandes dangereuses avec un hook
+
+Un hook `PreToolUse` garantit que Claude ne lancera pas de déploiement de migration, même par erreur. Dans `.claude/settings.json` :
+
+```json
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/bloquer-migrations.sh"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+Et le script `.claude/hooks/bloquer-migrations.sh` (rendez-le exécutable) :
+
+```bash
+#!/bin/bash
+commande=$(jq -r '.tool_input.command // empty')
+
+if echo "$commande" | grep -qiE 'prisma migrate (deploy|reset)|liquibase .*update|drop (table|database)'; then
+  jq -n '{
+    hookSpecificOutput: {
+      hookEventName: "PreToolUse",
+      permissionDecision: "deny",
+      permissionDecisionReason: "Les migrations se déploient par la CI après revue."
+    }
+  }'
+fi
+exit 0
+```
+
+Ajoutez aussi une règle `deny` dans les permissions et ne donnez jamais à Claude les identifiants de production : le hook est un filet, pas la seule protection.
+
+## Récapitulatif
+
+| Étape | Qui | Garde-fou |
+|---|---|---|
+| Plan expand / contract | Claude, en mode plan | Votre relecture |
+| Génération du SQL ou du changelog | Claude | `--create-only`, pas d'application directe |
+| Rollback | Claude | Testé sur base jetable |
+| Test (durée, verrous) | Claude | Rapport dans la PR |
+| Déploiement en production | CI après revue humaine | Hook `PreToolUse` + permissions |
 
 ## Pour aller plus loin
 
-- Documentation Prisma sur les migrations expand/contract et les déploiements zero-downtime.
-- Best practices Liquibase pour les rollbacks complexes et les `contexts` multi-environnements.
-- Outil `pg_squeeze` ou `pt-online-schema-change` pour les ALTER sur grosses tables sans lock.
-- Pattern "ghost tables" utilisé par GitHub (`gh-ost`) pour les migrations MySQL en production.
+- [Hooks PreToolUse et PostToolUse](/wiki/hooks/pre-post-tool-use)
+- [Sécurité des hooks](/wiki/hooks/securite-rce)
+- [Secrets et variables d'environnement](/wiki/workflows/secrets-env)
+- [Migrer une stack avec Claude Code](/wiki/workflows/migration-stack)
+- Outils de migration en ligne pour très grosses tables : `gh-ost` et `pt-online-schema-change` (MySQL), `pg_repack` (PostgreSQL).
+
+## Sources
+
+- [Hooks (Claude Code)](https://code.claude.com/docs/en/hooks)
+- [Bonnes pratiques Claude Code](https://code.claude.com/docs/en/best-practices)
+- [Prisma Migrate](https://www.prisma.io/docs/orm/prisma-migrate)
+- [Liquibase : rollback et preconditions](https://docs.liquibase.com/)
