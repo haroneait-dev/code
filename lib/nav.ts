@@ -5,6 +5,7 @@ export const NAV_LINKS = [
   { key: "fiches", href: "/fiches", label: "Fiches" },
   { key: "apps", href: "/applications", label: "Applications" },
   { key: "prompts", href: "/prompts", label: "Prompts" },
+  { key: "patch", href: "/patch-notes", label: "Patch notes" },
 ] as const;
 
 // Accepte aussi les clés des anciennes pages désactivées (communauté, messages)
