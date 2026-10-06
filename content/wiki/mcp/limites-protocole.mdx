@@ -1,71 +1,115 @@
 ---
-title: "Limites du protocole MCP"
-description: "Ce que MCP ne sait pas (encore) faire : streaming partiel, état persistant, multi-tenant, et pistes d'évolution."
-updatedAt: "2026-05-19"
-readingMinutes: 6
+title: "Limites du protocole MCP (et comment les contourner)"
+description: "Ce que MCP fait mal ou pas encore en octobre 2026 : opérations longues, état, événements poussés, autorisations fines, schémas, coût en contexte, forme des résultats, avec les contournements qui marchent dans Claude Code."
+updatedAt: "2026-10-03"
+readingMinutes: 8
 ---
 
-MCP est jeune (première spec fin 2024) et résout brillamment le problème de **connecter un LLM à des outils**. Mais il y a des cas d'usage où l'on bute encore sur des limites du protocole. Les connaître évite des architectures bancales.
+MCP résout bien un problème précis : brancher un modèle sur des outils et des données de façon standard. Il n'est pas pour autant une solution à tout. Connaître ses limites actuelles vous évite de concevoir un serveur qui se battra contre le protocole. Cet article reflète la révision **2026-07-28** et le comportement de Claude Code en octobre 2026.
 
-## Pas de streaming partiel des résultats d'outils
+## Résumé
 
-Aujourd'hui, un appel d'outil MCP est **request/response** : le serveur exécute, puis renvoie un payload complet. Pour un outil qui produit beaucoup de tokens (génération vidéo, scrape long, build), le LLM doit attendre la fin sans visibilité.
+| Limite | État en octobre 2026 | Contournement |
+|---|---|---|
+| Opérations longues | progression et annulation dans le cœur, Tasks en extension, support inégal des clients | découper en `start` / `status` / `result` |
+| État entre deux appels | protocole sans état depuis 2026-07-28 | identifiants explicites passés en arguments |
+| Événements poussés vers le modèle | pas de standard ; feuille de route | channels de Claude Code, hooks, polling |
+| Autorisations par outil | OAuth avec scopes, rien de standard par outil | vérifier les droits dans chaque outil |
+| Schémas d'entrée | JSON Schema 2020-12 libre, mais clients plus stricts | schémas plats, validation côté serveur |
+| Coût en contexte | chaque outil a un coût | tool search, descriptions courtes |
+| Forme des résultats | `content` et `structuredContent` coexistent | renvoyer les deux de façon cohérente |
+| Orchestration | aucune composition côté protocole | outils de plus haut niveau |
 
-Conséquences pratiques :
+## Opérations longues
 
-- Pas de feedback intermédiaire ("frame 12/300 rendue").
-- Timeouts difficiles à régler — soit trop courts, soit l'utilisateur attend dans le noir.
-- Impossible d'annuler proprement un outil long en cours.
+Un appel d'outil reste une requête suivie d'une réponse. Le protocole offre tout de même :
 
-Workaround actuel : découper l'opération en outils plus petits (`start_job`, `poll_status`, `get_result`) et laisser le LLM orchestrer. C'est verbeux mais ça marche.
+- des **notifications de progression** (`notifications/progress`) si le client fournit un `progressToken` ;
+- l'**annulation** (fermeture du flux en HTTP, `notifications/cancelled` en stdio) ;
+- l'extension officielle **Tasks** : le serveur renvoie un identifiant de tâche, le client interroge avec `tasks/get`.
 
-## État de session limité
+La limite est côté clients : Tasks est optionnelle et peu de clients la gèrent. Dans Claude Code, un appel d'outil MCP qui dure plus de **deux minutes** passe en tâche de fond (visible dans `/tasks`), mais il reste soumis au délai par serveur (`timeout` dans `.mcp.json` ou `MCP_TOOL_TIMEOUT`) et à un délai d'inactivité : 5 minutes sans réponse ni progression pour un serveur distant, 30 minutes pour un serveur stdio (`CLAUDE_CODE_MCP_TOOL_IDLE_TIMEOUT`).
 
-Le protocole considère chaque outil comme **stateless** vis-à-vis du serveur. Les `resources` apportent un état lisible, mais il n'y a pas de concept de "transaction" ou de "session utilisateur" portée par MCP.
+**Contournement robuste** : trois outils `start_job`, `get_job_status` et `get_job_result`. Le modèle lance, vérifie, puis récupère. Envoyez aussi des notifications de progression : elles maintiennent l'appel en vie face au délai d'inactivité.
 
-Si vous voulez :
+## État entre deux appels
 
-- Garder un curseur de pagination entre deux appels,
-- Maintenir une connexion DB ouverte avec un context manager,
-- Synchroniser plusieurs outils sur un même objet métier,
+Depuis 2026-07-28, le protocole est **sans état** : plus de session ni de `Mcp-Session-Id`. Un serveur ne doit rien déduire des requêtes précédentes.
 
-…c'est à vous de gérer l'état **dans votre serveur** (in-memory dict, Redis, etc.) et de l'exposer via des identifiants opaques que le LLM trimballe.
+Si vous avez besoin d'un curseur de pagination, d'une transaction ou d'un panier, créez un **identifiant explicite** côté serveur et renvoyez-le dans le résultat. Le modèle le repasse en argument à l'appel suivant :
 
-## Pas de notifications proactives (encore)
+```json
+{ "name": "query_next_page", "arguments": { "cursor_id": "cur_8f2a" } }
+```
 
-Le protocole supporte techniquement des notifications JSON-RPC (`notifications/resources/updated`), mais peu de clients les implémentent vraiment. Un serveur ne peut donc pas, en pratique :
+Stockez l'état associé dans Redis ou une base, avec une expiration. Un serveur conçu ainsi passe sans peine à plusieurs instances derrière un répartiteur de charge.
 
-- Réveiller le LLM quand un événement externe arrive ("nouveau mail").
-- Pousser une mise à jour de ressource sans que le client la redemande.
+## Événements poussés vers le modèle
 
-Pour du vrai temps réel (chat, alerting), MCP n'est pas encore la bonne couche. On reste sur WebSockets côté app, et on appelle le LLM en réaction.
+Les notifications de changement existent (`subscriptions/listen` : liste d'outils modifiée, ressource mise à jour). En revanche, le protocole n'a **aucun moyen standard** pour qu'un serveur réveille le modèle quand un événement externe arrive : nouveau ticket, CI en échec, message reçu.
 
-## Multi-tenant et auth fine
+C'est un chantier de la feuille de route (« événements déclenchés par le serveur », webhooks). En attendant :
 
-La spec 2025 a introduit OAuth pour le transport HTTP, mais la granularité reste grossière. Concrètement :
+- Claude Code propose les **channels** : un serveur qui déclare la capacité `claude/channel`, activé avec `--channels`, pousse des messages dans la session. C'est une extension propre à Claude Code, et elle ne fonctionne pas sur une connexion en 2026-07-28 : un tel serveur doit rester sur l'ancienne poignée de main.
+- Sinon, déclenchez Claude de l'extérieur (`claude -p` dans un script, une routine planifiée, un hook).
 
-- Pas de notion native de "rôle" ou de "scope par outil" — vous devez réimplémenter.
-- Les serveurs stdio sont mono-utilisateur par design (un process = un user).
-- Pour un SaaS avec milliers d'utilisateurs, il faut un proxy MCP qui multiplexe et applique l'auth.
+## Autorisations fines
 
-C'est un chantier actif de la communauté ; attendez-vous à des évolutions rapides en 2026.
+MCP s'appuie sur **OAuth 2.1** pour les serveurs distants : métadonnées de ressource protégée, scopes, demande de scope supplémentaire à la volée (step-up), jetons liés au serveur. Mais :
 
-## Pas de typage runtime fort
+- rien de standard pour dire « cet utilisateur peut appeler `list_invoices` mais pas `delete_invoice` » : c'est à votre serveur de vérifier, outil par outil ;
+- un serveur ne doit **jamais relayer** le jeton reçu vers une autre API : il doit obtenir son propre jeton pour l'API en aval ;
+- l'identité des agents (un agent qui agit sans utilisateur devant un navigateur) n'est pas encore normalisée. L'extension OAuth Client Credentials couvre le cas machine à machine, et la feuille de route prévoit DPoP et la délégation d'identité ;
+- un serveur stdio tourne avec **vos** droits : il n'y a pas d'isolation entre lui et votre compte.
 
-Les `inputSchema` sont du JSON Schema, donc déclaratifs. Mais :
+Côté Claude Code, complétez par les règles de permission (`mcp__serveur__outil`) et, pour un outil critique, l'annotation serveur `_meta["anthropic/requiresUserInteraction"]: true`, qui force une confirmation à chaque appel, même en mode `auto`.
 
-- La validation côté client n'est **pas obligatoire** dans la spec.
-- Les types complexes (unions discriminées, refs circulaires) sont mal supportés par certains LLM.
-- Pas d'équivalent à gRPC ou GraphQL pour générer des clients typés.
+## Schémas d'entrée
 
-En pratique, validez **systématiquement côté serveur** avec Pydantic ou Zod — ne comptez pas sur le LLM pour respecter le schema.
+Depuis 2026-07-28, `inputSchema` et `outputSchema` acceptent n'importe quel mot-clé JSON Schema 2020-12. Les clients, eux, sont plus stricts :
 
-## Pas de composition d'outils côté serveur
+- l'API Claude refuse `anyOf`, `oneOf` ou `allOf` **à la racine** du schéma. Claude Code aplatit ces schémas et décrit les combinaisons dans la description, mais ne les impose plus ;
+- un nom de propriété hors de `[A-Za-z0-9_.-]` (1 à 64 caractères) ou un schéma invalide fait exclure l'outil ;
+- le modèle peut envoyer des arguments qui ne respectent pas le schéma.
 
-Un serveur MCP expose une liste plate d'outils. Pas de moyen natif de dire "cet outil dépend de celui-là" ou "exécute ces trois outils en transaction". L'orchestration revient toujours au LLM, ce qui est élégant mais coûteux en tokens.
+**Règle** : schémas plats et simples, descriptions claires sur chaque champ, et **validation systématique côté serveur** (Zod, Pydantic). Renvoyez une erreur d'outil lisible (`isError: true`) pour que le modèle corrige son appel. Testez la portabilité avec [MCP Inspector](/wiki/mcp/debugging-inspector).
+
+## Coût en contexte
+
+Chaque définition d'outil consomme du contexte, et chaque résultat aussi. Claude Code limite les dégâts :
+
+- **tool search** (activé par défaut) : seuls les noms des outils sont chargés au démarrage ; `alwaysLoad: true` force un serveur à tout charger ;
+- descriptions d'outils et instructions de serveur tronquées à **2 048 caractères** ;
+- résultats limités à **25 000 tokens** par défaut (`MAX_MCP_OUTPUT_TOKENS`), avertissement dès 10 000. Au-delà, ou au-delà de 50 000 caractères de texte, le résultat est enregistré dans un fichier que Claude lit à la demande. Un serveur peut relever ce seuil pour un outil avec `_meta["anthropic/maxResultSizeChars"]` (500 000 caractères au maximum).
+
+Côté serveur : paginez, filtrez, renvoyez des résumés plutôt que des dumps. La « découverte progressive » des outils est un chantier de la feuille de route.
+
+## Forme des résultats
+
+Un résultat d'outil peut contenir `content` (texte, image, ressource) **et** `structuredContent` (JSON conforme à `outputSchema`). Les clients n'utilisent pas tous le même champ, ce que les mainteneurs reconnaissent comme une source de confusion ; une refonte est prévue. En attendant, si vous fournissez `structuredContent`, mettez aussi sa version texte dans `content`.
+
+## Pas de composition ni de transaction
+
+Un serveur expose une liste plate d'outils. Impossible de déclarer « cet outil dépend de celui-là » ou « exécute ces trois appels en transaction ». L'orchestration revient au modèle, ce qui coûte des tokens et des allers-retours.
+
+**Contournement** : exposez des outils de plus haut niveau (`deploy_preview` plutôt que `build` + `upload` + `set_alias`), et gardez les briques fines pour les cas rares.
+
+## Support inégal selon les clients
+
+La spécification décrit ce qui est possible, pas ce que chaque client implémente. Exemples en octobre 2026 : MCP Apps s'affiche dans Claude Desktop et claude.ai, mais pas dans Claude Code en terminal ; les prompts MCP deviennent des commandes `/serveur:prompt` dans Claude Code mais sont ignorés par d'autres clients ; sampling et roots sont dépréciés et de moins en moins pris en charge. Vérifiez la matrice de support avant de dépendre d'une fonction.
 
 ## Pour aller plus loin
 
-- Suivez les **RFCs** dans `modelcontextprotocol/specification` : streaming et notifications sont les sujets chauds.
-- Pour du long-running, regardez les patterns "job queue + polling tool" qui émergent.
-- Si vous avez besoin de vrai temps réel, combinez MCP (commande) + WebSocket app (data plane).
+- [MCP en 2026 : protocole sans état, élicitation, MCP Apps](/wiki/mcp/evolution-2026-apps-elicitation)
+- [Routage et agrégation de serveurs MCP](/wiki/mcp/routing-aggregation)
+- [Sécurité des serveurs MCP](/wiki/mcp/securite-mcp)
+- [Permissions des outils MCP](/wiki/slash-commands/mcp-permissions)
+
+## Sources
+
+- Changelog 2026-07-28 : https://modelcontextprotocol.io/specification/2026-07-28/changelog
+- Outils (schémas, résultats) : https://modelcontextprotocol.io/specification/2026-07-28/server/tools
+- Autorisation : https://modelcontextprotocol.io/specification/2026-07-28/basic/authorization
+- Extension Tasks : https://modelcontextprotocol.io/extensions/tasks/overview
+- Feuille de route : https://modelcontextprotocol.io/development/roadmap
+- MCP dans Claude Code (délais, limites de sortie, tool search, schémas, channels) : https://code.claude.com/docs/en/mcp

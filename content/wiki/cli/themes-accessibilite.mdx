@@ -1,113 +1,144 @@
 ---
-title: "Thèmes et accessibilité"
-description: "Personnaliser les couleurs, le contraste et la densité d'affichage de Claude Code, et tirer parti du support lecteurs d'écran dans le terminal."
-updatedAt: "2026-05-19"
-readingMinutes: 6
+title: "Thèmes et accessibilité dans Claude Code"
+description: "Choisir ou créer un thème, réduire les animations, activer le mode lecteur d'écran et régler le terminal pour un Claude Code confortable et accessible."
+updatedAt: "2026-10-03"
+readingMinutes: 7
 ---
 
-Un CLI qu'on regarde huit heures par jour doit être confortable. Claude Code embarque plusieurs thèmes, un mode compact et un support explicite des lecteurs d'écran. Cette page passe en revue les options d'accessibilité et comment les configurer durablement.
+Un outil que vous regardez des heures par jour doit être lisible et confortable. Claude Code propose des thèmes intégrés (dont des variantes pour daltoniens), des thèmes personnalisés, un réglage de réduction des animations et un vrai mode lecteur d'écran. Cette page rassemble ces options et la façon de les fixer durablement.
 
 ## Choisir un thème
 
-Quatre thèmes sont fournis par défaut : `dark`, `light`, `dark-daltonized`, `light-daltonized`. Les deux variantes « daltonized » remplacent le rouge/vert par du bleu/orange pour le daltonisme deutéranope et protanope.
+Tapez `/theme` (ou passez par `/config`, ligne **Theme**). Les valeurs possibles du réglage `theme` :
 
-Pour changer le thème de façon interactive :
+| Valeur | Usage |
+|---|---|
+| `auto` | Suit le fond clair ou sombre de votre terminal, donc l'apparence du système si votre terminal la suit |
+| `dark` (par défaut) / `light` | Thèmes standard |
+| `dark-daltonized` / `light-daltonized` | Couleurs adaptées au daltonisme |
+| `dark-ansi` / `light-ansi` | N'utilisent que la palette ANSI de votre terminal (pratique si vous avez déjà un thème de terminal soigné) |
+| `custom:<slug>` | Un thème personnalisé de `~/.claude/themes/` ou fourni par un plugin |
 
-```bash
-/config         # ouvre l'éditeur de paramètres
-# puis sélectionner "theme"
-```
-
-Pour le fixer dans la configuration utilisateur :
+Pour le fixer dans vos réglages utilisateur (`~/.claude/settings.json`) :
 
 ```json
 {
-  "theme": "dark-daltonized",
-  "verbose": false
+  "theme": "dark-daltonized"
 }
 ```
 
-Le fichier vit dans `~/.claude/settings.json`. Vous pouvez aussi l'imposer par projet via `.claude/settings.json` pour homogénéiser l'équipe pendant les sessions de pair programming.
+Claude Code ne modifie pas le jeu de couleurs du terminal lui-même : celui-ci reste géré par votre application de terminal.
 
-## Contraste et lisibilité
+## Créer un thème personnalisé
 
-Claude Code respecte les couleurs ANSI du terminal. Si votre thème de terminal est mal calibré, les blocs de code peuvent devenir illisibles. Quelques règles :
+Dans `/theme`, choisissez **New custom theme…** en bas de la liste : vous nommez le thème puis vous surchargez les couleurs une par une, avec aperçu en direct. `Ctrl+E` modifie un thème personnalisé existant.
 
-- Visez un ratio de contraste **WCAG AA** minimum (4.5:1) pour le texte normal.
-- Sur macOS, l'option « Increase contrast » dans Préférences Système renforce les bordures des panneaux du CLI.
-- Évitez les fonds purement noirs (#000000) sur écran OLED : préférez un gris très sombre (#0b0a09 par exemple) pour réduire la fatigue oculaire.
-- Pour les polices, JetBrains Mono, Fira Code ou Berkeley Mono offrent une excellente discrimination des caractères (`O`/`0`, `l`/`1`).
-
-```bash
-# Vérifier les codes couleur supportés par votre terminal
-echo $COLORTERM        # devrait afficher "truecolor"
-tput colors            # idéalement 256 ou plus
-```
-
-## Mode compact et densité
-
-Le mode compact réduit les marges, supprime les ASCII art décoratifs et resserre l'historique. Utile sur des écrans 13 pouces ou en split-screen.
+Chaque thème est un fichier JSON dans `~/.claude/themes/`. Le nom du fichier (sans `.json`) sert d'identifiant :
 
 ```json
 {
-  "compactMode": true,
-  "spinnerStyle": "minimal"
-}
-```
-
-Vous pouvez aussi désactiver les éléments visuels lourds :
-
-```bash
-# Désactiver les animations de spinner
-export CLAUDE_DISABLE_ANIMATIONS=1
-
-# Réduire la verbosité des messages d'outils
-claude --verbose=false
-```
-
-## Support des lecteurs d'écran
-
-Claude Code détecte automatiquement la présence d'un lecteur d'écran (VoiceOver, NVDA, Orca) via la variable `TERM_PROGRAM` et certaines variables d'environnement spécifiques. Quand c'est le cas, il :
-
-- Annonce les changements d'état (« Claude réfléchit », « Édition de fichier en cours »).
-- Sépare les blocs de code des commentaires par des marqueurs textuels explicites.
-- Désactive les animations qui troublent la synthèse vocale.
-- Sort le contenu en flux linéaire plutôt que dans des panneaux ANSI complexes.
-
-Pour forcer le mode accessible :
-
-```bash
-export CLAUDE_ACCESSIBILITY=1
-claude
-```
-
-Ou en configuration persistante :
-
-```json
-{
-  "accessibility": {
-    "screenReader": true,
-    "announceToolCalls": true,
-    "reducedMotion": true
+  "name": "Atelier",
+  "base": "light",
+  "overrides": {
+    "claude": "#2f5d46",
+    "error": "#b3261e",
+    "success": "#2e7d32",
+    "diffAdded": "#dcefdc",
+    "diffRemoved": "#f6dcdc",
+    "userMessageBackground": "#fbf6ee"
   }
 }
 ```
 
-## Navigation clavier
+- `base` : thème de départ (`dark`, `light`, `dark-daltonized`, `light-daltonized`, `dark-ansi` ou `light-ansi`), `dark` par défaut.
+- `overrides` : jetons de couleur à remplacer. Formats acceptés : `#rrggbb`, `#rgb`, `rgb(r,g,b)`, `ansi256(n)` ou `ansi:<nom>` (par exemple `ansi:cyanBright`).
+- Un jeton inconnu ou une couleur invalide est ignoré : une faute de frappe ne casse pas l'affichage.
 
-Quelques raccourcis utiles pour rester productif sans souris :
+Quelques jetons utiles : `claude` (accent principal), `text`, `inactive` (texte secondaire), `permission` (bordures des demandes d'autorisation), `planMode`, `autoAccept`, `promptBorder`, `diffAdded` / `diffRemoved`, `error` / `warning` / `success`. La liste complète figure dans la doc officielle et dans l'éditeur de `/theme`.
 
-- `Ctrl+C` : interrompt la génération en cours sans tuer la session.
-- `Ctrl+D` : sortie propre.
-- `Esc Esc` : revient à un point antérieur de la conversation (rollback).
-- `Shift+Tab` : bascule entre les modes (auto-accept, plan, normal).
-- `↑` / `↓` : historique des prompts dans la session.
+Claude Code surveille `~/.claude/themes/` et recharge les modifications à chaud. Seule exception : si le dossier n'existait pas au démarrage, redémarrez une fois après avoir créé votre premier fichier.
 
-Tous ces raccourcis sont remappables via `~/.claude/keybindings.json`.
+## Confort visuel
+
+| Réglage | Effet |
+|---|---|
+| `"prefersReducedMotion": true` | Réduit ou supprime spinner, scintillement et effets de flash. Dans `/config` : **Reduce motion**. |
+| `"maxProseWidth": 80` | Limite la largeur des paragraphes dans un terminal très large (minimum 40 colonnes ; tableaux et code gardent toute la largeur). |
+| `/tui fullscreen` | Rendu plein écran, à essayer si l'affichage scintille ou si le défilement saute. `CLAUDE_CODE_NO_FLICKER=1` a le même effet au lancement. |
+| `CLAUDE_CODE_ACCESSIBILITY=1` | Garde le curseur du terminal visible et calé sur la zone de saisie, utile avec une loupe d'écran (Zoom sur macOS). |
+
+Côté terminal, les règles habituelles s'appliquent : un contraste suffisant (le niveau WCAG AA demande 4,5:1 pour le texte courant) et une police à chasse fixe qui distingue bien `O`/`0` et `l`/`1` (JetBrains Mono, Fira Code, Cascadia Code…).
+
+## Mode lecteur d'écran
+
+Le mode lecteur d'écran remplace l'interface graphique du terminal par du texte linéaire, lisible dans l'ordre par VoiceOver, NVDA ou autre. Il n'est **pas** activé automatiquement : choisissez une méthode.
+
+```bash
+# Pour une session
+claude --ax-screen-reader
+
+# Pour toutes les sessions lancées depuis ce shell
+export CLAUDE_AX_SCREEN_READER=1
+```
+
+```json
+{
+  "axScreenReader": true
+}
+```
+
+Le flag l'emporte sur la variable, qui l'emporte sur le réglage. `CLAUDE_AX_SCREEN_READER=0` force le mode à l'arrêt. La première ligne affichée confirme l'état, par exemple `[Screen Reader Mode: on via env]`. En SSH, configurez la machine distante, là où tourne Claude Code.
+
+Ce qui change dans ce mode :
+
+- plus de caractères de dessin de boîtes, plus d'indices portés uniquement par la couleur, plus de redessins inutiles ;
+- chaque message commence par une étiquette annoncée : `you:`, `claude:`, `thinking:`, `tool:`, `tool error:`, `error:`, `warning:`, `Permission Required:` ;
+- les tableaux sont lus sous forme « En-tête : valeur » et les diffs ligne par ligne avec `+` et `-` ;
+- les menus deviennent des listes numérotées (tapez le numéro puis Entrée) et les questions oui/non attendent `y` ou `n` ;
+- le changement de mode de permission avec `Shift+Tab` est annoncé (« plan mode on ») ;
+- la cloche du terminal sonne quand Claude a fini, quand une réponse est attendue ou quand un outil de plus de 5 secondes se termine.
+
+Astuces : dans NVDA, `NVDA+6` empêche le curseur de revue de suivre le curseur du terminal, pour relire l'historique sans être ramené à la saisie. Claude Code émet des marqueurs OSC 133 entre les tours : dans iTerm2 (`Cmd+Shift+Haut`) ou le terminal de VS Code, la touche « invite précédente » saute d'un tour à l'autre.
+
+Limites connues : le passage en mode plan par la commande `/plan` n'est pas annoncé, et l'attachement à une session en arrière-plan utilise l'écran alternatif du terminal, sans historique natif. Dans l'extension VS Code, le panneau de chat annonce déjà l'activité au lecteur d'écran sans réglage.
+
+## Notifications
+
+Hors mode lecteur d'écran, Claude Code envoie une notification de bureau par défaut seulement dans Ghostty, Kitty et iTerm2. Ailleurs, demandez la cloche du terminal :
+
+```json
+{
+  "preferredNotifChannel": "terminal_bell"
+}
+```
+
+Ou branchez un hook `Notification` pour jouer un son ou lancer la commande de votre choix (voir le lien plus bas). Dans tmux, ajoutez `set -g allow-passthrough on` à `~/.tmux.conf` pour que les notifications atteignent le terminal hôte.
+
+## Clavier
+
+| Raccourci | Effet |
+|---|---|
+| `Esc` | Interrompt Claude en gardant le travail fait, ou ferme un dialogue |
+| `Esc` `Esc` | Efface le brouillon, ou ouvre le menu de retour arrière (`/rewind`) si la saisie est vide |
+| `Ctrl+C` | Interrompt ; sans tâche en cours, efface la saisie puis quitte au second appui |
+| `Ctrl+D` | Quitte (confirmation au second appui) |
+| `Shift+Tab` | Fait défiler les modes de permission |
+| `Ctrl+R` | Recherche dans l'historique des prompts |
+| `Ctrl+O` | Affiche le transcript détaillé |
+| `Ctrl+J` ou `\` puis Entrée | Retour à la ligne, dans tous les terminaux |
+
+`Shift+Entrée` fonctionne directement dans Ghostty, Kitty, iTerm2, WezTerm, Warp, Terminal d'Apple et Windows Terminal ; dans VS Code, Cursor ou Zed, lancez `/terminal-setup` une fois. Sur macOS, activez « Utiliser Option comme touche Méta » pour les raccourcis `Option`. Les raccourcis se redéfinissent dans `~/.claude/keybindings.json`, et un mode Vim est disponible via `/config` (réglage `editorMode`).
 
 ## Pour aller plus loin
 
-- Consultez la section [Accessibility](https://docs.claude.com/claude-code) de la doc officielle pour la liste exhaustive des variables d'environnement.
-- Pour les utilisateurs de Neovim ou Helix, des intégrations existent pour piloter Claude sans quitter l'éditeur — utile pour ceux qui dépendent d'un workflow clavier complet.
-- Si vous avez besoin d'un thème custom, ouvrez une issue : le projet accepte les contributions de palettes spécifiques.
-- Pensez à signaler les problèmes d'accessibilité rencontrés ; le support lecteur d'écran évolue rapidement.
+- [Personnaliser la status line](/wiki/cli/status-line-custom)
+- [Le fichier settings.json](/wiki/cli/settings-json)
+- [Le hook Notification](/wiki/hooks/notification)
+- [Output styles](/wiki/cli/output-styles)
+
+## Sources
+
+- [Use Claude Code with a screen reader](https://code.claude.com/docs/en/accessibility)
+- [Configure your terminal for Claude Code](https://code.claude.com/docs/en/terminal-config)
+- [Settings reference](https://code.claude.com/docs/en/settings-reference)
+- [Interactive mode](https://code.claude.com/docs/en/interactive-mode)

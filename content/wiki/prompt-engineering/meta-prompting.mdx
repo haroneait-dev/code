@@ -1,80 +1,137 @@
 ---
-title: "Meta-Prompting avec Claude"
-description: "Utiliser Claude pour écrire de meilleurs prompts pour Claude — la boucle d'amélioration qui transforme votre productivité."
-updatedAt: "2026-05-19"
-readingMinutes: 6
+title: "Meta-prompting : faire écrire et améliorer vos prompts par Claude"
+description: "Utiliser Claude pour rédiger un premier prompt, le critiquer à partir de vraies sorties et l'auditer, avec le notebook metaprompt, les sous-commandes /claude-api et /doctor prompt-audit de Claude Code."
+updatedAt: "2026-10-03"
+readingMinutes: 7
 ---
 
-Le **meta-prompting** consiste à utiliser un LLM pour écrire, critiquer et améliorer des prompts destinés au même LLM (ou à un autre). C'est l'une des techniques les plus rentables du prompt engineering moderne : au lieu de passer des heures à itérer manuellement, vous laissez Claude faire 80 % du travail.
+Le **meta-prompting** consiste à demander à un modèle d'écrire, de critiquer ou de corriger un prompt. Claude est bon à cet exercice : il sait structurer une consigne, prévoir les cas limites et proposer des exemples. Cet article montre comment l'utiliser sans tomber dans ses deux pièges : des prompts trop longs et des améliorations qu'on n'a jamais mesurées.
 
-L'intuition est simple : Claude connaît mieux que vous ce qui fait un bon prompt pour Claude. Il a été entraîné sur des millions d'exemples, il sait ce qui le déstabilise, ce qui le pousse à halluciner, ce qui clarifie une consigne ambiguë.
+## Quand le meta-prompting est utile
 
-## La boucle de base
+| Situation | Ce que Claude apporte |
+|---|---|
+| Page blanche | Un premier jet structuré (rôle, consignes, variables, format de sortie) |
+| Prompt qui échoue sur certains cas | Un diagnostic à partir des sorties fautives |
+| Prompt écrit pour un ancien modèle | La liste des consignes devenues inutiles ou nuisibles |
+| `CLAUDE.md` ou skills qui grossissent | Les instructions contradictoires, obsolètes ou redondantes |
 
-La boucle de meta-prompting tient en trois étapes :
+Le meta-prompting ne remplace pas l'évaluation. Un prompt « amélioré » par Claude n'est meilleur que si vos tests le confirment (voir [Tester un prompt](/wiki/prompt-engineering/tester-prompt)).
 
-1. Décrire votre objectif en langage naturel à Claude
-2. Demander à Claude de générer un prompt optimisé pour cet objectif
-3. Tester ce prompt, donner les résultats à Claude, et lui demander d'améliorer
+## Étape 1 : obtenir un premier jet
 
-Exemple de message initial :
+Décrivez la tâche comme à un collègue qui ne connaît pas votre projet : le but, le public, les entrées, le format attendu, ce qui compte vraiment.
 
-```
-Je veux un prompt qui extrait les entités nommées (personnes, lieux, organisations)
-d'un article de presse et les retourne en JSON. Écris-moi le meilleur prompt
-possible, avec un system prompt, des exemples few-shot, et des contraintes claires.
-```
+```text
+Rédigez un prompt système pour un assistant qui trie les e-mails du
+support client d'une boutique en ligne française.
 
-Claude produira un prompt structuré, souvent avec des balises XML, du few-shot, et des règles de fallback que vous n'auriez pas pensé à inclure.
+Contexte : 300 e-mails par jour, triés aujourd'hui à la main. Le résultat
+alimente un outil de tickets, donc la sortie doit être un JSON valide.
+Catégories : livraison, retour, paiement, produit, autre.
+Cas difficiles : e-mails avec plusieurs demandes, e-mails en anglais,
+messages agressifs.
 
-## Demander une critique avant d'améliorer
-
-Encore plus puissant : avant de demander une amélioration, demandez une **critique** structurée :
-
-```
-Voici mon prompt actuel : <prompt>...</prompt>
-Voici 3 sorties qu'il a produites : <outputs>...</outputs>
-
-Identifie :
-1. Les 3 plus grosses faiblesses du prompt
-2. Les ambiguïtés qui peuvent dérouter le modèle
-3. Les exemples manquants ou contre-exemples utiles
-4. Une version améliorée du prompt
+Le prompt doit utiliser des balises XML pour séparer consignes et
+données, prévoir la variable {{EMAIL}}, et contenir trois exemples
+couvrant les cas difficiles. Restez concis : pas de règle « au cas où ».
 ```
 
-Cette structure force Claude à raisonner avant d'écrire — la qualité du prompt final est bien supérieure.
+Pour aller plus loin, Anthropic fournit le notebook **metaprompt** dans le Claude Cookbook. C'est un long prompt rempli d'exemples de bons prompts : vous saisissez votre tâche (et éventuellement les noms de variables), il produit un modèle de prompt avec des variables `{$NOM}`, puis vous le testez sur vos exemples. Le notebook lui-même précise ses limites : il vise les tâches question-réponse en un seul tour, et le résultat est un point de départ, pas un prompt optimal.
 
-## Le Prompt Generator d'Anthropic
+## Étape 2 : critiquer à partir de vraies sorties
 
-La console Anthropic embarque depuis 2024 un **Prompt Generator** qui applique automatiquement le meta-prompting. Vous décrivez votre tâche, et il génère un prompt complet avec system, variables, et exemples. C'est littéralement Claude qui prompte Claude, packagé en interface.
+Une critique « à froid » d'un prompt donne surtout des généralités. Donnez à Claude des **sorties réelles**, dont celles qui ont échoué, et ce que vous attendiez.
 
-Utilisez-le comme point de départ, puis itérez manuellement sur les cas edge.
+```text
+<prompt>
+{{PROMPT_ACTUEL}}
+</prompt>
 
-## Auto-évaluation par Claude
+<cas_en_echec>
+  <cas>
+    <entree>{{EMAIL_1}}</entree>
+    <sortie_obtenue>{{SORTIE_1}}</sortie_obtenue>
+    <sortie_attendue>{{ATTENDU_1}}</sortie_attendue>
+  </cas>
+  <!-- deux ou trois autres cas -->
+</cas_en_echec>
 
-Une variante avancée : utilisez Claude comme **juge** de ses propres réponses. Vous lui faites générer 5 sorties pour un prompt, puis vous lui demandez de les noter selon des critères que vous définissez :
-
+Pour chaque échec, indiquez quelle partie du prompt l'explique
+(consigne ambiguë, exemple trompeur, information manquante).
+Proposez ensuite les modifications minimales, sous forme de diff,
+sans réécrire ce qui fonctionne.
 ```
-Note chaque réponse de 1 à 10 sur :
-- Respect du format JSON
-- Exhaustivité de l'extraction
-- Absence d'hallucinations
 
-Puis propose 3 modifications au prompt original qui amélioreraient le score moyen.
+Trois réglages rendent la critique plus fiable :
+
+- **Restez neutre.** « Ce prompt est mauvais, refaites-le » pousse Claude à tout réécrire, même ce qui marchait. Demandez un diagnostic, pas un verdict.
+- **Demandez des changements minimaux.** Un diff se relit et se teste ; une réécriture complète mélange dix changements et vous ne saurez pas lequel a aidé.
+- **Une modification à la fois.** Appliquez, relancez vos tests, gardez ou annulez.
+
+## Étape 3 : mettre à jour un prompt pour les modèles récents
+
+Les prompts écrits pour d'anciens modèles contiennent souvent des consignes qui gênent les modèles actuels (Opus 5.5, Sonnet 5.5, Fable 5.1). La documentation d'Anthropic en cite plusieurs :
+
+- les formules alarmistes (« CRITIQUE : vous DEVEZ utiliser cet outil ») qui provoquent un sur-déclenchement ;
+- « en cas de doute, utilisez l'outil » : même effet ;
+- les demandes d'écrire tout le raisonnement dans la réponse, qui peuvent déclencher un refus `reasoning_extraction` ;
+- le prefill du message assistant, qui renvoie une erreur 400 depuis la génération 4.6.
+
+Vous pouvez faire ce tri à la main avec Claude, ou laisser Claude Code le faire. Dans un projet qui appelle l'API, la skill intégrée `/claude-api` propose des sous-commandes dédiées :
+
+| Sous-commande | Rôle | Version minimale de Claude Code |
+|---|---|---|
+| `/claude-api prompt-audit` | Repère dans vos prompts, skills et descriptions d'outils les consignes écrites pour d'anciens modèles et propose les corrections sous forme de diff | 2.1.221 |
+| `/claude-api build-eval` | Construit un jeu d'évaluation pour votre application | 2.1.259 |
+| `/claude-api hillclimb` | Améliore votre application par itérations contre une évaluation existante | 2.1.259 |
+| `/claude-api migrate` | Met à jour votre code API vers un modèle plus récent | Ancienne |
+
+L'ordre logique : `build-eval` si vous n'avez pas encore de tests, puis `prompt-audit`, puis `hillclimb` pour itérer en mesurant chaque changement.
+
+## Étape 4 : auditer vos instructions Claude Code
+
+Le même principe s'applique à vos fichiers `CLAUDE.md` et à vos skills. Ils grossissent avec le temps, et la documentation de Claude Code prévient : un `CLAUDE.md` trop long fait ignorer les vraies consignes.
+
+- `/doctor prompt-audit` (Claude Code 2.1.283 ou plus) fait auditer vos `CLAUDE.md`, skills et autres fichiers de configuration pour repérer les instructions obsolètes ou contradictoires.
+- `/doctor` seul propose aussi de raccourcir un `CLAUDE.md` versionné en supprimant ce que Claude peut déduire du code.
+- `/skill-doctor` montre ce que chaque skill coûte en contexte et à quelle fréquence elle sert.
+
+Relisez toujours les propositions : `/doctor` présente ses constats et demande confirmation avant de modifier quoi que ce soit.
+
+## Variante : laisser Claude vous interroger
+
+Pour une grosse fonctionnalité, la documentation de Claude Code recommande d'inverser les rôles : au lieu d'écrire un long prompt, demandez à Claude de vous **interviewer**, puis de rédiger la spécification qui servira de prompt à une nouvelle session.
+
+```text
+Je veux ajouter un système de parrainage à l'application. Interrogez-moi
+en détail avec l'outil AskUserQuestion : implémentation technique,
+interface, cas limites, risques et compromis. Évitez les questions
+évidentes, creusez les points difficiles. Quand tout est couvert,
+écrivez la spécification complète dans SPEC.md.
 ```
 
-Vous obtenez une boucle d'optimisation quasi-automatique. C'est le principe derrière des frameworks comme DSPy ou les évaluations LLM-as-judge.
+Lancez ensuite une session neuve (`/clear`) qui implémente `SPEC.md`. Les meilleures spécifications nomment les fichiers concernés, disent ce qui est hors périmètre et se terminent par une vérification de bout en bout.
 
-## Pièges à éviter
+## Les pièges
 
-Le meta-prompting peut produire des prompts **trop longs**. Claude a tendance à empiler les exemples et les règles "au cas où". Demandez explicitement un prompt **concis** si la latence ou le coût comptent.
-
-Méfiez-vous aussi de la sycophancie : si vous dites "ce prompt est mauvais, refais-le", Claude va le réécrire même s'il était bon. Soyez neutre dans vos demandes de critique.
-
-Enfin, gardez l'humain dans la boucle. Le meta-prompting accélère l'itération, il ne remplace pas votre jugement sur la tâche métier finale.
+- **Le prompt obèse.** Claude a tendance à ajouter règles et exemples « au cas où ». Demandez un prompt concis et supprimez chaque ligne dont l'absence ne change rien à vos tests.
+- **L'amélioration non mesurée.** Sans jeu de tests, vous remplacez un prompt par un autre, pas par un meilleur.
+- **Le juge complaisant.** Si vous faites noter les sorties par un modèle, donnez-lui une grille précise et, de préférence, utilisez un autre modèle que celui qui a produit la réponse (voir [Évaluations automatisées](/wiki/api/evals-automatisees)).
+- **L'outil introuvable.** Le Workbench de la Console a été retiré en 2026 ; le playground qui l'a remplacé ne conserve pas vos prompts. Gardez-les versionnés dans votre dépôt.
 
 ## Pour aller plus loin
 
-- Anthropic Console → Prompt Generator
-- DSPy : framework Python pour optimiser des prompts automatiquement
-- Voir aussi l'article Prefilling pour combiner meta-prompting et sortie structurée
+- [Itérer sur un prompt : la méthode](/wiki/prompt-engineering/iterer-prompt)
+- [Tester un prompt](/wiki/prompt-engineering/tester-prompt)
+- [Anti-patterns](/wiki/prompt-engineering/anti-patterns)
+- [Prompter les modèles Claude 5.5](/wiki/prompt-engineering/prompting-sonnet-5)
+
+## Sources
+
+- [Prompt engineering overview (Anthropic)](https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/overview)
+- [Metaprompt, Claude Cookbook (Anthropic)](https://github.com/anthropics/claude-cookbooks/blob/main/misc/metaprompt.ipynb)
+- [Prompting best practices : Migration considerations (Anthropic)](https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/claude-prompting-best-practices)
+- [Skills : Work on Claude API projects, documentation Claude Code](https://code.claude.com/docs/en/skills)
+- [Commands : /doctor, /skill-doctor, documentation Claude Code](https://code.claude.com/docs/en/commands)
+- [Best practices : Let Claude interview you, documentation Claude Code](https://code.claude.com/docs/en/best-practices)

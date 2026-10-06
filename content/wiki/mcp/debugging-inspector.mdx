@@ -1,78 +1,162 @@
 ---
-title: "Debugging avec mcp inspector"
-description: "L'outil officiel pour inspecter, tester et déboguer un serveur MCP en local avant de l'intégrer à un client."
-updatedAt: "2026-05-19"
-readingMinutes: 6
+title: "Déboguer un serveur MCP avec MCP Inspector"
+description: "Tester un serveur MCP sans Claude avec MCP Inspector v2 : interface web, CLI scriptable pour la CI, serveurs distants et OAuth, révision 2026-07-28 et pièges de la migration depuis la v1."
+updatedAt: "2026-10-03"
+readingMinutes: 8
 ---
 
-Quand un serveur MCP ne fait pas ce qu'il devrait dans Claude Desktop ou Claude Code, le réflexe est de fouiller les logs… qui sont souvent muets. La bonne approche : utiliser **`mcp inspector`**, l'outil officiel qui agit comme un client MCP graphique, avec console réseau intégrée.
+Quand un serveur MCP se comporte mal dans Claude Code, il est difficile de savoir si le problème vient du serveur, de la configuration ou du modèle. **MCP Inspector** est l'outil officiel pour isoler le serveur : il se connecte comme un client MCP, affiche ce que le serveur expose et vous laisse appeler chaque outil à la main.
 
-## Lancer l'inspector
+## Ce qu'il faut savoir sur la v2
 
-L'inspector est distribué via npm et se lance sans installation :
+L'Inspector a été réécrit. La branche **v2** est celle publiée par défaut sur npm ; la v1 ne reçoit plus que des correctifs de sécurité.
 
-```bash
-npx @modelcontextprotocol/inspector uvx my-mcp-server
-```
+| | v1 (ancienne) | v2 (actuelle) |
+|---|---|---|
+| Node.js | 22.7.5 ou plus | **22.19.0 ou plus** |
+| Modes | web, `--cli` | web, `--cli`, **`--tui`** (interface terminal) |
+| Ports | UI sur `6274` + proxy sur `6277` | un seul serveur web sur `6274` (+ `6275` pour l'onglet Apps) |
+| Liste des serveurs | dans le navigateur | fichier catalogue `~/.mcp-inspector/mcp.json`, partagé par les trois modes |
+| Jeton d'accès | `MCP_PROXY_AUTH_TOKEN` | `MCP_INSPECTOR_API_TOKEN` |
 
-Ou pour un serveur Node :
+Beaucoup de tutoriels citent encore le port `5173` ou le proxy `6277` : ce n'est plus d'actualité. Si un vieux script ne fonctionne plus, `npx @modelcontextprotocol/inspector@v1-latest` relance la v1, le temps de migrer.
 
-```bash
-npx @modelcontextprotocol/inspector node ./build/server.js
-```
+## Lancer l'Inspector sur un serveur local (stdio)
 
-L'inspector ouvre une UI web (par défaut `http://localhost:5173`) qui :
-
-- lance votre serveur comme sous-process,
-- établit la connexion MCP (initialize, list_tools, list_resources),
-- vous laisse appeler chaque outil avec un formulaire généré depuis le JSON Schema.
-
-## Inspecter les capacités
-
-L'onglet **Tools** affiche tous les outils déclarés, leur description et leur schéma. C'est la première chose à vérifier : ce que le LLM "voit" est exactement ce qui s'affiche ici. Si une description est ambiguë ou un paramètre obligatoire absent, ça se voit immédiatement.
-
-Idem pour **Resources** (URIs lisibles) et **Prompts** (templates exposés). Si une section est vide alors que vous avez écrit le code, c'est probablement un problème d'enregistrement côté serveur.
-
-## Appeler un outil et lire la réponse
-
-Le formulaire d'appel permet de tester chaque outil avec des arguments arbitraires. La réponse s'affiche en JSON pretty-printed, avec :
-
-- le contenu retourné (text, image, embedded resource),
-- la durée d'exécution,
-- les éventuelles erreurs (avec stack si le serveur les renvoie).
-
-C'est précieux pour valider qu'un outil renvoie le bon **shape**. Un outil qui renvoie `{result: "ok"}` au lieu de `{"content": [{"type": "text", "text": "ok"}]}` ne sera pas affichable par le LLM, et vous le verrez tout de suite ici.
-
-## La console réseau
-
-L'onglet **Notifications / History** est le killer feature : il affiche toutes les requêtes JSON-RPC échangées, avec :
-
-- la méthode (`tools/call`, `resources/read`, etc.),
-- les params envoyés,
-- la réponse brute,
-- l'horodatage.
-
-C'est exactement ce que verrait Claude. Si quelque chose cloche en intégration (résultat tronqué, erreur de schéma), comparez ce que l'inspector reçoit avec ce que vous attendez.
-
-## Tester l'auth et le transport HTTP
-
-L'inspector supporte aussi les serveurs HTTP/SSE. Au lancement :
+Passez la commande de votre serveur après le nom du paquet. L'Inspector la lance comme sous-processus :
 
 ```bash
-npx @modelcontextprotocol/inspector
+# Serveur Node compilé
+npx @modelcontextprotocol/inspector node build/index.js
+
+# Serveur Python publié sur PyPI
+npx @modelcontextprotocol/inspector uvx mcp-server-git --repository .
+
+# Avec des variables d'environnement et des options propres au serveur
+npx @modelcontextprotocol/inspector -e API_KEY=VOTRE_CLE -- node build/index.js --verbose
 ```
 
-…puis dans l'UI, choisissez **Transport: SSE** et entrez l'URL. Pour les serveurs OAuth, l'inspector déclenche le flow et stocke le token le temps de la session — utile pour itérer sur des serveurs distants sans tout reconfigurer dans Claude Desktop.
+L'interface s'ouvre sur `http://localhost:6274`. Son API est protégée par un jeton généré à chaque lancement (`MCP_INSPECTOR_API_TOKEN`) ; la page ouverte par l'Inspector l'utilise déjà, vous n'avez rien à saisir.
 
-## Astuces pratiques
+Le serveur peut écrire ses logs sur stderr : ils s'affichent dans le terminal. En revanche, il ne doit **rien écrire d'autre que des messages MCP sur stdout**. Un simple `console.log` de débogage casse la connexion stdio. L'Inspector est souvent le moyen le plus rapide de le constater.
 
-- **Recharger sans redémarrer** : le bouton "Restart server" relance le sous-process en gardant la connexion UI. Combiné à un watcher (`tsx watch`, `uvicorn --reload`), on itère très vite.
-- **Variables d'env** : passez-les via `-e KEY=value` avant la commande, l'inspector les transmet au sous-process.
-- **Logs serveur** : ils sortent dans le terminal où vous avez lancé l'inspector, pas dans l'UI. Gardez les deux côte à côte.
-- **Debug d'un serveur installé** : si vous voulez inspecter un serveur déjà configuré dans Claude Desktop, copiez sa ligne de commande depuis `claude_desktop_config.json` et passez-la à l'inspector.
+## Lancer l'Inspector sur un serveur distant
+
+Pour un serveur Streamable HTTP, passez son URL :
+
+```bash
+npx @modelcontextprotocol/inspector https://mcp.exemple.com/mcp
+```
+
+La v2 devine le transport **uniquement** d'après la fin de l'URL : `/mcp` donne Streamable HTTP, `/sse` donne l'ancien transport SSE. Pour toute autre URL (y compris `/mcp/` avec une barre finale), précisez `--transport http` ou `--transport sse`.
+
+Côté authentification, la v2 gère OAuth (y compris les Client ID Metadata Documents et l'enregistrement dynamique) et les en-têtes personnalisés, à régler dans les paramètres du serveur. Les jetons et secrets sont rangés dans le trousseau du système. Sans trousseau (Linux sans libsecret, SSH, conteneur), ils vont dans `~/.mcp-inspector/secrets.json`, **en clair** sauf si vous fournissez une clé de chiffrement.
+
+## Que vérifier dans l'interface web
+
+1. **Tools** : la liste, les descriptions et les schémas d'entrée. C'est exactement ce que Claude verra. Une description vague ou un paramètre mal typé se repère ici. L'onglet signale aussi les schémas **mal portables** : des constructions valides en JSON Schema mais refusées par certains clients, Claude Code compris (par exemple un `true` nu à la place d'un schéma de propriété).
+2. **Appel d'un outil** : le formulaire est généré depuis le schéma. Vérifiez la forme du résultat : `content` (tableau de blocs `text`, `image`, `resource`…), éventuellement `structuredContent`, et `isError: true` pour une erreur métier.
+3. **Resources** et **Prompts** : si une liste est vide alors que votre code en déclare, l'enregistrement côté serveur est en cause.
+4. **Apps** : rendu des interfaces MCP Apps (ressources `ui://`) dans un bac à sable, servi sur le port `6275`.
+5. **Journaux protocole et réseau** : chaque message JSON-RPC échangé, avec ses paramètres et la réponse brute. Comparez avec ce que vous attendiez quand un résultat paraît tronqué ou mal formé.
+
+Exemple de résultat correct pour un outil :
+
+```json
+{
+  "content": [{ "type": "text", "text": "3 fichiers supprimés" }],
+  "isError": false
+}
+```
+
+Un outil qui renvoie `{ "result": "ok" }` sans `content` n'est pas conforme : le client ne saura pas l'afficher au modèle.
+
+## Tester la révision 2026-07-28
+
+La spécification **2026-07-28** supprime la poignée de main `initialize` et ajoute `server/discover`. Par défaut, l'Inspector se connecte avec l'ancienne poignée de main (`legacy`). Pour vérifier que votre serveur parle la nouvelle révision :
+
+```bash
+npx @modelcontextprotocol/inspector --protocol-era modern node build/index.js
+```
+
+Les valeurs possibles sont `legacy`, `auto` (détection) et `modern`. Dans le fichier catalogue, le champ équivalent s'appelle `protocolEra`. Testez les deux générations si votre serveur doit servir des clients anciens et récents.
+
+## Le mode CLI : tests rapides et CI
+
+Le mode `--cli` fait une requête, affiche le résultat et rend un code de sortie. Idéal pour un test de fumée à chaque commit.
+
+```bash
+# Le serveur répond-il ?
+npx @modelcontextprotocol/inspector --cli node build/index.js --method initialize
+
+# Lister les outils au format JSON
+npx @modelcontextprotocol/inspector --cli node build/index.js \
+  --method tools/list --format json
+
+# Appeler un outil avec des arguments typés
+npx @modelcontextprotocol/inspector --cli node build/index.js \
+  --method tools/call --tool-name get_temp \
+  --tool-args-json '{"city":"Paris","units":"C"}' --format json
+
+# Serveur distant
+npx @modelcontextprotocol/inspector --cli \
+  --transport http --server-url https://mcp.exemple.com/mcp --method tools/list
+```
+
+Vérifier qu'un outil existe, avec `jq` :
+
+```bash
+npx @modelcontextprotocol/inspector --cli node build/index.js \
+  --method tools/list --format json \
+  | jq -e '.result.tools | map(.name) | index("get_temp")' > /dev/null
+```
+
+Codes de sortie de la v2 :
+
+| Code | Signification |
+|---|---|
+| `0` | Succès |
+| `1` | Erreur d'usage ou inattendue |
+| `2` | L'outil n'a pas d'interface MCP App (sonde `--app-info`) |
+| `3` | Le serveur exige une authentification |
+| `4` | Serveur injoignable (DNS, connexion refusée, délai) |
+| `5` | Erreur d'outil (`isError: true` ou outil introuvable) |
+| `6` | `--strict` a trouvé un schéma non portable |
+
+En cas d'échec, une ligne JSON décrit l'erreur sur stderr. Gardez stdout (le résultat) et stderr (les diagnostics) séparés si vous analysez la sortie avec `jq`.
+
+## Pièges fréquents
+
+- **Ordre des arguments en `--cli`** : la commande du serveur vient **en premier**, avant toute option de l'Inspector. `--cli --method tools/list node build/index.js` ignore silencieusement votre serveur et utilise le catalogue.
+- **Le `--` s'inverse en `--cli`** : en mode web, ce qui suit `--` va au serveur ; en mode CLI, ce qui **précède** `--` est la commande du serveur et ce qui suit sont les options de l'Inspector. Exemple : `--cli node build/index.js --config ./srv.conf -- --method tools/list`.
+- **`--tool-arg` convertit les nombres** : `zip=10001` part comme nombre. Pour des identifiants numériques à garder en chaîne, utilisez `--tool-args-json`.
+- **`--config` est en lecture seule** : il lit un fichier `mcpServers` existant et échoue s'il n'existe pas. `--catalog` désigne un fichier que l'Inspector peut modifier. Les deux ne se combinent pas avec une commande ou une URL passée directement.
+- **CI non reproductible** : `npx @modelcontextprotocol/inspector` prend la dernière version à chaque exécution. En CI, épinglez une version exacte (`@modelcontextprotocol/inspector@<version>`) et lancez `npx --yes` pour éviter l'invite d'installation qui bloquerait le job.
+- **Exposition réseau** : le serveur web lance des processus. Gardez-le sur `127.0.0.1` (valeur par défaut). L'écoute sur toutes les interfaces exige `DANGEROUSLY_BIND_ALL_INTERFACES=true`, et `DANGEROUSLY_OMIT_AUTH=true` supprime la protection par jeton : à réserver à un environnement isolé.
+
+## Après l'Inspector : vérifier dans Claude Code
+
+Une fois le serveur validé seul, testez-le dans son vrai client :
+
+```bash
+claude mcp add mon-serveur -- node /chemin/absolu/build/index.js
+claude mcp get mon-serveur     # état et cause d'un éventuel échec
+claude --debug='mcp'           # journal détaillé des échanges MCP
+```
+
+Si l'Inspector fonctionne mais pas Claude Code, regardez du côté de la configuration (chemin relatif, variable d'environnement absente, scope) plutôt que du serveur.
 
 ## Pour aller plus loin
 
-- L'inspector est open source (`modelcontextprotocol/inspector` sur GitHub) — vous pouvez l'auto-héberger ou le forker.
-- Combiné à `mcp-scan` pour l'analyse statique, c'est une boîte à outils complète avant mise en prod.
-- Pensez aussi à ajouter un mode `--dry-run` dans vos serveurs pour faciliter les tests dans l'inspector.
+- [Installer un serveur MCP dans Claude Code](/wiki/mcp/installer-serveur-mcp)
+- [JSON-RPC 2.0 sous le capot de MCP](/wiki/mcp/json-rpc-mapping)
+- [Créer un serveur MCP en TypeScript](/wiki/mcp/creer-serveur-ts-setup)
+- [Créer un serveur MCP en Python](/wiki/mcp/creer-serveur-py-setup)
+
+## Sources
+
+- Dépôt MCP Inspector : https://github.com/modelcontextprotocol/inspector
+- Guide de migration v1 vers v2 : https://github.com/modelcontextprotocol/inspector/blob/main/docs/v1-to-v2-migration.md
+- Tests de fumée en CLI : https://github.com/modelcontextprotocol/inspector/blob/main/docs/cli-smoke-testing.md
+- Configuration des serveurs (catalogue, `protocolEra`) : https://github.com/modelcontextprotocol/inspector/blob/main/docs/mcp-server-configuration.md
+- MCP dans Claude Code : https://code.claude.com/docs/en/mcp

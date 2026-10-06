@@ -1,72 +1,89 @@
 ---
-title: "Claude Fable 5.1 et Mythos 5.1 : les modèles frontière"
-description: "Fable 5.1 accessible à tous, Mythos 5.1 réservé aux professionnels vérifiés : prix, accès, et l'histoire mouvementée de la version 5 (suspension de juin 2026)."
+title: "Claude Fable 5.1 et Mythos 5.1 : les modèles les plus puissants"
+description: "Fable 5.1 ouvert à tous, Mythos 5.1 réservé aux programmes d'accès vérifié : prix, contexte, usage dans Claude Code, et retour sur la suspension de Fable 5 en juin 2026."
 updatedAt: "2026-10-03"
-readingMinutes: 8
+readingMinutes: 7
 ---
 
-## La version actuelle : Fable 5.1 et Mythos 5.1 (septembre 2026)
+Fable et Mythos sont les modèles les plus puissants d'Anthropic, au-dessus d'Opus. Cet article explique ce qui distingue Fable 5.1 de Mythos 5.1, ce qu'ils coûtent, quand les choisir, et ce qui s'est passé avec la version 5 en juin 2026.
 
-Le **1er septembre 2026**, Anthropic a publié **Claude Fable 5.1** (`claude-fable-5-1`) et **Claude Mythos 5.1**. Ce sont **le même modèle**, avec deux niveaux de garde-fous :
+## Fable 5.1 et Mythos 5.1 (1er septembre 2026)
+
+Anthropic présente **Claude Fable 5.1** (`claude-fable-5-1`) et **Claude Mythos 5.1** comme **le même modèle**, avec deux niveaux de garde-fous :
 
 | | Fable 5.1 | Mythos 5.1 |
 |---|---|---|
-| Garde-fous | Standard | Allégés sur la cybersécurité et la biologie |
-| Accès | Tout le monde : claude.ai (offres payantes), Claude Code, API, Bedrock, Google Cloud, Foundry | Professionnels vérifiés uniquement |
-| Prix API | 10 $ / 50 $ par million de tokens | Sur programme |
-| Lecture du cache | 0,25 $ par million (75 % de moins qu'en 5.0) | Sur programme |
+| Garde-fous | Standard | Adaptés au travail en cybersécurité et en sciences du vivant |
+| Accès | claude.ai, Claude Code, API Claude, Bedrock, Google Cloud, Microsoft Foundry | Programmes d'accès vérifié uniquement |
+| Prix API (entrée / sortie) | 10 $ / 50 $ par million de tokens | 10 $ / 50 $ par million de tokens |
+| Lecture du cache | 0,25 $ par million (contre 1 $ pour Fable 5) | 0,25 $ par million |
+| Fenêtre de contexte | 1 million de tokens | 1 million de tokens |
 
-Pour accéder à Mythos 5.1, il faut passer par l'un des deux programmes de vérification d'Anthropic :
+Mythos 5.1 passe par l'un des deux programmes de vérification d'Anthropic :
 
-- le **Cyber Verification Program**, pour la sécurité défensive (recherche de vulnérabilités, red team autorisée) ;
-- le **Life Sciences Verification Program**, pour la recherche en biologie et en chimie (surtout aux États-Unis pour l'instant).
+- le **Cyber Verification Program** (CVP), pour la sécurité défensive ;
+- le **Life Sciences Verification Program** (LSVP), pour la recherche en biologie.
 
-Par rapport à Fable 5, Anthropic annonce environ **25 % de coût en moins** sur un usage typique et jusqu'à **45 % sur les tâches agentiques**, grâce à des réponses plus courtes et à la baisse du prix du cache.
+Selon Anthropic, Fable 5.1 coûte environ **25 % de moins** que Fable 5 sur un usage typique, et jusqu'à **45 % de moins** sur le travail agentique, grâce à des réponses plus courtes et à la baisse du prix du cache.
 
-> **Faut-il prendre Fable ?** Depuis le 22 septembre, [Opus 5.5](/wiki/modeles/opus-sonnet-5-5) atteint le niveau de Fable 5.1 sur la plupart des tâches pour 2,5 fois moins cher. Gardez Fable 5.1 pour les problèmes où Opus 5.5 bute vraiment.
+> **Faut-il prendre Fable ?** Depuis le 22 septembre, [Opus 5.5](/wiki/modeles/opus-sonnet-5-5) atteint le niveau de Fable 5.1 sur la plupart des tâches, pour 4 $ / 20 $ par million de tokens, soit 2,5 fois moins cher. Gardez Fable 5.1 pour les problèmes où Opus 5.5 bute vraiment.
+
+## Utiliser Fable dans Claude Code
+
+- **Choisir le modèle** : `/model fable` ou `claude --model fable`. L'alias `fable` vise Fable 5.1. Fable n'est le modèle par défaut sur aucune offre : il faut le sélectionner.
+- **Facturation** : selon votre offre, l'usage de Fable peut être décompté sur vos **crédits d'utilisation** plutôt que sur les limites incluses. Le sélecteur `/model` affiche alors « Requires usage credits », et Claude Code demande votre accord avant la première requête facturée.
+- **Requêtes signalées** : quand les classifieurs de sécurité de Fable signalent une requête (surtout en cybersécurité et en biologie), Claude Code peut la relancer automatiquement sur un modèle Opus.
+- **Sur Bedrock, Google Cloud ou Foundry** : épinglez la version avec `ANTHROPIC_DEFAULT_FABLE_MODEL` (voir [Claude sur les clouds](/wiki/enterprise/clouds)).
+
+## Gérer les refus côté API
+
+Fable 5.1 applique ses garde-fous en temps réel. Une requête refusée renvoie un HTTP 200 avec `stop_reason: "refusal"`. Le travail défensif légitime passe, mais votre code doit traiter ce cas :
+
+```python
+response = client.messages.create(
+    model="claude-fable-5-1",
+    max_tokens=4096,
+    messages=[{"role": "user", "content": prompt}],
+)
+
+if response.stop_reason == "refusal":
+    # Relancer sur un autre modèle, ou signaler le refus à l'utilisateur
+    response = client.messages.create(
+        model="claude-opus-5-5",
+        max_tokens=4096,
+        messages=[{"role": "user", "content": prompt}],
+    )
+```
 
 ## Retour sur la version 5 : lancement et suspension (juin 2026)
 
-En juin 2026, Anthropic a introduit deux modèles au sommet de sa gamme, avec une stratégie de distribution inédite dans l'industrie — et une histoire mouvementée : trois jours après leur lancement, le gouvernement américain en ordonnait la suspension mondiale.
+Fable 5 et Mythos 5 ont connu un démarrage mouvementé.
 
-### Deux modèles, deux niveaux d'accès
+- **9 juin 2026** : lancement public de **Fable 5** (`claude-fable-5`). **Mythos 5**, la version aux garde-fous allégés, reste réservée à des clients sur invitation.
+- **12 juin 2026** : après la démonstration d'un contournement des garde-fous de Fable 5 (rapporté par la presse comme venant de chercheurs d'Amazon), le gouvernement américain émet une directive de contrôle des exportations interdisant l'accès aux ressortissants étrangers. Anthropic désactive Fable 5 et Mythos 5 **pour tous ses clients, dans le monde entier**. Les autres modèles ne sont pas touchés.
+- **Position d'Anthropic** : l'entreprise se conforme à la directive tout en la contestant. Elle décrit les failles montrées comme « un petit nombre de vulnérabilités mineures déjà connues » et estime qu'une telle règle, appliquée à tout le secteur, bloquerait pratiquement tout nouveau déploiement de modèle.
+- **30 juin 2026** : les contrôles sont levés après la livraison d'un classifieur de sécurité renforcé. Anthropic s'engage notamment à donner au gouvernement un accès anticipé à ses futurs modèles et à participer, avec Amazon, Microsoft et Google, à un cadre commun d'évaluation de la gravité des contournements. L'accès est rétabli à partir du 1er juillet.
 
-- **Claude Fable 5** (`claude-fable-5`) : la version **publique**, dotée de garde-fous de cybersécurité robustes. Disponible pour les abonnés payants et via API.
-- **Claude Mythos 5** : la version **non restreinte**, extrêmement puissante, offerte en disponibilité limitée à des **clients approuvés** (grands comptes, agences gouvernementales) dans le cadre d'un programme d'accès contrôlé.
+Fable 5 et Mythos 5 restent disponibles (même prix que la version 5.1, mais lecture du cache à 1 $ par million). Pour un nouveau projet, préférez la version 5.1.
 
-Cette segmentation acte un principe nouveau : les capacités cyber des modèles frontière sont désormais trop sensibles pour une diffusion uniforme. La version publique est bridée sur les sujets à haut risque ; la version complète passe par une vérification d'identité et d'usage.
+## Ce qu'il faut retenir
 
-### Chronologie de la suspension
+1. **Fable 5.1 est réservé aux tâches les plus dures.** Pour le reste, Opus 5.5 ou Sonnet 5.5 suffisent, pour bien moins cher.
+2. **Prévoyez les refus** en cybersécurité et en biologie, surtout dans du code de production.
+3. **Gardez un plan B.** L'épisode de juin a montré qu'un modèle de pointe peut être suspendu du jour au lendemain : prévoyez un repli vers Opus 5.5 ou Sonnet 5.5 dans votre routage de modèles.
 
-- **9 juin 2026** — Lancement public de Fable 5 ; Mythos 5 ouvert aux clients approuvés.
-- **12 juin 2026** — Des chercheurs en cybersécurité (notamment chez Amazon, principal partenaire cloud d'Anthropic) signalent un **jailbreak** contournant les protections de Fable 5, le transformant potentiellement en outil cyber non restreint. L'administration américaine émet une **directive de contrôle des exportations** invoquant la sécurité nationale : interdiction d'accès « à tout ressortissant étranger, aux États-Unis ou à l'étranger, y compris les employés étrangers d'Anthropic ». Anthropic suspend l'accès aux deux modèles **pour tous les clients**.
-- **12–30 juin 2026** — 19 jours de gel. Anthropic conteste publiquement l'ampleur de la mesure, décrivant le problème comme « étroit » et regrettant l'absence de justification écrite détaillée. OpenAI restreint en parallèle son modèle concurrent à un cercle de clients approuvés par le gouvernement.
-- **30 juin 2026** — Le Département du Commerce **lève les contrôles**. En parallèle, Anthropic et ses partenaires (Amazon, Microsoft, Google…) proposent un cadre industriel commun pour évaluer la gravité des jailbreaks, avec accès gouvernemental préalable aux modèles avant sortie publique et partage rapide d'informations sur les usages abusifs.
-- **Jusqu'au 12 juillet 2026** — En compensation, Anthropic offre aux utilisateurs payants une extension de **cinq jours d'accès gratuit à Fable 5** avant le passage à la facturation standard. Attention : les sièges standards des plans entreprise n'incluent pas Fable 5 par défaut sans activation de crédits d'utilisation.
+## Pour aller plus loin
 
-### Qui utilise Mythos ?
-
-Paradoxe notable : alors même qu'Anthropic s'oppose frontalement au Pentagone sur les usages militaires (refus documenté de Dario Amodei de lever les garde-fous sur les armes autonomes et la surveillance de masse — le DoD ayant tenté en représailles une désignation « risque chaîne d'approvisionnement », bloquée par un juge), d'autres agences fédérales américaines adoptent massivement les modèles :
-
-- La **CISA** utilise Mythos pour scanner les dépôts logiciels gouvernementaux et identifier les vulnérabilités avant exploitation.
-- La **NSA** teste Mythos depuis avril 2026.
-- Au Canada, la **province de l'Alberta** a passé **466 millions de lignes de code gouvernemental** au crible avec Claude Code (Opus + Sonnet) en une vingtaine d'heures, corrigeant de nombreuses failles.
-
-## Ce que ça signifie pour toi
-
-1. **Fable 5.1 dans Claude Code** : il se choisit comme les autres modèles (`/model fable`). L'alias suit la version la plus récente. Si ton compte n'y a pas accès, vérifie ton offre et tes crédits d'utilisation.
-2. **Attends-toi à des refus en cybersécurité** : Fable 5.1, comme Opus 5.5, applique des garde-fous en temps réel (`stop_reason: "refusal"` avec un HTTP 200). Le travail défensif légitime passe, mais ton code doit gérer ce cas.
-3. **Prévois un plan B** : l'épisode de juin a montré qu'un modèle frontière peut être suspendu du jour au lendemain. En production, garde un repli vers Opus 5.5 ou Sonnet 5.5 dans ton routage de modèles.
+- [Opus 5.5 et Sonnet 5.5](/wiki/modeles/opus-sonnet-5-5)
+- [Choisir le bon modèle](/wiki/modeles/choisir-bon-modele)
+- [Tarification et optimisation des coûts](/wiki/modeles/pricing-tokens)
+- [Effort, fast mode et advisor](/wiki/cli/effort-fast-advisor)
 
 ## Sources
 
-- [Introducing Claude Fable 5.1 and Claude Mythos 5.1 — Anthropic](https://www.anthropic.com/claude-fable-and-mythos-5-1)
-- [Statement on the US government directive to suspend access to Fable 5 and Mythos 5 — Anthropic](https://www.anthropic.com/news/fable-mythos-access)
-- [Redeploying Claude Fable 5 — Anthropic](https://www.anthropic.com/news/redeploying-claude-fable-5)
-- [Anthropic says Trump admin has lifted export controls — CNBC](https://www.cnbc.com/2026/06/30/anthropic-says-trump-admin-has-lifted-export-controls-on-claude-fable-5-and-mythos-5.html)
-- [Anthropic Disabled Fable 5 And Mythos 5 — Forbes](https://www.forbes.com/sites/anishasircar/2026/06/16/anthropic-disabled-fable-5-and-mythos-5-after-a-us-export-control-order-heres-what-happened/)
-- [US lifts restrictions on Anthropic's AI models — Al Jazeera](https://www.aljazeera.com/economy/2026/7/1/us-lifts-restrictions-on-powerful-ai-models-fable-mythos-anthropic-says)
-
----
-
-*Cet article fait partie du wiki Claude Mastery. Non affilié à Anthropic. Claude™ est une marque d'Anthropic, PBC.*
+- Annonce Fable 5.1 et Mythos 5.1 : https://www.anthropic.com/claude-fable-and-mythos-5-1
+- Déclaration d'Anthropic sur la directive américaine : https://www.anthropic.com/news/fable-mythos-access
+- Tarifs de l'API : https://platform.claude.com/docs/en/about-claude/pricing
+- Fenêtres de contexte : https://platform.claude.com/docs/en/build-with-claude/context-windows
+- Fable dans Claude Code : https://code.claude.com/docs/en/model-config
+- Levée des restrictions (presse) : https://thenewstack.io/anthropic-fable-ban-lifted
