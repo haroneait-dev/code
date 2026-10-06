@@ -22,6 +22,8 @@ export type WikiArticle = {
   updatedAt: string;
   readingMinutes: number;
   body: string;
+  // Vidéo TikTok liée (champ « tiktok » du frontmatter, URL complète)
+  tiktok?: string;
 };
 
 async function tryReadMdx(
@@ -41,6 +43,7 @@ async function tryReadMdx(
       readingMinutes:
         (data.readingMinutes as number) ?? estimateReading(content),
       body: content.trim(),
+      tiktok: typeof data.tiktok === "string" && data.tiktok.startsWith("https://www.tiktok.com/") ? data.tiktok : undefined,
     };
   } catch {
     return null;

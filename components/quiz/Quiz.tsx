@@ -61,19 +61,15 @@ export function Quiz() {
   if (stage === "intro") {
     return (
       <div className="max-w-2xl mx-auto">
-        <BlurFade>
-          <p className="tag-note mb-7">10 questions · 2 minutes · sans inscription</p>
-        </BlurFade>
+        <p className="tag-note mb-7">10 questions · 2 minutes · sans inscription</p>
         <h1 className="font-display-xl font-extrabold tracking-tight text-on-surface text-[40px] leading-[1.05] md:text-[60px] md:leading-[1] mb-6">
-          <WordReveal text="Par où commencer ?" />
+          Par où commencer ?
         </h1>
-        <BlurFade delay={0.25}>
-          <p className="text-[18px] md:text-[20px] text-on-surface-variant leading-relaxed mb-8">
-            Répondez à 10 questions. Vous obtenez votre niveau actuel et un
-            parcours sur mesure : quoi lire, quoi pratiquer, et quel projet
-            réaliser pour passer au niveau suivant.
-          </p>
-        </BlurFade>
+        <p className="text-[18px] md:text-[20px] text-on-surface-variant leading-relaxed mb-8">
+          Répondez à 10 questions. Vous obtenez votre niveau actuel et un
+          parcours sur mesure : quoi lire, quoi pratiquer, et quel projet
+          réaliser pour passer au niveau suivant.
+        </p>
         <BlurFade delay={0.4} className="flex flex-col sm:flex-row gap-3">
           <button
             type="button"

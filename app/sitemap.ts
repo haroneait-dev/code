@@ -1,6 +1,7 @@
 import type { MetadataRoute } from "next";
 import { curriculum } from "@/lib/curriculum";
 import { CATEGORIES, ARTICLE_STUBS } from "@/lib/wiki-manifest";
+import { allApps } from "@/lib/applications";
 
 const siteUrl =
   process.env.NEXT_PUBLIC_SITE_URL ?? "https://claude-code-harone1.vercel.app";
@@ -20,6 +21,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { url: `${siteUrl}/prompts`, lastModified: now, priority: 0.85 },
     { url: `${siteUrl}/patch-notes`, lastModified: now, priority: 0.8 },
   ];
+
+  const appPages: MetadataRoute.Sitemap = allApps().map((a) => ({
+    url: `${siteUrl}/applications/${a.slug}`,
+    lastModified: now,
+    priority: 0.7,
+  }));
 
   const lessonPages: MetadataRoute.Sitemap = curriculum.flatMap((mod) =>
     mod.lessons.map((lesson) => ({
@@ -41,5 +48,5 @@ export default function sitemap(): MetadataRoute.Sitemap {
     priority: 0.6,
   }));
 
-  return [...staticPages, ...lessonPages, ...wikiPages, ...wikiArticles];
+  return [...staticPages, ...appPages, ...lessonPages, ...wikiPages, ...wikiArticles];
 }

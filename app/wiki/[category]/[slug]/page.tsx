@@ -64,8 +64,16 @@ export async function generateMetadata({
   const article = await loadArticle(category as CategoryId, slug);
   if (!article) return { title: "Wiki — Claude Mastery" };
   return {
-    title: `${article.title} — Wiki — Claude Mastery`,
+    title: article.title,
     description: article.description,
+    alternates: { canonical: `/wiki/${category}/${slug}` },
+    openGraph: {
+      type: "article",
+      title: article.title,
+      description: article.description,
+      url: `/wiki/${category}/${slug}`,
+      modifiedTime: article.updatedAt,
+    },
   };
 }
 
@@ -93,8 +101,50 @@ export default async function ArticlePage({
     id: slugifyHeading(m[1].trim()),
   }));
 
+  // Données structurées pour les moteurs de recherche : article, fil d'Ariane, quiz en FAQ.
+  const site = process.env.NEXT_PUBLIC_SITE_URL ?? "https://claude-code-harone1.vercel.app";
+  const url = `${site}/wiki/${cat.id}/${slug}`;
+  const quiz = ARTICLE_QUIZZES[`${cat.id}/${slug}`];
+  const jsonLd = [
+    {
+      "@context": "https://schema.org",
+      "@type": "TechArticle",
+      headline: article.title,
+      description: article.description,
+      inLanguage: "fr-FR",
+      dateModified: article.updatedAt,
+      mainEntityOfPage: url,
+      image: `${url}/opengraph-image`,
+      author: { "@type": "Organization", name: "Claude Mastery" },
+      publisher: { "@type": "Organization", name: "Claude Mastery" },
+    },
+    {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      itemListElement: [
+        { "@type": "ListItem", position: 1, name: "Wiki", item: `${site}/wiki` },
+        { "@type": "ListItem", position: 2, name: cat.name, item: `${site}/wiki/${cat.id}` },
+        { "@type": "ListItem", position: 3, name: article.title, item: url },
+      ],
+    },
+    ...(quiz
+      ? [
+          {
+            "@context": "https://schema.org",
+            "@type": "FAQPage",
+            mainEntity: quiz.map((q) => ({
+              "@type": "Question",
+              name: q.q,
+              acceptedAnswer: { "@type": "Answer", text: `${q.options[q.answer]}. ${q.why}` },
+            })),
+          },
+        ]
+      : []),
+  ];
+
   return (
     <div className="min-h-screen flex flex-col">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }} />
       <SiteHeader active={cat?.section === "claude" ? "claude" : cat?.section === "code" ? "code" : "wiki"} showSearch />
 
       <div className="flex-grow w-full max-w-[1440px] mx-auto px-margin-mobile md:px-10 xl:px-margin-desktop flex gap-10 xl:gap-12 py-8 relative">
@@ -196,6 +246,20 @@ export default async function ArticlePage({
               </details>
             )}
 
+            {article.tiktok && (
+              <a
+                href={article.tiktok}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mb-10 flex items-center justify-between gap-4 rounded-lg border-[1.5px] border-on-surface bg-surface-container-lowest px-5 py-4 shadow-[4px_4px_0_rgb(var(--c-mark))] hover:bg-[rgb(var(--c-mark)/0.35)] transition-colors"
+              >
+                <span>
+                  <span className="block font-semibold text-[16.5px] text-on-surface">Ce sujet en vidéo</span>
+                  <span className="block text-[14.5px] text-on-surface-variant">Une minute pour l'essentiel, sur TikTok</span>
+                </span>
+                <span className="btn-primary h-10 px-4 rounded-md inline-flex items-center font-semibold text-[14.5px] shrink-0">Voir la vidéo</span>
+              </a>
+            )}
             <ArticleBody body={article.body} />
             {ARTICLE_QUIZZES[`${category}/${slug}`] && (
               <ArticleQuiz id={`${category}/${slug}`} questions={ARTICLE_QUIZZES[`${category}/${slug}`]} />

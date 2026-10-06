@@ -22,6 +22,21 @@ export const PATCH_NOTES: PatchNote[] = [
   {
     date: "2026-10-06",
     kind: "site",
+    version: "Site 2.5",
+    title: "Comparatifs, une page par application, badges et défi de la semaine",
+    items: [
+      "3 comparatifs : Claude, ChatGPT ou Gemini ; Claude Code, Cursor ou Copilot ; quelle offre Claude choisir.",
+      "Une page par application (Shopify, Notion, Figma…) avec ses demandes à copier et la marche à suivre pour la brancher.",
+      "Badge à partager quand vous validez un niveau d'un parcours.",
+      "Un défi concret chaque semaine sur l'accueil.",
+      "Recherche rapide avec Ctrl+K (ou la loupe) depuis n'importe quelle page.",
+      "Pages plus rapides sur mobile, et plus lisibles pour Google.",
+    ],
+    href: "/wiki/comparatifs/claude-chatgpt-gemini",
+  },
+  {
+    date: "2026-10-06",
+    kind: "site",
     version: "Site 2.4",
     title: "Patch notes, prompts, mini-quiz et mode sombre",
     items: [

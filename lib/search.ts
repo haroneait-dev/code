@@ -4,9 +4,11 @@
 
 import { curriculum } from "@/lib/curriculum";
 import { ARTICLE_STUBS, getCategory } from "@/lib/wiki-manifest";
+import { allApps } from "@/lib/applications";
+import { PROMPT_GROUPS } from "@/lib/prompts";
 
 export type SearchResult = {
-  type: "lesson" | "wiki";
+  type: "lesson" | "wiki" | "page";
   title: string;
   description: string;
   href: string;
@@ -56,6 +58,39 @@ function buildIndex(): IndexItem[] {
       haystack: normalize(
         [stub.title, stub.description, cat?.name ?? ""].join(" "),
       ),
+    });
+  }
+
+  // Pages du site
+  const pages = [
+    { title: "Test de niveau", description: "10 questions pour savoir par où commencer.", href: "/test" },
+    { title: "Applications à brancher sur Claude", description: "Apps et serveurs MCP par thème, de débutant à expert.", href: "/applications" },
+    { title: "Prompts prêts à copier", description: "Des prompts testés par catégorie.", href: "/prompts" },
+    { title: "Patch notes", description: "Les mises à jour du site et les nouveautés de Claude.", href: "/patch-notes" },
+    { title: "Formation Claude Code", description: "Les modules pas à pas.", href: "/learn" },
+    { title: "Fiches mémo", description: "L'essentiel sur une page.", href: "/fiches" },
+  ];
+  for (const p of pages) {
+    items.push({ type: "page", ...p, context: "Page", haystack: normalize(`${p.title} ${p.description}`) });
+  }
+  for (const a of allApps()) {
+    items.push({
+      type: "page",
+      title: `Claude + ${a.name}`,
+      description: a.uses[0].what,
+      href: `/applications/${a.slug}`,
+      context: "Application",
+      haystack: normalize(`${a.name} ${a.uses.map((u) => `${u.what} ${u.theme.name}`).join(" ")}`),
+    });
+  }
+  for (const g of PROMPT_GROUPS) {
+    items.push({
+      type: "page",
+      title: `Prompts : ${g.name}`,
+      description: g.intro,
+      href: `/prompts#${g.id}`,
+      context: "Prompts",
+      haystack: normalize(`prompt ${g.name} ${g.intro} ${g.prompts.map((x) => x.title).join(" ")}`),
     });
   }
 

@@ -459,3 +459,36 @@ export const THEMES: Theme[] = [
     ],
   },
 ];
+
+// ─── Une page par application (/applications/<slug>) ───────────────────
+export function appSlug(name: string) {
+  return name
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+}
+
+export type AppPage = {
+  slug: string;
+  name: string;
+  kind: AppKind;
+  url: string;
+  setup?: string;
+  uses: { theme: Theme; what: string; prompt: string }[];
+};
+
+export function allApps(): AppPage[] {
+  const map = new Map<string, AppPage>();
+  for (const t of THEMES) {
+    for (const a of t.apps) {
+      const slug = appSlug(a.name);
+      const cur = map.get(slug) ?? { slug, name: a.name, kind: a.kind, url: a.url, setup: a.setup, uses: [] };
+      cur.setup ??= a.setup;
+      cur.uses.push({ theme: t, what: a.what, prompt: a.prompt });
+      map.set(slug, cur);
+    }
+  }
+  return [...map.values()];
+}
