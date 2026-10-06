@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ArrowRight, ArrowUpRight } from "lucide-react";
 import { SiteHeader } from "@/components/site/SiteHeader";
 import { SiteFooter } from "@/components/site/SiteFooter";
+import { ParcoursBanner } from "@/components/site/ParcoursBanner";
 import { curriculum, totalLessons } from "@/lib/curriculum";
 import { articleCount, articleCountBySection } from "@/lib/wiki-manifest";
 
@@ -75,6 +76,9 @@ export default function LandingPage() {
               formation de {totalLessons} leçons, relus à chaque nouvelle version.
               Choisissez votre porte d'entrée.
             </p>
+            <div className="mt-8 max-w-3xl">
+              <ParcoursBanner />
+            </div>
           </div>
         </section>
 

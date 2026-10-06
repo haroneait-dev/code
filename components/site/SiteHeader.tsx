@@ -44,10 +44,10 @@ export function SiteHeader({
         <div className="flex items-center gap-3">
           {showSearch && <SiteSearch />}
           <Link
-            href="/learn"
+            href="/test"
             className="hidden md:inline-flex btn-primary h-9 px-4 rounded-md items-center text-body-sm font-semibold"
           >
-            Commencer
+            Test de niveau
           </Link>
           <MobileNav active={active} />
         </div>

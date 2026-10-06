@@ -4,6 +4,7 @@ import { SiteHeader } from "@/components/site/SiteHeader";
 import { SiteFooter } from "@/components/site/SiteFooter";
 import { THEMES, KIND_LABEL, type AppKind } from "@/lib/applications";
 import { PATHS } from "@/lib/app-paths";
+import { ParcoursBanner } from "@/components/site/ParcoursBanner";
 
 export const metadata = {
   title: "Applications à brancher sur Claude, par thème",
@@ -37,6 +38,9 @@ export default function ApplicationsPage() {
               peut en faire, comment la connecter, et une demande à essayer tout
               de suite.
             </p>
+            <div className="mt-8 max-w-3xl">
+              <ParcoursBanner />
+            </div>
           </div>
         </section>
 
