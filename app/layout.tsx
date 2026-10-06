@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Bricolage_Grotesque, Figtree, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
+import { Analytics } from "@vercel/analytics/next";
 
 const display = Bricolage_Grotesque({
   subsets: ["latin"],
@@ -84,9 +85,19 @@ export default function RootLayout({
     <html
       lang="fr"
       className={`${display.variable} ${body.variable} ${jbm.variable}`}
+      suppressHydrationWarning
     >
+      <head>
+        {/* Applique le thème avant l'affichage pour éviter un flash clair */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `try{var t=localStorage.getItem("theme");if(t==="dark"||(!t&&matchMedia("(prefers-color-scheme: dark)").matches))document.documentElement.classList.add("dark")}catch(e){}`,
+          }}
+        />
+      </head>
       <body className="font-body-rt antialiased">
         {children}
+        <Analytics />
       </body>
     </html>
   );

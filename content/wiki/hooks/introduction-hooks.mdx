@@ -24,6 +24,8 @@ Les cas d'usage les plus fréquents :
 - **Injection de contexte** : ajouter des informations dynamiques (branche git, date, état du build) au prompt utilisateur.
 - **Observabilité** : envoyer des traces vers OpenTelemetry, Langfuse, Phoenix.
 
+![Schéma : les moments d'un tour de Claude Code où un hook peut s'exécuter (UserPromptSubmit, PreToolUse, PostToolUse, Stop).](/schemas/hooks.svg)
+
 ## Les événements disponibles
 
 En octobre 2026, Claude Code expose une trentaine d'événements. Les plus utilisés sont en gras.

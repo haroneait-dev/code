@@ -38,7 +38,7 @@ export function ParcoursBanner({ themeId }: { themeId?: string }) {
 
   if (!result) {
     return (
-      <BlurFade className="relative rounded-lg border-[1.5px] border-on-surface bg-surface-container-lowest p-5 md:p-6 shadow-[5px_5px_0_#fbe3a8] flex flex-col md:flex-row md:items-center gap-4 md:gap-8">
+      <BlurFade className="relative rounded-lg border-[1.5px] border-on-surface bg-surface-container-lowest p-5 md:p-6 shadow-[5px_5px_0_rgb(var(--c-mark))] flex flex-col md:flex-row md:items-center gap-4 md:gap-8">
         <div className="flex-1 pr-8">
           <p className="font-semibold text-[18px] text-on-surface mb-1">Nouveau ici ? Faites le test de niveau.</p>
           <p className="text-[15.5px] text-on-surface-variant leading-relaxed">
@@ -59,7 +59,7 @@ export function ParcoursBanner({ themeId }: { themeId?: string }) {
   const theme = THEMES.find((t) => t.id === result.theme);
   const plan = PATHS[result.theme]?.[result.levelIndex];
   return (
-    <BlurFade className="relative rounded-lg border-[1.5px] border-primary bg-[#cfe0d5]/40 p-5 md:p-6 flex flex-col md:flex-row md:items-center gap-4 md:gap-8">
+    <BlurFade className="relative rounded-lg border-[1.5px] border-primary bg-[rgb(var(--c-green-soft)/0.40)] p-5 md:p-6 flex flex-col md:flex-row md:items-center gap-4 md:gap-8">
       <div className="flex-1 pr-8 min-w-0">
         <p className="font-mono text-[12.5px] uppercase tracking-wider text-on-surface-variant mb-1">
           Votre parcours · {theme?.name} · {result.level}

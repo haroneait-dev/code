@@ -5,6 +5,7 @@ import { SiteFooter } from "@/components/site/SiteFooter";
 import { THEMES, KIND_LABEL, type AppKind } from "@/lib/applications";
 import { PATHS } from "@/lib/app-paths";
 import { ParcoursBanner } from "@/components/site/ParcoursBanner";
+import { StepCheck, ThemeProgress } from "@/components/site/Progress";
 
 export const metadata = {
   title: "Applications à brancher sur Claude, par thème",
@@ -13,8 +14,8 @@ export const metadata = {
 };
 
 const KIND_STYLE: Record<AppKind, string> = {
-  connecteur: "bg-[#cfe0d5] text-[#1f3f2f]",
-  mcp: "bg-[#fbe3a8] text-[#5a4210]",
+  connecteur: "bg-[rgb(var(--c-green-soft))] text-on-surface",
+  mcp: "bg-[rgb(var(--c-mark))] text-on-primary-fixed",
   communautaire: "bg-surface-container-high text-on-surface-variant",
   "sans-mcp": "bg-surface-container-low text-on-surface-variant border border-outline-variant",
 };
@@ -50,7 +51,7 @@ export default function ApplicationsPage() {
               <a
                 key={t.id}
                 href={`#${t.id}`}
-                className="rounded-full border-[1.5px] border-on-surface px-4 py-2 text-[15px] font-semibold text-on-surface hover:bg-[#fbe3a8] transition-colors"
+                className="rounded-full border-[1.5px] border-on-surface px-4 py-2 text-[15px] font-semibold text-on-surface hover:bg-[rgb(var(--c-mark))] transition-colors"
               >
                 {t.name}
               </a>
@@ -130,8 +131,11 @@ export default function ApplicationsPage() {
                 <div className="mb-12">
                   <h3 className="font-headline-lg text-[24px] md:text-[28px] font-bold mb-2">De débutant à expert</h3>
                   <p className="text-[15.5px] text-on-surface-variant mb-6 max-w-2xl">
-                    Quatre niveaux, dans l'ordre. Passez au suivant quand vous avez réussi le projet du niveau.
+                    Quatre niveaux, dans l'ordre. Cochez les étapes au fur et à mesure : votre progression reste enregistrée dans ce navigateur.
                   </p>
+                  <div className="mb-6">
+                    <ThemeProgress ids={PATHS[t.id].flatMap((lv, li) => lv.steps.map((_, si) => `${t.id}:${li}:${si}`))} />
+                  </div>
                   <ol className="grid grid-cols-1 md:grid-cols-2 gap-5">
                     {PATHS[t.id].map((lv, i) => (
                       <li key={lv.level} className="rounded-lg border border-outline-variant bg-surface-container-lowest p-6">
@@ -140,12 +144,12 @@ export default function ApplicationsPage() {
                           <span className="font-headline-lg text-[20px] font-bold text-on-surface">{lv.level}</span>
                         </div>
                         <p className="text-[15.5px] text-on-surface font-semibold leading-relaxed mb-3">{lv.goal}</p>
-                        <ul className="flex flex-col gap-2 mb-4 list-disc pl-5 text-[15px] text-on-surface-variant leading-relaxed">
-                          {lv.steps.map((s) => (
-                            <li key={s}>{s}</li>
+                        <ul className="flex flex-col gap-1.5 mb-4">
+                          {lv.steps.map((s, si) => (
+                            <StepCheck key={s} id={`${t.id}:${i}:${si}`} text={s} />
                           ))}
                         </ul>
-                        <p className="rounded-md bg-[#fbe3a8]/50 border border-[#f2b23e]/40 px-3.5 py-2.5 text-[14.5px] text-on-surface leading-relaxed">
+                        <p className="rounded-md bg-[rgb(var(--c-mark)/0.50)] border border-[#f2b23e]/40 px-3.5 py-2.5 text-[14.5px] text-on-surface leading-relaxed">
                           <strong>Projet de validation :</strong> {lv.project}
                         </p>
                       </li>
@@ -157,7 +161,7 @@ export default function ApplicationsPage() {
               <h3 className="font-headline-lg text-[24px] md:text-[28px] font-bold mb-6">Les applications</h3>
               <ul className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
                 {t.apps.map((a) => (
-                  <li key={a.name} className="flex flex-col rounded-lg border-[1.5px] border-on-surface bg-surface-container-lowest p-6 shadow-[4px_4px_0_#fbe3a8]">
+                  <li key={a.name} className="flex flex-col rounded-lg border-[1.5px] border-on-surface bg-surface-container-lowest p-6 shadow-[4px_4px_0_rgb(var(--c-mark))]">
                     <div className="flex items-start justify-between gap-3 mb-3">
                       <h4 className="font-headline-lg text-[22px] font-bold text-on-surface">{a.name}</h4>
                       <span className={`shrink-0 rounded px-2 py-0.5 text-[12.5px] font-semibold ${KIND_STYLE[a.kind]}`}>

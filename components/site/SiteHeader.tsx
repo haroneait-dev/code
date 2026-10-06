@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { MobileNav } from "@/components/site/MobileNav";
 import { SiteSearch } from "@/components/site/SiteSearch";
+import { ThemeToggle } from "@/components/site/ThemeToggle";
+import { Search } from "lucide-react";
 import { NAV_LINKS, type NavKey } from "@/lib/nav";
 
 
@@ -19,7 +21,7 @@ export function SiteHeader({
   return (
     <header className="bg-surface sticky top-0 border-b border-outline-variant z-50">
       <div className="flex justify-between items-center w-full px-margin-mobile md:px-margin-desktop max-w-container-max mx-auto h-16 gap-6">
-        <div className="flex items-center gap-8 min-w-0">
+        <div className="flex items-center gap-6 xl:gap-8 min-w-0">
           <Link
             href="/"
             className="flex items-center gap-2 font-headline-lg text-[21px] font-bold text-on-surface tracking-tight whitespace-nowrap"
@@ -32,7 +34,7 @@ export function SiteHeader({
             </span>
             Claude Mastery
           </Link>
-          <nav className="hidden md:flex items-center gap-6" aria-label="Navigation principale">
+          <nav className="hidden lg:flex items-center gap-5 xl:gap-6 whitespace-nowrap" aria-label="Navigation principale">
             {NAV_LINKS.map((l) => (
               <Link key={l.key} href={l.href} className={linkClass(l.key)}>
                 {l.label}
@@ -44,8 +46,16 @@ export function SiteHeader({
         <div className="flex items-center gap-3">
           {showSearch && <SiteSearch />}
           <Link
+            href="/recherche"
+            aria-label="Rechercher"
+            className={`inline-flex items-center justify-center w-9 h-9 rounded-full text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors`}
+          >
+            <Search className="w-[18px] h-[18px]" strokeWidth={1.75} />
+          </Link>
+          <ThemeToggle />
+          <Link
             href="/test"
-            className="hidden md:inline-flex btn-primary h-9 px-4 rounded-md items-center text-body-sm font-semibold"
+            className="hidden lg:inline-flex btn-primary h-9 px-4 rounded-md items-center text-body-sm font-semibold whitespace-nowrap"
           >
             Test de niveau
           </Link>

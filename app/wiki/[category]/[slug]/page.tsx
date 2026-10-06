@@ -31,6 +31,8 @@ import {
   type CategoryId,
 } from "@/lib/wiki-manifest";
 import { loadArticle } from "@/lib/wiki-loader";
+import { ARTICLE_QUIZZES } from "@/lib/article-quizzes";
+import { ArticleQuiz } from "@/components/wiki/ArticleQuiz";
 
 const CAT_ICONS = {
   terminal: Terminal,
@@ -195,6 +197,9 @@ export default async function ArticlePage({
             )}
 
             <ArticleBody body={article.body} />
+            {ARTICLE_QUIZZES[`${category}/${slug}`] && (
+              <ArticleQuiz id={`${category}/${slug}`} questions={ARTICLE_QUIZZES[`${category}/${slug}`]} />
+            )}
 
             {/* Prev / Next */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-16 pt-8 border-t border-outline-variant">

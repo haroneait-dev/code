@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 400" font-family="Figtree, Helvetica, Arial, sans-serif" role="img" aria-labelledby="t d">
+  <title id="t">Comment fonctionne MCP</title>
+  <desc id="d">Claude passe par un client MCP qui se connecte à plusieurs serveurs MCP, chacun relié à une application : Gmail, Shopify, GitHub.</desc>
+  <rect width="800" height="400" rx="16" fill="#fffcf7"/>
+  <defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#2b2119"/></marker></defs>
+  <rect x="40" y="150" width="160" height="100" rx="12" fill="#2f5d46"/>
+  <text x="120" y="195" text-anchor="middle" fill="#fffcf7" font-size="24" font-weight="700">Claude</text>
+  <text x="120" y="222" text-anchor="middle" fill="#cfe0d5" font-size="15">+ client MCP</text>
+  <g font-size="17" fill="#2b2119">
+    <rect x="320" y="40" width="190" height="70" rx="10" fill="#fbe3a8" stroke="#2b2119" stroke-width="1.5"/>
+    <text x="415" y="82" text-anchor="middle" font-weight="700">Serveur MCP Gmail</text>
+    <rect x="320" y="165" width="190" height="70" rx="10" fill="#fbe3a8" stroke="#2b2119" stroke-width="1.5"/>
+    <text x="415" y="207" text-anchor="middle" font-weight="700">Serveur MCP Shopify</text>
+    <rect x="320" y="290" width="190" height="70" rx="10" fill="#fbe3a8" stroke="#2b2119" stroke-width="1.5"/>
+    <text x="415" y="332" text-anchor="middle" font-weight="700">Serveur MCP GitHub</text>
+    <rect x="610" y="40" width="150" height="70" rx="10" fill="#f6efe3" stroke="#9a8774"/>
+    <text x="685" y="82" text-anchor="middle">Vos e-mails</text>
+    <rect x="610" y="165" width="150" height="70" rx="10" fill="#f6efe3" stroke="#9a8774"/>
+    <text x="685" y="207" text-anchor="middle">Votre boutique</text>
+    <rect x="610" y="290" width="150" height="70" rx="10" fill="#f6efe3" stroke="#9a8774"/>
+    <text x="685" y="332" text-anchor="middle">Votre code</text>
+  </g>
+  <g stroke="#2b2119" stroke-width="2" fill="none" marker-end="url(#a)">
+    <path d="M200 185 C260 150 270 90 318 78"/>
+    <path d="M200 200 L318 200"/>
+    <path d="M200 215 C260 250 270 310 318 322"/>
+    <path d="M510 75 L608 75"/><path d="M510 200 L608 200"/><path d="M510 325 L608 325"/>
+  </g>
+  <text x="120" y="290" text-anchor="middle" font-size="14" fill="#66574a">demande un outil</text>
+  <text x="560" y="140" text-anchor="middle" font-size="14" fill="#66574a">lit et agit</text>
+</svg>

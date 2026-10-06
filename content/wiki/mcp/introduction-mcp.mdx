@@ -7,6 +7,8 @@ readingMinutes: 5
 
 Le **Model Context Protocol** (MCP) est un standard ouvert qui permet à une application d'IA (Claude Code, l'application Claude, un IDE) de se connecter à des outils et à des données externes : fichiers, bases de données, GitHub, Notion, Sentry, etc. La documentation officielle le compare à un **port USB-C** : une prise unique et normalisée, à la place d'une intégration sur mesure pour chaque service.
 
+![Schéma : Claude passe par un client MCP vers des serveurs MCP (Gmail, Shopify, GitHub), chacun relié à une application.](/schemas/mcp.svg)
+
 ## Le problème que MCP résout
 
 Sans standard, chaque application d'IA doit coder sa propre intégration pour chaque service. Avec M applications et N services, on obtient M × N connecteurs à maintenir, tous incompatibles entre eux.

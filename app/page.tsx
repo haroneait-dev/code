@@ -3,6 +3,7 @@ import { ArrowRight, ArrowUpRight } from "lucide-react";
 import { SiteHeader } from "@/components/site/SiteHeader";
 import { SiteFooter } from "@/components/site/SiteFooter";
 import { ParcoursBanner } from "@/components/site/ParcoursBanner";
+import { NewsletterForm } from "@/components/site/NewsletterForm";
 import { curriculum, totalLessons } from "@/lib/curriculum";
 import { articleCount, articleCountBySection } from "@/lib/wiki-manifest";
 
@@ -88,7 +89,7 @@ export default function LandingPage() {
             {/* Claude */}
             <Link
               href="/claude"
-              className="group flex flex-col rounded-lg border-[1.5px] border-on-surface bg-surface-container-lowest p-7 md:p-9 shadow-[6px_6px_0_#fbe3a8] hover:shadow-[8px_8px_0_#f2b23e] transition-shadow"
+              className="group flex flex-col rounded-lg border-[1.5px] border-on-surface bg-surface-container-lowest p-7 md:p-9 shadow-[6px_6px_0_rgb(var(--c-mark))] hover:shadow-[8px_8px_0_#f2b23e] transition-shadow"
             >
               <span className="font-mono text-[13px] text-on-surface-variant mb-3">
                 Pour tout le monde · {articleCountBySection("claude")} articles
@@ -124,7 +125,7 @@ export default function LandingPage() {
             {/* Claude Code */}
             <Link
               href="/claude-code"
-              className="group flex flex-col rounded-lg border-[1.5px] border-on-surface bg-surface-container-lowest p-7 md:p-9 shadow-[6px_6px_0_#cfe0d5] hover:shadow-[8px_8px_0_#2f5d46] transition-shadow"
+              className="group flex flex-col rounded-lg border-[1.5px] border-on-surface bg-surface-container-lowest p-7 md:p-9 shadow-[6px_6px_0_rgb(var(--c-green-soft))] hover:shadow-[8px_8px_0_rgb(var(--c-primary))] transition-shadow"
             >
               <span className="font-mono text-[13px] text-on-surface-variant mb-3">
                 Pour les développeurs · {totalModules} modules · {articleCountBySection("code")} articles
@@ -205,6 +206,23 @@ export default function LandingPage() {
                 </li>
               ))}
             </ol>
+          </div>
+        </section>
+
+        {/* Newsletter */}
+        <section className="w-full px-margin-mobile md:px-margin-desktop py-16 md:py-20 border-b border-outline-variant">
+          <div className="max-w-container-max mx-auto grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
+            <div className="max-w-xl">
+              <p className="tag-note mb-5">Chaque lundi</p>
+              <h2 className="font-headline-lg text-[30px] md:text-[40px] leading-[1.1] font-bold tracking-tight mb-3">
+                Les nouveautés de Claude, en 5 minutes.
+              </h2>
+              <p className="text-on-surface-variant text-[17px] leading-relaxed">
+                Ce qui a changé dans la semaine, ce que ça change pour vous, et une
+                astuce à essayer tout de suite. En français, sans jargon.
+              </p>
+            </div>
+            <NewsletterForm source="accueil" />
           </div>
         </section>
 
