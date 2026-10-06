@@ -34,7 +34,7 @@ export function SiteHeader({
             </span>
             Claude Mastery
           </Link>
-          <nav className="hidden lg:flex items-center gap-5 xl:gap-6 whitespace-nowrap" aria-label="Navigation principale">
+          <nav className="hidden xl:flex items-center gap-5 whitespace-nowrap" aria-label="Navigation principale">
             {NAV_LINKS.map((l) => (
               <Link key={l.key} href={l.href} className={linkClass(l.key)}>
                 {l.label}
@@ -55,7 +55,7 @@ export function SiteHeader({
           <ThemeToggle />
           <Link
             href="/test"
-            className="hidden lg:inline-flex btn-primary h-9 px-4 rounded-md items-center text-body-sm font-semibold whitespace-nowrap"
+            className="hidden xl:inline-flex btn-primary h-9 px-4 rounded-md items-center text-body-sm font-semibold whitespace-nowrap"
           >
             Test de niveau
           </Link>

@@ -3,7 +3,6 @@ import { ArrowRight, ArrowUpRight } from "lucide-react";
 import { SiteHeader } from "@/components/site/SiteHeader";
 import { SiteFooter } from "@/components/site/SiteFooter";
 import { ParcoursBanner } from "@/components/site/ParcoursBanner";
-import { NewsletterForm } from "@/components/site/NewsletterForm";
 import { curriculum, totalLessons } from "@/lib/curriculum";
 import { articleCount, articleCountBySection } from "@/lib/wiki-manifest";
 
@@ -168,6 +167,13 @@ export default function LandingPage() {
               </div>
               <div className="flex flex-col gap-2 shrink-0">
                 <Link
+                  href="/patch-notes"
+                  className="inline-flex items-center gap-1.5 font-semibold text-primary hover:underline underline-offset-4"
+                >
+                  Toutes les patch notes
+                  <ArrowUpRight className="w-4 h-4" strokeWidth={2} />
+                </Link>
+                <Link
                   href="/wiki/actualites/nouveautes-claude-2026"
                   className="inline-flex items-center gap-1.5 font-semibold text-primary hover:underline underline-offset-4"
                 >
@@ -206,23 +212,6 @@ export default function LandingPage() {
                 </li>
               ))}
             </ol>
-          </div>
-        </section>
-
-        {/* Newsletter */}
-        <section className="w-full px-margin-mobile md:px-margin-desktop py-16 md:py-20 border-b border-outline-variant">
-          <div className="max-w-container-max mx-auto grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
-            <div className="max-w-xl">
-              <p className="tag-note mb-5">Chaque lundi</p>
-              <h2 className="font-headline-lg text-[30px] md:text-[40px] leading-[1.1] font-bold tracking-tight mb-3">
-                Les nouveautés de Claude, en 5 minutes.
-              </h2>
-              <p className="text-on-surface-variant text-[17px] leading-relaxed">
-                Ce qui a changé dans la semaine, ce que ça change pour vous, et une
-                astuce à essayer tout de suite. En français, sans jargon.
-              </p>
-            </div>
-            <NewsletterForm source="accueil" />
           </div>
         </section>
 

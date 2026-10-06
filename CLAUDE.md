@@ -118,3 +118,4 @@ git push       # Déploie sur Vercel (auto)
 - Composants inline dans `page.tsx` (pas de fichiers séparés)
 - Styles inline avec `style={{}}` — pas de classes Tailwind dans les composants
 - Ne pas toucher aux routes API sans vérifier l'auth
+- À chaque mise à jour du site ou nouveauté de Claude : ajouter une entrée en haut de `lib/patch-notes.ts` (page /patch-notes)
