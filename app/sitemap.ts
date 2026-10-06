@@ -16,6 +16,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { url: `${siteUrl}/wiki`, lastModified: now, priority: 0.8 },
     { url: `${siteUrl}/fiches`, lastModified: now, priority: 0.8 },
     { url: `${siteUrl}/applications`, lastModified: now, priority: 0.85 },
+    { url: `${siteUrl}/test`, lastModified: now, priority: 0.9 },
   ];
 
   const lessonPages: MetadataRoute.Sitemap = curriculum.flatMap((mod) =>

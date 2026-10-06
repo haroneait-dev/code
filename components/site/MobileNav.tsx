@@ -82,8 +82,15 @@ export function MobileNav({ active = null }: { active?: NavKey }) {
               })}
             </nav>
 
-            <div className="px-5 py-5 border-t border-outline-variant text-body-sm text-on-surface-variant">
-              Formation Claude Code en français, en accès libre.
+            <div className="px-5 py-5 border-t border-outline-variant flex flex-col gap-3">
+              <Link
+                href="/test"
+                onClick={() => setOpen(false)}
+                className="btn-primary h-12 rounded-md inline-flex items-center justify-center font-semibold text-[15px]"
+              >
+                Test de niveau (2 min)
+              </Link>
+              <span className="text-body-sm text-on-surface-variant">Formation Claude en français, en accès libre.</span>
             </div>
           </div>
         </div>
