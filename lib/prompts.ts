@@ -6,7 +6,7 @@ export type PromptLevel = "Débutant" | "Intermédiaire" | "Avancé";
 export type Prompt = { title: string; text: string; why?: string; tip?: string; level?: PromptLevel };
 export type PromptGroup = { id: string; name: string; intro: string; method?: string[]; prompts: Prompt[] };
 
-export const PROMPT_GROUPS: PromptGroup[] = [
+const BASE_GROUPS: PromptGroup[] = [
   // ─────────────────────────────────────────────────────────────────────
   {
     id: "bases",
@@ -60,162 +60,6 @@ export const PROMPT_GROUPS: PromptGroup[] = [
         level: "Intermédiaire",
         text: "Je veux un prompt pour que Claude fasse cette tâche de façon fiable et répétable : [tâche].\nRédige ce prompt avec : le rôle, le contexte, les étapes, les règles, le format de sortie et un exemple. Ensuite, liste les 3 cas où il risque d'échouer et comment les éviter.",
         why: "Claude écrit de très bons prompts pour lui-même. Lui demander ses propres points faibles rend le prompt plus robuste.",
-      },
-    ],
-  },
-
-  // ─────────────────────────────────────────────────────────────────────
-  {
-    id: "seo",
-    name: "SEO et référencement",
-    intro: "Les techniques des référenceurs, appliquées avec Claude : intention de recherche, cocon sémantique, balises, données structurées et audit.",
-    method: [
-      "Partez toujours de l'intention de recherche (ce que la personne veut vraiment) avant d'écrire.",
-      "Donnez des données réelles (mots-clés et volumes d'un outil comme Semrush ou Ubersuggest, pages existantes) : Claude ne connaît pas les volumes actuels.",
-      "Vérifiez les longueurs de balises et validez les données structurées avec l'outil de test des résultats enrichis de Google.",
-    ],
-    prompts: [
-      {
-        title: "Classer des mots-clés par intention",
-        level: "Débutant",
-        text: "Voici une liste de mots-clés avec leurs volumes mensuels : [liste].\nClasse chacun par intention de recherche : informationnelle (apprendre), commerciale (comparer), transactionnelle (acheter), navigationnelle (une marque).\nPour chaque mot-clé, indique le type de page qui doit le cibler (article de blog, page catégorie, fiche produit, comparatif) et regroupe ceux qui peuvent partager la même page.\nRends un tableau : mot-clé | volume | intention | type de page | groupe.",
-        why: "Google classe selon l'intention : un mot-clé « acheter » ne se positionne pas avec un article de blog. Regrouper les mots-clés proches évite la cannibalisation (deux pages qui se battent sur la même requête).",
-      },
-      {
-        title: "Construire un cocon sémantique",
-        level: "Intermédiaire",
-        text: "Mon site vend [produits] à [cible]. Mot-clé principal : « [mot-clé] ».\nConstruis un cocon sémantique :\n1. Une page mère (catégorie ou guide pilier) sur le mot-clé principal.\n2. 6 à 10 pages filles sur des sous-sujets précis, chacune avec son mot-clé cible et son intention.\n3. Pour chaque page fille, 3 à 5 articles de soutien (longue traîne, questions).\n4. Le plan de maillage : quelle page lie vers quelle autre, avec quelle ancre de lien.\nRègle : les pages filles lient vers la mère, les articles vers leur page fille ; pas de lien entre silos sans rapport.\nRends le tout en arborescence puis en tableau de maillage.",
-        why: "Le cocon sémantique concentre la pertinence et la popularité interne sur les pages stratégiques. Les ancres de lien descriptives aident Google à comprendre de quoi parle chaque page.",
-      },
-      {
-        title: "Analyser la SERP avant d'écrire",
-        level: "Intermédiaire",
-        text: "Fais une recherche web sur « [mot-clé] » et analyse les 10 premiers résultats :\n- type de contenu (guide, liste, fiche produit, comparatif, vidéo) ;\n- angle et promesse des titres ;\n- longueur approximative et structure (H2 récurrents) ;\n- questions de la section « Autres questions posées » si visibles ;\n- ce qu'aucun résultat ne couvre bien.\nConclus par : le format à adopter, les 8 sous-parties indispensables, et l'angle différenciant pour faire mieux.",
-        why: "La première page de Google montre ce que l'algorithme juge pertinent pour cette requête. Copier le format attendu et combler les manques est la méthode la plus fiable pour se positionner.",
-        tip: "Activez la recherche web. Les résultats varient selon le pays : précisez « résultats français ».",
-      },
-      {
-        title: "Balise title et méta-description",
-        level: "Débutant",
-        text: "Page : [type de page et sujet]. Mot-clé principal : « [mot-clé] ». Marque : [marque].\nPropose 5 balises title et 5 méta-descriptions.\nRègles title : 50 à 60 caractères, mot-clé principal au début, un bénéfice ou un chiffre, la marque à la fin si la place le permet.\nRègles méta-description : 140 à 155 caractères, reprend le mot-clé, promet un bénéfice concret, se termine par une incitation (Découvrez, Comparez…).\nIndique le nombre de caractères de chacune et recommande la meilleure combinaison.",
-        why: "Au-delà d'environ 60 caractères, Google coupe le titre. Le mot-clé en début de titre pèse plus, et une méta-description engageante augmente le taux de clic, même si elle n'est pas un critère de classement direct.",
-      },
-      {
-        title: "Brief de contenu pour un article",
-        level: "Intermédiaire",
-        text: "Rédige le brief d'un article qui doit se positionner sur « [mot-clé] » (intention : [intention]).\nInclus : titre H1, balise title, méta-description, plan détaillé H2/H3, les questions précises à traiter, les entités et termes du champ lexical à couvrir naturellement, les sources à citer, les liens internes à placer vers [pages], et un appel à l'action final.\nLongueur visée : [nombre] mots. Public : [cible].",
-        why: "Un brief structuré couvre le sujet en profondeur (ce que Google valorise) et évite le bourrage de mots-clés : on couvre le champ lexical au lieu de répéter un terme.",
-      },
-      {
-        title: "Données structurées Product",
-        level: "Avancé",
-        text: "Génère le balisage JSON-LD schema.org de type Product pour cette fiche :\nNom : [nom] · Marque : [marque] · Référence (SKU) : [sku] · GTIN : [gtin ou « aucun »] · Prix : [prix] EUR · Disponibilité : [en stock / rupture] · Image : [URL] · Description : [description] · Note moyenne : [note sur 5] sur [nombre] avis (ou « pas d'avis »).\nRègles : n'inclus aggregateRating que s'il y a de vrais avis visibles sur la page ; utilise offers avec priceCurrency et availability en URL schema.org ; pas de champ inventé.\nDonne ensuite la liste des vérifications à faire dans le test des résultats enrichis de Google.",
-        why: "Les données structurées Product permettent l'affichage du prix, de la disponibilité et des étoiles dans Google. Afficher des avis absents de la page enfreint les règles de Google et peut faire perdre les résultats enrichis.",
-      },
-      {
-        title: "FAQ optimisée « Autres questions posées »",
-        level: "Intermédiaire",
-        text: "Pour la page sur « [sujet] », liste les 10 questions que les internautes posent vraiment (fais une recherche web pour t'en assurer). Réponds à chacune en 40 à 60 mots : la réponse directe dans la première phrase, puis une précision utile. Pas de formules creuses.",
-        why: "Une réponse directe et courte en début de paragraphe est le format le plus souvent repris dans les extraits de Google et par les moteurs de réponse IA.",
-      },
-      {
-        title: "Textes alternatifs des images",
-        level: "Débutant",
-        text: "Voici les images d'une page [produit / article] sur [sujet] : [description ou fichier de chaque image].\nRédige un texte alternatif pour chacune : décris ce que montre l'image en moins de 125 caractères, intègre le mot-clé seulement quand c'est naturel, pas de « image de » ni de « photo de ». Propose aussi un nom de fichier en minuscules avec des tirets.",
-        why: "Le texte alternatif sert d'abord aux personnes malvoyantes, et aide Google Images à comprendre l'image. Un nom de fichier descriptif renforce le signal.",
-      },
-      {
-        title: "Audit de cannibalisation",
-        level: "Avancé",
-        text: "Voici la liste de mes pages avec leur title, leur H1 et la requête principale sur laquelle elles se positionnent (export Search Console) : [liste].\nRepère les pages qui ciblent la même intention de recherche. Pour chaque conflit, recommande : fusionner (laquelle garder, redirection 301), différencier (nouvel angle et nouveau mot-clé), ou désoptimiser. Classe les conflits par impact probable.",
-        why: "Quand deux pages visent la même requête, Google alterne entre elles et aucune ne monte. Fusionner avec une redirection 301 concentre les signaux sur une seule URL.",
-      },
-      {
-        title: "Optimiser une page qui stagne",
-        level: "Avancé",
-        text: "Cette page se positionne entre la 5e et la 15e place sur « [mot-clé] ». Voici son contenu : [texte] et les requêtes Search Console associées : [requêtes, impressions, clics, position].\nPropose un plan d'optimisation : sous-sujets manquants par rapport aux 3 premiers résultats (recherche web), requêtes à intégrer dans des H2, paragraphe d'introduction plus direct, liens internes à ajouter depuis quelles pages, et title plus incitatif. Classe les actions de la plus rapide à la plus longue.",
-        why: "Les pages déjà en 2e page sont les gains les plus rapides : Google les juge pertinentes, il leur manque un peu de profondeur ou de liens.",
-      },
-      {
-        title: "Écrire pour les moteurs de réponse IA",
-        level: "Avancé",
-        text: "Réécris cette section pour qu'elle soit facilement citée par les moteurs de réponse (Google AI Overviews, assistants IA) : [texte].\nRègles : une définition claire en une phrase au début, des listes et tableaux pour les comparaisons, des chiffres précis avec leur source, un titre de section formulé comme la question de l'utilisateur. Garde le ton humain.",
-        why: "Les moteurs de réponse reprennent des passages autonomes, factuels et bien structurés. Les mêmes qualités servent aussi les lecteurs pressés.",
-      },
-    ],
-  },
-
-  // ─────────────────────────────────────────────────────────────────────
-  {
-    id: "e-commerce",
-    name: "E-commerce",
-    intro: "Fiches produits qui convertissent et se référencent, Google Shopping, e-mails, avis et service client.",
-    method: [
-      "Mettez votre charte (ton, cible, mots interdits, livraison, retours) dans un projet Claude : chaque demande la respectera.",
-      "Donnez toujours les caractéristiques réelles : Claude ne connaît ni votre stock ni vos dimensions.",
-      "Vérifiez chaque chiffre avant publication et bannissez les promesses que vous ne pouvez pas tenir.",
-    ],
-    prompts: [
-      {
-        title: "Fiche produit qui convertit et se référence",
-        level: "Débutant",
-        text: "Rédige la fiche produit de [produit] pour ma boutique [nom], qui vend [type de produits] à [cible].\nCaractéristiques réelles : [liste avec dimensions, matières, poids, contenu].\nMot-clé principal : « [mot-clé] » ; mots-clés secondaires : [liste].\nStructure :\n1. Titre produit (mot-clé + attribut distinctif, 70 caractères max).\n2. Accroche de 2 lignes qui répond au problème du client.\n3. 4 bénéfices concrets, chacun relié à une caractéristique (caractéristique → ce que ça change pour le client).\n4. Caractéristiques techniques en liste.\n5. FAQ de 4 questions (entretien, taille, livraison, retour).\nTon : [ton]. Pas de superlatifs, pas de promesse que je ne peux pas prouver.",
-        why: "La méthode « caractéristique → bénéfice » parle au client, le mot-clé dans le titre et la FAQ parle à Google. Interdire les superlatifs évite les allégations trompeuses.",
-      },
-      {
-        title: "Titre Google Shopping (Merchant Center)",
-        level: "Intermédiaire",
-        text: "Optimise les titres de ces produits pour Google Shopping : [liste avec marque, type de produit, attributs : couleur, taille, matière, capacité, genre].\nStructure recommandée : Marque + Type de produit + Attributs clés (les plus recherchés d'abord) + Variante. 150 caractères maximum, les informations importantes dans les 70 premiers.\nPas de texte promotionnel (« promo », « livraison gratuite »), pas de majuscules excessives.\nRends un tableau : titre actuel | titre optimisé | nombre de caractères.",
-        why: "Google Shopping ne s'appuie pas sur des mots-clés achetés mais sur le titre du flux produit. Les attributs recherchés en début de titre augmentent la correspondance avec les requêtes, et le texte promotionnel peut faire refuser le produit.",
-      },
-      {
-        title: "Description de collection (page catégorie)",
-        level: "Intermédiaire",
-        text: "Écris la description de la collection « [nom] » (mot-clé : « [mot-clé] »).\n- Un paragraphe d'introduction de 50 à 80 mots au-dessus des produits, qui aide à choisir.\n- Sous les produits : un guide de 300 à 400 mots en questions-réponses (comment choisir, différences entre les modèles, tailles, entretien).\n- 3 liens internes vers [articles ou collections liées], avec des ancres descriptives.\nPas de répétition mécanique du mot-clé.",
-        why: "Les pages catégories sont souvent les plus rentables en SEO e-commerce. Un texte court en haut ne gêne pas l'achat, le guide en bas apporte la profondeur que Google attend.",
-      },
-      {
-        title: "Analyser les avis clients",
-        level: "Intermédiaire",
-        text: "Voici [nombre] avis clients sur [produit / mes produits et ceux d'un concurrent] : [avis].\nExtrais :\n1. Les 5 bénéfices les plus cités, avec les mots exacts des clients.\n2. Les 5 reproches ou craintes les plus fréquents.\n3. Les questions qui reviennent avant l'achat.\nPuis propose : 3 accroches publicitaires qui reprennent le vocabulaire des clients, 3 améliorations de la fiche produit, et les réponses à ajouter dans la FAQ.",
-        why: "Le vocabulaire des clients est le meilleur texte de vente : il reprend leurs mots, leurs doutes et leurs critères réels. C'est la technique dite du « voice of customer ».",
-      },
-      {
-        title: "Séquence de bienvenue",
-        level: "Intermédiaire",
-        text: "Écris une séquence de 4 e-mails de bienvenue pour les nouveaux inscrits de [boutique] :\n- J0 : bienvenue, promesse de la marque, le code de [X] % s'il y en a un.\n- J2 : l'histoire et ce qui nous différencie (preuve : [éléments réels]).\n- J4 : produit phare, avec avis clients réels.\n- J7 : rappel de l'offre qui expire, réponse à l'objection principale ([objection]).\nPour chacun : 3 objets à tester (moins de 45 caractères), un préheader, un corps de 120 mots maximum, un seul appel à l'action.",
-        why: "La séquence de bienvenue est l'automatisation la plus rentable en e-mail. Un seul appel à l'action par e-mail et plusieurs objets à tester (test A/B) sont les bonnes pratiques de base.",
-      },
-      {
-        title: "Relance de panier abandonné",
-        level: "Intermédiaire",
-        text: "Écris 3 e-mails de relance de panier abandonné pour [boutique] :\n1. Après 1 heure : rappel simple et utile (le produit, une photo, aide si besoin).\n2. Après 24 heures : lever l'objection principale ([prix / livraison / taille / confiance]) avec une preuve.\n3. Après 72 heures : dernière relance, éventuellement avec [avantage].\nTon : [ton]. Objet, préheader, corps court, un bouton. Pas de fausse urgence.",
-        why: "Les relances progressives répondent aux vraies raisons d'abandon au lieu de baisser le prix tout de suite. Une fausse urgence (« plus que 2 en stock » inventé) détruit la confiance et peut être illégale.",
-      },
-      {
-        title: "Répondre à un avis négatif",
-        level: "Débutant",
-        text: "Un client a laissé cet avis public : « [avis] ».\nRédige une réponse publique de moins de 100 mots qui : remercie, reconnaît le problème précis sans se justifier, explique ce qu'on fait pour le régler, et invite à nous contacter en privé ([contact]). Puis rédige le message privé à lui envoyer.",
-        why: "La réponse publique est lue par les futurs clients autant que par le client mécontent. Reconnaître le problème et proposer une solution rassure plus que de se défendre.",
-      },
-      {
-        title: "Réponses types du service client",
-        level: "Débutant",
-        text: "Crée une bibliothèque de réponses types pour le service client de [boutique] sur : retard de livraison, colis endommagé, demande de retour, mauvaise taille, demande de remboursement, question sur un produit.\nUtilise ma politique réelle : [délais, conditions de retour, frais]. Chaque réponse : empathique, courte, avec les étapes concrètes et les variables entre crochets ([prénom], [numéro de commande]).",
-        why: "Des réponses cohérentes avec votre politique réelle évitent les promesses contradictoires et font gagner un temps considérable.",
-      },
-      {
-        title: "Produits complémentaires et panier moyen",
-        level: "Intermédiaire",
-        text: "Je vends [produit principal] à [prix] à [cible]. Mon catalogue : [liste].\nPropose : 5 ventes additionnelles (accessoires logiques), 3 lots (bundles) avec un prix cohérent, et une offre de montée en gamme. Pour chacun : la logique d'achat et la phrase à afficher au panier.",
-        why: "Augmenter le panier moyen coûte moins cher qu'acquérir un nouveau client. Les associations doivent suivre une logique d'usage pour ne pas paraître forcées.",
-      },
-      {
-        title: "Fiches produits en série (Claude Code)",
-        level: "Avancé",
-        text: "Dans ce dossier, le fichier produits.csv contient [nombre] produits avec leurs caractéristiques. Pour chaque ligne, génère : titre, description HTML (structure de ma fiche type dans fiche-exemple.html), méta-titre, méta-description, et textes alternatifs. Écris le résultat dans produits-enrichis.csv, sans modifier les colonnes existantes. Signale dans un fichier à part les produits où une information manque.",
-        why: "Claude Code traite un catalogue entier en respectant un modèle, et signale les trous au lieu d'inventer. C'est le passage de « une fiche à la fois » à « tout le catalogue ».",
-        tip: "Testez d'abord sur 5 produits et relisez avant de lancer tout le fichier.",
       },
     ],
   },
@@ -316,6 +160,18 @@ export const PROMPT_GROUPS: PromptGroup[] = [
         level: "Avancé",
         text: "Voici les résultats de ma campagne [plateforme] sur [période] : [tableau par publicité : dépense, impressions, clics, CTR, CPC, conversions, coût par conversion, revenu].\nCalcule le ROAS par publicité, identifie les gagnantes et les perdantes, explique les écarts probables (accroche, visuel, audience), et propose une réallocation du budget et 3 nouveaux tests. Signale si les volumes sont trop faibles pour conclure.",
         why: "Le ROAS (revenu divisé par la dépense) dit ce qui rapporte vraiment. Demander de signaler les volumes trop faibles évite de tirer des conclusions d'un hasard statistique.",
+      },
+      {
+        title: "Choisir le bon appel à l'action",
+        level: "Intermédiaire",
+        text: "Voici une page de mon site : [type de page, contenu, public, maturité du visiteur]. Parmi ces 8 objectifs d'appel à l'action : orienter, engager, diffuser, capturer, qualifier, convertir, localiser, fidéliser, lequel correspond à cette page ? Propose ensuite 3 formulations d'appel à l'action pour cet objectif, l'endroit exact où le placer, et ce qu'il faut retirer pour qu'il n'y ait pas plusieurs choix concurrents au même endroit.",
+        why: "Un appel à l'action efficace sert un seul objectif, adapté à la maturité du visiteur : on ne demande pas d'acheter à quelqu'un qui découvre son problème. Trop de choix au même endroit font baisser les clics.",
+      },
+      {
+        title: "Concevoir un lead magnet",
+        level: "Avancé",
+        text: "Mon article le plus visité est « [titre] » ; ses lecteurs cherchent surtout à [besoin]. Propose 3 idées de ressource gratuite à offrir contre une adresse e-mail (checklist, modèle, mini-guide, outil). Critères : liée au contenu lu, répond au besoin le plus difficile, utilisable en 5 minutes, demande le moins d'informations possible. Pour la meilleure, rédige son contenu, le texte de l'encart de capture et l'e-mail de remise, avec un consentement explicite.",
+        why: "La plupart des visiteurs venus de Google ne sont pas prêts à acheter : sans contact, leur visite reste une statistique. Une ressource très ciblée attire des contacts qualifiés. Ce n'est pas un facteur de classement, mais une audience qui revient.",
       },
       {
         title: "Veille concurrentielle",
@@ -644,3 +500,8 @@ export const PROMPT_GROUPS: PromptGroup[] = [
     ],
   },
 ];
+
+import { EXPERT_GROUPS } from "@/lib/prompts-expert";
+
+// Ordre affiché : les indispensables, puis les catégories expert, puis les autres.
+export const PROMPT_GROUPS: PromptGroup[] = [BASE_GROUPS[0], ...EXPERT_GROUPS, ...BASE_GROUPS.slice(1)];

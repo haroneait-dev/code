@@ -22,6 +22,19 @@ export const PATCH_NOTES: PatchNote[] = [
   {
     date: "2026-10-06",
     kind: "site",
+    version: "Site 2.7",
+    title: "Prompts : méthodes de pro pour le SEO et l'e-commerce",
+    items: [
+      "92 prompts en 13 catégories, dont 2 nouvelles : recherche de niche et visuels produit.",
+      "SEO et blog : analyse avant d'écrire (intention, maturité, top 3), format anti-pavé, jus de lien, cocon sémantique, checklist et suivi après publication.",
+      "E-commerce : fiche exacte (données calculées, rien d'inventé), checklist d'activation, catégories en questions-réponses, audit priorisé, veille orientée décision, promotions conformes.",
+      "Marketing : choisir l'objectif d'un appel à l'action, concevoir un lead magnet.",
+    ],
+    href: "/prompts#seo",
+  },
+  {
+    date: "2026-10-06",
+    kind: "site",
     version: "Site 2.6",
     title: "Page Prompts entièrement refaite",
     items: [
