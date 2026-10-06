@@ -30,7 +30,7 @@ export function MobileNav({ active = null }: { active?: NavKey }) {
         aria-label="Ouvrir le menu"
         aria-expanded={open}
         aria-controls="mobile-nav-drawer"
-        className="md:hidden inline-flex items-center justify-center w-10 h-10 rounded-full hover:bg-surface-container transition-colors text-on-surface"
+        className="lg:hidden inline-flex items-center justify-center w-10 h-10 rounded-full hover:bg-surface-container transition-colors text-on-surface"
       >
         <Menu className="w-5 h-5" strokeWidth={1.75} />
       </button>
@@ -41,7 +41,7 @@ export function MobileNav({ active = null }: { active?: NavKey }) {
           role="dialog"
           aria-modal="true"
           aria-label="Menu principal"
-          className="fixed inset-0 z-[60] md:hidden"
+          className="fixed inset-0 z-[60] lg:hidden"
         >
           <div
             className="absolute inset-0 bg-on-surface/40 animate-fade-in"

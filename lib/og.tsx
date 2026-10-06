@@ -1,27 +1,76 @@
 import { ImageResponse } from "next/og";
 
-// ─── Template OG partagé ───────────────────────────────────────────────
-// Génère une image de partage social 1200×630 cohérente avec le branding
-// Claude Mastery (palette beige, logo « C », badge catégorie).
-// Utilisé par les routes opengraph-image.tsx des articles wiki, leçons, sections.
+// ─── Images de partage (1200×630), direction « Atelier » ──────────────
+// Papier chaud, encre, vert sapin, surligneur souci. Utilisé par les
+// routes opengraph-image.tsx (articles, leçons, sections) et le partage
+// du résultat du test de niveau.
 
 export const ogSize = { width: 1200, height: 630 };
 export const ogContentType = "image/png";
 
-/** Réduit la taille de police pour les titres longs afin d'éviter le débordement. */
+const INK = "#2b2119";
+const PAPER = "#fbf6ee";
+const GREEN = "#2f5d46";
+const MARK = "#fbe3a8";
+const MARIGOLD = "#f2b23e";
+
 function titleFontSize(title: string): number {
   const n = title.length;
-  if (n > 68) return 52;
+  if (n > 68) return 54;
   if (n > 48) return 64;
   if (n > 30) return 76;
-  return 88;
+  return 90;
 }
 
-/** Coupe proprement un texte trop long pour le sous-titre. */
 function clamp(text: string, max: number): string {
   const t = text.trim();
   if (t.length <= max) return t;
   return t.slice(0, max - 1).trimEnd() + "…";
+}
+
+function Logo() {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+      <div
+        style={{
+          width: 50,
+          height: 50,
+          borderRadius: 10,
+          background: GREEN,
+          color: PAPER,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          fontSize: 22,
+          fontWeight: 800,
+          transform: "rotate(-3deg)",
+        }}
+      >
+        {">_"}
+      </div>
+      <div style={{ fontSize: 30, fontWeight: 800, letterSpacing: -0.5 }}>Claude Mastery</div>
+    </div>
+  );
+}
+
+function Footer({ right }: { right: string }) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        fontSize: 22,
+        fontWeight: 600,
+        color: "#66574a",
+        borderTop: `2px solid ${INK}`,
+        paddingTop: 22,
+      }}
+    >
+      <div>Apprendre Claude en français · gratuit</div>
+      <div>{right}</div>
+    </div>
+  );
 }
 
 export function ogImage({
@@ -44,60 +93,23 @@ export function ogImage({
           display: "flex",
           flexDirection: "column",
           justifyContent: "space-between",
-          padding: "72px",
-          background:
-            "linear-gradient(135deg, #f5f1eb 0%, #ede4d3 60%, #e0c29e 100%)",
+          padding: "64px 72px",
+          background: PAPER,
           fontFamily: "sans-serif",
-          color: "#241a0e",
+          color: INK,
         }}
       >
-        {/* En-tête : logo */}
-        <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
-          <div
-            style={{
-              width: 48,
-              height: 48,
-              borderRadius: 12,
-              background: "#241a0e",
-              color: "#f5f1eb",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontSize: 28,
-              fontWeight: 800,
-            }}
-          >
-            C
-          </div>
+        <Logo />
+        <div style={{ display: "flex", flexDirection: "column", gap: 22 }}>
           <div
             style={{
               display: "flex",
-              gap: 8,
-              fontSize: 28,
-              fontWeight: 700,
-              letterSpacing: -0.5,
-            }}
-          >
-            <span>Claude</span>
-            <span style={{ fontWeight: 400, opacity: 0.7 }}>Mastery</span>
-          </div>
-        </div>
-
-        {/* Corps : badge + titre + sous-titre */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
               alignSelf: "flex-start",
-              padding: "8px 18px",
-              border: "1px solid rgba(36, 26, 14, 0.25)",
-              borderRadius: 999,
-              fontSize: 18,
-              letterSpacing: 2,
-              textTransform: "uppercase",
+              padding: "8px 16px",
+              background: MARK,
+              fontSize: 22,
               fontWeight: 700,
-              opacity: 0.7,
+              transform: "rotate(-1.5deg)",
             }}
           >
             {clamp(badge, 42)}
@@ -108,39 +120,62 @@ export function ogImage({
               lineHeight: 1.04,
               fontWeight: 800,
               letterSpacing: -1.5,
-              maxWidth: 1010,
+              maxWidth: 1040,
             }}
           >
             {clamp(title, 96)}
           </div>
           {subtitle ? (
-            <div
-              style={{
-                fontSize: 27,
-                lineHeight: 1.4,
-                opacity: 0.75,
-                maxWidth: 940,
-              }}
-            >
-              {clamp(subtitle, 140)}
+            <div style={{ fontSize: 28, lineHeight: 1.4, color: "#66574a", maxWidth: 980 }}>
+              {clamp(subtitle, 130)}
             </div>
           ) : null}
         </div>
+        <Footer right={kind === "wiki" ? "Wiki" : kind} />
+      </div>
+    ),
+    ogSize
+  );
+}
 
-        {/* Pied : domaine + type */}
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            fontSize: 20,
-            opacity: 0.7,
-            fontWeight: 600,
-          }}
-        >
-          <div>claude-mastery.fr</div>
-          <div>{`${kind} · 🇫🇷 100% Français`}</div>
+// Carte de partage du résultat du test de niveau.
+export function ogResult({ level, theme }: { level: string; theme?: string }) {
+  return new ImageResponse(
+    (
+      <div
+        style={{
+          width: "100%",
+          height: "100%",
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "space-between",
+          padding: "64px 72px",
+          background: PAPER,
+          fontFamily: "sans-serif",
+          color: INK,
+        }}
+      >
+        <Logo />
+        <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+          <div style={{ fontSize: 40, fontWeight: 700, color: "#66574a" }}>Mon niveau sur Claude :</div>
+          <div style={{ display: "flex" }}>
+            <div
+              style={{
+                fontSize: 150,
+                lineHeight: 1,
+                fontWeight: 800,
+                letterSpacing: -4,
+                background: MARK,
+                padding: "0 18px",
+                borderBottom: `10px solid ${MARIGOLD}`,
+              }}
+            >
+              {level}
+            </div>
+          </div>
+          {theme ? <div style={{ fontSize: 34, fontWeight: 600 }}>{`Parcours : ${theme}`}</div> : null}
         </div>
+        <Footer right="Et vous ? Test en 10 questions" />
       </div>
     ),
     ogSize

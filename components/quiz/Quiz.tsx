@@ -16,6 +16,8 @@ import {
 } from "@/lib/quiz";
 import { THEMES } from "@/lib/applications";
 import { PATHS } from "@/lib/app-paths";
+import { ShareResult } from "@/components/quiz/ShareResult";
+import { track } from "@vercel/analytics";
 
 type Stage = "intro" | "questions" | "result";
 
@@ -41,6 +43,7 @@ export function Quiz() {
       } else {
         const r = computeResult(next);
         saveResult(r);
+        track("test_termine", { niveau: r.level, theme: r.theme });
         setResult(r);
         setStage("result");
         window.scrollTo({ top: 0 });
@@ -74,7 +77,10 @@ export function Quiz() {
         <BlurFade delay={0.4} className="flex flex-col sm:flex-row gap-3">
           <button
             type="button"
-            onClick={() => setStage("questions")}
+            onClick={() => {
+              track("test_commence");
+              setStage("questions");
+            }}
             className="btn-primary h-12 px-6 rounded-md inline-flex items-center justify-center gap-2 font-semibold text-[16px] group"
           >
             Commencer le test
@@ -149,8 +155,8 @@ export function Quiz() {
                       onClick={() => choose(o.value)}
                       className={`w-full text-left rounded-lg border-[1.5px] px-5 py-4 text-[16px] leading-relaxed transition-all ${
                         active
-                          ? "border-primary bg-[#cfe0d5] text-on-surface shadow-[4px_4px_0_#2f5d46]"
-                          : "border-on-surface/70 bg-surface-container-lowest text-on-surface hover:border-on-surface hover:shadow-[4px_4px_0_#fbe3a8] hover:-translate-y-0.5"
+                          ? "border-primary bg-[rgb(var(--c-green-soft))] text-on-surface shadow-[4px_4px_0_rgb(var(--c-primary))]"
+                          : "border-on-surface/70 bg-surface-container-lowest text-on-surface hover:border-on-surface hover:shadow-[4px_4px_0_rgb(var(--c-mark))] hover:-translate-y-0.5"
                       }`}
                     >
                       {o.label}
@@ -203,13 +209,16 @@ export function Quiz() {
         <div className="max-w-md mb-3">
           <Meter value={r.score / MAX_SCORE} />
         </div>
-        <p className="font-mono text-[14px] text-on-surface-variant mb-8 tabular-nums">
+        <p className="font-mono text-[14px] text-on-surface-variant mb-5 tabular-nums">
           {r.score} points sur {MAX_SCORE} · thème : {theme?.name} · partie conseillée : {r.code ? "Claude Code" : "Claude"}
         </p>
+        <div className="mb-10">
+          <ShareResult levelIndex={r.levelIndex} level={r.level} theme={r.theme} />
+        </div>
       </BlurFade>
 
       {plan && (
-        <BlurFade delay={0.45} className="rounded-lg border-[1.5px] border-on-surface bg-surface-container-lowest p-6 md:p-8 shadow-[6px_6px_0_#fbe3a8] mb-12">
+        <BlurFade delay={0.45} className="rounded-lg border-[1.5px] border-on-surface bg-surface-container-lowest p-6 md:p-8 shadow-[6px_6px_0_rgb(var(--c-mark))] mb-12">
           <h2 className="font-headline-lg text-[24px] md:text-[30px] font-bold mb-2">Votre plan pour les prochains jours</h2>
           <p className="text-[17px] text-on-surface font-semibold leading-relaxed mb-5">{plan.goal}</p>
           <ol className="flex flex-col gap-4 mb-6">
@@ -220,7 +229,7 @@ export function Quiz() {
               </li>
             ))}
           </ol>
-          <p className="rounded-md bg-[#fbe3a8]/50 border border-[#f2b23e]/40 px-4 py-3 text-[15.5px] text-on-surface leading-relaxed mb-5">
+          <p className="rounded-md bg-[rgb(var(--c-mark)/0.50)] border border-[#f2b23e]/40 px-4 py-3 text-[15.5px] text-on-surface leading-relaxed mb-5">
             <strong>Projet pour valider ce niveau :</strong> {plan.project}
           </p>
           {nextLevel && (

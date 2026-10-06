@@ -21,6 +21,8 @@ Ces astuces viennent du guide officiel *Claude Code power user tips* d'Anthropic
 
 **5. Un hook `Stop` pour les longues tâches.** Un script lancé à chaque fin de tour (tests, typage) empêche Claude de déclarer « terminé » trop tôt. Voir [les hooks](/wiki/hooks/introduction-hooks).
 
+![Schéma : la boucle d'un agent, comprendre, planifier, agir, vérifier.](/schemas/boucle-agent.svg)
+
 ## 2. Planifier avant de construire
 
 **6. Le mode plan pour tout ce qui dépasse dix minutes.** `Shift+Tab` jusqu'à *plan mode* : Claude lit, explore et propose un plan sans rien modifier. Corrigez le plan, puis repassez en mode `auto` pour l'exécution. Une heure de plan bien fait économise une journée de corrections.

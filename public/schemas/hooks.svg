@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 330" font-family="Figtree, Helvetica, Arial, sans-serif" role="img" aria-labelledby="t d">
+  <title id="t">Où s'exécutent les hooks</title>
+  <desc id="d">Un tour de Claude Code : votre message déclenche UserPromptSubmit, chaque outil est entouré de PreToolUse et PostToolUse, et la fin du tour déclenche Stop.</desc>
+  <rect width="800" height="330" rx="16" fill="#fffcf7"/>
+  <defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#2b2119"/></marker></defs>
+  <g font-size="17" fill="#2b2119" text-anchor="middle">
+    <rect x="30" y="60" width="140" height="70" rx="10" fill="#f6efe3" stroke="#9a8774"/>
+    <text x="100" y="101">Votre message</text>
+    <rect x="230" y="60" width="140" height="70" rx="10" fill="#f6efe3" stroke="#9a8774"/>
+    <text x="300" y="101">Claude réfléchit</text>
+    <rect x="430" y="60" width="140" height="70" rx="10" fill="#2f5d46"/>
+    <text x="500" y="94" fill="#fffcf7" font-weight="700">Outil</text>
+    <text x="500" y="116" fill="#cfe0d5" font-size="14">Edit, Bash, MCP…</text>
+    <rect x="630" y="60" width="140" height="70" rx="10" fill="#f6efe3" stroke="#9a8774"/>
+    <text x="700" y="101">Fin du tour</text>
+  </g>
+  <g stroke="#2b2119" stroke-width="2" fill="none" marker-end="url(#a)">
+    <path d="M170 95 L228 95"/><path d="M370 95 L428 95"/><path d="M570 95 L628 95"/>
+    <path d="M500 130 C500 175 330 175 310 132"/>
+  </g>
+  <text x="405" y="190" text-anchor="middle" font-size="14" fill="#66574a">autant d'outils que nécessaire</text>
+  <g font-size="15" font-weight="700" fill="#3a2a05" text-anchor="middle">
+    <rect x="25" y="230" width="150" height="40" rx="6" fill="#fbe3a8"/><text x="100" y="256">UserPromptSubmit</text>
+    <rect x="375" y="230" width="110" height="40" rx="6" fill="#fbe3a8"/><text x="430" y="256">PreToolUse</text>
+    <rect x="495" y="230" width="120" height="40" rx="6" fill="#fbe3a8"/><text x="555" y="256">PostToolUse</text>
+    <rect x="655" y="230" width="90" height="40" rx="6" fill="#fbe3a8"/><text x="700" y="256">Stop</text>
+  </g>
+  <g stroke="#f2b23e" stroke-width="2" stroke-dasharray="4 4"><path d="M100 230 L100 132"/><path d="M450 230 L450 132"/><path d="M550 230 L550 132"/><path d="M700 230 L700 132"/></g>
+  <text x="400" y="305" text-anchor="middle" font-size="14" fill="#66574a">En jaune : les moments où vos scripts peuvent s'exécuter (liste complète dans l'article).</text>
+</svg>

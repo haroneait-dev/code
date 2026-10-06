@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 300" font-family="Figtree, Helvetica, Arial, sans-serif" role="img" aria-labelledby="t d">
+  <title id="t">La boucle d'un agent</title>
+  <desc id="d">Un agent comme Claude Code tourne en boucle : comprendre, planifier, agir, vérifier, et recommence jusqu'à ce que la vérification réussisse.</desc>
+  <rect width="800" height="300" rx="16" fill="#fffcf7"/>
+  <defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#2b2119"/></marker></defs>
+  <g font-size="19" font-weight="700" fill="#2b2119" text-anchor="middle">
+    <rect x="30" y="90" width="150" height="80" rx="12" fill="#f6efe3" stroke="#9a8774"/><text x="105" y="125">1. Comprendre</text>
+    <text x="105" y="150" font-size="14" font-weight="400" fill="#66574a">lit le code, la demande</text>
+    <rect x="225" y="90" width="150" height="80" rx="12" fill="#f6efe3" stroke="#9a8774"/><text x="300" y="125">2. Planifier</text>
+    <text x="300" y="150" font-size="14" font-weight="400" fill="#66574a">découpe en étapes</text>
+    <rect x="420" y="90" width="150" height="80" rx="12" fill="#2f5d46"/><text x="495" y="125" fill="#fffcf7">3. Agir</text>
+    <text x="495" y="150" font-size="14" font-weight="400" fill="#cfe0d5">modifie, lance</text>
+    <rect x="615" y="90" width="155" height="80" rx="12" fill="#fbe3a8" stroke="#2b2119" stroke-width="1.5"/><text x="692" y="125">4. Vérifier</text>
+    <text x="692" y="150" font-size="14" font-weight="400" fill="#66574a">tests, captures</text>
+  </g>
+  <g stroke="#2b2119" stroke-width="2" fill="none" marker-end="url(#a)">
+    <path d="M180 130 L223 130"/><path d="M375 130 L418 130"/><path d="M570 130 L613 130"/>
+    <path d="M692 170 C692 250 300 250 300 172"/>
+  </g>
+  <text x="500" y="262" text-anchor="middle" font-size="15" fill="#66574a">ça échoue ? il corrige et recommence</text>
+  <text x="400" y="50" text-anchor="middle" font-size="16" fill="#2b2119">Donnez-lui un moyen de vérifier : c'est ce qui rend la boucle fiable.</text>
+</svg>

@@ -102,7 +102,7 @@ export function SiteSearch({ initialQuery = "" }: { initialQuery?: string }) {
   const showDropdown = open && value.trim().length >= 2;
 
   return (
-    <div ref={containerRef} className="relative hidden md:block">
+    <div ref={containerRef} className="hidden">
       <form
         onSubmit={handleSubmit}
         role="search"
@@ -118,7 +118,7 @@ export function SiteSearch({ initialQuery = "" }: { initialQuery?: string }) {
           onChange={(e) => setValue(e.target.value)}
           onKeyDown={handleKeyDown}
           onFocus={() => results.length && setOpen(true)}
-          className="bg-transparent border-none text-body-sm text-on-surface focus:ring-0 placeholder:text-on-surface-variant w-48 outline-none"
+          className="bg-transparent border-none text-body-sm text-on-surface focus:ring-0 placeholder:text-on-surface-variant w-28 xl:w-36 outline-none"
           placeholder="Rechercher…"
           type="text"
           aria-label="Rechercher dans la formation et le wiki"
