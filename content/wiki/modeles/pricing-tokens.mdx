@@ -39,29 +39,29 @@ Sur 10 000 requêtes par jour pendant 30 jours, cela fait **environ 14 700 $ par
 
 ## Les leviers d'optimisation (cumulables)
 
-1. **[Batch](/wiki/api/batch-api) : −50 %** — pour les charges non urgentes, remise inconditionnelle, résultats sous 24 h.
-2. **[Prompt caching](/wiki/api/prompt-caching-implementation) : jusqu'à −90 % en lecture** — lecture cache à 0,1× le prix d'entrée ; écriture à 1,25× (5 min) ou 2× (1 h).
-3. **Batch + caching se cumulent** — coût effectif possible autour d'un dixième du tarif non-caché.
+1. **[Batch](/wiki/api/batch-api) : −50 %** : pour les charges non urgentes, remise inconditionnelle, résultats sous 24 h.
+2. **[Prompt caching](/wiki/api/prompt-caching-implementation) : jusqu'à −90 % en lecture** : lecture cache à 0,1× le prix d'entrée ; écriture à 1,25× (5 min) ou 2× (1 h).
+3. **Batch + caching se cumulent** : coût effectif possible autour d'un dixième du tarif non-caché.
 
 Reprends l'exemple : si les 20 000 tokens de document sont mis en cache, ils passent de 0,040 $ à 0,004 $ par appel. Sur 10 000 appels par jour, ce seul changement économise environ 10 800 $ par mois.
 
 ## Le coût de la réflexion et du fast mode
 
-- **[Extended thinking](/wiki/modeles/extended-thinking-mecanismes)** : les tokens de réflexion sont facturés comme des tokens de **sortie**. Plafonne avec `max_tokens` (≈ 3–5× la sortie visible attendue) et règle la profondeur avec `effort` plutôt qu'avec un budget de tokens.
+- **[Extended thinking](/wiki/modeles/extended-thinking-mecanismes)** : les tokens de réflexion sont facturés comme des tokens de **sortie**. Plafonnez avec `max_tokens` (≈ 3–5× la sortie visible attendue) et réglez la profondeur avec `effort` plutôt qu'avec un budget de tokens.
 - **Fast mode** : Opus 5.5 servi plus vite, facturé le double (8 $ / 40 $). Utile quand la latence compte vraiment. Pour la plupart des charges, Sonnet 5.5 à vitesse normale offre un meilleur rapport qualité/prix.
 
 ## Raisonner en coût par tâche aboutie
 
-Au prix par token brut, Claude n'est pas toujours le moins cher face à d'autres fournisseurs. Son avantage est la **qualité de sortie** sur les tâches complexes, qui réduit les reprises (retries) et donc le **coût effectif par réponse utile**. Raisonne en coût par tâche aboutie, pas seulement au prix unitaire.
+Au prix par token brut, Claude n'est pas toujours le moins cher face à d'autres fournisseurs. Son avantage est la **qualité de sortie** sur les tâches complexes, qui réduit les reprises (retries) et donc le **coût effectif par réponse utile**. Raisonnez en coût par tâche aboutie, pas seulement au prix unitaire.
 
 ## Bonnes pratiques
 
 - **Bon modèle pour la tâche** (Haiku, Sonnet, Opus) plutôt que tout en Opus.
 - **Caching** sur le contexte stable et volumineux.
 - **Batch** pour tout ce qui n'est pas temps réel.
-- **Réduis l'output** : demande des réponses courtes / structurées (JSON) — l'output coûte ~5× l'input.
-- **Compresse le contexte** : un premier appel Haiku pour résumer un long document, puis le résumé envoyé à Sonnet/Opus.
-- **Plafonne** `max_tokens` (surtout avec réflexion) et surveille `input_tokens` vs tokens lus du cache.
+- **Réduisez l'output** : demandez des réponses courtes ou structurées (JSON), car l'output coûte ~5× l'input.
+- **Compressez le contexte** : un premier appel Haiku pour résumer un long document, puis le résumé envoyé à Sonnet/Opus.
+- **Plafonnez** `max_tokens` (surtout avec réflexion) et surveillez `input_tokens` vs tokens lus du cache.
 - Les nouveaux comptes reçoivent un petit **crédit gratuit** ; les évaluations Enterprise étendues passent par l'équipe commerciale.
 
 ## Pour aller plus loin

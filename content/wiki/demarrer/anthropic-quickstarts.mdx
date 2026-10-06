@@ -1,96 +1,78 @@
 ---
-title: "Anthropic Quickstarts"
-description: "Architectures de référence officielles (templates AWS, GCP, Vercel) pour démarrer rapidement un projet basé sur Claude."
-updatedAt: "2026-05-19"
-readingMinutes: 6
+title: "Claude Quickstarts : les templates officiels"
+description: "Le dépôt claude-quickstarts d'Anthropic : quels projets il contient (support client, analyse de données, computer use, Managed Agents) et comment en démarrer un."
+updatedAt: "2026-10-03"
+readingMinutes: 4
 ---
 
-Les **Anthropic Quickstarts** sont une collection de templates open source maintenus par Anthropic pour démarrer un projet Claude en quelques minutes. Plutôt que de réinventer l'authentification, le streaming, la gestion d'outils ou le déploiement cloud, vous clonez un repo, vous renseignez vos clés, et vous itérez sur la logique métier. C'est le point d'entrée recommandé pour quiconque veut passer du `curl` initial à une vraie application en production.
+Les **Claude Quickstarts** sont des projets open source publiés par Anthropic pour démarrer une application Claude sans partir de zéro. Chaque dossier est une petite application complète qui illustre un usage précis. Vous clonez, vous ajoutez votre clé API, puis vous adaptez la logique métier.
 
-## À quoi servent les Quickstarts
+## Le dépôt
 
-Chaque Quickstart est une mini-application complète qui illustre un pattern précis : agent conversationnel, RAG, outils MCP, customer support, etc. Le code est volontairement minimaliste et lisible : pas d'abstraction maison, juste le SDK Anthropic et les briques cloud essentielles. Vous l'utilisez comme :
+Le dépôt officiel s'appelle désormais `anthropics/claude-quickstarts` (l'ancien nom `anthropic-quickstarts` redirige). Il sert à trois choses :
 
-- une **base de projet** que vous forkez
-- un **exemple de référence** quand vous bloquez sur un pattern
-- un **benchmark de coût** pour estimer un cas d'usage
+- une **base de projet** à forker ;
+- un **exemple de référence** quand vous bloquez sur un pattern (outils, streaming, agents) ;
+- un **terrain d'essai** pour mesurer le coût réel d'un cas d'usage avant de l'industrialiser.
 
-Le repo principal vit sur `github.com/anthropics/anthropic-quickstarts`.
+## Les projets disponibles
 
-## Cloner et démarrer un template
+| Projet | Ce qu'il montre |
+|---|---|
+| `customer-support-agent` | Assistant de support client avec accès à une base de connaissances |
+| `financial-data-analyst` | Analyse de données financières en chat, avec graphiques interactifs |
+| `computer-use-demo` | Environnement Docker où Claude pilote un bureau virtuel |
+| `computer-use-best-practices` | Agent computer use natif macOS (cache de prompt, appels groupés) |
+| `browser-use-demo` | Automatisation de navigateur avec Playwright |
+| `autonomous-coding` | Deux agents qui construisent une application sur plusieurs sessions (Claude Agent SDK) |
+| `managed-agents/*` | Exemples Claude Managed Agents : chat Next.js, bots Slack et Linear, triage Sentry, serveur MCP, etc. |
 
-L'installation est uniforme sur tous les templates :
+La liste évolue : consultez le README du dépôt avant de choisir.
+
+## Démarrer un projet
 
 ```bash
-git clone https://github.com/anthropics/anthropic-quickstarts.git
-cd anthropic-quickstarts/customer-support-agent
-cp .env.example .env.local
-# Renseigner ANTHROPIC_API_KEY dans .env.local
-npm install
-npm run dev
+git clone https://github.com/anthropics/claude-quickstarts.git
+cd claude-quickstarts/customer-support-agent
+export ANTHROPIC_API_KEY="votre-cle"
+# Puis suivez le README du dossier (installation des dépendances, lancement)
 ```
 
-La plupart des Quickstarts utilisent Next.js + le SDK officiel `@anthropic-ai/sdk`, ce qui rend l'intégration directe avec Vercel triviale (`vercel deploy`).
+Chaque projet a ses propres étapes d'installation (Python avec `pip`, Next.js avec `npm`, Docker pour computer use). Le README du dossier fait foi.
 
-## Les templates phares
+## Bonnes pratiques
 
-Quelques Quickstarts particulièrement utiles pour démarrer :
+- **Lisez le README avant tout** : les templates sont mis à jour à chaque nouvelle génération de modèles et d'outils.
+- **Vérifiez le modèle utilisé** dans le code et remplacez-le si besoin par un modèle actuel, par exemple `claude-sonnet-5-5` (bon rapport qualité-prix) ou `claude-opus-5-5`.
+- **Ne mettez jamais la clé API côté navigateur** : gardez les appels dans une route serveur.
+- **Activez le prompt caching** si votre system prompt est long et réutilisé.
+- **Forkez** si vous comptez itérer longtemps : vous pourrez récupérer les mises à jour du dépôt d'origine.
 
-- **customer-support-agent** : agent conversationnel avec mémoire courte, classification d'intent et escalade humaine.
-- **financial-data-analyst** : analyse de fichiers CSV/Excel via le `code_execution_tool` et génération de graphiques.
-- **computer-use-demo** : référence officielle pour piloter un OS via Claude (Docker + VNC).
-- **agents** : squelette d'agent autonome avec boucle d'outils et `stop_reason`.
-
-Tous partagent la même configuration d'appel modèle :
+Exemple d'appel minimal avec le SDK TypeScript :
 
 ```ts
 import Anthropic from "@anthropic-ai/sdk";
 
-const client = new Anthropic();
+const client = new Anthropic(); // lit ANTHROPIC_API_KEY
 
 const message = await client.messages.create({
   model: "claude-sonnet-5-5",
   max_tokens: 1024,
-  system: "Tu es un assistant utile.",
+  system: "Vous êtes un assistant de support concis.",
   messages: [{ role: "user", content: "Bonjour" }],
 });
+
+console.log(message.content);
 ```
-
-## Déploiement multi-cloud
-
-Anthropic publie aussi des Quickstarts ciblés cloud pour exploiter Claude via les marketplaces :
-
-- **AWS Bedrock** : `anthropic-bedrock-quickstart` avec credentials IAM et région `us-west-2`.
-- **GCP Vertex AI** : déploiement via `gcloud` et facturation Google Cloud.
-- **Vercel** : déploiement en un clic avec variables d'environnement préconfigurées.
-
-L'avantage est que les Quickstarts gèrent déjà les **différences de SDK** entre l'API directe d'Anthropic, Bedrock et Vertex, qui ne sont pas strictement identiques (champ `anthropic_version`, format des credentials, modèles disponibles).
-
-Un fichier `vercel.json` minimal pour pousser un template :
-
-```json
-{
-  "env": {
-    "ANTHROPIC_API_KEY": "@anthropic_api_key"
-  },
-  "build": {
-    "env": {
-      "NEXT_PUBLIC_APP_URL": "@app_url"
-    }
-  }
-}
-```
-
-## Bonnes pratiques d'utilisation
-
-- **Forkez plutôt que cloner** si vous prévoyez d'itérer longtemps : vous pourrez tirer les mises à jour upstream.
-- **Lisez le README** de chaque template : les Quickstarts évoluent vite et chaque mise à jour de modèle peut changer les paramètres recommandés.
-- **Ne laissez jamais la clé API côté client** : tous les Quickstarts passent par une route API Next.js — gardez ce pattern.
-- **Activez le prompt caching** dès que le système prompt dépasse 1024 tokens, ce que les templates récents font par défaut.
 
 ## Pour aller plus loin
 
-- Repo officiel : `github.com/anthropics/anthropic-quickstarts`
-- Documentation Anthropic : `docs.anthropic.com`
-- Cookbook Anthropic (notebooks Python) : `github.com/anthropics/anthropic-cookbook`
-- Pour Bedrock : guide AWS « Use Anthropic Claude models »
+- [Premier appel API](/wiki/api/premier-appel-api)
+- [SDK TypeScript](/wiki/api/sdk-typescript)
+- [Implémenter le prompt caching](/wiki/api/prompt-caching-implementation)
+- [Claude sur AWS Bedrock](/wiki/enterprise/aws-bedrock) et [Google Cloud](/wiki/enterprise/gcp-vertex)
+
+## Sources
+
+- [github.com/anthropics/claude-quickstarts](https://github.com/anthropics/claude-quickstarts)
+- [Documentation de la plateforme Claude](https://platform.claude.com/docs/en/api/overview)

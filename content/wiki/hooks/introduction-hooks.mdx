@@ -5,11 +5,11 @@ updatedAt: "2026-10-03"
 readingMinutes: 6
 ---
 
-Les hooks sont l'un des mécanismes les plus puissants pour transformer Claude Code en un véritable agent intégré à votre workflow. Contrairement à une instruction donnée dans `CLAUDE.md`, qui repose sur la bonne volonté du modèle, un hook est un **script shell exécuté par le harness lui-même** à des moments précis du cycle de vie d'une session. Le harness garantit son exécution — Claude ne peut ni l'oublier, ni le contourner.
+Les hooks sont l'un des mécanismes les plus puissants pour transformer Claude Code en un véritable agent intégré à votre workflow. Contrairement à une instruction donnée dans `CLAUDE.md`, qui repose sur la bonne volonté du modèle, un hook est un **script shell exécuté par le harness lui-même** à des moments précis du cycle de vie d'une session. Le harness garantit son exécution : Claude ne peut ni l'oublier, ni le contourner.
 
 ## Définition et philosophie
 
-Un hook est une commande shell (bash, zsh, sh, Python, Node, n'importe quoi qui s'exécute) que vous déclarez dans votre `settings.json`. Quand un événement précis se produit — par exemple juste avant qu'un outil soit appelé — le harness exécute votre commande, lui passe un contexte JSON via `stdin`, et lit son code de sortie ainsi que sa `stdout` pour décider quoi faire.
+Un hook est une commande shell (bash, zsh, sh, Python, Node, n'importe quoi qui s'exécute) que vous déclarez dans votre `settings.json`. Quand un événement précis se produit (par exemple juste avant qu'un outil soit appelé), le harness exécute votre commande, lui passe un contexte JSON via `stdin`, et lit son code de sortie ainsi que sa `stdout` pour décider quoi faire.
 
 La philosophie est simple : **déterministe plutôt que probabiliste**. Quand vous écrivez "lance toujours `prettier` après une édition" dans `CLAUDE.md`, vous comptez sur le modèle. Quand vous écrivez un hook `PostToolUse` qui lance `prettier`, c'est garanti à 100%.
 
@@ -98,7 +98,7 @@ C'est tout. Plus jamais besoin de surveiller le terminal du coin de l'œil.
 Les hooks communiquent avec le harness via :
 
 - **exit code 0** : succès, on continue.
-- **exit code 2** : blocage — le harness annule l'action en cours (utile pour `PreToolUse`).
+- **exit code 2** : blocage, le harness annule l'action en cours (utile pour `PreToolUse`).
 - **exit code autre** : erreur non bloquante, loggée mais ignorée.
 - **stdout JSON** : permet de renvoyer une réponse structurée (`decision`, `reason`, etc.).
 

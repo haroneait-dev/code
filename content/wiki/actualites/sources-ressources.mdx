@@ -1,66 +1,69 @@
 ---
-title: "Sources & ressources externes"
-description: "Liens fiables et riches en données pour répondre à presque toutes les questions sur Claude, Claude Code, MCP et Obsidian."
-updatedAt: "2026-06-05"
-readingMinutes: 5
+title: "Sources et ressources fiables sur Claude"
+description: "Les liens officiels à consulter en priorité (API, Claude Code, aide, MCP), puis les ressources communautaires utiles, avec leurs limites."
+updatedAt: "2026-10-03"
+readingMinutes: 4
 ---
 
-Cette page rassemble des **liens fiables et riches en données** pour aller plus loin sur Claude, Claude Code, MCP, Obsidian et l'écosystème Anthropic. Quand une info n'est pas dans le wiki, c'est ici qu'on renvoie vers la **source officielle la plus proche**.
+Cette page rassemble les sources à consulter quand une information ne figure pas dans le wiki. Commencez toujours par la documentation officielle : prix, modèles, commandes et limites changent souvent, et seules ces pages font foi.
 
-## Sources officielles Anthropic (priorité absolue)
+## Sources officielles Anthropic (à consulter en premier)
 
 | Sujet | Lien |
 |---|---|
-| Documentation API Claude | [docs.claude.com/en/api/overview](https://docs.claude.com/en/api/overview) |
-| Carte des docs API (index complet) | [docs.claude.com/en/docs_site_map.md](https://docs.claude.com/en/docs_site_map.md) |
-| Documentation Claude Code | [docs.claude.com/en/docs/claude-code/overview](https://docs.claude.com/en/docs/claude-code/overview) |
-| Setup / installation Claude Code | [code.claude.com/docs/en/setup](https://code.claude.com/docs/en/setup) |
-| Centre d'aide Claude.ai | [support.claude.com](https://support.claude.com) |
-| Actualités produit Anthropic | [anthropic.com/news](https://www.anthropic.com/news) |
-| Package npm Claude Code | [npmjs.com/package/@anthropic-ai/claude-code](https://www.npmjs.com/package/@anthropic-ai/claude-code) |
-| Ingénierie de prompt (guide officiel) | [docs.claude.com — prompt engineering](https://docs.claude.com/en/docs/build-with-claude/prompt-engineering/overview) |
+| Documentation API et plateforme | [platform.claude.com/docs](https://platform.claude.com/docs/en/api/overview) |
+| Guide de prompt engineering | [Prompting best practices](https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/claude-prompting-best-practices) |
+| Documentation Claude Code | [code.claude.com/docs](https://code.claude.com/docs/en/overview) |
+| Index complet de la doc Claude Code (format texte) | [code.claude.com/docs/llms.txt](https://code.claude.com/docs/llms.txt) |
+| Changelog Claude Code | [code.claude.com/docs/en/changelog](https://code.claude.com/docs/en/changelog) |
+| Centre d'aide Claude (claude.ai, offres, apps) | [support.claude.com](https://support.claude.com) |
+| Notes de version de l'assistant Claude | [Release notes](https://support.claude.com/en/articles/12138966-release-notes) |
+| Actualités produit | [anthropic.com/news](https://www.anthropic.com/news) |
+| Templates officiels | [github.com/anthropics/claude-quickstarts](https://github.com/anthropics/claude-quickstarts) |
 
-> **Règle d'or** : pour tout ce qui touche aux **prix, limites de débit, plans, modèles disponibles, fonctionnalités récentes**, ces pages officielles font foi (elles changent souvent).
+> **Règle d'or** : pour les prix, les limites de débit, les offres, les modèles disponibles et les fonctionnalités récentes, ces pages officielles priment sur toute autre source, y compris ce wiki.
+
+Astuce : `llms.txt` liste toutes les pages de la doc Claude Code. Vous pouvez la donner à Claude Code (`WebFetch`) pour qu'il trouve lui-même la bonne page.
 
 ## MCP (Model Context Protocol)
 
 | Sujet | Lien |
 |---|---|
-| Annuaire de serveurs MCP | [mcpservers.org](https://mcpservers.org) |
-| Annuaire de serveurs MCP (mcp.so) | [mcp.so](https://mcp.so) |
-| Catalogue MCP (Glama) | [glama.ai/mcp/servers](https://glama.ai/mcp/servers) |
+| Spécification et documentation officielles | [modelcontextprotocol.io](https://modelcontextprotocol.io) |
+| Serveurs de référence (dépôt officiel) | [github.com/modelcontextprotocol/servers](https://github.com/modelcontextprotocol/servers) |
+| Annuaire communautaire | [mcp.so](https://mcp.so) |
+| Catalogue communautaire (Glama) | [glama.ai/mcp/servers](https://glama.ai/mcp/servers) |
 
-## Obsidian + Claude
+Les annuaires communautaires ne vérifient pas la sécurité des serveurs listés. Lisez le code avant d'installer un serveur inconnu (voir [la sécurité MCP](/wiki/mcp/securite-mcp)).
+
+## Obsidian et Claude
 
 | Sujet | Lien |
 |---|---|
 | `mcp-obsidian` (serveur MCP Python) | [github.com/MarkusPfundstein/mcp-obsidian](https://github.com/MarkusPfundstein/mcp-obsidian) |
-| `obsidian-claude-code-mcp` (plugin + serveur MCP) | [github.com/iansinnott/obsidian-claude-code-mcp](https://github.com/iansinnott/obsidian-claude-code-mcp) |
-| Forum Obsidian — serveurs MCP : retours | [forum.obsidian.md](https://forum.obsidian.md/t/obsidian-mcp-servers-experiences-and-recommendations/99936) |
-| Forum Obsidian — automatiser les notes | [forum.obsidian.md](https://forum.obsidian.md/t/automate-note-generation-in-obsidian-with-claude-desktop-and-mcp-servers/99542) |
-| Forum Obsidian — Claude.ai ↔ vault | [forum.obsidian.md](https://forum.obsidian.md/t/i-built-an-mcp-server-that-connects-claude-ai-directly-to-your-obsidian-vault/112454) |
-| Écrire 2 000 mots en 90 min (Obsidian + MCP) | [haihai.ai/obsidian-mcp](https://www.haihai.ai/obsidian-mcp/) |
+| `obsidian-claude-code-mcp` (plugin et serveur MCP) | [github.com/iansinnott/obsidian-claude-code-mcp](https://github.com/iansinnott/obsidian-claude-code-mcp) |
+| Forum Obsidian : retours sur les serveurs MCP | [forum.obsidian.md](https://forum.obsidian.md/t/obsidian-mcp-servers-experiences-and-recommendations/99936) |
 
-> Sur le sujet Obsidian, voir aussi nos articles internes : [le guide complet](/wiki/obsidian/guide-complet) et [les serveurs MCP](/wiki/obsidian/serveurs-mcp).
+Voir aussi nos articles : [le guide complet](/wiki/obsidian/guide-complet) et [les serveurs MCP pour Obsidian](/wiki/obsidian/serveurs-mcp).
 
-## Suivre les nouveautés & changelogs
+## Ressources communautaires (non officielles)
 
-| Sujet | Lien |
-|---|---|
-| Actualités officielles Anthropic | [anthropic.com/news](https://www.anthropic.com/news) |
-| Agrégateur de mises à jour — Anthropic | [releasebot.io/updates/anthropic](https://releasebot.io/updates/anthropic) |
-| Agrégateur de mises à jour — Claude Code | [releasebot.io/updates/anthropic/claude-code](https://releasebot.io/updates/anthropic/claude-code) |
-
-## Tutoriels & communauté (non officiels mais riches)
-
-> À utiliser comme complément. Toujours recouper avec la doc officielle, car ces sites peuvent être en retard ou imprécis.
+À utiliser en complément, toujours en recoupant avec la doc officielle : ces sites peuvent être en retard ou imprécis.
 
 | Sujet | Lien |
 |---|---|
-| ClaudeLog — guides & bonnes pratiques | [claudelog.com](https://claudelog.com) |
-| Changelog communautaire Claude Code | [claudefa.st/blog/guide/changelog](https://claudefa.st/blog/guide/changelog) |
-| Récap des updates Claude Code (Builder.io) | [builder.io/blog/claude-code-updates](https://www.builder.io/blog/claude-code-updates) |
+| ClaudeLog : guides et bonnes pratiques | [claudelog.com](https://claudelog.com) |
+| Agrégateur de mises à jour Claude Code | [releasebot.io/updates/anthropic/claude-code](https://releasebot.io/updates/anthropic/claude-code) |
 
----
+## Articles utiles du wiki
 
-*Page de ressources du wiki Claude Mastery. Non affilié à Anthropic. Claude™ est une marque d'Anthropic, PBC.*
+- [Nouveautés 2026](/wiki/actualites/nouveautes-2026)
+- [Comparatif des modèles](/wiki/modeles/comparatif-modeles)
+- [Les serveurs MCP officiels](/wiki/mcp/serveurs-officiels)
+
+## Sources
+
+- [Documentation Claude Code](https://code.claude.com/docs/llms.txt)
+- [Documentation de la plateforme Claude](https://platform.claude.com/docs/en/api/overview)
+- [Notes de version de Claude](https://support.claude.com/en/articles/12138966-release-notes)
+- [Model Context Protocol](https://modelcontextprotocol.io)

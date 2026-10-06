@@ -9,7 +9,7 @@ Claude.ai permet de partager n'importe quelle conversation via une URL publique.
 
 ## Comment fonctionne un lien partagé
 
-Quand vous cliquez sur **Share** en haut d'une conversation, Claude génère un **snapshot** : une copie figée de l'état du chat au moment du partage. Le lien produit ressemble à `claude.ai/share/<id>` et reste accessible à toute personne disposant de l'URL — il n'y a pas d'authentification requise pour le consulter.
+Quand vous cliquez sur **Share** en haut d'une conversation, Claude génère un **snapshot** : une copie figée de l'état du chat au moment du partage. Le lien produit ressemble à `claude.ai/share/<id>` et reste accessible à toute personne disposant de l'URL : il n'y a pas d'authentification requise pour le consulter.
 
 Ce snapshot vit indépendamment de votre conversation originale. Si vous continuez à discuter avec Claude après avoir partagé, les nouveaux messages **n'apparaissent pas** dans le lien public. Pour répercuter les ajouts, il faut explicitement cliquer à nouveau sur "Update share" (ou recréer un lien).
 
@@ -23,7 +23,7 @@ Par défaut, un lien partagé contient :
 - Les références aux outils utilisés par Claude (web search, calculatrice, etc.) avec leurs résultats.
 - Le nom du modèle utilisé (Sonnet, Opus, Haiku) et la date de la conversation.
 
-Le destinataire peut **cloner** la conversation dans son propre compte Claude pour la continuer. À partir de ce moment, votre version et la sienne divergent — il n'y a pas de synchronisation bidirectionnelle.
+Le destinataire peut **cloner** la conversation dans son propre compte Claude pour la continuer. À partir de ce moment, votre version et la sienne divergent : il n'y a pas de synchronisation bidirectionnelle.
 
 ## Ce qui est masqué ou retiré
 
@@ -31,11 +31,11 @@ Quelques éléments **ne sont jamais** exposés dans un lien partagé :
 
 - Votre nom, votre email et votre photo de profil.
 - Les autres conversations de votre historique.
-- Les instructions de votre **Project** (system prompt custom) si la conversation appartient à un projet — seul le contenu visible du chat est inclus.
+- Les instructions de votre **Project** (system prompt custom) si la conversation appartient à un projet (seul le contenu visible du chat est inclus).
 - Les **connexions privées** comme les fichiers Google Drive ouverts via intégration : le destinataire verra que Claude a lu un fichier, mais ne pourra pas y accéder lui-même.
 - Les contenus de votre **memory** Claude (préférences enregistrées).
 
-En revanche — et c'est important — **tout ce que vous avez collé en clair** dans la conversation reste visible. Si vous avez tapé un token API, un mot de passe ou une donnée client dans un message, il sera lisible par toute personne avec le lien.
+En revanche, et c'est important, **tout ce que vous avez collé en clair** dans la conversation reste visible. Si vous avez tapé un token API, un mot de passe ou une donnée client dans un message, il sera lisible par toute personne avec le lien.
 
 ## Gérer et révoquer un partage
 
