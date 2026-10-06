@@ -26,7 +26,9 @@ export function ParcoursBanner({ themeId }: { themeId?: string }) {
     setReady(true);
   }, []);
 
-  if (!ready || hidden) return null;
+  // Avant lecture du navigateur : on réserve la place pour éviter que la page saute.
+  if (!ready) return <div aria-hidden className="min-h-[188px] md:min-h-[104px]" />;
+  if (hidden) return null;
   if (themeId && result && result.theme !== themeId) return null;
 
   function hide() {

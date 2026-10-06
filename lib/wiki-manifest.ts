@@ -22,6 +22,7 @@ export type CategoryId =
   | "enterprise"
   | "plugins"
   | "obsidian"
+  | "comparatifs"
   | "actualites";
 
 export type CategoryIcon =
@@ -211,6 +212,13 @@ export const CATEGORIES: Category[] = [
     name: "Obsidian + Claude",
     icon: "layers",
     description: "Connecter ton vault Obsidian à Claude — approche fichiers et MCP.",
+  },
+  {
+    id: "comparatifs",
+    section: "commun",
+    name: "Comparatifs",
+    icon: "layers",
+    description: "Claude face à ChatGPT et Gemini, Claude Code face à Cursor et Copilot, et quelle offre choisir.",
   },
   {
     id: "actualites",
@@ -489,6 +497,9 @@ export const ARTICLE_STUBS: ArticleStub[] = [
   { category: "obsidian", slug: "serveurs-mcp", title: "Serveurs MCP Obsidian : installation & config", description: "Local REST API, mcp-obsidian, obsidian-claude-code-mcp — configuration Claude Desktop & Claude Code, dépannage." },
 
   // ═══ ACTUALITÉS & RESSOURCES ═════════════════════════════════════
+  { category: "comparatifs", slug: "claude-chatgpt-gemini", title: "Claude, ChatGPT ou Gemini ?", description: "Les vraies différences pour un usage quotidien : écriture, travail sur documents, recherche, agents, images, confidentialité." },
+  { category: "comparatifs", slug: "claude-code-cursor-copilot", title: "Claude Code, Cursor ou GitHub Copilot ?", description: "Agent dans le terminal, éditeur augmenté ou extension : comment choisir selon votre façon de coder." },
+  { category: "comparatifs", slug: "quelle-offre-claude", title: "Quelle offre Claude choisir ?", description: "Free, Pro, Max, Team ou Enterprise : un arbre de décision simple selon votre usage." },
   { category: "actualites", slug: "nouveautes-claude-2026", title: "Nouveautés de Claude (2026)", description: "Le journal mois par mois de l'assistant : One Claude, Docs, Cowork, mémoire, Chrome, Office." },
   { category: "actualites", slug: "nouveautes-2026", title: "Nouveautés Claude Code (2026)", description: "Le journal mois par mois de l'outil des développeurs : modèles, auto mode, agent view, workflows, plugins, mods." },
   { category: "actualites", slug: "claude-tag-slack", title: "Claude Tag — l'IA ambiante dans Slack", description: "Le coéquipier IA persistant d'Anthropic et Salesforce : mémoire de canal, mode multi-joueurs et défis de gouvernance." },

@@ -181,3 +181,54 @@ export function ogResult({ level, theme }: { level: string; theme?: string }) {
     ogSize
   );
 }
+
+// Badge partagé quand un niveau d'un parcours est validé.
+export function ogBadge({ level, theme }: { level: string; theme: string }) {
+  return new ImageResponse(
+    (
+      <div
+        style={{
+          width: "100%",
+          height: "100%",
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "space-between",
+          padding: "64px 72px",
+          background: PAPER,
+          fontFamily: "sans-serif",
+          color: INK,
+        }}
+      >
+        <Logo />
+        <div style={{ display: "flex", alignItems: "center", gap: 48 }}>
+          <div
+            style={{
+              width: 220,
+              height: 220,
+              borderRadius: 999,
+              background: GREEN,
+              color: PAPER,
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              border: `10px solid ${MARIGOLD}`,
+              transform: "rotate(-6deg)",
+            }}
+          >
+            <div style={{ fontSize: 30, fontWeight: 700 }}>Validé</div>
+            <div style={{ width: 70, height: 36, borderLeft: `12px solid ${PAPER}`, borderBottom: `12px solid ${PAPER}`, transform: "rotate(-45deg)", marginTop: 14 }} />
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            <div style={{ fontSize: 36, fontWeight: 700, color: "#66574a" }}>{`Parcours ${theme}`}</div>
+            <div style={{ display: "flex" }}>
+              <div style={{ fontSize: 110, lineHeight: 1, fontWeight: 800, letterSpacing: -3, background: MARK, padding: "0 16px" }}>{level}</div>
+            </div>
+          </div>
+        </div>
+        <Footer right="Votre parcours sur Claude Mastery" />
+      </div>
+    ),
+    ogSize
+  );
+}

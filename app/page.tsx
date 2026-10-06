@@ -3,6 +3,7 @@ import { ArrowRight, ArrowUpRight } from "lucide-react";
 import { SiteHeader } from "@/components/site/SiteHeader";
 import { SiteFooter } from "@/components/site/SiteFooter";
 import { ParcoursBanner } from "@/components/site/ParcoursBanner";
+import { DefiSemaine } from "@/components/site/DefiSemaine";
 import { curriculum, totalLessons } from "@/lib/curriculum";
 import { articleCount, articleCountBySection } from "@/lib/wiki-manifest";
 
@@ -212,6 +213,21 @@ export default function LandingPage() {
                 </li>
               ))}
             </ol>
+          </div>
+        </section>
+
+        {/* Défi de la semaine */}
+        <section className="w-full px-margin-mobile md:px-margin-desktop py-16 md:py-20 border-b border-outline-variant">
+          <div className="max-w-container-max mx-auto grid grid-cols-1 lg:grid-cols-[1fr_1.4fr] gap-8 lg:gap-12 items-center">
+            <div className="max-w-md">
+              <h2 className="font-headline-lg text-[30px] md:text-[40px] leading-[1.1] font-bold tracking-tight mb-3">
+                Un défi par semaine.
+              </h2>
+              <p className="text-on-surface-variant text-[17px] leading-relaxed">
+                Un petit exercice concret, de 10 à 30 minutes, pour pratiquer au lieu de seulement lire. Il change chaque lundi.
+              </p>
+            </div>
+            <DefiSemaine />
           </div>
         </section>
 

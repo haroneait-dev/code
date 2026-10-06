@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Bricolage_Grotesque, Figtree, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { Analytics } from "@vercel/analytics/next";
+import { CommandPalette } from "@/components/site/CommandPalette";
 
 const display = Bricolage_Grotesque({
   subsets: ["latin"],
@@ -97,6 +98,7 @@ export default function RootLayout({
       </head>
       <body className="font-body-rt antialiased">
         {children}
+        <CommandPalette />
         <Analytics />
       </body>
     </html>

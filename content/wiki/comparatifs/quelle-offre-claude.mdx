@@ -1,0 +1,48 @@
+---
+title: "Quelle offre Claude choisir ?"
+description: "Free, Pro, Max, Team ou Enterprise : ce que contient chaque offre, combien elle coûte, et un arbre de décision simple selon votre usage réel."
+updatedAt: "2026-10-06"
+readingMinutes: 6
+---
+
+Le bon choix dépend surtout de **combien** vous utilisez Claude et de **ce que** vous lui confiez. La plupart des gens commencent gratuitement, passent à Pro quand ils l'utilisent chaque jour, et ne vont à Max que s'ils atteignent régulièrement les limites.
+
+## Les offres en un tableau
+
+Prix officiels en dollars, hors taxes. La facture en euros dépend du taux de change et de la TVA.
+
+| Offre | Prix | Pour qui | Ce qu'elle ajoute |
+| :- | :- | :- | :- |
+| **Free** | 0 $ | Découvrir | Discussion web, bureau et mobile, recherche web, fichiers, mémoire, connecteurs, artifacts |
+| **Pro** | 20 $/mois (17 $/mois en annuel) | Usage quotidien | Plus d'usage, Claude Code, Cowork, projets, Docs, Slides et Design, tâches planifiées, plus de modèles, Chrome et Microsoft 365 |
+| **Max** | à partir de 100 $/mois | Usage intensif | 5 ou 20 fois l'usage de Pro, réponses plus longues, accès anticipé, priorité aux heures chargées |
+| **Team** | 25 $/siège/mois (20 $ en annuel), siège Premium plus cher | Équipes | Tout Pro, administration, SSO, facturation centralisée, données non utilisées pour l'entraînement |
+| **Enterprise** | sur devis | Grandes organisations | Contrôles de sécurité et de conformité avancés, journaux d'audit, rétention configurable |
+
+Le détail des limites (fenêtre de 5 heures, plafond hebdomadaire) est expliqué dans [Offres et limites d'usage](/wiki/claude-bases/offres-et-limites).
+
+## L'arbre de décision
+
+1. **Vous découvrez Claude, ou vous l'utilisez quelques fois par semaine** → **Free**. Prenez le temps d'apprendre à bien demander : c'est ce qui fait la différence. Voir [Bien formuler ses demandes](/wiki/claude-bases/bien-demander).
+2. **Vous l'utilisez tous les jours, ou vous voulez Claude Code ou Cowork** → **Pro**. C'est l'offre de la grande majorité des utilisateurs réguliers.
+3. **Vous atteignez les limites de Pro plusieurs fois par semaine**, ou vous codez avec Claude Code plusieurs heures par jour → **Max 5x**.
+4. **Vous faites tourner plusieurs agents en parallèle toute la journée** → **Max 20x**.
+5. **Vous êtes au moins deux à travailler ensemble** et voulez centraliser la facturation et garder vos données hors entraînement → **Team**.
+
+## Avant de payer plus : économiser son quota
+
+Beaucoup d'utilisateurs passent à l'offre supérieure alors que quelques habitudes suffiraient :
+
+- **Une conversation par sujet** : une conversation très longue consomme beaucoup plus à chaque message.
+- **Sonnet pour le quotidien, Opus pour le difficile.** Voir [Choisir son modèle](/wiki/claude-bases/choisir-modele).
+- **Des projets** plutôt que recoller les mêmes documents à chaque fois.
+- **Dans Claude Code** : `/clear` entre deux tâches, `/compact` sur les longues sessions, `/usage` pour suivre votre consommation.
+
+## Et l'API ?
+
+Si vous développez une application qui appelle Claude, vous ne passez pas par ces abonnements mais par **l'API**, facturée au nombre de tokens. Voir [Premier appel à l'API](/wiki/api/premier-appel-api) et [les prix des modèles](/wiki/modeles/pricing-tokens).
+
+## Sources
+
+- [Tarifs officiels de Claude](https://claude.com/pricing)
+- [Centre d'aide Claude : limites d'usage](https://support.claude.com)

@@ -21,7 +21,7 @@ Le site est une **plateforme de formation Claude Code en français**. Objectif :
    - Bascule vers un modèle payant :
      - **3€/mois** (abonnement)
      - **100€ paiement unique** (accès à vie)
-   - Contenu gratuit limité (module `intro` actuel) → reste derrière paywall
+   - Contenu gratuit limité → le reste derrière paywall (à décider le moment venu)
    - Stripe pour les paiements, gestion abonnements via Supabase
 
 ### Implications techniques à anticiper
@@ -29,7 +29,7 @@ Le site est une **plateforme de formation Claude Code en français**. Objectif :
 - **Analytics** : tracker conversions visiteur → inscrit → payant (Vercel Analytics + éventuellement PostHog/Plausible)
 - **Performance** : Core Web Vitals au top — le mobile TikTok est exigeant
 - **Stripe-ready** : prévoir la table `subscriptions` dans Supabase dès maintenant, même si pas activée
-- **Auth gate actuel** = fondation du futur paywall (juste à étendre)
+- **Paywall futur** : le code d'authentification Supabase est conservé (désactivé) et pourra servir de base
 - **Partage social** : OG images dynamiques par leçon → boost le partage TikTok/Twitter
 
 ### Ton & positionnement
@@ -38,84 +38,89 @@ Le site est une **plateforme de formation Claude Code en français**. Objectif :
 - Différenciation : la seule formation Claude Code structurée en français
 
 ## Stack
-- **Framework** : Next.js 16 App Router (Turbopack)
-- **Language** : TypeScript
-- **Auth + DB** : Supabase (auth, postgres, RLS)
-- **IA** : Anthropic API (`@anthropic-ai/sdk`) — claude-sonnet-4-6
-- **Déploiement** : Vercel
-- **Fonts** : Inter + JetBrains Mono (Google Fonts)
+- **Framework** : Next.js 16 App Router (Turbopack), React 18, TypeScript
+- **Styles** : Tailwind 3 (jetons « Atelier » en variables CSS, mode sombre par classe `.dark`)
+- **Animations** : `motion` (composants dans `components/ui/motion.tsx`)
+- **Contenu** : MDX dans `content/wiki/<categorie>/<slug>.mdx`, rendu par react-markdown
+- **Statistiques** : Vercel Analytics (`@vercel/analytics`, événements via `track()`)
+- **DB** : Supabase (code des anciennes fonctions à compte encore présent, désactivé)
+- **Déploiement** : Vercel (branche → aperçu, `main` → production)
+- **Polices** : Bricolage Grotesque (titres), Figtree (texte), JetBrains Mono (code)
 
 ## Architecture
 
 ```
 app/
-  page.tsx              # SPA principale (~1900 lignes, "use client")
-  globals.css           # Tous les styles + animations
-  layout.tsx            # Root layout
-  auth/callback/        # OAuth PKCE callback (Supabase SSR)
-  api/
-    chat/               # POST — assistant IA avec streaming + web search
-    wiki/               # GET liste, POST nouvelle tip
-    wiki/[id]/          # DELETE (admin seulement, vérifie JWT)
-    wiki/[id]/vote/     # POST upvote
-    skills/             # GET liste skills communauté
-    skills/[id]/vote/   # POST upvote skill
+  page.tsx                  # Accueil (portes Claude / Claude Code, nouveautés, bandeau de guidage)
+  claude/  claude-code/     # Les deux parties du site, avec parcours conseillé
+  wiki/                     # Index, catégories, articles ([category]/[slug])
+  learn/                    # Formation Claude Code (modules et leçons)
+  fiches/                   # Fiches mémo
+  applications/             # Apps et MCP par thème + parcours débutant → expert
+  prompts/                  # Prompts prêts à copier
+  test/                     # Test de niveau (10 questions) + pages de résultat partagé
+  patch-notes/              # Patch notes du site et nouveautés Claude
+  recherche/                # Recherche
+  (comparatifs : catégorie du wiki, content/wiki/comparatifs/)
+  opengraph-image.tsx       # Images de partage (modèle dans lib/og.tsx)
+components/
+  site/                     # En-tête, pied, menus, bandeau de parcours, progression, thème…
+  ui/motion.tsx             # BlurFade, WordReveal, StepProgress, Meter
+  quiz/  wiki/              # Test de niveau, rendu et mini-quiz des articles
 lib/
-  curriculum.ts         # Tout le contenu de la formation (modules + leçons)
-  exercises.ts          # Exercices par leçon
-  supabase.ts           # Client Supabase lazy-init via Proxy
+  wiki-manifest.ts          # SOURCE DE VÉRITÉ du wiki : catégories, articles, parties
+  curriculum.ts  exercises.ts  fiches.ts
+  applications.ts  app-paths.ts   # Apps par thème, parcours en 4 niveaux
+  quiz.ts  share.ts               # Test de niveau, liens de partage
+  article-quizzes.ts              # Mini-quiz de fin d'article
+  prompts.ts  patch-notes.ts  nav.ts  og.tsx
+proxy.ts                    # Désactive les anciennes pages/API à compte (308 / 410)
+next.config.mjs             # Redirections des articles retirés
 ```
 
 ## Patterns importants
 
-### SPA pattern
-`app/page.tsx` est un seul composant "use client". L'état `view` gère la navigation :
-- `"home"` → HomePage
-- `"lesson"` → LessonView
-- `"wiki"` → WikiView
+### Wiki
+- Ajouter un article = créer le `.mdx` (frontmatter `title`, `description`, `updatedAt`, `readingMinutes`) **et** l'entrée dans `lib/wiki-manifest.ts`.
+- Retirer un article = le sortir du manifest et ajouter une redirection dans `next.config.mjs`.
+- Liens internes : uniquement vers des articles existants (`/wiki/<cat>/<slug>`).
+- Schémas : SVG dans `public/schemas/`, insérés en Markdown `![description](/schemas/x.svg)`.
 
 ### Accès libre (depuis octobre 2026)
-- Aucune connexion : formation, wiki et fiches sont accessibles à tous.
-- Communauté, messagerie, notifications, profils, assistant IA et admin sont désactivés.
-  Leur code est resté en place ; `proxy.ts` redirige leurs pages vers `/` et leurs API répondent 410.
-- Articles retirés : redirections permanentes dans `next.config.mjs`.
+- Aucune connexion : tout est accessible à tous.
+- Communauté, messagerie, notifications, profils, assistant IA et admin sont désactivés ; leur code reste, `proxy.ts` redirige leurs pages et leurs API répondent 410.
+- Données du visiteur (test, progression, thème) : seulement dans `localStorage`, rien n'est envoyé.
 
-### Supabase client
-- Client lazy via Proxy dans `lib/supabase.ts`
-- Routes API utilisent `createClient` avec `SUPABASE_SERVICE_ROLE_KEY` pour bypasser RLS
-- Auth OAuth PKCE via `@supabase/ssr` dans `app/auth/callback/route.ts`
-
-### Streaming IA
-- Route `/api/chat` : POST avec `Authorization: Bearer <token>`
-- Vérifie le token Supabase, puis appelle Anthropic avec streaming + web_search
-- Client lit le body stream avec `ReadableStream` + `TextDecoder`
+### Couleurs et mode sombre
+- Toutes les couleurs passent par des variables `--c-<nom>` (canaux RGB) définies dans `app/globals.css` pour `:root` et `.dark`.
+- Dans les classes arbitraires, utiliser `rgb(var(--c-mark))`, jamais un hexadécimal en dur (sinon le mode sombre casse).
 
 ## Variables d'environnement
 ```
 NEXT_PUBLIC_SUPABASE_URL
 NEXT_PUBLIC_SUPABASE_ANON_KEY
-NEXT_PUBLIC_ADMIN_EMAIL=haroneait@gmail.com
+NEXT_PUBLIC_SITE_URL          # optionnel, domaine de production
 SUPABASE_SERVICE_ROLE_KEY
-ANTHROPIC_API_KEY
+ANTHROPIC_API_KEY             # assistant IA (désactivé)
 ```
 
 ## Design (direction « Atelier », octobre 2026)
 - Papier chaud `#fbf6ee`, encre `#2b2119`, vert sapin `#2f5d46` pour les actions, souci `#f2b23e` / `#fbe3a8` pour surligner
-- Jetons dans `tailwind.config.ts` (noms Material conservés) et `app/globals.css`
-- Polices : Bricolage Grotesque (titres), Figtree (texte), JetBrains Mono (code)
-- Classes utiles : `.text-mark` (surligneur), `.tag-note` (étiquette post-it), `.btn-primary`, `.btn-secondary`
+- Classes utiles : `.text-mark` (surligneur), `.tag-note` (étiquette post-it), `.btn-primary`, `.btn-secondary`, `.soft-lift`
 - À éviter : dégradés de texte, halos flous animés, bandeaux défilants, compteurs animés, glassmorphism
+- Animations courtes, toujours compatibles avec « réduire les animations »
 
 ## Commandes
 ```bash
-npm run dev    # Dev server
-npm run build  # Build prod
-git push       # Déploie sur Vercel (auto)
+npm run dev    # Serveur de développement
+npm run build  # Build de production (à lancer avant chaque push)
+git push       # Une branche crée un aperçu Vercel ; main part en production
 ```
 
 ## Conventions
-- Répondre en français (le site est en français)
-- Composants inline dans `page.tsx` (pas de fichiers séparés)
-- Styles inline avec `style={{}}` — pas de classes Tailwind dans les composants
-- Ne pas toucher aux routes API sans vérifier l'auth
-- À chaque mise à jour du site ou nouveauté de Claude : ajouter une entrée en haut de `lib/patch-notes.ts` (page /patch-notes)
+- Tout le site est en français, au vouvoiement, avec la typographie française (espace avant : ; ? !, guillemets « »), sans tiret cadratin comme ponctuation.
+- Composants en fichiers séparés dans `components/`, styles en classes Tailwind.
+- Mobile d'abord : vérifier à 390 px de large qu'aucun élément ne déborde.
+- Vérifier les faits sur Claude dans la documentation officielle avant de les écrire, et citer les sources en fin d'article.
+- Ne pas toucher aux routes API sans vérifier l'auth.
+- À chaque mise à jour du site ou nouveauté de Claude : ajouter une entrée en haut de `lib/patch-notes.ts` (page /patch-notes).

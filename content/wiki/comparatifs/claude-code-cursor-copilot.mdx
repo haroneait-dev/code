@@ -1,0 +1,83 @@
+---
+title: "Claude Code, Cursor ou GitHub Copilot : lequel choisir ?"
+description: "Agent dans le terminal, éditeur augmenté ou extension : les différences de fond entre Claude Code, Cursor et GitHub Copilot (et Codex, Gemini CLI), et comment choisir selon votre façon de coder."
+updatedAt: "2026-10-06"
+readingMinutes: 9
+---
+
+Les trois outils aident à coder avec l'IA, mais ils ne partent pas du même endroit. **Cursor** est un éditeur de code. **GitHub Copilot** est une extension qui s'installe dans votre éditeur. **Claude Code** est un agent : vous lui confiez une tâche, il lit le projet, modifie les fichiers, lance les commandes et les tests, et revient avec un résultat.
+
+Depuis 2025, les trois se rapprochent : Cursor et Copilot ont un mode agent, Claude Code existe dans VS Code, JetBrains, une application de bureau et le web. Mais leur logique de départ explique encore leurs forces.
+
+## En un coup d'œil
+
+| | Claude Code | Cursor | GitHub Copilot |
+| :- | :- | :- | :- |
+| Ce que c'est | Agent (terminal, IDE, bureau, web) | Éditeur de code dérivé de VS Code | Extension pour votre éditeur + agent cloud |
+| Façon de travailler | Vous déléguez une tâche entière | Vous codez, l'IA complète et modifie | Vous codez, l'IA complète ; agent pour les tâches |
+| Modèles | Modèles Claude (Opus, Sonnet, Haiku) | Plusieurs fournisseurs au choix | Plusieurs fournisseurs au choix |
+| Point fort | Tâches longues, gros refactors, automatisation | Confort d'édition au quotidien | Intégration GitHub, prix d'entrée bas |
+| Prix d'entrée | Inclus dans Claude Pro (20 $/mois) | Offre gratuite limitée, puis payant | Offre gratuite, Pro à 10 $/mois |
+
+## Claude Code : l'agent
+
+**Pour qui :** les développeurs qui veulent **déléguer** plutôt que se faire compléter, et automatiser.
+
+Ses forces :
+- **Il va au bout** : lire le code, planifier, modifier plusieurs fichiers, lancer les tests, corriger jusqu'à ce que ça passe.
+- **Il se configure finement** : CLAUDE.md pour le contexte, skills pour vos méthodes, hooks pour automatiser, MCP pour brancher vos outils, plugins pour tout partager. Voir [les astuces des utilisateurs avancés](/wiki/demarrer/astuces-avancees).
+- **Il passe à l'échelle** : plusieurs sessions en parallèle, sous-agents, [dynamic workflows](/wiki/cli/dynamic-workflows-agents-arriere-plan), routines dans le cloud.
+- **Il marche partout** : terminal, VS Code, JetBrains, application de bureau, web, et même en CI.
+
+Ses limites : il n'utilise que les modèles Claude, et l'usage intensif peut demander l'offre Max. Pas de complétion « fantôme » ligne par ligne comme un éditeur.
+
+## Cursor : l'éditeur
+
+**Pour qui :** ceux qui veulent garder la main ligne par ligne, avec une IA omniprésente dans l'éditeur.
+
+Ses forces : complétion très fluide, modifications ciblées sur une sélection, interface visuelle des changements, choix du modèle (dont Claude).
+
+Ses limites : il faut adopter son éditeur, et la facturation à l'usage des modèles premium demande de surveiller sa consommation.
+
+## GitHub Copilot : l'extension
+
+**Pour qui :** les équipes déjà sur GitHub, et ceux qui veulent commencer pour pas cher.
+
+Prix officiels (octobre 2026, en dollars) :
+
+| Offre | Prix |
+| :- | :- |
+| Free | 0 $, usage limité |
+| Pro | 10 $ par mois |
+| Pro+ | 39 $ par mois, avec délégation à des agents tiers comme Claude |
+| Max | 100 $ par mois |
+| Business et Enterprise | sur devis |
+
+Ses forces : s'installe dans l'éditeur que vous avez déjà, revue de code et agent cloud intégrés à GitHub, plusieurs modèles au choix.
+
+Ses limites : moins configurable qu'un agent comme Claude Code pour les tâches longues et l'automatisation.
+
+## Et les autres ?
+
+- **OpenAI Codex** : l'équivalent d'OpenAI (terminal et cloud), inclus dans les abonnements ChatGPT payants.
+- **Gemini CLI** : l'agent en terminal de Google, open source, avec une offre gratuite.
+
+## Comment choisir
+
+1. **Vous voulez déléguer des tâches entières** (une fonctionnalité, une migration, un audit) : Claude Code.
+2. **Vous voulez coder vous-même avec une complétion excellente** : Cursor, ou Copilot dans votre éditeur.
+3. **Votre équipe vit sur GitHub** et veut une solution validée par l'entreprise : Copilot, éventuellement avec délégation à Claude.
+4. **Vous débutez** et voulez créer une application en décrivant ce que vous voulez : Claude Code, avec le [parcours vibe coding](/applications#vibe-coding).
+
+Beaucoup de développeurs combinent : un éditeur avec complétion pour écrire, **et** Claude Code pour les tâches qu'ils délèguent. Les deux ne s'excluent pas.
+
+## Le test qui tranche
+
+Prenez une vraie tâche de votre projet (une petite fonctionnalité avec tests) et donnez-la à chaque outil pendant une heure. Comparez : le résultat fonctionne-t-il ? Combien de fois avez-vous dû intervenir ? Combien cela a-t-il coûté ? C'est plus fiable que n'importe quel classement.
+
+## Sources
+
+- [Tarifs officiels de Claude (Claude Code inclus dans les offres payantes)](https://claude.com/pricing)
+- [Offres GitHub Copilot](https://github.com/features/copilot/plans)
+- [Tarifs de Cursor](https://cursor.com/pricing)
+- [Documentation Claude Code](https://code.claude.com/docs)

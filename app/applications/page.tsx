@@ -2,10 +2,10 @@ import Link from "next/link";
 import { ArrowUpRight } from "lucide-react";
 import { SiteHeader } from "@/components/site/SiteHeader";
 import { SiteFooter } from "@/components/site/SiteFooter";
-import { THEMES, KIND_LABEL, type AppKind } from "@/lib/applications";
+import { THEMES, KIND_LABEL, appSlug, type AppKind } from "@/lib/applications";
 import { PATHS } from "@/lib/app-paths";
 import { ParcoursBanner } from "@/components/site/ParcoursBanner";
-import { StepCheck, ThemeProgress } from "@/components/site/Progress";
+import { LevelBadge, StepCheck, ThemeProgress } from "@/components/site/Progress";
 
 export const metadata = {
   title: "Applications à brancher sur Claude, par thème",
@@ -152,6 +152,7 @@ export default function ApplicationsPage() {
                         <p className="rounded-md bg-[rgb(var(--c-mark)/0.50)] border border-[#f2b23e]/40 px-3.5 py-2.5 text-[14.5px] text-on-surface leading-relaxed">
                           <strong>Projet de validation :</strong> {lv.project}
                         </p>
+                        <LevelBadge ids={lv.steps.map((_, si) => `${t.id}:${i}:${si}`)} theme={t.id} levelIndex={i} level={lv.level} />
                       </li>
                     ))}
                   </ol>
@@ -163,7 +164,7 @@ export default function ApplicationsPage() {
                 {t.apps.map((a) => (
                   <li key={a.name} className="flex flex-col rounded-lg border-[1.5px] border-on-surface bg-surface-container-lowest p-6 shadow-[4px_4px_0_rgb(var(--c-mark))]">
                     <div className="flex items-start justify-between gap-3 mb-3">
-                      <h4 className="font-headline-lg text-[22px] font-bold text-on-surface">{a.name}</h4>
+                      <h4 className="font-headline-lg text-[22px] font-bold text-on-surface"><Link href={`/applications/${appSlug(a.name)}`} className="hover:text-primary transition-colors">{a.name}</Link></h4>
                       <span className={`shrink-0 rounded px-2 py-0.5 text-[12.5px] font-semibold ${KIND_STYLE[a.kind]}`}>
                         {KIND_LABEL[a.kind]}
                       </span>

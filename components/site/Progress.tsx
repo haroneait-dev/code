@@ -86,3 +86,44 @@ export function ThemeProgress({ ids }: { ids: string[] }) {
     </div>
   );
 }
+
+// Badge affiché quand toutes les étapes d'un niveau sont cochées.
+export function LevelBadge({ ids, theme, levelIndex, level }: { ids: string[]; theme: string; levelIndex: number; level: string }) {
+  const done = useDone();
+  const complete = ids.length > 0 && ids.every((id) => done.includes(id));
+  const [copied, setCopied] = useState(false);
+  if (!complete) return null;
+  const slugs = ["debutant", "intermediaire", "avance", "expert"];
+  const path = `/badge/${theme}/${slugs[levelIndex]}`;
+
+  async function share() {
+    const url = `${window.location.origin}${path}`;
+    const text = `J'ai validé le niveau ${level} sur Claude Mastery.`;
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: text, text, url });
+        return;
+      } catch {}
+    }
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2000);
+    } catch {}
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.96 }}
+      animate={{ opacity: 1, scale: 1 }}
+      className="mt-4 flex items-center justify-between gap-3 rounded-md bg-primary text-on-primary px-4 py-3"
+    >
+      <span className="inline-flex items-center gap-2 font-semibold text-[15px]">
+        <Check className="w-4 h-4" strokeWidth={3} /> Niveau validé
+      </span>
+      <button type="button" onClick={share} className="text-[14px] font-semibold underline underline-offset-4">
+        {copied ? "Lien copié" : "Partager mon badge"}
+      </button>
+    </motion.div>
+  );
+}
