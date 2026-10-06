@@ -1,132 +1,142 @@
 ---
-title: "Skills vs slash commands : lequel choisir ?"
-description: "Quand préférer un skill, quand préférer une slash command, et comment les combiner."
-updatedAt: "2026-05-19"
+title: "Skills et slash commands : ce qui a changé et comment choisir"
+description: "Les commandes personnalisées sont désormais des skills : comment choisir entre déclenchement manuel et automatique, commande intégrée, skill intégré, CLAUDE.md et hook."
+updatedAt: "2026-10-03"
 readingMinutes: 6
 ---
 
-Claude Code propose deux mécanismes pour encapsuler une expertise réutilisable : les **slash commands** (déclenchées manuellement avec `/`) et les **skills** (chargées automatiquement quand Claude détecte qu'elles s'appliquent). Beaucoup d'équipes mélangent les deux sans savoir lequel choisir. Règle simple : slash command si **vous** voulez décider, skill si vous voulez que **Claude** décide.
+La question « skill ou slash command ? » ne se pose plus comme avant : Claude Code a fusionné les commandes personnalisées dans les skills. Un fichier `.claude/commands/deploy.md` et un skill `.claude/skills/deploy/SKILL.md` créent tous les deux `/deploy` et fonctionnent de la même façon. La vraie question est désormais : **qui déclenche** (vous, Claude, ou les deux) et **où placer l'instruction** (skill, CLAUDE.md ou hook).
 
-## La différence fondamentale
+## Ce qui se cache derrière un `/`
 
-| | Slash command | Skill |
-|---|---|---|
-| Déclenchement | Manuel (`/maCommande`) | Automatique (Claude reconnaît le besoin) |
-| Découvrabilité | Visible dans `/help` | Visible dans le system prompt |
-| Idéal pour | Workflows explicites | Expertise contextuelle |
-| Argument | `$ARGUMENTS` explicite | Pas d'argument, le contexte suffit |
-| Coût | Chargé à l'invocation | Chargé en début de session ou à la demande |
+Quand vous tapez `/`, le menu mélange plusieurs familles :
 
-Une slash command est un **raccourci procédural** : "je veux faire ça, lance le script". Un skill est une **compétence latente** : "si tu vois telle situation, tu sauras quoi faire".
+| Famille | Exemples | Ce que c'est |
+| --- | --- | --- |
+| Commandes intégrées | `/clear`, `/compact`, `/model`, `/usage` | Logique codée dans le CLI, exécutée directement |
+| Skills intégrés (bundled) | `/code-review`, `/simplify`, `/batch`, `/loop`, `/doctor` | Prompts fournis par Anthropic, que Claude exécute avec ses outils |
+| Vos skills | `.claude/skills/<nom>/SKILL.md` | Format recommandé pour vos commandes |
+| Ancien format | `.claude/commands/<nom>.md` | Toujours pris en charge, mêmes champs sauf `name` et `paths` |
+| Skills de plugin | `/mon-plugin:revue` | Toujours préfixés par le nom du plugin |
+| Prompts MCP | `/serveur:prompt` (aussi `/mcp__serveur__prompt`) | Exposés par un serveur MCP, marqués « (MCP) » dans le menu |
 
-## Exemple : déploiement Vercel
+Un skill du projet ou personnel qui porte le nom d'une commande intégrée ou d'un skill intégré la remplace (mais pas ses alias). Un skill `code-review` dans votre projet remplace `/code-review`, alors que `/review` lance toujours la version intégrée.
 
-**Approche slash command** — l'utilisateur déclenche explicitement :
+## Le vrai choix : qui déclenche ?
 
-`.claude/commands/deploy.md` :
+Par défaut, un skill peut être lancé par vous (`/nom`) **et** chargé par Claude quand sa description correspond à la demande. Deux champs changent ce comportement :
+
+| Frontmatter | Vous | Claude | Coût en contexte |
+| --- | --- | --- | --- |
+| (par défaut) | Oui | Oui | Description chargée en permanence |
+| `disable-model-invocation: true` | Oui | Non | Rien tant que vous ne l'invoquez pas |
+| `user-invocable: false` | Non | Oui | Description chargée en permanence |
+
+### Déclenchement manuel uniquement
+
+Pour toute action avec effets de bord ou dont vous voulez choisir le moment : déployer, commiter, publier une release, envoyer un message.
 
 ```md
 ---
-description: "Déploie sur Vercel (preview par défaut, prod si --prod)"
+description: Déploie sur Vercel (preview par défaut)
 argument-hint: "[--prod]"
-allowed-tools: [Bash(vercel:*), Bash(git status)]
+disable-model-invocation: true
+allowed-tools: Bash(git status *) Bash(vercel *)
 ---
 
-Déploie sur Vercel :
-1. Vérifie `git status` (refuse si non-clean)
-2. Si $ARGUMENTS contient `--prod`, lance `vercel --prod`
-3. Sinon, `vercel` (preview)
-4. Affiche l'URL générée
+1. Vérifiez `git status` et arrêtez-vous si le dépôt n'est pas propre.
+2. Si les arguments contiennent `--prod`, lancez `vercel --prod`, sinon `vercel`.
+3. Affichez l'URL obtenue.
+
+Arguments : $ARGUMENTS
 ```
 
-Usage : `> /deploy --prod`. L'utilisateur sait qu'il déploie, c'est son intention.
+Vous ne voulez pas que Claude décide de déployer parce que le code « a l'air prêt ». Si Claude essaie quand même, Claude Code bloque l'appel.
 
-**Approche skill** — Claude détecte le contexte :
+### Déclenchement par Claude (et par vous)
 
-`~/.claude/skills/vercel-deploy/SKILL.md` :
+Pour une procédure que Claude doit appliquer dès que la situation se présente : conventions d'API, règles Supabase, style de tests. La `description` fait tout le travail : écrivez-la avec les mots que vous utiliseriez.
 
 ```md
 ---
-name: vercel-deploy
-description: "Vercel deployment expertise. TRIGGER when user says 'deploy', 'ship', 'push to prod' in a project with vercel.json or .vercel/ folder."
+description: Conventions Supabase du projet (migrations, RLS, clients). À utiliser dès qu'on crée une table, une migration ou une route qui lit la base.
 ---
 
-Quand l'utilisateur veut déployer un projet Vercel :
-- Toujours vérifier git status avant
-- Preview par défaut, prod uniquement sur demande explicite
-- Lire les logs de build si échec
-- Vérifier les env vars manquantes
+- Toute nouvelle table a RLS activé et au moins une policy.
+- Les routes API utilisent le client service role, jamais côté navigateur.
+- Une migration par changement, nommée en snake_case.
 ```
 
-Usage : l'utilisateur dit "déploie en prod" ou "ship it", Claude charge le skill et applique la procédure.
+### Claude seulement
 
-## Quand choisir une slash command
+`user-invocable: false` pour du savoir de fond qui n'a pas de sens comme commande (« comment fonctionne l'ancien système de facturation »). La commande disparaît du menu `/`, mais Claude peut toujours la charger.
 
-- **Action atomique fréquente** : `/release`, `/test`, `/migrate`. Vous savez exactement ce que vous voulez.
-- **Workflow avec arguments** : `/pr-review 1234`, `/explain <fichier>`. L'argument est central.
-- **Action sensible à déclencher consciemment** : `/security-review`, `/deploy --prod`. Vous ne voulez pas que Claude le lance "par accident".
-- **Bouton qu'on veut voir dans `/help`** : si vous voulez que les nouveaux du projet voient la liste, c'est une commande.
+## Skill, CLAUDE.md ou hook ?
 
-## Quand choisir un skill
+| Besoin | Où le mettre | Pourquoi |
+| --- | --- | --- |
+| Un fait court valable tout le temps (« on utilise pnpm ») | `CLAUDE.md` | Chargé à chaque session |
+| Une procédure en plusieurs étapes | Skill | Chargé seulement quand il sert |
+| Une longue référence (API, conventions détaillées) | Skill + fichiers annexes | `SKILL.md` court, détails lus à la demande |
+| Une règle qui doit s'appliquer **à chaque fois** | Hook | Exécuté par Claude Code, pas laissé au jugement de Claude |
+| Une tâche longue et isolée | Skill avec `context: fork` ou sous-agent | Ne pollue pas votre contexte |
 
-- **Expertise contextuelle** : "quand on travaille avec Supabase, voici les patterns à suivre". Pas une action, une connaissance.
-- **Détection automatique souhaitée** : Claude doit reconnaître qu'il est en train de faire X et appliquer les conventions.
-- **Long contenu de référence** : un skill peut contenir des centaines de lignes de doc, exemples, conventions. Une slash command devient lourde à ce volume.
-- **Sécurité par contexte** : "ne jamais commit avec --no-verify" est un comportement à respecter en permanence, pas une commande à lancer.
+La documentation officielle le résume ainsi : créez un skill quand vous collez sans cesse les mêmes instructions, ou quand une section de `CLAUDE.md` est devenue une procédure plutôt qu'un fait. Pour une règle impérative (« jamais de `--no-verify` »), un skill ne suffit pas : Claude peut l'oublier en cours de route. Utilisez un hook ou une règle `deny`.
 
-## Combiner les deux
+Pour la comparaison avec les sous-agents et MCP, voir [Skill, agent ou MCP](/wiki/skills/skill-vs-agent-vs-mcp).
 
-Le pattern le plus puissant : un skill qui expose une slash command associée.
+## Exécuter dans un sous-agent : `context: fork`
 
-`~/.claude/skills/supabase-helper/SKILL.md` :
+Avec `context: fork`, le contenu du skill devient le prompt d'un sous-agent isolé, qui ne voit pas votre conversation. Il tourne en arrière-plan par défaut et rapporte son résultat à la fin (`background: false` pour l'attendre).
 
 ```md
 ---
-name: supabase-helper
-description: "Supabase expertise: migrations, RLS, auth. TRIGGER on files supabase/* or imports of @supabase/."
+description: Recherche approfondie dans le code
+context: fork
+agent: Explore
+disable-model-invocation: true
 ---
 
-Quand tu manipules Supabase :
-- Toujours créer des migrations versionnées
-- Activer RLS sur chaque nouvelle table
-- Pour créer une migration, suggère à l'utilisateur la commande /db:migrate
-
-Conventions RLS du projet :
-... (200 lignes)
+Recherchez $ARGUMENTS dans le code :
+1. Trouvez les fichiers concernés avec Glob et Grep.
+2. Lisez et analysez le code.
+3. Résumez avec les chemins de fichiers.
 ```
 
-`.claude/commands/db/migrate.md` :
+Ne l'utilisez que pour un skill qui contient une tâche complète. Un skill de conventions (« suivez ces règles d'API ») en `fork` ne produit rien d'utile : le sous-agent reçoit des règles mais aucune tâche. Attention aussi : les modifications faites par un fork en arrière-plan échappent aux checkpoints, `/rewind` ne les annule pas.
 
-```md
----
-description: "Crée une migration Supabase"
-argument-hint: "<nom>"
-allowed-tools: [Bash(supabase migration:*), Write]
----
+## Coût en contexte
 
-Crée une migration nommée `$ARGUMENTS`.
-Applique les conventions RLS définies dans le skill supabase-helper.
+- Chaque skill invocable par Claude ajoute sa description à la liste chargée à chaque tour. Ce budget est d'environ 1 % de la fenêtre de contexte ; au-delà, les descriptions des skills les moins utilisés sont supprimées.
+- Une fois invoqué, le contenu d'un skill reste dans la conversation. Après une compaction, Claude Code n'en garde que le début (5 000 tokens par skill, 25 000 au total) : placez l'essentiel en haut.
+- `/skills` affiche le coût de chaque skill (touche `t` pour trier) ; `/skill-doctor` repère ceux qui coûtent sans servir.
+
+## Migrer un ancien fichier `.claude/commands/`
+
+Rien ne presse : l'ancien format fonctionne. Migrez quand vous avez besoin d'une fonction propre aux skills (fichiers annexes, rechargement à chaud, champ `paths`).
+
+```bash
+mkdir -p .claude/skills/deploy
+git mv .claude/commands/deploy.md .claude/skills/deploy/SKILL.md
 ```
 
-Le skill explique **pourquoi** et **comment** ; la commande automatise le **quoi**.
-
-## Coût et latence
-
-Les skills coûtent du contexte au démarrage (leur description est chargée pour que Claude sache qu'ils existent), mais ne consomment leur contenu complet que quand ils sont déclenchés. Les slash commands ne coûtent rien tant qu'elles ne sont pas invoquées.
-
-Si vous avez 50 commandes et 50 skills, vous voulez :
-
-- Skills : descriptions courtes, contenu lazy-loaded
-- Slash commands : `description` claire pour `/help`
+Si les deux existent avec le même nom, c'est le skill qui gagne. Attention aux sous-dossiers : `.claude/commands/db/migrate.md` donne `/db:migrate`, alors qu'un skill `db-migrate` donne `/db-migrate`. Prévenez l'équipe si le nom change.
 
 ## Anti-patterns
 
-- **Skill qui se déclenche tout le temps** : description trop large = chargé constamment = pollue le contexte de chaque session.
-- **Slash command qui essaie de tout détecter automatiquement** : si vous écrivez "détecte le contexte et choisis quoi faire" dans un `.md`, vous voulez un skill, pas une commande.
-- **Doublon skill + commande qui font la même chose** : choisissez. Sinon, vous maintenez deux fois le même prompt.
+- **Description trop large** : le skill se charge pour tout et pollue le contexte.
+- **Action sensible sans `disable-model-invocation: true`** : Claude peut la lancer de lui-même.
+- **Doublon skill + commande** au même nom : seul le skill est utilisé, l'autre fichier devient du code mort.
+- **Règle impérative confiée à un skill** : passez par un hook.
 
 ## Pour aller plus loin
 
-- Doc skills : https://docs.claude.com/en/docs/claude-code/skills
-- Doc slash commands : https://docs.claude.com/en/docs/claude-code/slash-commands
-- Examiner les skills officiels Anthropic comme inspiration
+- [Créer une commande personnalisée](/wiki/slash-commands/creer-slash-command)
+- [Le frontmatter des commandes](/wiki/slash-commands/markdown-frontmatter)
+- [Structure d'un skill](/wiki/skills/structure-skill)
+- [Skill, agent ou MCP](/wiki/skills/skill-vs-agent-vs-mcp)
+
+## Sources
+
+- [Skills](https://code.claude.com/docs/en/skills)
+- [Commands](https://code.claude.com/docs/en/commands)

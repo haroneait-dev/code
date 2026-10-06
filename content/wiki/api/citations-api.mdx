@@ -1,19 +1,25 @@
 ---
-title: "Citations API pour RAG"
-description: "Forcer et récupérer les pointeurs vers sources (numéros de lignes, paragraphes) avec la Citations API d'Anthropic."
-updatedAt: "2026-05-19"
+title: "Citations API pour le RAG"
+description: "Activer les citations natives de Claude sur vos documents (texte, PDF, contenu découpé) et exploiter les passages cités renvoyés par l'API pour afficher et vérifier les sources."
+updatedAt: "2026-10-03"
 readingMinutes: 6
 ---
 
-La Citations API d'Anthropic est une fonctionnalité native qui permet à Claude de citer précisément les passages des documents fournis en contexte. Contrairement à une approche RAG classique où l'on doit demander au modèle de mentionner ses sources via le prompt, ici les citations sont **structurées, vérifiables et garanties** par l'API. C'est l'outil idéal pour bâtir des assistants juridiques, médicaux ou de support client où la traçabilité est non négociable.
+Avec les **citations**, Claude indique précisément quels passages de vos documents soutiennent chaque affirmation de sa réponse. L'API renvoie ces passages sous forme structurée (texte cité, document, position), ce qui permet de les surligner dans votre interface ou de rejeter une réponse non sourcée. La fonction est disponible sur tous les modèles actifs, sur l'API Claude comme sur Bedrock, Google Cloud et Microsoft Foundry.
 
-## Pourquoi utiliser les citations natives ?
+## Pourquoi plutôt que « cite tes sources » dans le prompt
 
-Les hallucinations restent le talon d'Achille des LLM en production. Demander dans un system prompt « cite tes sources » ne suffit pas : le modèle peut inventer un numéro de page, déformer une phrase ou attribuer une citation au mauvais document. Avec la Citations API, chaque citation retournée pointe exactement vers un index de caractère, un numéro de ligne ou un index de bloc dans le document source. Vous pouvez donc surligner le passage dans votre UI ou rejeter automatiquement les réponses sans citation.
+Demander des citations dans le prompt ne garantit rien : le modèle peut déformer une phrase ou inventer un numéro de page. Avec la fonction native :
 
-## Activer les citations sur un document
+- chaque citation pointe vers une position **valide** dans un document fourni (l'API extrait elle-même le `cited_text`) ;
+- le `cited_text` **n'est pas compté en tokens de sortie**, ni en tokens d'entrée quand vous le renvoyez dans l'historique ;
+- selon les évaluations d'Anthropic, les passages choisis sont plus pertinents qu'avec une approche par prompt.
 
-Pour activer les citations, il suffit d'ajouter `citations: { enabled: true }` au bloc `document` dans votre message. Anthropic supporte trois formats sources : texte brut, PDF et `content blocks` personnalisés.
+Le coût : une légère hausse des tokens d'entrée, due au découpage des documents.
+
+## Activer les citations
+
+Ajoutez `"citations": {"enabled": true}` sur chaque bloc `document`. C'est **tout ou rien** : soit tous les documents de la requête ont les citations activées, soit aucun.
 
 ```python
 import anthropic
@@ -21,8 +27,8 @@ import anthropic
 client = anthropic.Anthropic()
 
 response = client.messages.create(
-    model="claude-sonnet-5-5",
-    max_tokens=1024,
+    model="claude-opus-5-5",
+    max_tokens=2048,
     messages=[{
         "role": "user",
         "content": [
@@ -31,36 +37,38 @@ response = client.messages.create(
                 "source": {
                     "type": "text",
                     "media_type": "text/plain",
-                    "data": "Article 1. Le contrat prend effet le 1er juin.\nArticle 2. La durée est de 12 mois.",
+                    "data": "Article 1. Le contrat prend effet le 1er juin 2026. "
+                            "Article 2. Sa durée est de 12 mois.",
                 },
                 "title": "Contrat A",
+                "context": "Version signée, référence interne C-2026-014",
                 "citations": {"enabled": True},
             },
-            {"type": "text", "text": "Quand le contrat prend-il effet ?"},
+            {"type": "text", "text": "Quand le contrat prend-il effet, et pour combien de temps ?"},
         ],
     }],
 )
 ```
 
-## Lire les citations dans la réponse
+`title` et `context` sont transmis au modèle mais ne peuvent pas être cités. `title` est limité en longueur : rangez vos métadonnées (auteur, date, URL) dans `context`, en texte ou en JSON.
 
-Chaque bloc `text` retourné peut contenir un tableau `citations`. Chaque citation indique le type de localisation (`char_location`, `page_location`, `content_block_location`) et les bornes exactes.
+## Les trois types de documents
 
-```ts
-for (const block of response.content) {
-  if (block.type !== "text") continue;
-  console.log(block.text);
-  for (const c of block.citations ?? []) {
-    console.log(`source: ${c.document_title}`);
-    console.log(`extrait: "${c.cited_text}"`);
-    console.log(`offset: ${c.start_char_index}-${c.end_char_index}`);
-  }
-}
-```
+| Type | `source.type` | Découpage | Position renvoyée |
+|---|---|---|---|
+| Texte brut | `text` | Par phrase | `char_location` : `start_char_index` / `end_char_index` (à partir de 0) |
+| PDF | `base64`, `url` ou `file` | Par phrase, sur le texte extrait | `page_location` : `start_page_number` / `end_page_number` (à partir de 1) |
+| Contenu personnalisé | `content` | Aucun : vos blocs tels quels | `content_block_location` : `start_block_index` / `end_block_index` (à partir de 0) |
 
-## Documents personnalisés en blocs
+Les indices de fin sont **exclusifs** dans les trois cas. `document_index` numérote les documents de la requête à partir de 0, tous messages confondus.
 
-Pour un RAG sur des paragraphes pré-chunkés, utilisez `type: "content"`. Chaque chunk devient une unité de citation indépendante, ce qui facilite l'affichage côté UI.
+Les documents peuvent aussi être envoyés une fois via la [Files API](/wiki/api/files-api) puis référencés par `{"type": "file", "file_id": "..."}`.
+
+Limites : seules les citations de **texte** sont possibles. Un PDF scanné sans texte extractible ne peut pas être cité, et les images d'un PDF non plus.
+
+### Contenu personnalisé pour vos chunks RAG
+
+Si vous avez déjà découpé vos documents (paragraphes, puces, lignes de transcription), utilisez `type: "content"`. Chaque bloc devient une unité de citation, sans redécoupage :
 
 ```python
 {
@@ -68,26 +76,82 @@ Pour un RAG sur des paragraphes pré-chunkés, utilisez `type: "content"`. Chaqu
     "source": {
         "type": "content",
         "content": [
-            {"type": "text", "text": "Paragraphe sur la garantie."},
-            {"type": "text", "text": "Paragraphe sur la résiliation."},
+            {"type": "text", "text": "La garantie couvre les pannes pendant 24 mois."},
+            {"type": "text", "text": "La résiliation exige un préavis de 30 jours."},
         ],
     },
+    "title": "CGV 2026",
     "citations": {"enabled": True},
 }
 ```
 
-Claude retournera alors un `content_block_location` avec `start_block_index` et `end_block_index`, parfait pour mettre en surbrillance le bon paragraphe dans l'interface.
+Règle simple : un chunk RAG par document **texte** si vous voulez des citations à la phrase près ; un document **content** si vous voulez garder votre propre granularité.
 
-## Forcer la présence d'une citation
+## Lire la réponse
 
-Anthropic ne propose pas (encore) de mode strict « no citation = no answer », mais on peut s'en approcher avec deux techniques :
+Avec les citations, la réponse est découpée en plusieurs blocs `text`. Ceux qui s'appuient sur une source portent un tableau `citations` :
 
-1. **System prompt explicite** : « Si tu ne trouves pas la réponse dans les documents fournis, réponds exactement *INFO_NON_TROUVÉE*. »
-2. **Validation côté serveur** : rejeter toute réponse dont les blocs `text` n'ont pas de tableau `citations`. Si le ratio caractères_cités / caractères_totaux est inférieur à un seuil (ex. 30 %), redemander une réponse plus ancrée.
+```json
+{
+  "type": "text",
+  "text": "le contrat prend effet le 1er juin 2026",
+  "citations": [{
+    "type": "char_location",
+    "cited_text": "Article 1. Le contrat prend effet le 1er juin 2026. ",
+    "document_index": 0,
+    "document_title": "Contrat A",
+    "start_char_index": 0,
+    "end_char_index": 52
+  }]
+}
+```
+
+Pour reconstruire la réponse avec des renvois numérotés :
+
+```ts
+import Anthropic from "@anthropic-ai/sdk";
+
+function rendreAvecSources(message: Anthropic.Message) {
+  let texte = "";
+  const sources: string[] = [];
+  for (const block of message.content) {
+    if (block.type !== "text") continue; // ignore les blocs thinking
+    texte += block.text;
+    for (const c of block.citations ?? []) {
+      sources.push(`${c.document_title ?? "Document"} : « ${c.cited_text.trim()} »`);
+      texte += ` [${sources.length}]`;
+    }
+  }
+  return { texte, sources };
+}
+```
+
+En streaming, chaque citation arrive dans un événement `content_block_delta` de type `citations_delta`, à ajouter au bloc `text` en cours (voir [Streaming](/wiki/api/streaming)).
+
+## Exiger une réponse sourcée
+
+L'API n'a pas de mode « pas de citation, pas de réponse ». Deux garde-fous complémentaires :
+
+1. **Dans le prompt système** : « Si la réponse ne figure pas dans les documents fournis, répondez exactement : INFO_NON_TROUVÉE. »
+2. **Côté serveur** : rejetez ou signalez les réponses dont aucun bloc n'a de citation, ou dont la part de texte cité est trop faible pour votre cas d'usage.
+
+## Compatibilités et pièges
+
+- **Sorties structurées** : incompatibles. Activer les citations avec `output_config.format` renvoie une erreur 400.
+- **Prompt caching** : compatible. Posez `cache_control` sur le bloc `document` pour ne pas repayer un long document à chaque question (voir [prompt caching](/wiki/api/prompt-caching-implementation)).
+- **Batch et comptage de tokens** : compatibles.
+- **Blocs `search_result`** : pour un pipeline RAG, vous pouvez aussi passer vos résultats de recherche sous forme de blocs `search_result`, qui gèrent les citations de la même façon.
+- **Réflexion** : sur Opus 5.5, un bloc `thinking` peut précéder le texte. Filtrez toujours sur `type === "text"`.
 
 ## Pour aller plus loin
 
-- Combinez les citations avec le **prompt caching** : les longs documents sources sont parfaits pour être mis en cache, vous économisez jusqu'à 90 % sur l'input.
-- Pour les PDF, Anthropic retourne automatiquement le numéro de page via `page_location`, vous n'avez rien à parser.
-- Côté UI, créez un composant `<Citation>` qui ouvre une modale avec le `cited_text` surligné, c'est un game-changer UX pour la confiance utilisateur.
-- Limitez les chunks à ~500 tokens pour des citations granulaires et lisibles dans l'interface.
+- [Files API](/wiki/api/files-api)
+- [Implémenter le prompt caching](/wiki/api/prompt-caching-implementation)
+- [Streaming](/wiki/api/streaming)
+- [Vision et documents](/wiki/api/vision-integration)
+
+## Sources
+
+- Citations : https://platform.claude.com/docs/en/build-with-claude/citations
+- Search results : https://platform.claude.com/docs/en/build-with-claude/search-results
+- PDF support : https://platform.claude.com/docs/en/build-with-claude/pdf-support

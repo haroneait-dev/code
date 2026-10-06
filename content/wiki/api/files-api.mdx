@@ -1,99 +1,173 @@
 ---
-title: "Files API"
-description: "Uploader des fichiers réutilisables côté Anthropic, file_id, lifecycle et bonnes pratiques."
-updatedAt: "2026-05-19"
-readingMinutes: 6
+title: "Files API : envoyer un fichier une fois, le réutiliser partout"
+description: "Uploader PDF, textes, images ou jeux de données une seule fois, les référencer par file_id dans vos requêtes, gérer leur expiration et télécharger les fichiers générés par l'exécution de code."
+updatedAt: "2026-10-03"
+readingMinutes: 7
 ---
 
-La Files API d'Anthropic permet d'uploader un fichier une seule fois sur les serveurs Anthropic et de le réutiliser ensuite dans plusieurs requêtes via un simple `file_id`. Fini les payloads de plusieurs Mo envoyés à chaque appel : vous gagnez en latence, en coût et en simplicité d'architecture.
+La **Files API** stocke un fichier chez Anthropic et vous renvoie un `file_id`. Vous le citez ensuite dans autant de requêtes que nécessaire, sans renvoyer le contenu en base64 à chaque fois. Elle sert aussi à récupérer les fichiers produits par l'outil d'exécution de code (graphiques, rapports, tableurs).
 
-## À quoi sert la Files API ?
-
-Avant la Files API, pour analyser un PDF ou une image, il fallait l'encoder en base64 et le réinjecter dans chaque message. Pour un document de 5 Mo utilisé 10 fois dans la journée, cela représente 50 Mo de bande passante et un overhead de parsing à chaque requête. Avec la Files API :
-
-- **Upload une fois**, référencez le fichier par `file_id` partout (Messages, Batch, Code Execution, tools).
-- **TTL configurable** (par défaut 30 jours), parfait pour des documents long-lived.
-- **Compatible** avec les PDF, images, fichiers texte et bientôt vidéo/audio.
+La Files API est **sortie de bêta** : plus besoin de l'en-tête `files-api-2025-04-14`, et les SDK l'exposent sous `client.files` (et non plus `client.beta.files`). Elle est disponible sur l'API Claude, Claude Platform on AWS et Microsoft Foundry (déploiement « Hosted on Anthropic »), mais pas sur Bedrock ni Google Cloud.
 
 ## Uploader un fichier
-
-L'endpoint est `POST /v1/files` et nécessite le header `anthropic-beta: files-api-2025-04-14`.
 
 ```python
 import anthropic
 
 client = anthropic.Anthropic()
 
-uploaded = client.beta.files.upload(
-    file=("rapport.pdf", open("./rapport.pdf", "rb"), "application/pdf"),
+uploaded = client.files.upload(
+    file=("rapport.pdf", open("rapport.pdf", "rb"), "application/pdf"),
 )
-
-print(uploaded.id)  # file_01ABC...
-print(uploaded.size_bytes)
-print(uploaded.mime_type)
+print(uploaded.id)         # file_011CNha8...
+print(uploaded.size_bytes, uploaded.mime_type, uploaded.expires_at)
 ```
 
-Le `file_id` retourné est immédiatement utilisable. La taille max est de 32 Mo par fichier et 100 Go au total par workspace.
-
-## Référencer un fichier dans Messages
-
-Une fois uploadé, on l'injecte dans n'importe quelle conversation avec un bloc de type `document` ou `image` selon le MIME.
+En TypeScript :
 
 ```ts
-import Anthropic from "@anthropic-ai/sdk";
+import fs from "node:fs";
+import Anthropic, { toFile } from "@anthropic-ai/sdk";
 
 const client = new Anthropic();
 
-const msg = await client.beta.messages.create({
-  model: "claude-sonnet-5-5",
-  max_tokens: 1024,
-  betas: ["files-api-2025-04-14"],
-  messages: [{
-    role: "user",
-    content: [
-      {
-        type: "document",
-        source: { type: "file", file_id: "file_01ABC..." },
-      },
-      { type: "text", text: "Résume les conclusions du rapport." },
-    ],
-  }],
+const uploaded = await client.files.upload({
+  file: await toFile(fs.createReadStream("rapport.pdf"), "rapport.pdf", {
+    type: "application/pdf",
+  }),
 });
+console.log(uploaded.id);
 ```
 
-Pour une image, remplacez `document` par `image` avec la même structure de source.
+Le `file_id` est utilisable immédiatement. Les opérations de la Files API (upload, liste, suppression, téléchargement) sont **gratuites** : vous ne payez que les tokens d'entrée quand le contenu est lu dans une requête Messages.
 
-## Lifecycle : list, retrieve, delete
+## Utiliser le fichier dans une requête
 
-La Files API expose un CRUD complet. C'est important de penser au **nettoyage** : un fichier oublié consomme votre quota et reste accessible tant qu'il n'est pas supprimé.
+Le type de bloc dépend du type de fichier :
+
+| Fichier | MIME | Bloc à utiliser |
+|---|---|---|
+| PDF | `application/pdf` | `document` |
+| Texte brut (aussi `.csv`, `.md` envoyés en `text/plain`) | `text/plain` | `document` |
+| Image | `image/jpeg`, `image/png`, `image/gif`, `image/webp` | `image` |
+| Jeu de données pour l'exécution de code | variable | `container_upload` |
 
 ```python
-# Lister tous les fichiers
-for f in client.beta.files.list(limit=100):
-    print(f.id, f.filename, f.created_at)
+response = client.messages.create(
+    model="claude-opus-5-5",
+    max_tokens=4096,
+    messages=[{
+        "role": "user",
+        "content": [
+            {
+                "type": "document",
+                "source": {"type": "file", "file_id": uploaded.id},
+                "title": "Rapport annuel 2025",
+                "citations": {"enabled": True},  # optionnel
+            },
+            {"type": "text", "text": "Résume les trois conclusions principales."},
+        ],
+    }],
+)
 
-# Récupérer les metadata
-meta = client.beta.files.retrieve("file_01ABC...")
-
-# Télécharger le contenu (utile pour debug)
-content = client.beta.files.download("file_01ABC...")
-
-# Supprimer
-client.beta.files.delete("file_01ABC...")
+print("".join(b.text for b in response.content if b.type == "text"))
 ```
 
-Stratégie recommandée : taguer le `filename` à l'upload avec un identifiant métier (`user_42_invoice_2026Q1.pdf`) puis créer un cron qui liste et supprime les fichiers plus vieux que N jours.
+Pour une image : `{"type": "image", "source": {"type": "file", "file_id": "..."}}`. Un type de bloc qui ne correspond pas au fichier (une image dans un bloc `document`) renvoie une erreur 400.
 
-## Cas d'usage typiques
+Les formats `.docx` ou `.xlsx` ne sont pas acceptés dans un bloc `document` : convertissez-les en texte, en PDF (si le document contient des images), ou passez-les à l'exécution de code.
 
-- **Assistants documentaires** : upload du PDF utilisateur au login, réutilisation pendant toute la session.
-- **Code Execution** : passez un CSV en `file_id` à l'outil `code_execution`, Claude peut le lire avec pandas sans le recharger.
-- **Batch processing** : combinez Files API + Message Batches API pour traiter 1 000 documents à -50 % du prix sans réuploader à chaque batch.
-- **Multi-tenant** : isolez les fichiers par workspace pour respecter la séparation des données clients.
+## Analyser un jeu de données avec l'exécution de code
+
+Avec un bloc `container_upload`, le fichier est copié dans le conteneur de l'outil d'exécution de code. Claude peut alors le lire avec pandas et produire un graphique :
+
+```python
+csv = client.files.upload(file=("ventes.csv", open("ventes.csv", "rb"), "text/csv"))
+
+response = client.messages.create(
+    model="claude-opus-5-5",
+    max_tokens=8192,
+    tools=[{"type": "code_execution_20260521", "name": "code_execution"}],
+    messages=[{
+        "role": "user",
+        "content": [
+            {"type": "container_upload", "file_id": csv.id},
+            {"type": "text", "text": "Trace l'évolution mensuelle du chiffre d'affaires en PNG."},
+        ],
+    }],
+)
+```
+
+Les fichiers créés par Claude apparaissent avec leur `file_id` dans le bloc `bash_code_execution_tool_result` de la réponse. Vous pouvez alors les télécharger :
+
+```python
+fichier = client.files.download(file_id_genere)
+fichier.write_to_file("ca-mensuel.png")
+```
+
+Seuls les fichiers **générés** (par l'exécution de code ou les skills) sont téléchargeables : leur métadonnée `downloadable` vaut `true`. Télécharger un fichier que vous avez uploadé renvoie une erreur 400.
+
+## Gérer le cycle de vie
+
+| Action | Python | Endpoint |
+|---|---|---|
+| Lister (du plus récent au plus ancien, 20 par page par défaut, 1 000 max) | `client.files.list()` | `GET /v1/files` |
+| Lire les métadonnées | `client.files.retrieve_metadata(file_id)` | `GET /v1/files/{id}` |
+| Télécharger un fichier généré | `client.files.download(file_id)` | `GET /v1/files/{id}/content` |
+| Supprimer | `client.files.delete(file_id)` | `DELETE /v1/files/{id}` |
+
+Un fichier ne peut être ni modifié ni renommé : pour changer son contenu, uploadez-en un nouveau et supprimez l'ancien.
+
+### Expiration automatique
+
+Par défaut, un fichier reste stocké **jusqu'à sa suppression** (`expires_at` vaut `null`). Pour le faire expirer, ajoutez le champ de formulaire `expires_in_seconds` à l'upload, entre 3 600 (1 heure) et 7 776 000 (90 jours) :
+
+```bash
+curl -X POST https://api.anthropic.com/v1/files \
+  -H "x-api-key: $ANTHROPIC_API_KEY" \
+  -H "anthropic-version: 2023-06-01" \
+  -F "file=@devis.pdf" \
+  -F "expires_in_seconds=86400"
+```
+
+Une fois expiré, le fichier ne peut plus être utilisé (la requête Messages échoue avant l'inférence) ; ses métadonnées restent visibles jusqu'à 30 jours. L'expiration se fixe à l'upload et ne se modifie plus.
+
+## Limites
+
+| Limite | Valeur |
+|---|---|
+| Taille maximale d'un fichier | 500 Mo (erreur 413 au-delà) |
+| Stockage total | 1 To par organisation |
+| Débit des appels Files | environ 500 requêtes par minute |
+| Nom de fichier | 1 à 255 caractères, sans `< > : " \| ? * \ /` |
+
+Attention : un fichier accepté par la Files API peut quand même dépasser la fenêtre de contexte du modèle quand vous l'utilisez dans une requête (erreur 400).
+
+## Sécurité : le workspace est la frontière
+
+Un fichier uploadé est accessible à **toutes les clés API du workspace**, pas seulement à l'utilisateur ou à la conversation qui l'a envoyé. Conséquences :
+
+- **N'acceptez jamais un `file_id` venant d'un utilisateur final.** Gardez dans votre base la correspondance utilisateur ↔ fichiers et ne manipulez les ID que côté serveur.
+- Pour une application **multi-tenant**, créez un workspace par client (jusqu'à 100 par organisation) et utilisez des clés limitées à ce workspace.
+- Prévoyez un nettoyage : soit `expires_in_seconds` à l'upload, soit une tâche planifiée qui supprime les fichiers inutiles.
+
+## Migrer depuis la bêta
+
+Les requêtes qui envoient encore `files-api-2025-04-14` fonctionnent toujours, avec l'ancien format de réponse. Pour migrer :
+
+1. retirez l'en-tête et passez de `client.beta.files` à `client.files` ;
+2. remplacez la pagination `after_id` / `before_id` par le curseur `page` / `next_page` (ou l'auto-pagination des SDK) ;
+3. lisez le nouveau champ `expires_at`.
 
 ## Pour aller plus loin
 
-- La Files API est en **beta**, n'oubliez pas le header `anthropic-beta` et surveillez la changelog.
-- Combinez avec **prompt caching** : un fichier de 100 pages référencé via `file_id` peut être mis en cache pour 90 % de réduction sur l'input des appels suivants.
-- Pour les uploads volumineux, prévoyez une **retry policy** avec backoff exponentiel — l'upload peut timeout sur des connexions lentes.
-- Côté sécurité, traitez le `file_id` comme un secret : qui possède l'ID peut interroger le contenu via votre clé API.
+- [Citations API pour le RAG](/wiki/api/citations-api)
+- [Envoyer des images à Claude](/wiki/api/vision-integration)
+- [Implémenter le prompt caching](/wiki/api/prompt-caching-implementation)
+- [Tool use](/wiki/api/tool-use)
+
+## Sources
+
+- Files API : https://platform.claude.com/docs/en/build-with-claude/files
+- Code execution tool : https://platform.claude.com/docs/en/agents-and-tools/tool-use/code-execution-tool
+- PDF support : https://platform.claude.com/docs/en/build-with-claude/pdf-support

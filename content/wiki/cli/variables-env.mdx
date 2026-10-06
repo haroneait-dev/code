@@ -1,85 +1,150 @@
 ---
 title: "Les variables d'environnement"
-description: "Configurer Claude Code par variables d'environnement : modèle, désactivation de comportements, proxy d'entreprise, OpenTelemetry, et l'ordre de lecture des sources."
-updatedAt: "2026-06-08"
-readingMinutes: 7
+description: "Les variables d'environnement utiles de Claude Code (authentification, modèle, délais, mises à jour, proxy, télémétrie) et comment elles interagissent avec settings.json."
+updatedAt: "2026-10-03"
+readingMinutes: 6
 ---
 
-Les variables d'environnement offrent un contrôle programmatique de Claude Code, utile en CI, derrière un proxy d'entreprise, ou pour désactiver des comportements. Claude Code les lit **au démarrage** : un changement prend effet au prochain lancement de `claude`.
+Les variables d'environnement permettent de configurer Claude Code sans toucher aux fichiers de réglages : en CI, derrière un proxy d'entreprise, ou pour couper un comportement le temps d'un test. La référence officielle en liste plusieurs centaines ; cet article regroupe celles que vous utiliserez vraiment.
 
-## D'où sont lues les variables
+## Deux façons de les définir
 
-Plusieurs sources, par ordre de lecture :
-
-1. L'environnement du **shell**
-2. Un fichier `.env` à la racine du projet
-3. `~/.claude/env`
-4. Le champ [`env` de `settings.json`](/wiki/cli/settings-json) (et `claudeCode.environmentVariables` pour l'extension VS Code)
-
-Le réglage `settings.json` s'applique **quand la variable n'est pas déjà définie** ailleurs. L'interaction exacte avec les flags varie : `--model` / [`/model`](/wiki/slash-commands) priment sur `ANTHROPIC_MODEL`.
-
-## Choisir le modèle
+**Dans le shell**, pour la session de terminal en cours :
 
 ```bash
-export ANTHROPIC_MODEL=claude-sonnet-5-5
+export API_TIMEOUT_MS="1200000"
+claude
 ```
 
-Override ponctuel par session : `claude --model …`. Voir [Modèles](/wiki/modeles).
+Sous PowerShell : `$env:API_TIMEOUT_MS = "1200000"`. Pour une valeur permanente sous Windows : `setx API_TIMEOUT_MS "1200000"` puis ouvrez un nouveau terminal.
 
-## Authentification
+**Dans le bloc `env` d'un `settings.json`**, pour chaque lancement de `claude` :
+
+```json
+{
+  "env": {
+    "API_TIMEOUT_MS": "1200000",
+    "BASH_DEFAULT_TIMEOUT_MS": "300000"
+  }
+}
+```
+
+Le fichier choisi détermine qui est concerné : `~/.claude/settings.json` (vous), `.claude/settings.json` (l'équipe), `.claude/settings.local.json` (vous, dans ce projet). Voir [settings.json](/wiki/cli/settings-json).
+
+## Qui l'emporte
+
+- **Shell et bloc `env`** : quand la même variable est définie dans les deux, la valeur du fichier de réglages s'applique dans la plupart des cas.
+- **Variable et clé de réglage** : la règle dépend de la paire. `ANTHROPIC_MODEL` est lue avant la clé `model` ; `CLAUDE_CODE_EFFORT_LEVEL` l'emporte même sur `--effort` et `/effort`.
+- **Variable et flag** : `--model` et `/model` l'emportent sur `ANTHROPIC_MODEL`.
+- **Moment de lecture** : les variables du shell sont lues au démarrage. Celles du bloc `env` sont réappliquées quand vous enregistrez le fichier (sauf quelques fonctions lues une seule fois, comme OpenTelemetry).
+
+Pour neutraliser une variable héritée d'un profil shell que vous ne contrôlez pas, mettez-la à une chaîne vide dans `env` : `"CLAUDE_CODE_USE_VERTEX": ""`.
+
+## Authentification et fournisseur
 
 | Variable | Rôle |
 |---|---|
-| `ANTHROPIC_API_KEY` | Clé d'API (compte Console) |
-| `ANTHROPIC_AUTH_TOKEN` | Token OAuth (rempli après `claude login`) |
-| `ANTHROPIC_BASE_URL` | URL d'API alternative (proxy, gateway interne) |
+| `ANTHROPIC_API_KEY` | Clé d'API Console. Remplace votre abonnement Pro/Max/Team/Enterprise, même connecté. En mode `-p`, elle est toujours utilisée si elle existe |
+| `CLAUDE_CODE_OAUTH_TOKEN` | Jeton d'abonnement longue durée pour la CI, généré par `claude setup-token` |
+| `ANTHROPIC_AUTH_TOKEN` | Valeur personnalisée de l'en-tête `Authorization` (préfixée par `Bearer `) |
+| `ANTHROPIC_BASE_URL` | Faire passer les requêtes par un proxy ou une passerelle |
+| `CLAUDE_CODE_USE_BEDROCK`, `CLAUDE_CODE_USE_VERTEX`, `CLAUDE_CODE_USE_FOUNDRY` | Utiliser Amazon Bedrock, Google Cloud ou Microsoft Foundry |
 
-> ⚠️ `ANTHROPIC_API_KEY` **écrase** l'auth OAuth : si tu es connecté en Claude Max et qu'une vieille variable traîne, tu seras facturé sur la clé API. **Ne la commite jamais** dans un dépôt ni dans un `.vscode/settings.json` partagé — utilise les réglages utilisateur ou un secret CI.
+Piège classique : une ancienne `ANTHROPIC_API_KEY` dans votre `~/.zshrc` vous fait payer à l'usage alors que vous avez un abonnement Max. En mode interactif, Claude Code vous demande une fois de valider la clé ; en mode `-p`, il l'utilise sans demander. Faites `unset ANTHROPIC_API_KEY` pour revenir à l'abonnement, et ne commitez jamais cette clé.
 
-## Désactiver des comportements
+## Modèle et raisonnement
+
+| Variable | Rôle |
+|---|---|
+| `ANTHROPIC_MODEL` | Modèle de la session (alias `opus`, `sonnet`, `haiku`, `fable` ou identifiant complet) |
+| `ANTHROPIC_DEFAULT_SONNET_MODEL` (et `_OPUS_`, `_HAIKU_`) | Identifiant vers lequel pointe chaque alias |
+| `CLAUDE_CODE_SUBAGENT_MODEL` | Modèle par défaut des sous-agents |
+| `CLAUDE_CODE_EFFORT_LEVEL` | Niveau d'effort : `low`, `medium`, `high`, `xhigh`, `max` ou `auto` |
+| `MAX_THINKING_TOKENS` | Budget fixe de réflexion, uniquement pour les modèles à budget fixe (les modèles à raisonnement adaptatif l'ignorent : utilisez l'effort) |
+| `CLAUDE_CODE_MAX_OUTPUT_TOKENS` | Plafond de tokens en sortie (ramené au maximum du modèle) |
+
+```bash
+# Une session ponctuelle sur Sonnet 5.5, effort élevé
+ANTHROPIC_MODEL=claude-sonnet-5-5 CLAUDE_CODE_EFFORT_LEVEL=high claude
+```
+
+## Délais et exécution
+
+| Variable | Défaut | Rôle |
+|---|---|---|
+| `API_TIMEOUT_MS` | 600000 (10 min) | Délai des requêtes API |
+| `BASH_DEFAULT_TIMEOUT_MS` | 120000 (2 min) | Délai par défaut d'une commande Bash |
+| `BASH_MAX_TIMEOUT_MS` | 600000 (10 min) | Délai maximal que Claude peut demander |
+| `CLAUDE_ENV_FILE` | non défini | Script sourcé avant chaque commande Bash (virtualenv, conda) |
+
+`CLAUDE_ENV_FILE` résout un piège fréquent : un `export` ou un `source venv/bin/activate` ne survit pas d'une commande Bash à l'autre. Mettez-le dans ce fichier.
+
+## Contexte et mémoire
+
+| Variable | Rôle |
+|---|---|
+| `DISABLE_AUTO_COMPACT=1` | Coupe la compaction automatique (`/compact` reste disponible) |
+| `CLAUDE_CODE_AUTO_COMPACT_WINDOW` | Seuil de compaction en tokens, de `100000` à `1000000` (entier brut, pas `500k`) |
+| `CLAUDE_CODE_DISABLE_AUTO_MEMORY=1` | Coupe la mémoire automatique |
+| `CLAUDE_CONFIG_DIR` | Déplace `~/.claude` (pratique pour séparer deux comptes) |
+
+```bash
+# Un compte perso et un compte pro côte à côte
+alias claude-pro='CLAUDE_CONFIG_DIR=~/.claude-pro claude'
+```
+
+## Mises à jour, télémétrie, trafic
 
 | Variable | Effet |
 |---|---|
-| `DISABLE_AUTOUPDATER=1` | Désactive la mise à jour automatique |
-| `DISABLE_TELEMETRY=1` | Désactive la télémétrie |
-| `DISABLE_AUTOCOMPACT=1` | Désactive la compaction automatique du contexte |
-| `MAX_THINKING_TOKENS=0` | Coupe la réflexion étendue |
-
-> La référence officielle liste l'ensemble des variables et leurs valeurs acceptées (plus de 200 selon les versions). Vérifie toujours la doc pour les valeurs exactes.
-
-## Délais d'expiration & exécution
-
-`API_TIMEOUT_MS` règle le délai des requêtes. Pour [Bash](/wiki/outils) : `BASH_DEFAULT_TIMEOUT_MS` et `BASH_MAX_TIMEOUT_MS`. Pour fixer une variable de façon durable sous Windows : `setx API_TIMEOUT_MS "1200000"` (puis nouveau terminal), ou sous PowerShell via `[Environment]::SetEnvironmentVariable(...)`.
+| `DISABLE_AUTOUPDATER=1` | Coupe les mises à jour automatiques (`claude update` reste possible) |
+| `DISABLE_UPDATES=1` | Bloque toute mise à jour, y compris manuelle |
+| `DISABLE_TELEMETRY=1` | Désactive la télémétrie. Attention : `0` ou `false` la désactivent aussi ; supprimez la variable pour la réactiver |
+| `DISABLE_ERROR_REPORTING=1` | Désactive l'envoi des rapports d'erreur |
+| `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1` | Coupe tout le trafic non essentiel : mises à jour, télémétrie, rapports d'erreur, `/feedback`, notes de version |
 
 ## Proxy d'entreprise
 
-En réseau corporate, configure avant de lancer Claude :
-
 ```bash
-export HTTPS_PROXY=http://proxy.corp:8080
-export NO_PROXY=api.anthropic.com,gateway.corp
+export HTTPS_PROXY=http://proxy.entreprise.local:8080
+export NO_PROXY=localhost,127.0.0.1,.entreprise.local
 ```
 
-Si ton organisation route le trafic Claude par une passerelle interne, pointe `ANTHROPIC_BASE_URL` vers cette passerelle et ajoute son hôte à `NO_PROXY` (pour éviter une double interception). Voir [Architecture & Enterprise](/wiki/enterprise).
+Si votre organisation fait passer le trafic Claude par une passerelle interne, pointez `ANTHROPIC_BASE_URL` vers elle. Avec un hôte autre qu'Anthropic, la recherche d'outils MCP et Remote Control sont désactivés par défaut.
 
-## Observabilité (OpenTelemetry)
+## OpenTelemetry
 
-Claude Code supporte les variables OTel standard : `OTEL_METRICS_EXPORTER`, `OTEL_LOGS_EXPORTER`, `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_EXPORTER_OTLP_PROTOCOL`, `OTEL_EXPORTER_OTLP_HEADERS`, `OTEL_METRIC_EXPORT_INTERVAL`, `OTEL_RESOURCE_ATTRIBUTES`, etc. — pour envoyer métriques et logs vers ta stack d'observabilité.
+```bash
+export CLAUDE_CODE_ENABLE_TELEMETRY=1
+export OTEL_METRICS_EXPORTER=otlp
+export OTEL_LOGS_EXPORTER=otlp
+export OTEL_EXPORTER_OTLP_ENDPOINT=http://collector.local:4317
+```
 
-## Variables injectées dans les sous-processus
+`CLAUDE_CODE_ENABLE_TELEMETRY` est obligatoire avant les exporteurs. Ces variables sont ignorées dans les réglages de projet : définissez-les dans le shell, vos réglages utilisateur ou les réglages gérés.
 
-Quand Claude exécute un outil `Bash`, un hook ou un MCP server, il **injecte** des variables décrivant l'état courant : `CLAUDE_PROJECT_DIR` (racine du projet), `CLAUDE_MODEL`, etc. Pratique pour qu'un hook écrive un log à la racine, peu importe d'où la commande est lancée :
+## Variables que Claude Code fournit
+
+Claude Code définit lui-même certaines variables dans les processus qu'il lance :
+
+- `CLAUDECODE=1` dans les commandes Bash, hooks, barre d'état et serveurs MCP stdio. Un script peut ainsi savoir qu'il tourne sous Claude Code.
+- `CLAUDE_PROJECT_DIR` dans les hooks : la racine du projet, quel que soit le dossier courant.
 
 ```bash
 #!/usr/bin/env bash
-echo "$(date) — $1" >> "$CLAUDE_PROJECT_DIR/.claude/hooks.log"
+# Hook : journaliser à la racine du projet
+echo "$(date -Iseconds) $1" >> "$CLAUDE_PROJECT_DIR/.claude/hooks.log"
 ```
 
 ## Pour aller plus loin
 
 - [Le fichier settings.json](/wiki/cli/settings-json)
-- [Modes de permission](/wiki/cli/permissions-modes)
-- [Architecture & Enterprise](/wiki/enterprise)
+- [Mode headless](/wiki/cli/headless-mode)
+- [Exécution en CI/CD](/wiki/cli/cicd-execution)
+- [Observabilité OpenTelemetry](/wiki/hooks/observabilite-otel)
 
-### Sources officielles
-- Variables d'environnement : https://code.claude.com/docs/en/env-vars
+## Sources
+
+- [Environment variables](https://code.claude.com/docs/en/env-vars)
+- [Settings](https://code.claude.com/docs/en/settings)
+- [Hooks reference](https://code.claude.com/docs/en/hooks)

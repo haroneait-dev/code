@@ -1,43 +1,140 @@
 ---
-title: "Onboarding nouveau dev"
-description: "Utiliser Claude pour accélérer l'arrivée d'un nouveau dev sur le codebase et raccourcir le time-to-first-PR."
-updatedAt: "2026-05-19"
-readingMinutes: 6
+title: "Onboarding d'un nouveau développeur"
+description: "Préparer un dépôt pour qu'un nouvel arrivant soit productif vite avec Claude Code : CLAUDE.md, /team-onboarding, réglages partagés, skills de visite guidée et premières PR relues."
+updatedAt: "2026-10-03"
+readingMinutes: 7
 ---
 
-L'onboarding est le moment où une équipe perd le plus de temps : un nouveau dev passe des semaines à reconstruire mentalement ce que les autres ont déjà digéré. Claude Code, bien configuré, divise ce délai par deux ou trois. L'idée n'est pas de remplacer le mentor humain, mais de fournir un binôme disponible 24/7 qui connaît le repo aussi bien que les anciens.
+Un nouveau développeur passe ses premières semaines à reconstruire ce que l'équipe sait déjà. Claude Code peut réduire ce délai : il répond aux questions sur le code en lisant les fichiers, et un dépôt bien préparé lui donne le contexte que les anciens ont en tête. Il ne remplace pas le mentor, il lui évite les questions de surface.
 
-## Préparer un CLAUDE.md d'accueil
+## Ce que l'équipe prépare avant l'arrivée
 
-Le fichier `CLAUDE.md` à la racine devient le manuel d'orientation. Il doit contenir l'essentiel : stack, architecture en 10 lignes, conventions de nommage, commandes courantes, pièges connus. Un nouveau dev qui lance `claude` dans le repo se retrouve immédiatement avec un assistant déjà briefé. Évite l'exhaustivité : ce fichier n'est pas une doc, c'est un cahier de bord. Tout ce qui change rarement, tout ce qui n'est pas évident depuis le code.
+### Un `CLAUDE.md` court et à jour
 
-Ajoute un fichier `ONBOARDING.md` plus détaillé que tu pointes depuis le CLAUDE.md. Il contient l'arbre de décision « j'ai un bug, par où chercher ? », les liens vers Notion, Linear, le Slack channel.
+`CLAUDE.md` à la racine est chargé au début de chaque session. C'est le premier levier : un nouvel arrivant qui lance `claude` dans le dépôt a d'emblée un assistant briefé. (Si le dépôt n'a qu'un `AGENTS.md`, Claude Code le lit à la place.)
 
-## Premier jour : laisser explorer
+Pour démarrer, `/init` analyse le projet et génère un premier `CLAUDE.md`. Gardez ensuite ce qui n'est pas évident en lisant le code :
 
-Demande au nouveau dev de poser ses questions à Claude avant de déranger l'équipe : `Explique-moi le flux d'authentification`, `Pourquoi utilise-t-on Hono plutôt qu'Express ici ?`, `Quel test je dois lancer si je modifie src/billing/ ?`. Claude lit les fichiers, croise avec le CLAUDE.md et répond en contexte. Les questions qui restent floues remontent à l'humain — et elles sont souvent les plus pertinentes.
+```markdown
+# Projet Facturation
 
-Donne-lui un ticket bonbon dès le premier jour : changer un libellé, ajouter un log, écrire un test manquant. Claude l'aide à trouver le bon fichier, à respecter les conventions et à ouvrir un PR propre. Le but est de toucher au workflow complet (branche, commit, CI, review) en 24h.
+## Commandes
+- `npm run dev` : serveur local (port 3000)
+- `npm test -- src/billing` : tests d'un module
+- `npm run db:reset` : base locale avec données de démo
 
-## Générer des tours guidés
+## Architecture
+- Next.js App Router ; API dans app/api/, logique métier dans lib/
+- Supabase pour l'auth et la base ; toutes les routes API vérifient le token
 
-Crée des slash commands d'onboarding réutilisables. Par exemple `/tour-auth` qui demande à Claude d'expliquer le module auth avec liens vers les fichiers, ou `/tour-deploy` qui retrace ce qui se passe quand on push sur main. Stockés dans `.claude/commands/`, ils deviennent un parcours guidé que chaque nouveau peut suivre à son rythme.
+## Conventions
+- Pas de logique métier dans les composants React
+- Une migration SQL par PR, jamais de modification d'une migration publiée
 
-Tu peux aussi générer un quiz : `Pose-moi 10 questions sur l'architecture du repo, corrige mes réponses en pointant les fichiers concernés`. Ludique et redoutablement efficace pour ancrer les connaissances.
+## Pièges connus
+- Les montants sont en centimes (entiers), jamais en float
+- Les tests e2e exigent `SUPABASE_URL` pointant vers la base locale
+```
 
-## Cadrer les premières PR
+Les recommandations officielles insistent sur la concision : un `CLAUDE.md` trop long dilue les consignes importantes. Pour la documentation détaillée, faites des liens (`Voir docs/architecture.md pour le détail des flux`) ou déplacez les procédures dans des skills chargées à la demande. `/doctor` sait repérer et alléger un `CLAUDE.md` trop gros, et `/doctor prompt-audit` signale les consignes obsolètes ou contradictoires.
 
-Demande au nouveau de toujours faire passer ses PR par une auto-review Claude avant de solliciter l'équipe : `Relis mon diff, vérifie le respect des conventions du CLAUDE.md, propose des améliorations`. Cela élimine les remarques de surface (formatage, naming, tests manquants) et permet aux reviewers humains de se concentrer sur le fond.
+### Des réglages partagés dans le dépôt
 
-Côté reviewer, garde l'œil humain critique : Claude peut valider du code qui suit les conventions mais rate l'intention business. Le mentor reste indispensable sur les décisions produit.
+Versionnez `.claude/settings.json` pour que le nouvel arrivant ait d'emblée les bonnes permissions, sans accumuler les demandes de validation ni ouvrir trop large :
 
-## Mesurer et itérer
+```json
+{
+  "permissions": {
+    "allow": ["Bash(npm test *)", "Bash(npm run lint)", "Bash(npm run dev)"],
+    "deny": ["Read(./.env)", "Read(./.env.*)", "Bash(git push *)"]
+  }
+}
+```
 
-Mesure le time-to-first-PR, le time-to-prod, le nombre de questions Slack la première semaine. Si certaines questions reviennent souvent, c'est que le CLAUDE.md est incomplet : enrichis-le. L'onboarding devient un cycle d'amélioration continue du repo lui-même.
+Les règles `allow` d'un dépôt ne s'appliquent qu'après que la personne a accepté la boîte de dialogue de confiance du dossier ; les règles `deny` et `ask` s'appliquent tout de suite. Si l'équipe utilise des serveurs MCP (Linear, Sentry, base de données), déclarez-les dans `.mcp.json` à la racine : chaque développeur les approuvera au premier lancement.
+
+### Un guide généré avec `/team-onboarding`
+
+Un membre de l'équipe qui utilise déjà Claude Code peut lancer `/team-onboarding`. Claude analyse ses sessions, commandes et serveurs MCP des 30 derniers jours et produit un guide en Markdown que le nouvel arrivant colle comme premier message pour être configuré rapidement. Sur les offres claude.ai Pro, Max, Team et Enterprise, la commande renvoie aussi un lien de partage que le collègue ouvre directement dans Claude Code. Relisez le guide avant de l'envoyer : il reflète les habitudes d'une personne, pas forcément les conventions de l'équipe.
+
+## Premier jour : explorer en posant des questions
+
+La documentation officielle le présente comme un usage efficace : posez à Claude les questions que vous poseriez à un collègue, sans technique de prompt particulière.
+
+```text
+Donne-moi une vue d'ensemble de ce dépôt : architecture, dossiers clés, flux principaux.
+Explique le flux d'authentification, de la page de connexion jusqu'à la vérification du token côté API.
+Pourquoi utilise-t-on Hono plutôt qu'Express dans server/ ?
+Quels tests dois-je lancer si je modifie src/billing/ ?
+Où est géré l'envoi des e-mails de facturation ?
+```
+
+Deux réglages aident à apprendre plutôt qu'à seulement recevoir des réponses :
+
+- `/output-style explanatory` : Claude ajoute de courts blocs « Insight » qui expliquent ses choix et le code du dépôt.
+- `/output-style learning` : Claude explique et vous laisse écrire vous-même de petits morceaux de code.
+
+Pour les questions larges (« comment fonctionne la facturation ? »), Claude délègue souvent la lecture au sous-agent intégré Explore, qui parcourt les fichiers dans son propre contexte et ne renvoie qu'un résumé. Votre conversation reste légère.
+
+## Des visites guidées réutilisables avec des skills
+
+Plutôt que de réexpliquer le module d'authentification à chaque arrivée, écrivez-le une fois sous forme de skill. Les anciennes commandes de `.claude/commands/` fonctionnent toujours, mais les skills sont le format actuel.
+
+```markdown
+---
+name: tour-auth
+description: Visite guidée du module d'authentification pour un nouvel arrivant
+disable-model-invocation: true
+---
+
+Fais une visite guidée du module d'authentification :
+1. Lis lib/auth/, app/auth/callback/route.ts et middleware.ts.
+2. Explique le flux complet en 6 étapes maximum, avec pour chaque étape
+   le fichier et la fonction concernés (format `fichier:ligne`).
+3. Liste les trois pièges que l'équipe a déjà rencontrés (voir docs/incidents/auth.md).
+4. Termine par trois questions pour vérifier la compréhension, sans donner les réponses.
+```
+
+Enregistrez ce fichier sous `.claude/skills/tour-auth/SKILL.md` : le nouvel arrivant tape `/tour-auth`. `disable-model-invocation: true` réserve la skill à un appel explicite. Créez-en autant que de zones clés (`/tour-deploy`, `/tour-billing`). Pour partager ces skills entre plusieurs dépôts, regroupez-les dans un plugin d'équipe.
+
+Un quiz fonctionne aussi très bien :
+
+```text
+Pose-moi 10 questions sur l'architecture de ce dépôt, une à la fois.
+Corrige chaque réponse en citant les fichiers concernés.
+```
+
+## Une première PR dans la journée
+
+Donnez un petit ticket dès le premier jour : un libellé, un log manquant, un test à écrire. Le but est de parcourir tout le circuit (branche, commit, CI, revue) en 24 heures. Claude aide à trouver le bon fichier et à respecter les conventions.
+
+Avant de demander une revue humaine, le nouvel arrivant lance une revue automatique :
+
+```text
+/code-review
+```
+
+La skill relit les modifications de la branche dans un contexte séparé et remonte les bugs probables, en tenant compte du `CLAUDE.md`. Les relecteurs humains peuvent alors se concentrer sur le fond : l'intention métier, l'architecture, ce que Claude ne peut pas deviner.
+
+## Faire évoluer le dispositif
+
+- Notez les questions qui reviennent la première semaine : chacune signale un manque dans `CLAUDE.md` ou dans une skill.
+- Demandez au nouvel arrivant de compléter lui-même `CLAUDE.md` à la fin de sa première semaine, avec ce qui lui a manqué.
+- Mesurez quelques indicateurs simples : délai jusqu'à la première PR mergée, jusqu'à la première mise en production, nombre de questions posées sur Slack.
+- Relancez `/doctor prompt-audit` de temps en temps : un `CLAUDE.md` faux est pire qu'un `CLAUDE.md` absent.
 
 ## Pour aller plus loin
 
-- Demande au nouveau dev d'écrire les sections du CLAUDE.md qui lui ont manqué pendant son onboarding
-- Crée un subagent `code-explorer` spécialisé dans la cartographie de modules inconnus
-- Enregistre une session pair-programming entre un senior et Claude pour les patterns complexes
-- Programme un retour à 30/60/90 jours pour ajuster le matériel d'accueil
+- [Écrire un bon CLAUDE.md](/wiki/demarrer/claude-md)
+- [Configurer un projet](/wiki/demarrer/configurer-projet)
+- [Structure d'une skill](/wiki/skills/structure-skill)
+- [Output styles](/wiki/cli/output-styles)
+- [Code review automatisée avec Claude](/wiki/workflows/code-review-auto)
+
+## Sources
+
+- [Best practices : Ask codebase questions ; Write an effective CLAUDE.md, documentation Claude Code](https://code.claude.com/docs/en/best-practices)
+- [Common workflows : Understand new codebases, documentation Claude Code](https://code.claude.com/docs/en/common-workflows)
+- [Commands (`/init`, `/team-onboarding`, `/doctor`, `/output-style`), documentation Claude Code](https://code.claude.com/docs/en/commands)
+- [Output styles, documentation Claude Code](https://code.claude.com/docs/en/output-styles)
+- [Settings, documentation Claude Code](https://code.claude.com/docs/en/settings)

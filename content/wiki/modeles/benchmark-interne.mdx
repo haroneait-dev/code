@@ -1,57 +1,97 @@
 ---
-title: "Benchmarks et évaluation de performance"
-description: "Comprendre MMLU, HumanEval et SWE-bench, lire correctement les chiffres publiés par Anthropic, et reproduire les évaluations sur vos propres cas d'usage."
-updatedAt: "2026-05-19"
+title: "Benchmarks et évaluation sur vos propres cas"
+description: "Comment lire les benchmarks publiés par Anthropic (Terminal-Bench, SWE-bench, HLE...), éviter les pièges de comparaison, et construire votre propre suite d'évaluation."
+updatedAt: "2026-10-03"
 readingMinutes: 6
 ---
 
-Les benchmarks publics donnent un repère utile pour comparer les modèles, mais ils ne remplacent jamais une évaluation sur vos propres données. Cet article récapitule les benchmarks que vous croiserez le plus souvent dans les communications Anthropic et propose une méthode simple pour construire votre suite d'évaluation interne.
+Les benchmarks publics donnent un repère pour comparer les modèles. Ils ne remplacent jamais une évaluation sur vos données : un modèle meilleur « en moyenne » peut être moins bon sur votre cas précis. Cette page explique comment lire les chiffres publiés et comment construire votre propre suite d'évaluation.
 
-## MMLU — le test de culture générale
+## Les benchmarks que vous croiserez
 
-Le **Massive Multitask Language Understanding** mesure la précision du modèle sur 57 disciplines académiques (mathématiques, droit, médecine, histoire...). Format QCM à 4 choix. Les modèles récents (Sonnet 4.6, Opus 4.7) dépassent 90 % en zero-shot, ce qui sature partiellement le benchmark. Limites : la mémorisation joue beaucoup, le format QCM ne reflète pas les usages réels, et certaines questions contiennent des erreurs.
+Les annonces de 2026 ont largement délaissé les tests de culture générale, devenus trop faciles, au profit de tâches agentiques longues.
 
-À retenir : MMLU est un proxy de connaissances générales, pas de raisonnement. Un écart de 1 à 2 points est rarement significatif.
+| Benchmark | Ce qu'il mesure | À savoir |
+|---|---|---|
+| **Terminal-Bench** | Tâches réelles en ligne de commande (compiler, configurer, déboguer) | Très utilisé pour les agents de code. Plusieurs versions coexistent : comparez à version égale. |
+| **SWE-bench Verified** | Corriger un vrai bug dans un dépôt Python à partir d'une issue GitHub | 500 tâches validées à la main. Proche de la saturation pour les modèles de pointe. |
+| **OSWorld** | Utiliser un ordinateur (interface graphique) pour accomplir une tâche | Référence pour le computer use. |
+| **Humanity's Last Exam (HLE)** | Questions expertes très difficiles | Résultats souvent donnés « avec outils » et « sans outils ». |
+| **GDPval** | Tâches de travail de connaissance évaluées par des professionnels | Score parfois exprimé en Elo. |
+| **MMLU, HumanEval** | Culture générale en QCM, petites fonctions Python (164 problèmes) | Saturés : utiles comme contrôle rapide, pas pour départager les modèles récents. |
 
-## HumanEval — la base du code
+Exemple de lecture : l'annonce d'Opus 5.5 donne 66,4 % sur Terminal-Bench 4.0 **en effort `xhigh`**, avec une erreur type d'environ 2,6 points. Sans l'effort et la marge d'erreur, le chiffre ne veut pas dire grand-chose.
 
-Suite de 164 problèmes Python (Chen et al., 2021). Le modèle reçoit une docstring et doit produire une fonction qui passe les tests. Métrique principale : `pass@1` (probabilité de réussir au premier essai). Sonnet 4.5 atteint environ 96 %, Opus 4.7 frôle le plafond. HumanEval reste utile comme sanity check rapide, mais il est trop simple pour différencier les modèles de pointe.
+## Les pièges de lecture
 
-Variantes plus exigeantes : **HumanEval+**, **MBPP**, **APPS**, **LiveCodeBench** (problèmes Codeforces récents, moins susceptibles d'être dans les données d'entraînement).
+- **Le niveau d'effort.** Un même modèle donne des scores très différents en `medium` et en `max`, pour un coût très différent. Comparez à effort égal, ou comparez à coût égal.
+- **L'outillage (scaffold).** Un score SWE-bench obtenu avec Claude Code n'est pas comparable à un score obtenu avec un autre harnais. Lisez les notes de méthodologie.
+- **Les tentatives multiples.** Certains scores agrègent plusieurs essais ou une sélection du meilleur. Cherchez « pass@1 » ou le nombre d'essais.
+- **La version du benchmark.** Terminal-Bench 2.x et 4.0, OSWorld et OSWorld 2.x ne sont pas interchangeables. SWE-bench Verified n'est pas SWE-bench complet.
+- **La marge d'erreur.** Un écart de 1 ou 2 points est souvent dans le bruit.
+- **La contamination.** Un benchmark public ancien peut se retrouver dans les données d'entraînement. Les jeux récents ou privés sont plus fiables.
 
-## SWE-bench — la vraie épreuve agentique
+## Construire votre propre suite d'évaluation
 
-**SWE-bench Verified** est devenu le benchmark de référence pour l'usage code en agent. Le modèle reçoit un repository GitHub réel (Django, scikit-learn, sympy...) et un bug report ; il doit produire un patch qui fasse passer les tests cachés. C'est multi-fichiers, multi-étapes, et nécessite des outils (lecture, édition, shell).
+### 1. Collecter des cas réels
 
-Scores typiques (à fin 2025) :
+Rassemblez 30 à 100 cas issus de votre produit : tickets, requêtes d'utilisateurs, bugs déjà corrigés. Anonymisez, puis fixez pour chacun un attendu ou un critère de réussite. Incluez des cas limites et des cas où le modèle doit refuser ou demander une précision.
 
-- Sonnet 4.5 : ~65 % sur SWE-bench Verified
-- Sonnet 4.6 : ~70 %
-- Opus 4.7 : ~75 %
+### 2. Choisir une métrique automatisable
 
-Attention : les scores varient selon le **scaffold** utilisé (Claude Code, SWE-agent, OpenHands...). Anthropic publie toujours la stack exacte ; lisez la note de bas de page.
+| Type de sortie | Métrique |
+|---|---|
+| JSON, classification | Correspondance exacte, validation de schéma |
+| Code | Le code compile et les tests passent |
+| Texte libre | Grille notée par un modèle juge (LLM-as-judge), contrôlée par un échantillon humain |
 
-## Comment reproduire sur vos cas
+### 3. Rejouer à chaque changement
 
-Le bon réflexe : construire une **eval suite maison**. Trois étapes :
+Relancez la suite à chaque nouveau modèle, nouveau prompt ou changement d'effort. Gardez les résultats (CSV, table Postgres) pour suivre l'évolution.
 
-1. **Collecter 20 à 50 cas réels** issus de votre produit (tickets support, requêtes utilisateurs, prompts internes). Anonymiser, fixer les attendus.
-2. **Définir une métrique automatisable** : exact match, regex, score LLM-as-judge avec un modèle plus puissant, ou test fonctionnel (le code produit compile et passe les tests).
-3. **Versionner et faire tourner à chaque release** : à chaque nouveau modèle Anthropic, relancer la suite et comparer. Stocker les résultats dans un CSV ou une table Postgres pour tracer la dérive.
+```python
+import json
+import anthropic
 
-Outils utiles : `promptfoo`, `Inspect AI` (UK AISI), `Braintrust`, ou simplement un script Node + le SDK Anthropic en parallèle (`Promise.allSettled` avec rate limit).
+client = anthropic.Anthropic()
+cases = [json.loads(line) for line in open("evals/support.jsonl")]
 
-## Lire les benchmarks Anthropic sans se faire piéger
+def run(model: str, effort: str) -> float:
+    ok = 0
+    for case in cases:
+        r = client.messages.create(
+            model=model,
+            max_tokens=300,
+            output_config={"effort": effort},
+            system="Classe le ticket : facturation, technique ou commercial. Un seul mot.",
+            messages=[{"role": "user", "content": case["input"]}],
+        )
+        text = next(b.text for b in r.content if b.type == "text").strip().lower()
+        ok += text == case["expected"]
+    return ok / len(cases)
 
-Quelques pièges récurrents :
+for effort in ["low", "medium", "high"]:
+    print(effort, run("claude-sonnet-5-5", effort))
+```
 
-- **Best-of-N caché** : certains scores SWE-bench sont obtenus avec 5 tentatives en parallèle puis sélection.
-- **Extended thinking activé** : doublement du coût en tokens, à mentionner.
-- **Différence dataset** : SWE-bench *Verified* ≠ SWE-bench *full* (1699 cas), les scores ne sont pas comparables directement.
-- **Date de cutoff** : un benchmark sur du code GitHub récent peut avantager le modèle entraîné le plus tard.
+Ce petit balayage d'effort est le premier test à faire à chaque migration : la documentation d'Anthropic recommande de ne pas reprendre l'ancien réglage tel quel, car les niveaux sont recalibrés d'un modèle à l'autre.
+
+### Outils utiles
+
+- **promptfoo** : configuration YAML, comparaison de modèles et de prompts, adapté à la CI.
+- **Inspect AI** (UK AI Security Institute) : framework d'évaluation open source.
+- **Braintrust** et équivalents : interface de suivi des expériences.
+- Un simple script avec le SDK, lancé en parallèle avec une limite de débit, suffit souvent pour commencer.
 
 ## Pour aller plus loin
 
-- Repo officiel SWE-bench : https://www.swebench.com/
-- Papers with Code pour suivre l'état de l'art en continu.
-- Lire la *model card* d'Anthropic à chaque release pour la méthodologie exacte.
+- [Évaluations automatisées en API](/wiki/api/evals-automatisees)
+- [Model drift et migrations](/wiki/modeles/model-drift)
+- [Tester un prompt](/wiki/prompt-engineering/tester-prompt)
+- [Comparatif des modèles](/wiki/modeles/comparatif-modeles)
+
+## Sources
+
+- [Introducing Claude Opus 5.5 (Anthropic)](https://www.anthropic.com/claude-opus-5-5)
+- [Effort : recommandations par modèle](https://platform.claude.com/docs/en/build-with-claude/effort)
+- [SWE-bench](https://www.swebench.com/)

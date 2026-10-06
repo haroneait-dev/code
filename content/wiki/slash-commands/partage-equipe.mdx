@@ -1,176 +1,193 @@
 ---
-title: "Partager et centraliser les slash commands en équipe"
-description: "Versionner les commandes Claude Code dans un repo d'entreprise pour les partager efficacement."
-updatedAt: "2026-05-19"
-readingMinutes: 6
+title: "Partager et centraliser les commandes personnalisées en équipe"
+description: "Diffuser vos commandes /nom à toute une équipe : skills commités dans le dépôt, marketplace de plugins pour plusieurs dépôts, skills gérés par l'organisation, conventions et revue."
+updatedAt: "2026-10-03"
+readingMinutes: 7
 ---
 
-Une slash command vraiment utile, c'est une slash command que toute l'équipe utilise. Versionner `.claude/commands/` dans git transforme les bonnes pratiques d'un développeur en standard partagé : pas de doc à jour à maintenir, pas de Notion à lire, juste un `git pull` et la commande apparaît. Pour les grosses orgs, on peut même centraliser un catalogue commun à plusieurs repos.
+Une commande utile devient vraiment rentable quand toute l'équipe s'en sert. Le chemin le plus simple est de commiter vos skills dans le dépôt : un `git pull` suffit pour que vos collègues les reçoivent. Pour partager un catalogue entre plusieurs dépôts, la solution officielle est un plugin publié dans une marketplace privée, que le projet peut activer automatiquement.
 
-## Le principe : .claude/commands/ versionné
+## Choisir le bon canal
 
-Le dossier `.claude/commands/` à la racine de votre projet est destiné à être commité. C'est la première règle :
+| Besoin | Canal | Ce que voit l'utilisateur |
+| --- | --- | --- |
+| Commandes propres à un dépôt | `.claude/skills/` commité | `/deploy` |
+| Catalogue commun à plusieurs dépôts | Plugin dans une marketplace privée | `/outils-equipe:deploy` |
+| Commandes imposées à toute l'organisation | Skills gérés (managed settings) | `/deploy`, prioritaire sur tout |
+| Commandes personnelles | `~/.claude/skills/` | `/deploy`, sur votre machine seulement |
+| Cowork et sessions cloud | Skills activés sur le compte claude.ai | `/deploy` |
+
+## 1. Dans le dépôt : `.claude/skills/` versionné
+
+Les skills du projet sont faits pour être commités :
 
 ```bash
-$ git add .claude/commands/
-$ git commit -m "chore: add /pr:review and /db:migrate commands"
-$ git push
+git add .claude/skills/
+git commit -m "chore: ajoute les commandes /db-migrate et /revue-pr"
+git push
 ```
 
-À partir du moment où votre collègue pull, il a accès aux commandes. Pas d'installation, pas de plugin, pas de version à synchroniser.
+Au prochain `git pull`, vos collègues ont les commandes, sans installation. Elles sont aussi chargées dans les sessions cloud, qui clonent le dépôt. L'ancien format `.claude/commands/` fonctionne de la même façon.
 
-Ce qui doit **ne pas** être versionné :
+Structure type pour un dépôt avec une dizaine de commandes :
 
-- `.claude/settings.local.json` (préférences personnelles, ajouter au `.gitignore`)
-- `.claude/sessions/` (historiques de sessions, sensibles)
-- Tout fichier temporaire généré par hooks (`.claude/last-audit.md`, etc.)
-
-`.gitignore` recommandé :
-
-```
-.claude/settings.local.json
-.claude/sessions/
-.claude/cache/
-.claude/*.log
-```
-
-## Structure recommandée pour un repo
-
-Pour un projet avec 5–20 commandes :
-
-```
+```text
 .claude/
-  commands/
-    db/
-      migrate.md
-      rollback.md
-      seed.md
-    pr/
-      review.md
-      summary.md
-    test/
-      unit.md
-      e2e.md
-    release.md
-    deploy.md
-  settings.json           # config partagée (permissions, MCPs, hooks)
-  README.md               # doc des conventions et commandes
+  skills/
+    db-migrate/
+      SKILL.md
+      templates/table.sql      # fichier annexe lu à la demande
+    revue-pr/
+      SKILL.md
+      checklist.md
+    release/
+      SKILL.md
+      scripts/changelog.sh     # appelé via ${CLAUDE_SKILL_DIR}
+  settings.json                # réglages partagés : permissions, hooks, plugins
 ```
 
-Le namespacing par dossier (`/db:migrate`, `/pr:review`) garde `/help` lisible.
+Dans un monorepo, un skill placé dans `apps/web/.claude/skills/` est chargé dès que Claude travaille dans `apps/web/`.
 
-## Centraliser à l'échelle entreprise
+### Ce qu'il ne faut pas commiter
 
-Pour partager des commandes entre **plusieurs repos** d'une même organisation, trois approches :
+- `.claude/settings.local.json` : vos réglages personnels. Claude Code l'ajoute au `.gitignore` quand il y écrit, vérifiez quand même.
+- Les fichiers produits par vos hooks ou scripts (rapports, journaux).
+- Tout secret : un skill est du texte lisible par tous. Voir [Secrets et skills](/wiki/skills/secrets-skills).
 
-### 1. Submodule git
+```gitignore
+.claude/settings.local.json
+.claude/*.log
+.claude/rapports/
+```
+
+Les transcripts de session ne sont pas dans le dépôt : ils sont stockés dans `~/.claude/`.
+
+## 2. Entre plusieurs dépôts : un plugin dans une marketplace privée
+
+Les sous-modules git et les scripts de copie fonctionnent, mais un plugin est la solution prévue pour cet usage : versionné, mis à jour, activable par projet.
+
+**Étape 1 : un dépôt de plugins.** Un dépôt `macorp/claude-plugins` contient le plugin et le fichier de marketplace :
+
+```text
+claude-plugins/
+  .claude-plugin/
+    marketplace.json
+  outils-equipe/
+    .claude-plugin/plugin.json
+    skills/
+      deploy/SKILL.md
+      revue-pr/SKILL.md
+```
+
+`.claude-plugin/marketplace.json` :
+
+```json
+{
+  "name": "macorp",
+  "owner": { "name": "Équipe plateforme" },
+  "plugins": [
+    { "name": "outils-equipe", "source": "./outils-equipe" }
+  ]
+}
+```
+
+Vérifiez avant de pousser avec `claude plugin validate .`. Si le dépôt est privé, la marketplace l'est aussi : seuls ceux qui peuvent cloner le dépôt peuvent installer.
+
+**Étape 2 : l'activer dans chaque projet.** Dans le `.claude/settings.json` commité du projet :
+
+```json
+{
+  "extraKnownMarketplaces": {
+    "macorp": {
+      "source": { "source": "github", "repo": "macorp/claude-plugins" }
+    }
+  },
+  "enabledPlugins": {
+    "outils-equipe@macorp": true
+  }
+}
+```
+
+À l'ouverture du dépôt, après acceptation de la boîte de dialogue de confiance, Claude Code enregistre la marketplace et propose le plugin. Ces entrées sont ignorées dans un dossier non approuvé, en `claude -p` comme dans les sessions cloud.
+
+Pour une installation manuelle :
 
 ```bash
-$ cd .claude/
-$ git submodule add git@github.com:macorp/claude-commands.git commands-shared
+claude plugin marketplace add macorp/claude-plugins
+claude plugin install outils-equipe@macorp
 ```
 
-Vous montez le repo central comme submodule dans chaque projet. Les commandes communes vivent dans `commands-shared/` (préfixées `/shared:` via le namespacing), les commandes spécifiques au projet restent dans `commands/`.
+Les skills d'un plugin sont toujours préfixés (`/outils-equipe:deploy`) : ils n'entrent jamais en conflit avec les skills du projet. Pour publier une nouvelle version, voir [Créer un plugin](/wiki/plugins/creer-plugin).
 
-Pour : versionning fin, mise à jour explicite.
-Contre : les submodules sont notoirement pénibles.
+## 3. Pour toute l'organisation : skills gérés
 
-### 2. Symlink ou script de sync
+Un administrateur peut déployer des skills dans le dossier `.claude/skills/` du répertoire des réglages gérés (par exemple `/etc/claude-code/` sous Linux). Ils sont chargés sur tous les postes concernés et passent avant les skills personnels et ceux des projets en cas de nom identique.
 
-Maintenir un repo `claude-commands-internal` côté entreprise et un script qui copie/link les commandes dans chaque projet :
+Les réglages gérés permettent aussi de pré-enregistrer la marketplace interne (`extraKnownMarketplaces`) et d'interdire les autres (`strictKnownMarketplaces`). Voir [settings.json](/wiki/cli/settings-json).
 
-```bash
-# scripts/sync-claude.sh
-#!/bin/bash
-git clone --depth 1 git@github.com:macorp/claude-commands.git /tmp/cc
-mkdir -p .claude/commands/shared
-cp -r /tmp/cc/commands/* .claude/commands/shared/
-echo "Synced shared Claude commands."
-```
+Pour Cowork et les sessions cloud, qui ne lisent pas `~/.claude/skills/`, l'organisation peut aussi fournir des skills via claude.ai : ils sont synchronisés dans les sessions des membres connectés avec leur compte.
 
-À lancer après chaque clone du repo, ou via un hook git `post-checkout`.
+## Conventions de nommage
 
-### 3. Commandes utilisateur globales
+Mettez-vous d'accord une fois et documentez la règle :
 
-Pour les commandes vraiment universelles (review, audit sécu, helpers de productivité), installez-les dans `~/.claude/commands/` une fois pour toutes :
+- **Préfixe de domaine** : `db-migrate`, `db-seed`, `pr-revue`, `pr-resume`. Taper `/db` filtre tout le domaine.
+- **Verbe d'abord** : `creer-composant`, `lancer-tests`. Plus naturel à l'oral.
+- **Évitez les noms des commandes intégrées** (`review`, `usage`, `init`) : votre skill remplacerait la commande intégrée pour toute l'équipe.
 
-```bash
-$ git clone git@github.com:macorp/claude-commands.git ~/.claude/commands-corp
-# puis sym-link les .md voulus dans ~/.claude/commands/
-```
-
-Avantage : disponibles dans tous les projets sans config.
-Limite : chaque dev doit le faire à l'embauche (à automatiser dans le script d'onboarding).
+Le nom réservé `anthropic-skills` et un dossier nommé `synced` ne sont pas chargés.
 
 ## Documenter le catalogue
 
-Un `.claude/README.md` à la racine du dossier décrit les commandes disponibles. Exemple :
+Le menu `/` affiche déjà la `description` et l'`argument-hint` de chaque commande : soignez-les, c'est la première documentation. Ajoutez une courte section dans `CLAUDE.md` :
 
 ```md
-# Claude Commands — projet MyApp
+## Commandes du projet
+- `/db-migrate <nom>` : crée une migration Supabase avec RLS
+- `/revue-pr <numéro>` : revue d'une PR selon notre checklist
+- `/release <patch|minor|major>` : changelog et version, sans push
 
-## Database
-- `/db:migrate <nom>`    Crée une migration Supabase
-- `/db:rollback`         Rollback la dernière migration
-- `/db:seed`             Lance les seeds dev
-
-## Pull Requests
-- `/pr:review [n°]`      Review une PR (défaut: branche courante)
-- `/pr:summary [n°]`     Génère un résumé pour le team channel
-
-## Release
-- `/release <patch|minor|major>`  Bump version + changelog + tag
-
-## Convention
-- Toute commande qui modifie du code doit avoir un mode `--dry-run`
-- Toute commande destructive doit demander confirmation
+Règles : toute commande à effets de bord a `disable-model-invocation: true`.
 ```
 
-Bonus : un lien vers ce README dans le `CLAUDE.md` principal :
+Pour un nouvel arrivant, `/team-onboarding` génère un guide de prise en main à partir de votre usage de Claude Code sur les 30 derniers jours.
 
-```md
-## Slash commands custom
-Voir `.claude/README.md` pour la liste complète.
-```
+## Qualité des commandes partagées
 
-## Convention de nommage
+Une commande partagée mérite le soin d'une bibliothèque interne :
 
-Mettez-vous d'accord en équipe sur la convention. Exemples qui marchent :
+- [ ] `description` claire, formulée du point de vue de l'utilisateur
+- [ ] `argument-hint` présent dès qu'il y a un argument
+- [ ] `disable-model-invocation: true` sur toute action avec effets de bord
+- [ ] `allowed-tools` précis (jamais `Bash` seul), et rappelez-vous qu'il pré-autorise sans rien interdire
+- [ ] Aucun argument dans un bloc `` !`…` `` (voir [Bash injection](/wiki/slash-commands/bash-injection-securisee))
+- [ ] Un mode `--dry-run` ou une confirmation avant toute action irréversible
+- [ ] Testée dans une session neuve, sans le contexte qui a servi à l'écrire
 
-- **Namespace = domaine** : `/db:*`, `/pr:*`, `/test:*`, `/deploy:*`
-- **Verbe en premier** : `/create-component`, `/run-tests`, `/audit-perf`
-- **Action-objet** : `/component-create`, `/test-run`. Plus régulier mais moins naturel.
+Pour mesurer qu'une commande fait bien ce qu'on attend, `claude plugin eval` (pour un plugin) ou le plugin `skill-creator` comparent les résultats avec et sans le skill. Voir [Tester un skill](/wiki/skills/tester-skill).
 
-L'important : ne pas mélanger. Un repo où on a `/db:migrate` et `/migrate-db` côte à côte rend `/help` confus.
+## Sécurité : relire avant de lancer
 
-## Tests et qualité des commandes partagées
+Les `allowed-tools` et les hooks d'un skill de projet s'appliquent même dans un dossier que vous n'avez pas encore approuvé, y compris en `claude -p`. Dans un dépôt que vous ne connaissez pas, lisez `.claude/skills/` et `.claude/settings.json` avant de lancer Claude Code. Pour une exécution sans rien charger du dépôt, utilisez `claude --bare`.
 
-Une commande partagée mérite le même niveau de soin qu'une lib interne :
+## Cycle de vie d'une commande
 
-- **Description claire** dans le frontmatter
-- **`argument-hint`** systématique
-- **`allowed-tools`** précis (pas de `Bash(*)`)
-- **Mode dry-run** pour les commandes destructives
-- **Confirmation** explicite avant action irréversible
-- **Tests manuels** documentés dans le README : "Pour tester `/release`, lancer `/release patch --dry-run` sur la branche main."
-
-## Lifecycle : créer, faire vivre, retirer
-
-```
-1. Un dev identifie une procédure répétitive
-2. Il crée la commande dans .claude/commands/, branch dédiée
-3. PR avec :
-   - Le .md de la commande
-   - Mise à jour de .claude/README.md
-   - Un exemple d'utilisation dans la description de la PR
-4. Review d'équipe : utilité, sécurité, naming
-5. Merge → tout le monde a la commande au prochain pull
-6. Si une commande tombe en désuétude : suppression + entrée dans le CHANGELOG
-```
+1. Un développeur repère une procédure répétée.
+2. Il crée le skill sur une branche dédiée et met à jour la section de `CLAUDE.md`.
+3. Pull request avec un exemple d'utilisation dans la description.
+4. Revue : utilité, sécurité (`allowed-tools`, blocs `!`), nommage.
+5. Fusion : toute l'équipe l'a au prochain `git pull`.
+6. Commande inutilisée : `/skill-doctor` aide à la repérer, supprimez-la et notez-le dans le changelog.
 
 ## Pour aller plus loin
 
-- Doc officielle : https://docs.claude.com/en/docs/claude-code/slash-commands
-- Guide "Markdown frontmatter" pour produire des commandes lisibles
-- Guide "Arguments et namespacing" pour structurer un gros catalogue
-- Étudier le repo public anthropics/claude-code pour des exemples d'organisation
+- [Créer une commande personnalisée](/wiki/slash-commands/creer-slash-command)
+- [Arguments et namespacing](/wiki/slash-commands/arguments-namespacing)
+- [Publier un skill](/wiki/skills/publier-skill)
+- [Introduction aux plugins](/wiki/plugins/introduction-plugins)
+
+## Sources
+
+- [Skills : share skills](https://code.claude.com/docs/en/skills)
+- [Publish and distribute a plugin](https://code.claude.com/docs/en/plugins/publish)
+- [Settings reference : extraKnownMarketplaces, enabledPlugins](https://code.claude.com/docs/en/settings-reference)

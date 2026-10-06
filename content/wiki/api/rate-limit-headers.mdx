@@ -1,119 +1,167 @@
 ---
-title: "Gestion fine du Rate Limiting"
-description: "Parser les headers anthropic-ratelimit-* pour adapter dynamiquement la charge et éviter les 429."
-updatedAt: "2026-05-19"
-readingMinutes: 6
+title: "Rate limits : lire les en-têtes et éviter les 429"
+description: "Comprendre les limites RPM, ITPM et OTPM de l'API Claude, lire les en-têtes anthropic-ratelimit-* renvoyés à chaque réponse et construire un limiteur côté client qui respecte retry-after."
+updatedAt: "2026-10-03"
+readingMinutes: 7
 ---
 
-Subir un `429 Too Many Requests` en pleine prod, c'est l'assurance d'incidents utilisateurs. Plutôt que d'attendre l'erreur pour réagir, Anthropic expose sur **chaque réponse** une dizaine de headers `anthropic-ratelimit-*` qui décrivent l'état exact de vos quotas. Bien parser ces headers permet de construire un ordonnanceur adaptatif qui maximise le débit sans jamais dépasser.
+L'API Claude limite le nombre de requêtes et de tokens que votre organisation peut consommer par minute. Plutôt que de découvrir ces limites par des erreurs 429 en production, lisez les en-têtes `anthropic-ratelimit-*` renvoyés avec chaque réponse et adaptez votre débit avant d'atteindre le plafond.
 
-## Les headers exposés
+## Les trois limites par modèle
 
-À chaque réponse 2xx (et même sur les 429), Anthropic renvoie :
+Pour l'API Messages, chaque **modèle** a trois limites, mesurées par minute au niveau de l'organisation :
 
-| Header | Signification |
+- **RPM** : requêtes par minute ;
+- **ITPM** : tokens d'entrée par minute ;
+- **OTPM** : tokens de sortie par minute.
+
+L'API utilise un **seau à jetons** (token bucket) : votre capacité se reconstitue en continu, elle n'est pas remise à zéro chaque minute. En contrepartie, une limite de 60 RPM peut être appliquée comme 1 requête par seconde : une rafale courte peut déclencher un 429 même si la moyenne sur la minute est correcte.
+
+Deux bonnes nouvelles :
+
+- **Les tokens lus depuis le cache ne comptent pas dans l'ITPM** (sur tous les modèles actuels). Seuls `input_tokens` et `cache_creation_input_tokens` comptent. Avec 80 % de hits de cache, une limite de 2 millions d'ITPM permet de traiter environ 10 millions de tokens d'entrée par minute.
+- **`max_tokens` n'entre pas dans le calcul de l'OTPM** : seuls les tokens réellement générés comptent. Un `max_tokens` généreux ne vous pénalise pas.
+
+Les limites sont **séparées par modèle** : Opus 5.5 et Sonnet 5.5 ont chacun leur propre seau.
+
+## Les niveaux d'usage (tiers)
+
+Votre organisation est placée automatiquement dans un niveau selon son historique. Les nouvelles organisations peuvent démarrer dans un niveau d'évaluation plus bas. Limites standard au 3 octobre 2026 :
+
+| Niveau | Plafond de dépense mensuel | Opus 5.5 / Sonnet 5.5 / Haiku 4.5 (RPM, ITPM, OTPM) |
+|---|---|---|
+| Start | 500 $ | 1 000 / 2 000 000 / 400 000 |
+| Build | 1 000 $ | 5 000 / 5 000 000 / 1 000 000 |
+| Scale | 200 000 $ | 10 000 / 10 000 000 / 2 000 000 |
+| Custom | sur contrat | sur contrat |
+
+Vos valeurs exactes sont visibles dans la Console, page **Settings > Limits**, où vous pouvez aussi demander une augmentation. L'API Batch a ses propres limites, partagées entre modèles (par exemple 200 000 requêtes en file d'attente au niveau Start).
+
+## Les en-têtes renvoyés
+
+| En-tête | Contenu |
 |---|---|
-| `anthropic-ratelimit-requests-limit` | RPM max autorisé |
-| `anthropic-ratelimit-requests-remaining` | RPM restants dans la fenêtre |
-| `anthropic-ratelimit-requests-reset` | ISO 8601, fin de la fenêtre RPM |
-| `anthropic-ratelimit-tokens-limit` | TPM max (input + output) |
-| `anthropic-ratelimit-tokens-remaining` | Tokens restants |
-| `anthropic-ratelimit-tokens-reset` | Reset de la fenêtre tokens |
-| `anthropic-ratelimit-input-tokens-*` | Variantes pour les input tokens |
-| `anthropic-ratelimit-output-tokens-*` | Variantes pour les output tokens |
-| `retry-after` | Secondes à attendre avant de réessayer (sur 429) |
+| `retry-after` | Secondes à attendre avant de réessayer (sur un 429) |
+| `anthropic-ratelimit-requests-limit` / `-remaining` / `-reset` | Limite de requêtes, solde restant, date de recharge complète |
+| `anthropic-ratelimit-tokens-limit` / `-remaining` / `-reset` | La limite de tokens **la plus contraignante** en vigueur |
+| `anthropic-ratelimit-input-tokens-limit` / `-remaining` / `-reset` | Idem pour les tokens d'entrée |
+| `anthropic-ratelimit-output-tokens-limit` / `-remaining` / `-reset` | Idem pour les tokens de sortie |
+| `anthropic-workspace-id` | Le workspace auquel la requête a été imputée |
 
-Les fenêtres sont glissantes sur 1 minute. Le quota n'est pas remis à zéro brutalement : il se reconstitue continuellement.
+Les dates `-reset` sont au format **RFC 3339** et indiquent quand le seau sera **entièrement** rechargé. Les soldes de tokens sont arrondis au millier.
 
-## Lire les headers dans le SDK
+## Lire les en-têtes avec les SDK
 
-Les SDK Python et TypeScript exposent les headers via `with_raw_response`.
+En Python, `with_raw_response` donne accès aux en-têtes ; `parse()` renvoie le `Message` habituel :
 
 ```python
 import anthropic
+
 client = anthropic.Anthropic()
 
 raw = client.messages.with_raw_response.create(
-    model="claude-sonnet-5-5",
+    model="claude-opus-5-5",
     max_tokens=1024,
-    messages=[{"role": "user", "content": "Hi"}],
+    messages=[{"role": "user", "content": "Bonjour"}],
 )
-print(raw.headers["anthropic-ratelimit-tokens-remaining"])
-print(raw.headers["anthropic-ratelimit-tokens-reset"])
+print(raw.headers.get("anthropic-ratelimit-input-tokens-remaining"))
+print(raw.headers.get("anthropic-ratelimit-output-tokens-reset"))
 
-message = raw.parse()  # le Message original
+message = raw.parse()
 ```
 
-En TypeScript :
+En TypeScript, avec `.withResponse()` :
 
 ```ts
-const { data, response } = await client.messages
-  .create({ model: "claude-sonnet-5-5", max_tokens: 1024, messages })
+import Anthropic from "@anthropic-ai/sdk";
+
+const client = new Anthropic();
+
+const { data: message, response } = await client.messages
+  .create({
+    model: "claude-opus-5-5",
+    max_tokens: 1024,
+    messages: [{ role: "user", content: "Bonjour" }],
+  })
   .withResponse();
 
-const remaining = Number(response.headers.get("anthropic-ratelimit-tokens-remaining"));
-const resetIso = response.headers.get("anthropic-ratelimit-tokens-reset");
+const restant = Number(response.headers.get("anthropic-ratelimit-input-tokens-remaining"));
 ```
 
-## Construire un throttler adaptatif
+## Un limiteur côté client
 
-L'idée : maintenir en mémoire un état `{ tokens_remaining, reset_at }` mis à jour à chaque réponse. Avant d'envoyer une requête, on estime ses tokens (input + max_tokens) et on attend si le solde est insuffisant.
+L'idée : garder en mémoire le dernier solde connu, estimer le coût de la prochaine requête et attendre si le solde est insuffisant. Pour estimer les tokens d'entrée, utilisez l'endpoint de comptage (voir [Budgéter ses tokens](/wiki/api/token-budgeting)) ou une estimation prudente.
 
 ```python
-import time, datetime as dt
+import time
+from datetime import datetime, timezone
 
-class RateLimitState:
+class LimiteurEntree:
     def __init__(self):
-        self.tokens_remaining = 1_000_000
-        self.reset_at = dt.datetime.now(dt.timezone.utc)
+        self.restant = None
+        self.recharge = None
 
-    def update(self, headers):
-        self.tokens_remaining = int(headers.get("anthropic-ratelimit-tokens-remaining", 0))
-        self.reset_at = dt.datetime.fromisoformat(
-            headers["anthropic-ratelimit-tokens-reset"].replace("Z", "+00:00")
-        )
+    def mettre_a_jour(self, headers):
+        valeur = headers.get("anthropic-ratelimit-input-tokens-remaining")
+        reset = headers.get("anthropic-ratelimit-input-tokens-reset")
+        if valeur is not None:
+            self.restant = int(valeur)
+        if reset:
+            self.recharge = datetime.fromisoformat(reset.replace("Z", "+00:00"))
 
-    def wait_if_needed(self, estimated_tokens):
-        if estimated_tokens > self.tokens_remaining:
-            sleep_s = (self.reset_at - dt.datetime.now(dt.timezone.utc)).total_seconds()
-            time.sleep(max(0.5, sleep_s))
+    def attendre_si_besoin(self, tokens_estimes):
+        if self.restant is None or tokens_estimes <= self.restant:
+            return
+        attente = (self.recharge - datetime.now(timezone.utc)).total_seconds()
+        time.sleep(max(0.5, min(attente, 60)))
 ```
 
-Cette logique évite ~99 % des 429 en charge soutenue, tout en utilisant ~95 % du quota disponible.
+Limites de cette approche : avec plusieurs workers, chacun ne voit que ses propres réponses. Au-delà d'un processus, centralisez le solde (Redis, par exemple) ou passez par une file d'attente unique.
 
-## Gérer le 429 résiduel
+## Gérer le 429 qui reste
 
-Même avec un throttler parfait, vous prendrez occasionnellement un 429 (latence réseau, plusieurs workers en parallèle). Respectez **toujours** le header `retry-after` plutôt qu'un backoff arbitraire.
+Même avec un limiteur, des 429 arriveront (rafales, plusieurs instances). Les SDK relancent déjà automatiquement les 429 en respectant `retry-after` (2 tentatives par défaut, réglables avec `max_retries`). Si vous gérez la relance vous-même, respectez toujours `retry-after` et ajoutez un peu d'aléa :
 
 ```ts
-async function callWithRetry(payload) {
-  for (let i = 0; i < 5; i++) {
+async function appelerAvecRelance(payload: Anthropic.MessageCreateParamsNonStreaming) {
+  for (let tentative = 0; tentative < 5; tentative++) {
     try {
-      return await client.messages.create(payload);
+      return await client.messages.create(payload, { maxRetries: 0 });
     } catch (e) {
-      if (e.status === 429) {
-        const wait = Number(e.headers?.get("retry-after") ?? 2) * 1000;
-        await new Promise(r => setTimeout(r, wait + Math.random() * 500));
+      if (e instanceof Anthropic.RateLimitError) {
+        const retryAfter = e.headers?.get("retry-after");
+        if (!retryAfter) throw e; // plafond de dépense : inutile d'insister
+        const attente = Number(retryAfter) * 1000 + Math.random() * 500;
+        await new Promise((r) => setTimeout(r, attente));
         continue;
       }
       throw e;
     }
   }
-  throw new Error("Rate limit retries exhausted");
+  throw new Error("Limite de débit : relances épuisées");
 }
 ```
 
-Le `Math.random() * 500` ajoute du **jitter**, indispensable quand plusieurs instances retry en même temps.
+Un 429 **sans** `retry-after` signale le plus souvent le plafond de dépense mensuel du niveau (code `enforced_spend_limit_reached` dans `error.details.error_code`). L'accès reprend le 1er du mois suivant à 00:00 UTC ou après passage à un niveau supérieur : relancer ne sert à rien.
 
-## Priorisation et files d'attente
+Une montée en charge très brutale peut aussi provoquer des 429 dus aux **limites d'accélération** : augmentez le trafic progressivement.
 
-Quand le throttler est saturé, ne traitez pas toutes les requêtes égalitairement : priorisez les appels utilisateur synchrones (UI) au détriment des jobs background. Utilisez deux files séparées (BullMQ, Sidekiq, SQS FIFO) avec des poids de consommation différents.
+## Organiser le trafic
 
-Pour les workloads massifs non temps réel, basculez sur la **Message Batches API** : aucune limite RPM/TPM compétitive avec les appels synchrones, et -50 % de prix.
+- **Séparez les priorités** : une file pour les requêtes interactives, une autre pour les tâches de fond, avec un débit réservé aux premières.
+- **Limitez par workspace** : dans la Console, vous pouvez fixer des limites de débit et de dépense plus basses par workspace (pas sur le workspace par défaut). Un job d'analyse ne peut alors plus épuiser le quota de votre application.
+- **Passez les gros volumes en [batch](/wiki/api/batch-api)** : file et limites séparées, moitié prix.
+- **Activez le [prompt caching](/wiki/api/prompt-caching-implementation)** : c'est le levier le plus efficace pour gagner du débit d'entrée.
+- **Surveillez** la page Usage de la Console, qui affiche votre pic d'ITPM non caché par heure, votre limite et votre taux de cache.
 
 ## Pour aller plus loin
 
-- Exposez les valeurs `tokens_remaining` et `requests_remaining` en métriques Prometheus pour visualiser votre consommation en temps réel.
-- Demandez une **augmentation de quota** via la console Anthropic dès que votre consommation dépasse 70 % du plafond sur les pics.
-- Le **prompt caching** réduit drastiquement les input tokens facturés au quota — c'est le levier #1 pour tenir vos limites.
-- Distribuez vos clés API par environnement : un job d'analytics qui consomme tout le quota ne doit pas tuer votre API user-facing.
+- [Mettre l'API en production](/wiki/api/best-practices-production)
+- [Budgéter ses tokens](/wiki/api/token-budgeting)
+- [Limites et quotas des modèles](/wiki/modeles/limites-quotas)
+
+## Sources
+
+- Rate limits : https://platform.claude.com/docs/en/api/rate-limits
+- Errors : https://platform.claude.com/docs/en/api/errors
+- API overview (en-têtes de réponse) : https://platform.claude.com/docs/en/api/overview

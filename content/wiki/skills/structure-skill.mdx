@@ -1,143 +1,127 @@
 ---
-title: "Structure d'un Skill : anatomie d'un dossier"
-description: "Décortiquer un Skill : SKILL.md, scripts, ressources, dépendances et conventions de nommage."
-updatedAt: "2026-05-19"
-readingMinutes: 7
+title: "Structure d'un skill : anatomie d'un dossier"
+description: "Ce que contient un dossier de skill (SKILL.md, scripts, références), où le placer et comment Claude Code le découvre."
+updatedAt: "2026-10-03"
+readingMinutes: 5
 ---
 
-Un Skill Claude Code est avant tout un **dossier sur disque**, lisible par n'importe quel humain et versionnable avec Git. Cette simplicité est volontaire : pas de runtime caché, pas de manifeste binaire. Voyons ce qu'on y trouve, fichier par fichier.
+Un skill Claude Code est un **dossier sur disque** : un fichier `SKILL.md` obligatoire, plus des fichiers d'appui facultatifs. Pas de build, pas de manifeste binaire, tout se versionne avec Git. Voici ce qu'on y met et où le ranger.
 
 ## Arborescence type
 
-```
-my-skill/
-├── SKILL.md              # Manifeste + instructions (obligatoire)
-├── README.md             # Doc utilisateur (optionnel)
-├── package.json          # Si publié sur npm
-├── scripts/
-│   ├── setup.sh
-│   └── validate.py
+```text
+generer-migration/
+├── SKILL.md              # obligatoire : frontmatter + instructions
+├── reference.md          # documentation détaillée, lue à la demande
+├── exemples.md           # exemples, lus à la demande
 ├── templates/
-│   └── component.tsx.hbs
-├── references/
-│   └── api-spec.md
-└── tests/
-    └── skill.test.ts
+│   └── migration.sql     # modèle à copier
+└── scripts/
+    └── valider.py        # script exécuté, son code n'entre pas dans le contexte
 ```
 
-Seul `SKILL.md` est strictement obligatoire. Tout le reste s'organise selon le besoin du skill.
+Seul `SKILL.md` est obligatoire. Le nom du dossier devient la commande : ce skill s'invoque avec `/generer-migration`, sauf si le champ `name` du frontmatter en fixe une autre.
 
 ## Le fichier SKILL.md
 
-C'est le **cœur** du skill. Il contient un frontmatter YAML suivi de Markdown libre. Claude lit le frontmatter pour décider quand activer le skill, et le corps une fois activé.
+Il contient deux parties : un frontmatter YAML entre deux lignes `---` (la première ligne du fichier doit être `---`), puis les instructions en Markdown.
 
-```md
+```markdown
 ---
-name: api-route-tester
-description: Génère et exécute des tests pour les routes Next.js avec Vitest
-allowed-tools:
-  - Bash
-  - Read
-  - Write
-  - Edit
-version: 1.2.0
+name: generer-migration
+description: Génère une migration SQL Supabase à partir d'une modification de schéma. À utiliser quand l'utilisateur ajoute une table, une colonne ou une politique RLS.
+allowed-tools: Bash(python3 *) Read Write
 ---
 
-# API Route Tester
+# Générer une migration
 
-## Quand l'utiliser
-Active-toi automatiquement quand l'utilisateur ajoute ou modifie un fichier
-sous `app/api/**/route.ts`.
+1. Lisez le schéma actuel dans `supabase/migrations/`.
+2. Partez du modèle [templates/migration.sql](templates/migration.sql).
+3. Écrivez la migration dans `supabase/migrations/<horodatage>_<nom>.sql`.
+4. Validez avec `python3 ${CLAUDE_SKILL_DIR}/scripts/valider.py <fichier>`.
 
-## Procédure
-1. Lis la route concernée
-2. Identifie les handlers exportés (GET, POST, etc.)
-3. Crée un fichier de test parallèle dans `__tests__/`
-4. Lance `npm run test -- --run` pour valider
+Pour les politiques RLS complexes, lisez [reference.md](reference.md).
 ```
 
-## Le dossier `scripts/`
+Dans Claude Code, tous les champs du frontmatter sont facultatifs, mais `description` est fortement recommandé : c'est lui qui permet à Claude de décider quand charger le skill. La liste complète est dans l'article [Frontmatter de SKILL.md](/wiki/skills/skill-md-frontmatter).
 
-Stocke ici les scripts que le skill exécutera via Bash. Convention : un script = une étape claire et testable. Préférez des scripts **idempotents** qui peuvent être relancés sans dégât.
+## Les fichiers d'appui : la divulgation progressive
 
-```bash
-#!/usr/bin/env bash
-# scripts/setup.sh
-set -euo pipefail
-mkdir -p .my-skill/cache
-echo "Skill initialisé : $(date)" >> .my-skill/log
+Le principe central des skills est la **divulgation progressive** (progressive disclosure), en trois niveaux :
+
+| Niveau | Quand c'est chargé | Contenu |
+|---|---|---|
+| 1. Métadonnées | Toujours | Nom et description |
+| 2. Instructions | Quand le skill est invoqué | Corps de `SKILL.md` |
+| 3. Ressources | Seulement si Claude les lit | Fichiers de référence, modèles ; les scripts sont exécutés et seule leur sortie entre dans le contexte |
+
+Conséquences pratiques :
+
+- gardez `SKILL.md` **sous 500 lignes** et déplacez le détail dans des fichiers séparés ;
+- citez chaque fichier depuis `SKILL.md` avec un lien relatif et dites **quand** le lire ;
+- restez à **un niveau** de référence : `SKILL.md` pointe vers `reference.md`, mais évitez que `reference.md` pointe vers un troisième fichier ;
+- préférez un script pour les opérations déterministes (validation, conversion) : c'est plus fiable et moins coûteux que de laisser Claude réécrire le code.
+
+## Référencer les scripts de façon robuste
+
+Le répertoire courant de la session ne correspond pas au dossier du skill. Utilisez les variables substituées par Claude Code :
+
+| Variable | Valeur |
+|---|---|
+| `${CLAUDE_SKILL_DIR}` | Dossier qui contient le `SKILL.md` |
+| `${CLAUDE_PROJECT_DIR}` | Racine du projet |
+| `${CLAUDE_PLUGIN_ROOT}` | Racine du plugin (skills de plugin uniquement) |
+
+Astuce : utilisez la même variable dans `allowed-tools` et dans le corps. Le script s'exécute alors sans demande de permission.
+
+```yaml
+allowed-tools: Bash(python3 ${CLAUDE_SKILL_DIR}/scripts/valider.py *)
 ```
 
-Le skill peut les invoquer ainsi :
+La règle doit correspondre exactement à la commande que le corps demande de lancer.
 
-```bash
-bash "$CLAUDE_SKILL_DIR/scripts/setup.sh"
-```
+## Où placer le dossier
 
-La variable `$CLAUDE_SKILL_DIR` est exposée par Claude Code au moment de l'exécution.
+| Emplacement | Chemin | Portée |
+|---|---|---|
+| Personnel | `~/.claude/skills/<nom>/SKILL.md` | Tous vos projets sur cette machine |
+| Projet | `.claude/skills/<nom>/SKILL.md` | Ce dépôt (à committer pour l'équipe) |
+| Imbriqué | `<sous-dossier>/.claude/skills/<nom>/SKILL.md` | Chargé quand Claude travaille dans ce sous-dossier |
+| Plugin | `<plugin>/skills/<nom>/SKILL.md` | Partout où le plugin est activé, en `/plugin:nom` |
+| Entreprise | Dossier des managed settings | Tous les postes de l'organisation |
+| Compte claude.ai | Skills activés sur votre compte | Sessions Cowork, cloud et terminal connectées à ce compte |
 
-## Le dossier `templates/`
+Claude Code remonte aussi les dossiers parents jusqu'à la racine du dépôt : un skill défini à la racine d'un monorepo reste disponible quand vous lancez `claude` dans `packages/front/`. Un dossier de skill peut être un lien symbolique.
 
-Pour les skills qui scaffoldent du code (composants, migrations, tests), un dossier `templates/` avec des fichiers Handlebars, EJS ou de simples placeholders `{{name}}` est la norme. Le skill lit le template, substitue les variables et écrit le résultat.
-
-## Le dossier `references/`
-
-Documentation interne que Claude pourra consulter dynamiquement : specs OpenAPI, schémas SQL, extraits de doc API tierce. Plutôt que d'embarquer toute la doc dans `SKILL.md` (et de consommer du contexte à chaque session), on la décharge ici et le skill instruit Claude à la lire **à la demande**.
-
-```md
-Si l'utilisateur demande un endpoint Stripe inconnu, lis d'abord
-`references/stripe-api.md` avant de répondre.
-```
-
-## Dépendances et `package.json`
-
-Si votre skill embarque du code Node ou Python exécutable, déclarez ses dépendances clairement.
-
-```json
-{
-  "name": "@acme/skill-pdf-tools",
-  "version": "0.3.1",
-  "type": "module",
-  "dependencies": {
-    "pdf-lib": "^1.17.1"
-  },
-  "files": ["SKILL.md", "scripts/", "templates/"]
-}
-```
-
-Le champ `files` est important : il évite de publier `node_modules` ou les tests sur npm.
+Deux noms sont réservés : `synced` (utilisé pour les skills synchronisés depuis claude.ai) et `anthropic-skills`.
 
 ## Conventions de nommage
 
-- **Nom du skill** (champ `name`) : kebab-case, court, descriptif (`pdf-form-filler`, pas `pdf`).
-- **Dossier** : identique au `name` pour faciliter le grep.
-- **Scripts** : verbe + objet (`setup.sh`, `validate.py`, `cleanup.sh`).
-- **Templates** : suffixe `.hbs`, `.tpl` ou extension cible + `.template`.
-
-## Découverte automatique
-
-Claude Code scanne plusieurs emplacements :
-
-```
-~/.claude/skills/                  # Skills utilisateur (globaux)
-<projet>/.claude/skills/           # Skills projet (partagés via Git)
-<projet>/node_modules/*/skill.json # Skills npm
-```
-
-Un skill installé via `npx claude-mem add` est généralement placé dans `~/.claude/skills/`.
+- **Dossier et `name`** : minuscules, chiffres et tirets, 64 caractères maximum. Les mots réservés « anthropic » et « claude » sont refusés sur claude.ai et l'API.
+- Un nom qui décrit l'action : `generer-migration` plutôt que `helper` ou `utils`.
+- **Fichiers** : barres obliques `/` dans les chemins, jamais de `\` Windows.
 
 ## Vérifier la structure
 
-Une commande utile pour vérifier la santé d'un skill avant publication :
+Il n'existe pas de linter dédié aux skills, mais la CLI des plugins vérifie le frontmatter :
 
 ```bash
-npx claude-skill-lint ./my-skill
+claude plugin validate .claude/skills      # skills du projet
+claude plugin validate ~/.claude/skills    # skills personnels
 ```
 
-Cela valide le frontmatter, vérifie que les `allowed-tools` existent et signale les références cassées vers `scripts/` ou `templates/`.
+Ensuite, dans une session, `/skills` liste les skills chargés et leur source. Si votre YAML est invalide, le skill se charge quand même mais sans métadonnées : lancez `claude --debug` pour voir l'erreur.
 
 ## Pour aller plus loin
 
-- Article wiki « SKILL.md frontmatter » pour la liste exhaustive des champs.
-- Dépôt `anthropics/skills` : https://github.com/anthropics/skills
-- Documentation officielle : https://docs.claude.com/en/docs/claude-code/skills
+- [Frontmatter de SKILL.md](/wiki/skills/skill-md-frontmatter)
+- [Installer un skill](/wiki/skills/installer-skill)
+- [Tester un skill](/wiki/skills/tester-skill)
+- [Skill, subagent, MCP ou plugin](/wiki/skills/skill-vs-agent-vs-mcp)
+
+## Sources
+
+- Skills dans Claude Code : https://code.claude.com/docs/en/skills
+- Agent Skills, structure et divulgation progressive : https://docs.claude.com/en/docs/agents-and-tools/agent-skills/overview
+- Bonnes pratiques de rédaction : https://platform.claude.com/docs/en/agents-and-tools/agent-skills/best-practices
+- Exemples officiels : https://github.com/anthropics/skills

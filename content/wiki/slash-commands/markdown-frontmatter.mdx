@@ -1,142 +1,169 @@
 ---
-title: "Markdown frontmatter dans les slash commands"
-description: "Tous les champs supportés dans le frontmatter d'une slash command et leur effet."
-updatedAt: "2026-05-19"
-readingMinutes: 5
+title: "Le frontmatter des commandes personnalisées"
+description: "Les champs du frontmatter d'une commande /nom (description, argument-hint, allowed-tools, model, effort, context…), leur effet réel et les erreurs qui les rendent inopérants."
+updatedAt: "2026-10-03"
+readingMinutes: 7
 ---
 
-Le frontmatter YAML en haut d'un fichier `.md` de slash command n'est pas décoratif : chaque champ a un effet précis sur la façon dont Claude Code exécute la commande. Description visible dans `/help`, restriction des tools, hint d'argument, choix du modèle... bien remplir le frontmatter rend vos commandes prévisibles, sûres et plus économiques.
+Le bloc YAML en tête d'une commande personnalisée décide de ce qu'affiche le menu `/`, de qui peut la déclencher, des outils pré-autorisés et du modèle utilisé. Les mêmes champs valent pour un skill (`.claude/skills/<nom>/SKILL.md`) et pour l'ancien format (`.claude/commands/<nom>.md`), sauf `name` et `paths`, réservés aux skills. Cet article se concentre sur l'usage en commande ; la référence complète est dans [Frontmatter de SKILL.md](/wiki/skills/skill-md-frontmatter).
 
-## Anatomie complète
+## Un exemple complet
 
-Voici une commande qui utilise tous les champs courants, `.claude/commands/pr-review.md` :
+`.claude/skills/revue-pr/SKILL.md` :
 
 ```md
 ---
-description: "Review approfondie d'une pull request GitHub"
-argument-hint: "<numéro de PR>"
-allowed-tools: [Read, Grep, Bash(gh pr:*), Bash(gh api:*)]
-model: claude-opus-5-5
+description: Revue approfondie d'une pull request GitHub
+argument-hint: <numéro de PR>
+disable-model-invocation: true
+allowed-tools: Read Grep Bash(gh pr diff *) Bash(gh pr view *)
+model: opus
+effort: high
 ---
 
-Review approfondie de la PR #$ARGUMENTS.
+Faites la revue de la PR #$ARGUMENTS.
 
-1. Récupère le diff avec `gh pr diff $ARGUMENTS`
-2. Analyse les changements selon les critères :
-   - correctness
-   - sécurité
-   - performance
-   - tests
-   - lisibilité
-3. Poste un résumé en commentaire avec `gh pr comment`
+1. Vérifiez que l'argument est un nombre, sinon arrêtez-vous.
+2. Récupérez le diff avec `gh pr diff <numéro>` et le contexte avec `gh pr view <numéro>`.
+3. Évaluez : correction (bugs, cas limites), sécurité (entrées non validées, secrets), tests manquants.
+
+Rendez un rapport classé par gravité. Ne publiez aucun commentaire sur la PR.
 ```
 
-## `description`
+Le diff est récupéré par Claude via l'outil Bash, pas par une injection `` !`…` `` : l'argument tapé n'est donc jamais exécuté tel quel dans un shell (voir [Bash injection](/wiki/slash-commands/bash-injection-securisee)). Les deux règles `Bash(gh pr …)` évitent les demandes de confirmation.
 
-Apparaît dans `/help` à côté du nom de la commande. C'est la documentation à un niveau d'abstraction utile : pas le code, pas le détail d'implémentation, juste ce que la commande fait du point de vue de l'utilisateur.
+## Les champs, un par un
 
-Bonne description : `"Review approfondie d'une pull request GitHub"`
-Mauvaise : `"Lance gh pr diff puis appelle l'API"` (trop technique, change avec l'implé).
+| Champ | Effet | Valeur par défaut |
+| --- | --- | --- |
+| `description` | Texte du menu `/` ; sert à Claude pour décider de charger le skill | Première ligne non vide du contenu |
+| `argument-hint` | Indice affiché dans l'autocomplétion | Aucun |
+| `arguments` | Noms des arguments positionnels (`$composant`, `$cible`) | Aucun |
+| `disable-model-invocation` | `true` : seul vous pouvez lancer la commande | `false` |
+| `user-invocable` | `false` : la commande disparaît du menu `/`, seul Claude l'utilise | `true` |
+| `allowed-tools` | Outils pré-autorisés pendant le tour de l'invocation | Aucun |
+| `disallowed-tools` | Outils retirés tant que la commande est active | Aucun |
+| `model` | Modèle pour le reste du tour | Modèle de la session |
+| `effort` | Niveau d'effort (`low` à `max`) | Celui de la session |
+| `context` | `fork` : exécution dans un sous-agent isolé | Contexte principal |
+| `agent` | Type de sous-agent avec `context: fork` | `general-purpose` |
+| `hooks` | Hooks activés à l'invocation, jusqu'à la fin de la session | Aucun |
+| `shell` | `bash` ou `powershell` pour les blocs `` !`…` `` | `bash` |
+| `name`, `paths` | Nom de commande, activation par motif de fichiers (skills seulement) | Nom du dossier |
 
-## `argument-hint`
+### `description`
 
-Hint affiché à côté du nom dans l'auto-complétion. Utilisez les conventions Unix : `<obligatoire>`, `[optionnel]`, `a|b|c` pour des choix.
+Écrivez ce que fait la commande du point de vue de l'utilisateur, avec les mots qu'il emploierait. Placez l'usage principal en premier : la description et `when_to_use` réunis sont tronqués à 1 536 caractères dans la liste des skills.
+
+- Bonne : `Revue approfondie d'une pull request GitHub`
+- Mauvaise : `Lance gh pr diff puis appelle l'API` (décrit l'implémentation, pas le besoin)
+
+### `argument-hint`
+
+Suivez les conventions Unix : `<obligatoire>`, `[optionnel]`, `a|b|c` pour un choix.
 
 ```yaml
-argument-hint: "<numéro de PR>"
+argument-hint: <numéro de PR>
 argument-hint: "[fichier]"
-argument-hint: "<patch|minor|major>"
-argument-hint: "<méthode HTTP> <chemin>"
+argument-hint: <patch|minor|major>
 ```
 
-Pas de hint = champ vide dans `/help`. Pour des commandes partagées en équipe, c'est presque obligatoire.
+Mettez entre guillemets une valeur qui commence par `[` ou `{` : sinon YAML la lit comme une liste ou un objet.
 
-## `allowed-tools`
+### `allowed-tools` : une autorisation, pas une restriction
 
-C'est le champ le plus important pour la sécurité. Il restreint les tools que Claude peut utiliser **uniquement pour cette commande**. Tout ce qui n'est pas dans la liste est interdit.
+C'est le champ le plus mal compris. Il **pré-autorise** les outils listés : Claude peut les utiliser sans vous demander confirmation, pendant le tour où la commande est invoquée. L'autorisation disparaît dès votre message suivant.
+
+Il ne **restreint rien** : tous les autres outils restent disponibles et suivent vos règles de permission habituelles. Une commande avec `allowed-tools: Read Grep` peut toujours modifier un fichier si vous l'acceptez dans la demande de confirmation (ou si le mode `auto` l'accepte).
+
+Syntaxe : liste séparée par des espaces ou des virgules, ou liste YAML. Les motifs suivent les règles de permission :
 
 ```yaml
-allowed-tools: [Read, Grep, Bash(gh pr:*), Bash(gh api:*)]
+allowed-tools: Read Grep Glob Bash(git log *) Bash(npm test *)
 ```
 
-Syntaxe :
+- `Bash(git log *)` couvre `git log` suivi de n'importe quoi. L'ancienne forme `Bash(git log:*)` est équivalente.
+- Pour les fichiers, seuls les motifs `Edit(...)` et `Read(...)` sont vérifiés. `Write(tests/**)` est accepté mais jamais consulté : écrivez `Edit(tests/**)`.
 
-- Nom de tool seul : `Read`, `Edit`, `Write`, `Grep`, `Glob`
-- Tool avec pattern : `Bash(npm:*)`, `Bash(git status)`, `WebFetch(https://docs.claude.com/*)`
-- Wildcards `*` à la fin d'un pattern
+### `disallowed-tools` : la vraie restriction
 
-Si vous omettez `allowed-tools`, la commande hérite des permissions globales de la session. Si vous le définissez, c'est cette liste qui l'emporte — y compris contre les permissions globales plus permissives. C'est le mécanisme de "least privilege" : votre `/db:migrate` ne pourra pas appeler `rm -rf` même si vous l'avez autorisé ailleurs.
-
-## `model`
-
-Force un modèle spécifique pour l'exécution de cette commande. Utile dans deux cas :
+Pour empêcher une commande d'utiliser un outil, listez-le ici. L'outil est retiré tant que la commande est active, jusqu'à votre message suivant.
 
 ```yaml
-model: claude-opus-5-5      # tâche critique, on veut Opus
-model: claude-haiku-4-5     # tâche simple, on veut Haiku pour la latence
+disallowed-tools: Edit Write Bash
 ```
 
-- **Tâche critique** (audit sécurité, refactor complexe) : forcez Opus même si l'utilisateur est sur Sonnet par défaut.
-- **Tâche très simple** (lint, format, résumé court) : forcez Haiku pour réduire le coût et la latence.
+Pour une interdiction permanente, utilisez plutôt des règles `deny` dans `settings.json` : voir [Permissions et MCP](/wiki/slash-commands/mcp-permissions).
 
-Sans ce champ, la commande utilise le modèle courant de la session.
+### `model` et `effort`
 
-## Autres champs (selon la version)
+`model` accepte les mêmes valeurs que `/model` : un alias (`opus`, `sonnet`, `haiku`), un identifiant complet (`claude-opus-5-5`) ou `inherit`. Le changement vaut pour le reste du tour et n'est pas enregistré : la session reprend son modèle au prompt suivant.
 
-D'autres champs peuvent apparaître selon la version de Claude Code :
+```yaml
+model: haiku     # tâche mécanique : rapide et peu coûteux
+model: opus      # revue critique
+effort: high     # raisonnement plus poussé sur cette commande
+```
 
-- `temperature` : ajuster la température pour cette commande (rare).
-- `disallowed-tools` : liste noire explicite (l'inverse d'`allowed-tools`).
-- `pre-prompt` / `post-prompt` : injecter du texte avant/après le corps du fichier.
+Un modèle exclu par la liste `availableModels` de votre organisation est ignoré sans erreur. Avec `context: fork`, `model` choisit le modèle du sous-agent.
 
-Vérifiez la doc officielle de votre version pour la liste exhaustive.
+### `disable-model-invocation` et `user-invocable`
+
+| Frontmatter | Vous pouvez lancer | Claude peut lancer |
+| --- | --- | --- |
+| (rien) | Oui | Oui |
+| `disable-model-invocation: true` | Oui | Non |
+| `user-invocable: false` | Non | Oui |
+
+Mettez `disable-model-invocation: true` sur toute commande avec effets de bord (déploiement, commit, envoi de message). Bonus : sa description ne charge plus le contexte de Claude.
+
+### `context: fork`
+
+La commande s'exécute dans un sous-agent qui ne voit pas votre conversation, en arrière-plan par défaut (`background: false` pour attendre son résultat). Réservez-le aux commandes qui contiennent une tâche complète. Voir [Skills et commandes](/wiki/slash-commands/skills-vs-slash).
 
 ## Patterns recommandés
 
-**Commande de lecture seule** :
+**Lecture seule, sans confirmation** :
 
 ```yaml
 ---
-description: "Liste les TODO du code"
-allowed-tools: [Read, Grep, Glob]
-model: claude-haiku-4-5
+description: Liste les TODO et FIXME du code
+allowed-tools: Read Grep Glob
+disallowed-tools: Edit Write
+model: haiku
 ---
 ```
 
-Restreindre à `Read/Grep/Glob` garantit qu'aucun fichier ne sera modifié, peu importe ce que demande l'utilisateur.
-
-**Commande d'audit coûteuse** :
+**Génération limitée aux tests** :
 
 ```yaml
 ---
-description: "Audit architecture complet"
-allowed-tools: [Read, Grep, Glob, Bash(git log:*)]
-model: claude-opus-5-5
+description: Génère des tests unitaires pour un fichier
+argument-hint: <fichier>
+allowed-tools: Read Edit(tests/**) Bash(npm test *)
 ---
 ```
 
-Opus + lecture seule + accès à l'historique git.
-
-**Commande sandbox-friendly** :
-
-```yaml
----
-description: "Génère un fichier de test sans toucher au code prod"
-allowed-tools: [Read, Write(tests/**), Bash(npm test:*)]
----
-```
-
-`Write(tests/**)` n'autorise les écritures que dans `tests/`. Combiné aux permissions globales, c'est une garantie forte.
+Ici, seules les écritures dans `tests/` passent sans confirmation. Une écriture ailleurs déclenche la demande habituelle.
 
 ## Erreurs fréquentes
 
-- **YAML invalide** : tab au lieu d'espaces, deux-points manquant, guillemets non échappés. La commande disparaît silencieusement de `/help`.
-- **`allowed-tools` trop large** : `Bash(*)` annule l'intérêt. Préférez des préfixes.
-- **`model` sur une commande légère** : forcer Opus pour générer une liste de TODO coûte 5× plus pour rien.
-- **`description` qui ment** : si la commande fait plus que ce qu'elle dit, l'utilisateur ne peut pas s'y fier.
+- **Le `---` n'est pas en première ligne** : tout le fichier, marqueurs compris, est traité comme du contenu.
+- **YAML invalide** : la commande reste disponible mais sans aucun champ (ni description, ni outils). Lancez `claude --debug` pour voir l'erreur, ou `claude plugin validate .claude/skills`.
+- **Nom de champ mal écrit** : `allowedTools`, `disableModelInvocation` ou un champ inventé (`temperature`, `pre-prompt`) sont ignorés sans avertissement.
+- **Croire qu'`allowed-tools` protège** : il ouvre des droits, il n'en ferme aucun.
+- **Forcer `opus` partout** : réservez-le aux commandes où la qualité du raisonnement change le résultat.
+
+Les valeurs booléennes acceptent `true`/`false`, mais aussi `yes`, `no`, `on`, `off`, `1` et `0`.
 
 ## Pour aller plus loin
 
-- Doc officielle : https://docs.claude.com/en/docs/claude-code/slash-commands
-- Guide "Bash injection sécurisée" pour les détails sur les patterns Bash
-- Tester votre frontmatter : `/help` doit afficher la description correctement
+- [Créer une commande personnalisée](/wiki/slash-commands/creer-slash-command)
+- [Arguments et namespacing](/wiki/slash-commands/arguments-namespacing)
+- [Frontmatter de SKILL.md : tous les champs](/wiki/skills/skill-md-frontmatter)
+
+## Sources
+
+- [Skills : frontmatter reference](https://code.claude.com/docs/en/skills)
+- [Permissions](https://code.claude.com/docs/en/permissions)
+- [Commands](https://code.claude.com/docs/en/commands)

@@ -1,156 +1,129 @@
 ---
-title: "Gestion des conflits d'édition"
-description: "Comment Claude Code détecte et résout les modifications concurrentes sur un fichier — bonnes pratiques."
-updatedAt: "2026-05-19"
-readingMinutes: 6
+title: "Conflits d'édition et de merge avec Claude Code"
+description: "Comment éviter et résoudre les conflits quand Claude, vous, un formateur, d'autres sessions ou Git modifient les mêmes fichiers : règles d'Edit, checkpoints, worktrees et résolution de merge."
+updatedAt: "2026-10-03"
+readingMinutes: 7
 ---
 
-Quand vous travaillez avec Claude Code, votre fichier peut être modifié par plusieurs acteurs en même temps : Claude lui-même, vous via votre éditeur, un script de format-on-save, ou même un autre agent. Ces **modifications concurrentes** peuvent provoquer des conflits d'édition. Claude Code intègre plusieurs mécanismes pour détecter ces situations et s'en sortir proprement.
+Pendant une session, un même fichier peut être modifié par plusieurs acteurs : Claude, vous dans votre éditeur, un formateur automatique, un sous-agent, une autre session ou un `git pull`. Claude Code a des garde-fous pour ne pas écraser ce qu'il n'a pas vu, mais certains cas restent à votre charge. Cet article couvre les deux familles de conflits : les **modifications concurrentes** en cours de session et les **conflits de merge Git**.
 
-## Le problème : pourquoi des conflits
+## Ce que Claude Code fait pour vous protéger
 
-Les conflits d'édition surviennent typiquement dans ces scénarios :
+### Le remplacement exact d'Edit
 
-1. **Claude lit un fichier → vous l'éditez dans VS Code → Claude tente un Edit** → le `old_string` ne matche plus.
-2. **Un linter (Prettier, ESLint) modifie le fichier au save** alors que Claude vient de lire.
-3. **Un git pull** rapporte des changements en cours de session.
-4. **Deux subagents en parallèle** éditent le même fichier.
+`Edit` ne modifie un fichier que si `old_string` correspond **exactement** et **une seule fois** au contenu. Si vous avez changé ce passage entre-temps, l'édition échoue au lieu d'écraser votre travail.
 
-Sans détection, Claude écraserait votre travail ou échouerait silencieusement.
+### Le fichier modifié sur disque
 
-## Mécanismes de détection
+Depuis la version 2.1.208, si le fichier a changé depuis la dernière lecture de Claude, l'édition passe quand même lorsque `old_string` correspond exactement au contenu **actuel**. Le résultat signale à Claude que le fichier contient d'autres changements, pour qu'il le relise avant toute modification qui dépend du contexte. Dans tous les autres cas, Claude relit le fichier avant de réessayer.
 
-### 1. Mismatch sur Edit
+### La lecture préalable
 
-Si vous modifiez `app/page.tsx` pendant que Claude lit le fichier, son `Edit` suivant fera matcher `old_string` contre la **version qu'il a lue**, pas la version actuelle. Si elles diffèrent, l'Edit échoue avec une erreur claire ("old_string not found").
+Selon le modèle, Claude doit avoir lu un fichier avant de l'éditer ou de l'écraser. Les modèles récents peuvent s'en dispenser quand la lecture ne demanderait pas d'autorisation, mais une lecture partielle (`PARTIAL view`) ne compte jamais, et un notebook doit toujours être lu avant un `Write`.
 
-C'est la garantie centrale de l'outil Edit : pas de match, pas de modification.
+## Les situations à risque
 
-### 2. Read obligatoire avant Edit/Write
+| Situation | Risque | Parade |
+|-----------|--------|--------|
+| Vous éditez le fichier dans votre IDE pendant que Claude travaille | Un `Write` efface vos changements | Laissez Claude finir son tour, ou demandez des `Edit` ciblés |
+| Formatage automatique (format-on-save, hook) | Les `Edit` suivants ne correspondent plus | Relecture automatique ; formater via un hook `PostToolUse` plutôt que dans l'IDE |
+| Deux sous-agents sur les mêmes fichiers | Le dernier écrit gagne | Périmètres disjoints ou `isolation: worktree` |
+| Deux sessions Claude sur le même dépôt | Modifications croisées | Une session par worktree (`claude --worktree`) |
+| `git pull` ou changement de branche en cours de session | Claude travaille sur une version périmée | Lui dire de relire les fichiers concernés |
 
-Edit refuse de modifier un fichier qui n'a pas été lu **dans la conversation courante**. Si une session précédente avait lu le fichier, ce n'est pas suffisant — il faut un Read récent. Cela force Claude à toujours travailler sur une vue à jour.
+## Isoler le travail parallèle avec les worktrees
 
-### 3. Détection de changement disque (selon harness)
-
-Certaines versions du harness détectent que le mtime du fichier a changé entre le Read et l'Edit, et insèrent un avertissement. [à vérifier selon version]
-
-## Stratégies de résolution
-
-### Conflit détecté : Edit échoue
-
-Symptôme : "old_string not found in file".
-
-Solution :
+La meilleure prévention est de ne jamais faire travailler deux agents dans le même dossier.
 
 ```bash
-# 1. Re-lire pour obtenir l'état actuel
-Read(file_path="/.../app/page.tsx")
-
-# 2. Identifier ce qui a changé (mentalement ou via git diff)
-Bash(command="git diff /.../app/page.tsx", description="See current changes")
-
-# 3. Adapter l'Edit à la nouvelle version
-Edit(file_path="/.../app/page.tsx", old_string="<nouvelle version>", new_string="...")
+# Terminal 1
+claude --worktree feature-auth
+# Terminal 2
+claude --worktree fix-paiement
 ```
 
-Ne **forcez pas** un Write par dessus — vous perdriez les modifications externes.
+Chaque session travaille dans `.claude/worktrees/<nom>/` sur sa propre branche (`worktree-<nom>`). Ajoutez `.claude/worktrees/` à votre `.gitignore`, et un fichier `.worktreeinclude` pour copier les fichiers ignorés utiles (`.env`, `.env.local`) dans chaque nouveau worktree.
 
-### Conflit avec un formatter
+Pour les sous-agents, ajoutez `isolation: worktree` à leur définition : chacun reçoit un worktree temporaire, supprimé automatiquement s'il n'a rien modifié.
 
-Si Prettier reformate vos fichiers au save :
+## Revenir en arrière : checkpoints et limites
 
-- soit désactiver le format-on-save pendant les sessions Claude longues ;
-- soit accepter que Claude doive relire avant chaque Edit ;
-- soit demander à Claude de respecter le format Prettier dans ses Edit (utile sur les `;`, indentation, quotes).
+`/rewind` (ou `Échap` deux fois sur une saisie vide) restaure le code et/ou la conversation à un prompt précédent. Mais il ne restaure pas tout :
 
-### Conflit avec un git pull en cours
+- les fichiers modifiés par des commandes **Bash** (`rm`, `mv`, `sed -i`, scripts) ;
+- les modifications **externes** (vous, une autre session), sauf si elles touchent les mêmes fichiers ;
+- les modifications des **sous-agents** (hors skill forké au premier plan) ;
+- les fichiers liés par lien symbolique ou lien physique.
 
-Si un coéquipier push pendant votre session :
+Pour tout cela, Git reste le filet de sécurité : commitez avant les opérations risquées.
+
+## Résoudre un conflit de merge Git avec Claude
+
+Claude gère bien les conflits Git, à condition de travailler en non interactif (`git rebase -i` ou un éditeur qui attend une saisie bloquent la commande).
+
+**Prompt type :** « Fusionne `main` dans ma branche. S'il y a des conflits, résous-les en gardant notre logique métier et les correctifs de `main`, explique chaque choix, puis lance les tests. Ne commite pas sans mon accord. »
+
+Enchaînement typique :
 
 ```bash
-# 1. Constater
-Bash(command="git fetch && git status", description="Check remote changes")
-
-# 2. Décider : merger maintenant ou plus tard ?
-# Si merge maintenant :
-Bash(command="git pull --rebase", description="Pull with rebase")
-
-# 3. Re-lire les fichiers touchés
-Read(file_path="...")  # avant de réediter
+git fetch origin
+git merge origin/main            # ou : git rebase origin/main
+git status                       # liste des fichiers en conflit
+git diff --name-only --diff-filter=U
 ```
 
-### Conflit entre deux subagents
-
-Si vous lancez deux Task en parallèle qui éditent les mêmes fichiers, le dernier Edit gagne. **Prévention** : isoler les périmètres.
+Pour chaque fichier en conflit, Claude lit les blocs `<<<<<<<`, `=======`, `>>>>>>>`, comprend l'intention des deux côtés (au besoin avec `git log -p` sur les commits concernés), remplace le bloc par la version fusionnée avec `Edit`, puis :
 
 ```bash
-# Bon
-Task(prompt="Refactor /src/auth/...")
-Task(prompt="Refactor /src/billing/...")
-
-# Risqué
-Task(prompt="Refactor utils used everywhere")
-Task(prompt="Add new utility to utils/")
-# → deux subagents touchent /utils/, dernier gagne
+rg -n "^(<<<<<<<|=======|>>>>>>>)" .   # vérifier qu'aucun marqueur ne reste
+npm run build && npm test
+git add <fichiers résolus>
+GIT_EDITOR=true git merge --continue   # ou : GIT_EDITOR=true git rebase --continue
 ```
 
-## Pièges courants
+`GIT_EDITOR=true` évite l'ouverture d'un éditeur interactif pour le message de commit.
 
-**Forcer un Write après échec d'Edit.** Tentation : "tant pis, je réécris tout". Vous perdez les changements externes. Re-lisez avant.
+Bonnes pratiques :
 
-**Ignorer un mtime suspect.** Si vous avez l'impression que le fichier a changé entre votre Read et votre Edit, refaites un Read. C'est 5 secondes contre des heures de debug.
+- **Exigez une explication par conflit** : vous validez des choix, pas seulement un résultat qui compile.
+- **Méfiez-vous des fichiers générés** (lockfiles, migrations, snapshots) : régénérez-les (`npm install`, outil de migration) plutôt que de fusionner le texte.
+- **Pour un rebase long**, demandez un arrêt après chaque commit en conflit pour vérifier.
 
-**Conflits silencieux avec un linter.** Prettier formate votre code, votre Edit échoue, vous le refaites, le linter reformate à nouveau... boucle infinie possible. Diagnostiquez tôt.
+## Commandes Git destructives
 
-**Travailler sur un fichier sans VCS.** Sans git, tout conflit est un risque réel de perte. Initialisez un repo même pour les projets temporaires.
+Ne laissez jamais Claude lancer sans votre accord explicite `git reset --hard`, `git checkout .`, `git clean -fd` ou `git push --force`. Deux règles de permission suffisent à imposer une confirmation, même en mode `auto` :
 
-**Subagents qui se marchent dessus.** Toujours définir des périmètres disjoints quand vous parallélisez.
+```json
+{
+  "permissions": {
+    "ask": ["Bash(git push --force *)", "Bash(git reset --hard *)", "Bash(git clean *)"]
+  }
+}
+```
 
-## Bonnes pratiques
-
-**1. Lisez juste avant d'éditer.** Pas en début de session — juste avant.
-
-**2. Petits Edit, validation rapide.** Plutôt qu'un gros Edit risqué, plusieurs petits avec build/test entre. Réduit la surface de conflit.
-
-**3. Commit fréquent.** Plus vos commits sont rapprochés, plus le diff est court, plus facile de récupérer si un conflit casse quelque chose.
-
-**4. Pause les automatisations lourdes.** Pendant un refactoring long, désactivez momentanément les format-on-save agressifs.
-
-**5. Surveillez les hooks Claude.** Si vous avez configuré des hooks dans `settings.json` (ex. format après Edit), ils peuvent eux-mêmes créer des conflits. Testez en isolé.
-
-## Et avec git ?
-
-Claude Code respecte git. Quelques bonnes pratiques :
-
-| Situation | Recommandation |
-|-----------|----------------|
-| Tâche longue | Branche dédiée |
-| Refactoring lourd | Commits intermédiaires fréquents |
-| Conflit pendant push | `git pull --rebase`, re-lire, ré-éditer |
-| Edit qui casse les tests | `git restore <file>` puis recommencer |
-| Avant un commit | Toujours `git status` + `git diff` |
-
-**Important :** ne jamais utiliser `git reset --hard`, `git checkout .`, `git clean -f`, ou `git push --force` sans demande explicite — ce sont des opérations destructives qui peuvent perdre du travail.
-
-## Récupération après un conflit mal géré
-
-Si vous suspectez que Claude a écrasé du contenu :
+## Récupérer après un écrasement
 
 ```bash
-# 1. Vérifier l'historique
-Bash(command="git log -p -- /.../fichier-suspect.ts | head -100", description="File history")
-
-# 2. Comparer avec une version précédente
-Bash(command="git diff HEAD~1 -- /.../fichier-suspect.ts", description="Compare with last commit")
-
-# 3. Restaurer si nécessaire
-Bash(command="git restore --source=HEAD~1 -- /.../fichier-suspect.ts", description="Restore previous version")
+git diff -- chemin/fichier.ts                       # ce qui a changé depuis le dernier commit
+git log -p -5 -- chemin/fichier.ts                  # historique récent du fichier
+git restore --source=HEAD~1 -- chemin/fichier.ts    # restaurer une version précédente
+git reflog                                          # retrouver un état perdu après reset ou rebase
 ```
 
-Si vous n'avez pas committé : `git stash list` (parfois sauvegardé automatiquement), ou les snapshots VS Code (timeline).
+Si rien n'était commité : essayez d'abord `/rewind` (pour les modifications faites par les outils d'édition de Claude), puis l'historique local de votre IDE.
 
-## Pour aller plus loin
+## Articles liés
 
-- [Documentation Claude Code](https://docs.claude.com/en/docs/claude-code)
-- Voir aussi : `Edit` (mécanisme de match exact), `Task` (isolation des subagents), `Bash` (commandes git).
-- Astuce : pour les tâches risquées, demandez à Claude d'enchaîner Edit → `git diff` → `git add -p` → revue interactive avant commit. Cette discipline élimine 95 % des conflits avant qu'ils ne mordent.
+- [L'outil Edit](/wiki/outils/edit)
+- [L'outil Write](/wiki/outils/write)
+- [L'outil Agent (sous-agents)](/wiki/outils/task-subagents)
+- [Checkpoints et /rewind](/wiki/cli/continue-checkpoints)
+- [Travailler sur plusieurs projets](/wiki/cli/multi-projet-context-switching)
+
+## Sources
+
+- [Tools reference : Edit tool behavior](https://code.claude.com/docs/en/tools-reference#edit-tool-behavior)
+- [Checkpointing](https://code.claude.com/docs/en/checkpointing)
+- [Run parallel sessions with worktrees](https://code.claude.com/docs/en/worktrees)
+- [Configure permissions](https://code.claude.com/docs/en/permissions)
+- [git-merge](https://git-scm.com/docs/git-merge)

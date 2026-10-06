@@ -1,49 +1,219 @@
 ---
-title: "Documentation technique vivante"
-description: "Boucler code et documentation avec MkDocs et diagrammes Mermaid régénérés à chaque commit via hook Claude."
-updatedAt: "2026-05-19"
-readingMinutes: 6
+title: "Documentation vivante : tenir la doc à jour avec Claude Code"
+description: "Faire mettre à jour la documentation technique (pages Markdown, diagrammes Mermaid) à partir de chaque diff, avec une skill /maj-doc, un rappel par hook après commit et une GitHub Action qui ouvre une PR de documentation."
+updatedAt: "2026-10-03"
+readingMinutes: 8
 ---
 
-La documentation technique vieillit dès qu'on cesse de l'écrire. Le seul moyen fiable de la maintenir à jour est de la coupler au cycle de vie du code lui-même. Avec Claude Code, un hook `PostToolUse` ou un hook Git côté CI peut régénérer les pages MkDocs et les diagrammes Mermaid affectés à chaque commit, sans intervention humaine.
+Une documentation technique vieillit dès que le code change sans elle. La solution durable consiste à la garder dans le même dépôt que le code et à la mettre à jour au même rythme. Claude Code est bien placé pour cela : il lit le diff, retrouve les pages concernées et propose les modifications. Cet article montre un circuit complet, de la session locale à la CI, avec des garde-fous pour que la doc reste fiable.
 
-## Le principe de la doc vivante
+## Le principe
 
-Une documentation vivante repose sur trois propriétés. Elle est versionnée dans le même dépôt que le code. Elle est partiellement générée à partir de signatures, commentaires ou conventions du code. Elle est régénérée automatiquement quand le code change. Claude n'écrit pas toute la doc : il met à jour les sections impactées par un diff et signale celles qui méritent une relecture humaine.
+Une documentation « vivante » a trois propriétés :
 
-## Stack MkDocs minimale
+1. Elle est **versionnée avec le code**, dans un dossier `docs/`.
+2. Elle est **partiellement dérivée du code** : signatures, schémas, variables d'environnement, routes.
+3. Elle est **mise à jour à partir du diff**, pas réécrite à chaque fois.
 
-MkDocs Material est un excellent point de départ. Structurez `docs/` avec un dossier par domaine fonctionnel et une page par module ou service. Activez les plugins `mkdocs-mermaid2` pour les diagrammes, `mkdocstrings` pour les signatures Python ou TypeScript extraites du code, et `mkdocs-include-markdown-plugin` pour réutiliser des fragments. Le build se lance avec `mkdocs build --strict` pour échouer dès qu'un lien casse.
+Claude ne rédige pas toute la documentation. Il met à jour les passages touchés par un changement et signale ceux qui demandent une relecture humaine.
 
-## Hook de régénération
+## Ce qu'on automatise, ce qu'on garde humain
 
-Configurez un hook qui se déclenche après chaque commit local ou en pré-merge sur la CI. Le script appelle Claude avec le diff Git et une consigne précise : "identifie les fichiers de doc à mettre à jour à partir de ce diff, modifie-les pour refléter les changements de comportement, n'invente rien". Claude répond avec une liste de patchs MkDocs et, si nécessaire, des diagrammes Mermaid mis à jour. Le hook applique les patchs et relance `mkdocs build`.
+| Type de page | Mise à jour par Claude | Pourquoi |
+|---|---|---|
+| Référence API, routes, variables d'environnement, schéma de base | Oui, à chaque changement | Dérivée du code, vérifiable |
+| Diagrammes d'architecture (Mermaid) | Oui, sur changement structurel | Nouveau service, route renommée, dépendance ajoutée |
+| Guides et tutoriels | Proposition seulement, relue par un humain | Le ton et la pédagogie comptent |
+| Décisions d'architecture (ADR) | Jamais | Une décision passée ne se réécrit pas |
+
+Matérialisez ce choix dans chaque page avec un champ de frontmatter, par exemple `auto_update: true` ou `auto_update: false`. Ce champ est une convention de votre projet : Claude le respecte parce que vos consignes le lui demandent.
+
+## Étape 1 : une doc en Markdown avec Mermaid
+
+N'importe quel générateur de site à partir de Markdown convient (MkDocs, Docusaurus, Starlight), ou même un simple dossier `docs/` affiché par GitHub, qui rend les blocs Mermaid nativement. Avec MkDocs et le thème Material, activez Mermaid ainsi :
 
 ```yaml
-# .github/workflows/docs.yml
-on: [push]
+# mkdocs.yml
+site_name: Documentation technique
+theme:
+  name: material
+markdown_extensions:
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+```
+
+Les diagrammes vivent alors dans les pages, à côté du texte qu'ils illustrent :
+
+````markdown
+```mermaid
+flowchart LR
+  Client --> API[/api/*]
+  API --> Middleware{Token Supabase valide ?}
+  Middleware -- oui --> Routes
+  Middleware -- non --> E401[401]
+  Routes --> DB[(Postgres + RLS)]
+```
+````
+
+Lancez `mkdocs build --strict` en CI : le build échoue sur un lien interne cassé ou un avertissement, ce qui attrape une bonne partie des incohérences.
+
+Ajoutez enfin dans `CLAUDE.md` les règles de la doc :
+
+```markdown
+## Documentation
+- La doc vit dans `docs/`. Une page par module, un dossier par domaine.
+- Pages `auto_update: true` : à mettre à jour quand le code change.
+- Pages `auto_update: false` : ne jamais modifier, signaler seulement.
+- N'inventez rien : chaque affirmation doit correspondre au code actuel.
+```
+
+## Étape 2 : une skill /maj-doc
+
+Une skill transforme la consigne en commande réutilisable. Celle-ci injecte le diff de la branche avant que Claude ne lise les instructions (syntaxe `` !`commande` ``, propre à Claude Code).
+
+````markdown
+---
+name: maj-doc
+description: Met à jour la documentation de docs/ à partir du diff de la branche courante
+disable-model-invocation: true
+allowed-tools: Read Grep Glob Edit Bash(git diff *) Bash(mkdocs build *)
+---
+Voici les changements de la branche par rapport à main :
+
+!`git diff --stat origin/main...HEAD`
+
+!`git diff origin/main...HEAD -- src/ app/ lib/`
+
+1. Listez les pages de `docs/` concernées par ces changements.
+2. Mettez à jour uniquement les pages marquées `auto_update: true`,
+   diagrammes Mermaid compris. Gardez le style existant.
+3. Pour les pages `auto_update: false` concernées, ne modifiez rien :
+   listez-les à la fin avec la raison.
+4. N'inventez aucun comportement : si le diff ne permet pas de conclure,
+   écrivez « à vérifier » dans votre rapport plutôt que dans la doc.
+5. Lancez `mkdocs build --strict` et corrigez les erreurs.
+6. Terminez par la liste des fichiers modifiés et des points à relire.
+````
+
+Enregistrez-la dans `.claude/skills/maj-doc/SKILL.md`, puis tapez `/maj-doc` avant d'ouvrir votre PR. `disable-model-invocation: true` réserve son déclenchement à vous : elle modifie des fichiers, mieux vaut choisir le moment.
+
+## Étape 3 : un rappel automatique après chaque commit
+
+Un hook peut rappeler à Claude de penser à la doc chaque fois qu'il commite. Le filtre `if` limite le hook aux commandes `git commit`, et la sortie JSON ajoute un message au contexte de Claude.
+
+```json
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "if": "Bash(git commit *)",
+            "command": "echo '{\"hookSpecificOutput\":{\"hookEventName\":\"PostToolUse\",\"additionalContext\":\"Un commit vient d etre cree. Si du code sous src/ a change, proposez de lancer /maj-doc.\"}}'"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+À placer dans `.claude/settings.json` pour toute l'équipe. Ce hook ne voit que les commits que Claude fait lui-même, pas ceux lancés depuis votre terminal. Pour une garantie qui couvre tout le monde, passez par la CI (étape suivante). Voir [PreToolUse et PostToolUse](/wiki/hooks/pre-post-tool-use) pour le format complet.
+
+## Étape 4 : une PR de documentation en CI
+
+Dans la CI, la GitHub Action `anthropics/claude-code-action@v1` fait la même chose sans personne devant l'écran. Cette version tourne après chaque push sur `main` qui touche le code, et ouvre une PR séparée que quelqu'un relit.
+
+```yaml
+# .github/workflows/doc-vivante.yml
+name: Documentation vivante
+on:
+  push:
+    branches: [main]
+    paths: ["src/**", "app/**", "lib/**"]
+
+concurrency:
+  group: doc-vivante
+  cancel-in-progress: true
+
 jobs:
   docs:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+      pull-requests: write
+      id-token: write
     steps:
-      - uses: actions/checkout@v4
-        with: { fetch-depth: 2 }
-      - run: npx @anthropic-ai/claude-code update-docs --diff HEAD~1
-      - run: mkdocs build --strict
-      - uses: peaceiris/actions-gh-pages@v3
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 2
+      - run: pip install mkdocs-material
+      - uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            Le dernier commit de main est décrit par `git diff HEAD~1 HEAD`.
+            Mettez à jour les pages de docs/ marquées auto_update: true
+            qui sont concernées, selon les règles de CLAUDE.md.
+            Ne modifiez aucun fichier hors de docs/. Lancez ensuite
+            `mkdocs build --strict` et corrigez les erreurs.
+          claude_args: |
+            --max-turns 30
+            --allowedTools "Read,Grep,Glob,Edit,Write,Bash(git diff *),Bash(git log *),Bash(mkdocs build *)"
+      - uses: peter-evans/create-pull-request@v7
+        with:
+          branch: docs/maj-automatique
+          title: "docs : mise à jour automatique"
+          body: "Mise à jour de docs/ générée par Claude à partir du dernier commit de main. À relire avant merge."
+          add-paths: docs/**
 ```
 
-## Diagrammes Mermaid synchronisés
+Points d'attention :
 
-Les diagrammes d'architecture sont les premières victimes de l'obsolescence. Stockez-les en Mermaid directement dans les pages MkDocs. Lorsque Claude détecte un changement structurel (nouveau service, route renommée, dépendance ajoutée), il met à jour le bloc ` ```mermaid ` correspondant. Pour les diagrammes de séquence, il peut les régénérer à partir des traces OpenTelemetry exportées par votre environnement de staging.
+- **Sans `--allowedTools`**, Claude n'a ni shell ni droit d'écriture dans ce mode : la liste ci-dessus donne juste ce qu'il faut.
+- **`add-paths: docs/**`** garantit que seule la documentation entre dans la PR, même si un autre fichier a bougé.
+- **`concurrency`** annule un run en cours si un nouveau push arrive, pour éviter deux PR concurrentes.
+- **Coût** : chaque run consomme des tokens et des minutes GitHub. `--max-turns` et `timeout-minutes` bornent la dépense.
 
-## Garde-fous éditoriaux
+## Étape 5 : bloquer le code sans sa doc
 
-Tout n'est pas automatisable. Les guides conceptuels, tutoriels et décisions d'architecture (ADR) doivent rester écrits par des humains. Marquez ces pages avec un front-matter `auto_update: false` que le hook respecte. À l'inverse, les pages de référence (API, schéma DB, variables d'env) peuvent porter `auto_update: true` et être réécrites intégralement. Un check CI échoue si une PR modifie du code sans toucher la doc associée.
+Ajoutez un contrôle simple dans la CI des pull requests : si des fichiers sous `src/api/` changent sans aucune modification sous `docs/api/`, le job échoue. Une étiquette `pas-de-doc` permet de passer outre quand le changement n'a vraiment aucun impact documentaire.
+
+```bash
+# .github/scripts/doc-requise.sh
+changed=$(git diff --name-only origin/main...HEAD)
+if echo "$changed" | grep -q '^src/api/' && ! echo "$changed" | grep -q '^docs/api/'; then
+  echo "Le code de src/api/ a changé sans mise à jour de docs/api/."
+  echo "Lancez /maj-doc ou ajoutez l'étiquette pas-de-doc."
+  exit 1
+fi
+```
+
+## Pièges fréquents
+
+- **La doc qui invente.** Claude complète volontiers un comportement plausible. La règle « n'inventez rien, écrivez à vérifier » et la relecture humaine de la PR restent indispensables.
+- **Les réécritures complètes.** Demandez des modifications ciblées : une page réécrite en entier se relit mal et perd le style de l'équipe.
+- **Les diagrammes trop détaillés.** Un diagramme qui liste chaque fichier change à chaque commit. Restez au niveau des services et des flux.
+- **Le contexte qui déborde.** Sur un gros diff, faites traiter un dossier de `docs/` à la fois, ou déléguez chaque domaine à un sous-agent.
 
 ## Pour aller plus loin
 
-- Documentation officielle de MkDocs Material et de ses plugins phares.
-- Spécification Mermaid pour les diagrammes de séquence, de classes et C4.
-- Pattern Architecture Decision Records (ADR) de Michael Nygard pour les décisions structurantes.
-- Intégration Backstage ou Docusaurus si vous avez besoin d'un portail multi-dépôts.
+- [Générer et maintenir la documentation de vos skills](/wiki/skills/doc-generation)
+- [Claude Code en CI/CD : GitHub Actions et GitLab](/wiki/cli/cicd-execution)
+- [Mode headless (claude -p)](/wiki/cli/headless-mode)
+- [Qu'est-ce qu'un hook ?](/wiki/hooks/introduction-hooks)
+
+## Sources
+
+- [Skills : dynamic context injection, frontmatter, documentation Claude Code](https://code.claude.com/docs/en/skills)
+- [Hooks reference : PostToolUse, champ if, sortie JSON, documentation Claude Code](https://code.claude.com/docs/en/hooks)
+- [Claude Code GitHub Actions, documentation Claude Code](https://code.claude.com/docs/en/github-actions)
+- [Common workflows : Handle documentation, documentation Claude Code](https://code.claude.com/docs/en/common-workflows)
+- [Best practices, documentation Claude Code](https://code.claude.com/docs/en/best-practices)
+- [peter-evans/create-pull-request (GitHub)](https://github.com/peter-evans/create-pull-request)

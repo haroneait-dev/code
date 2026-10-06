@@ -1,191 +1,112 @@
 ---
 title: "L'outil Grep"
-description: "Rechercher dans le contenu de fichiers avec Claude Code — regex, multiline, contextes et output modes."
-updatedAt: "2026-05-19"
-readingMinutes: 8
+description: "Comment Claude Code cherche dans le contenu des fichiers : syntaxe ripgrep, modes de sortie, filtres glob et type, multiligne, et équivalents grep/rg quand l'outil n'est pas chargé."
+updatedAt: "2026-10-03"
+readingMinutes: 5
 ---
 
-`Grep` est le moteur de recherche textuelle de Claude Code. Bâti sur `ripgrep` (`rg`), il est rapide, support complet des regex, et conçu pour scanner des codebases entières en quelques millisecondes. Là où `Glob` cherche des noms de fichiers, `Grep` cherche **dans** les fichiers. C'est l'outil indispensable pour comprendre où une fonction est appelée, où une variable est définie, ou où un bug pourrait se cacher.
+`Grep` cherche un motif **dans le contenu** des fichiers, là où Glob cherche par nom. Il repose sur ripgrep : rapide, compatible `.gitignore`, avec la syntaxe d'expressions régulières de ripgrep. Sur macOS, Linux et WSL, l'outil n'est pas chargé par défaut : Claude lance alors `grep` (une version intégrée d'`ugrep`) ou `rg` via Bash.
 
-## À quoi sert Grep
+## Disponibilité
 
-- Trouver les appels d'une fonction (`functionName\\(`) ;
-- Localiser une string d'erreur précise (`"Cannot read property"`) ;
-- Lister les fichiers contenant un import spécifique (`from ['"]@supabase`) ;
-- Identifier des patterns suspects (`TODO`, `FIXME`, `console.log`) ;
-- Cartographier les usages d'une API.
+Mêmes règles que Glob : présent par défaut sous Windows, absent sur macOS, Linux et WSL. Il revient si vous le nommez dans `--tools` ou `--allowedTools`, si Bash est retiré de la session, ou dans un sous-agent qui le liste sans `Bash`. Les recherches faites via Bash apparaissent dans vos hooks et vos permissions comme des appels `Bash`.
 
-## Paramètres principaux
+## Paramètres
 
-| Paramètre | Type | Description |
-|-----------|------|-------------|
-| `pattern` | string | Regex (style ripgrep) — **obligatoire** |
-| `path` | string | Fichier ou dossier où chercher |
-| `glob` | string | Filtre par pattern (`"*.ts"`) |
-| `type` | string | Filtre par type (`"ts"`, `"py"`, `"js"`) |
-| `output_mode` | string | `content`, `files_with_matches`, `count` |
-| `-i` | boolean | Case insensitive |
-| `-n` | boolean | Inclure numéros de ligne (si `content`) |
-| `-A` / `-B` / `-C` | integer | Lignes de contexte après / avant / des deux côtés |
-| `multiline` | boolean | Active le mode multilignes (`.` matche `\n`) |
-| `head_limit` | integer | Limiter le nombre de résultats |
+| Paramètre | Rôle |
+|-----------|------|
+| `pattern` | Expression régulière (syntaxe ripgrep), obligatoire |
+| `path` | Fichier ou dossier où chercher |
+| `glob` | Filtre de fichiers, par exemple `**/*.tsx` |
+| `type` | Filtre par langage : `ts`, `py`, `rust`… |
+| `output_mode` | `files_with_matches` (défaut), `content` ou `count` |
+| `-i` | Insensible à la casse |
+| `-n` | Numéros de ligne (mode `content`) |
+| `-A`, `-B`, `-C` | Lignes de contexte après, avant, autour |
+| `multiline` | Permet à un motif de couvrir plusieurs lignes |
+| `head_limit`, `offset` | Pagination des résultats |
 
-## Output modes
+## Les trois modes de sortie
 
-**`files_with_matches`** (défaut) : ne retourne que les chemins de fichiers qui contiennent le motif. Idéal pour cartographier.
+| Mode | Renvoie | Usage |
+|------|---------|-------|
+| `files_with_matches` | Chemins des fichiers seulement | Cartographier |
+| `content` | Lignes trouvées avec fichier et numéro | Comprendre un usage |
+| `count` | Nombre de correspondances par fichier, puis un total | Prioriser |
 
-**`content`** : retourne les lignes qui matchent, avec éventuellement leur contexte. Idéal pour comprendre un usage.
+En mode `count`, le total couvre toutes les correspondances même quand `head_limit` ou `offset` tronquent la liste. En mode `content`, un `offset` au-delà de la dernière correspondance renvoie `No entries at this offset` : cela ne veut pas dire que le motif est absent.
 
-**`count`** : retourne le nombre d'occurrences par fichier. Idéal pour prioriser.
+## Exemples d'appels
 
-## Exemples concrets
+Lister les routes API qui exportent un `POST` :
 
-### Tous les fichiers qui importent `useState`
-
-```bash
-Grep(
-  pattern="import.*useState",
-  type="tsx",
-  output_mode="files_with_matches"
-)
-```
-
-### Lignes qui définissent une route API
-
-```bash
-Grep(
-  pattern="export async function (GET|POST|PUT|DELETE)",
-  glob="app/api/**/*.ts",
-  output_mode="content",
+```json
+{
+  "pattern": "export async function POST",
+  "glob": "app/api/**/route.ts",
+  "output_mode": "content",
   "-n": true
-)
+}
 ```
 
-### Tous les `TODO` et `FIXME` du projet
+Compter les `console.log` par fichier TypeScript :
+
+```json
+{
+  "pattern": "console\\.log",
+  "type": "ts",
+  "output_mode": "count"
+}
+```
+
+## Syntaxe ripgrep : ce qui change par rapport à grep
+
+- Les métacaractères s'échappent : pour trouver `interface{}` en Go, le motif est `interface\{\}` ; pour un point littéral, `\.`.
+- Par défaut, un motif ne traverse pas les fins de ligne. Pour un bloc sur plusieurs lignes, activez `multiline: true`.
+- Dans le JSON d'un appel, chaque `\` est doublé : `console\\.log` arrive à ripgrep sous la forme `console\.log`.
+- Un motif, un glob ou un type rejeté par ripgrep renvoie une erreur avec le diagnostic de ripgrep (avant la version 2.1.208, cela renvoyait à tort `No files found`).
+
+## .gitignore
+
+Grep **respecte `.gitignore`** : `node_modules/`, `dist/` ou `.env` ignorés ne sont pas fouillés. Pour chercher dans un fichier ignoré, Claude passe son chemin directement dans `path`.
+
+## Équivalents en ligne de commande
+
+Quand l'outil n'est pas chargé, Claude obtient les mêmes résultats via Bash :
 
 ```bash
-Grep(
-  pattern="(TODO|FIXME):",
-  output_mode="content",
-  "-n": true,
-  "-C": 1
-)
+# Fichiers qui importent Supabase
+rg -l "from ['\"]@supabase" src
+
+# TODO et FIXME avec numéro de ligne et une ligne de contexte
+rg -n -C 1 "(TODO|FIXME):"
+
+# Nombre de console.log par fichier
+rg -c "console\.log" --type ts
+
+# Sans rg : grep récursif en excluant node_modules
+grep -rn --exclude-dir=node_modules "useEffect" src
 ```
 
-### Recherche multilignes
+## Pièges fréquents
 
-Pour trouver un bloc qui s'étend sur plusieurs lignes :
+**Point non échappé.** `app.config.js` trouve aussi `app-config-js`. Écrivez `app\.config\.js`.
 
-```bash
-Grep(
-  pattern="export default function.*\\{[^}]*useEffect",
-  multiline=true,
-  type="tsx"
-)
-```
+**Résultats trop nombreux.** Commencez par `files_with_matches` ou `count`, puis passez en `content` sur un dossier précis avec `head_limit`.
 
-### Compter les `console.log` par fichier
+**`glob` ou `type` ?** `type: "ts"` utilise la table de types de ripgrep, qui couvre plusieurs extensions TypeScript. `glob` filtre sur un motif de chemin exact. Les deux se combinent.
 
-```bash
-Grep(
-  pattern="console\\.log",
-  type="ts",
-  output_mode="count"
-)
-```
+**Permissions.** Grep ne demande pas d'autorisation dans le répertoire de travail. Ses règles de chemin s'écrivent avec `Read(...)`, et une règle `Read(...)` en `deny` s'applique au mieux à Grep aussi.
 
-## Regex : la syntaxe ripgrep
+## Articles liés
 
-Grep utilise la syntaxe regex de ripgrep — proche de Rust regex, donc :
+- [L'outil Glob](/wiki/outils/glob)
+- [L'outil Read](/wiki/outils/read)
+- [L'outil Bash](/wiki/outils/bash)
+- [Tool use patterns](/wiki/outils/tool-use-patterns)
 
-- pas de lookbehind variable (mais le lookbehind fixe est OK selon version) ;
-- `\\d`, `\\w`, `\\s` standards ;
-- groupes nommés `(?P<name>...)` ;
-- alternation `(a|b)`, classes `[a-z]`, quantificateurs `*`, `+`, `?`, `{n,m}`.
+## Sources
 
-Important : dans un appel d'outil, les `\\` JSON doivent être doublés. `\\d+` dans le code → `\d+` pour ripgrep.
-
-## Pièges courants
-
-**Caractères spéciaux non échappés.** `.` matche n'importe quel caractère, pas un point littéral. Pour matcher `app.config.js`, écrivez `app\\.config\\.js`.
-
-**Multiline désactivé par défaut.** `.` ne matche pas `\n`. Pour traverser des lignes, activez `multiline=true`.
-
-**`output_mode="content"` sans `-n`.** Sans numéros de ligne, vous ne pouvez pas situer le match. Activez `-n` quasi systématiquement.
-
-**`head_limit` oublié.** Sur un gros codebase, une recherche large peut retourner 5000 lignes. Limitez avec `head_limit=100`.
-
-**Confondre `glob` et `type`.** `glob="*.ts"` filtre par pattern. `type="ts"` utilise la table de types de ripgrep (qui inclut aussi `.tsx`, `.cts`, `.mts`). Préférez `type` quand il existe.
-
-**Recherche dans node_modules.** Grep respecte les `.gitignore` par défaut. Si vous voulez quand même chercher dans `node_modules`, il faut le préciser explicitement (selon la config).
-
-## Combinaisons typiques
-
-### Renommer une API en plusieurs étapes
-
-```bash
-# 1. Repérer tous les fichiers
-Grep(pattern="oldApiName", output_mode="files_with_matches")
-
-# 2. Pour chaque fichier
-Read(file_path="...")
-Edit(file_path="...", old_string="oldApiName", new_string="newApiName", replace_all=true)
-```
-
-### Diagnostiquer une erreur
-
-```bash
-# 1. Trouver l'erreur exacte
-Grep(pattern="Cannot read property 'foo' of undefined", output_mode="files_with_matches")
-
-# 2. Si elle vient d'une lib, chercher dans la source
-Grep(
-  pattern="property 'foo'",
-  path="/Users/harone/projet/node_modules/some-lib"
-)
-```
-
-### Cartographier un module
-
-```bash
-# Tous les exports d'un dossier
-Grep(
-  pattern="^export (const|function|class|type|interface)",
-  path="src/auth",
-  output_mode="content",
-  "-n": true
-)
-```
-
-## Contexte : -A, -B, -C
-
-- `-A 3` : 3 lignes **après** le match
-- `-B 3` : 3 lignes **avant**
-- `-C 3` : 3 lignes **avant et après**
-
-Très utile pour comprendre un usage sans devoir lire tout le fichier :
-
-```bash
-Grep(
-  pattern="useSupabase\\(\\)",
-  "-C": 5,
-  output_mode="content",
-  "-n": true
-)
-```
-
-## Performance
-
-Ripgrep est l'un des outils de grep les plus rapides au monde. Sur un repo Linux entier (40M lignes), il scanne en quelques secondes. Sur un projet typique, attendez-vous à < 100 ms.
-
-Bonnes pratiques pour rester rapide :
-
-- préférer `type=ts` à `glob="**/*.ts"` (plus rapide en interne) ;
-- filtrer par dossier avec `path` ;
-- éviter les regex en lookbehind lourdes.
-
-## Pour aller plus loin
-
-- [Documentation ripgrep](https://github.com/BurntSushi/ripgrep)
-- Voir aussi : `Glob` pour les noms de fichiers, `Read` pour lire un fichier identifié.
-- Astuce : combinez `output_mode="count"` + tri pour identifier les "hot files" d'une codebase — ceux qui contiennent le plus d'une chose donnée (logs, console, TODO, etc.).
+- [Tools reference : Grep tool behavior](https://code.claude.com/docs/en/tools-reference#grep-tool-behavior)
+- [Tools reference : Glob tool behavior](https://code.claude.com/docs/en/tools-reference#glob-tool-behavior)
+- [ripgrep](https://github.com/BurntSushi/ripgrep)

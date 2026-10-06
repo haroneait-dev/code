@@ -1,88 +1,157 @@
 ---
-title: "Transports MCP : Stdio vs SSE"
-description: "Choisir entre Stdio pour les serveurs locaux et SSE/HTTP pour les serveurs distants — cas d'usage et trade-offs."
-updatedAt: "2026-05-19"
-readingMinutes: 6
+title: "Transports MCP : stdio et Streamable HTTP"
+description: "Comment un client et un serveur MCP échangent leurs messages : stdio en local, Streamable HTTP à distance, ce qui change avec la révision 2026-07-28, l'ancien transport SSE et la configuration dans Claude Code."
+updatedAt: "2026-10-03"
+readingMinutes: 8
 ---
 
-Un serveur MCP communique avec son client (Claude Desktop, Claude Code, un IDE) via un **transport**. Le protocole en définit deux principaux : **Stdio** pour l'exécution locale et **SSE / HTTP streamable** pour le distant. Le choix conditionne l'architecture, la sécurité et l'expérience utilisateur.
+Le **transport** est la façon dont les messages MCP circulent entre le client (Claude Code, Claude Desktop, un IDE) et le serveur. La spécification en définit deux : **stdio** pour un serveur lancé sur votre machine et **Streamable HTTP** pour un serveur distant. Le contenu des messages est le même dans les deux cas ; seul l'acheminement change.
 
-## Stdio : le transport local par défaut
+## Vue d'ensemble
 
-Avec Stdio, le client lance le serveur MCP comme un sous-processus et communique via **stdin / stdout**. Les messages JSON-RPC sont échangés ligne par ligne ; stderr est réservé aux logs.
+| | stdio | Streamable HTTP | HTTP+SSE (ancien) |
+|---|---|---|---|
+| Où tourne le serveur | sous-processus local lancé par le client | service web indépendant | service web indépendant |
+| Canal | stdin / stdout, un message JSON par ligne | un POST par message vers une URL unique | flux GET SSE + POST séparés |
+| Clients servis | un seul | beaucoup | beaucoup |
+| Authentification | droits de votre utilisateur | OAuth 2.1, jeton Bearer, en-têtes | idem |
+| Statut | actif | actif, recommandé pour le distant | **déprécié** depuis 2025-03-26 |
+| Type dans Claude Code | `stdio` | `http` (alias `streamable-http`) | `sse` |
 
-Avantages :
-- **Zéro configuration réseau** — pas de port, pas de CORS, pas de TLS
-- **Sécurité implicite** : le serveur tourne avec les droits de l'utilisateur, sur sa machine
-- **Latence négligeable**
-- **Cycle de vie simple** : le client tue le processus quand il ferme
+## stdio : le serveur local
 
-Inconvénients :
-- Le serveur doit être **installé localement** (npm, pip, binaire)
-- Pas de partage entre plusieurs utilisateurs ou machines
-- Mises à jour gérées par chaque poste
+Le client lance le serveur comme sous-processus et dialogue avec lui par les flux standard :
 
-C'est le choix par défaut pour les serveurs filesystem, git, sqlite, ou tout outil qui doit accéder aux fichiers de l'utilisateur.
+- le client écrit les requêtes sur **stdin**, une par ligne ;
+- le serveur répond sur **stdout**, un message JSON-RPC par ligne, sans retour à la ligne à l'intérieur ;
+- **stderr** est libre pour les logs. Le client peut l'afficher ou l'ignorer, et ne doit pas y voir une erreur ;
+- le serveur ne doit **jamais** écrire autre chose qu'un message MCP sur stdout.
 
-## SSE et HTTP streamable : le transport distant
+Ce dernier point cause la majorité des pannes : un `print()` ou un `console.log()` de débogage corrompt le flux. Écrivez vos logs sur stderr (`console.error`, `print(..., file=sys.stderr)`).
 
-Le transport HTTP avec **Server-Sent Events** (ou la version plus récente *streamable HTTP*) permet d'exposer un serveur MCP comme un service web. Le client se connecte à une URL, négocie une session, puis échange des messages JSON-RPC bidirectionnels (le serveur pousse via SSE, le client poste en HTTP).
+Autres règles utiles :
 
-Avantages :
-- **Hébergement centralisé** : un seul déploiement pour toute l'équipe
-- **Mises à jour instantanées** côté serveur
-- **Accès à des ressources cloud** (bases internes, APIs privées) sans installer de credentials sur chaque poste
-- **Multi-tenant** possible avec authentification
+- **Annulation** : le client envoie `notifications/cancelled` avec l'identifiant de la requête.
+- **Arrêt** : le client ferme stdin, attend la sortie du serveur, puis le termine de force si besoin. Votre serveur doit donc s'arrêter proprement quand stdin se ferme.
+- **Plantage** : le protocole étant sans état depuis 2026-07-28, le client peut relancer le serveur et rejouer les requêtes perdues. Claude Code, lui, ne relance pas automatiquement un serveur stdio : faites-le depuis `/mcp`.
 
-Inconvénients :
-- Nécessite **TLS, auth, rate limiting**
-- Plus de surface d'attaque
-- Latence réseau
-- Sessions à gérer (reconnexion, timeouts)
+Choisissez stdio pour tout ce qui doit voir votre machine : fichiers locaux, dépôt Git, outils en ligne de commande, base SQLite, navigateur piloté localement.
 
-## Cas d'usage typiques
+## Streamable HTTP : le serveur distant
 
-**Stdio est idéal pour :**
-- Accéder au filesystem local
-- Manipuler un repo git
-- Lancer des outils CLI (docker, kubectl, terraform)
-- Interagir avec une base SQLite locale
-- Tout serveur qui doit voir ce que l'utilisateur voit
+Le serveur expose **une seule URL** (par exemple `https://mcp.exemple.com/mcp`) qui accepte des POST :
 
-**SSE / HTTP est idéal pour :**
-- Exposer un CRM, un ERP, une base interne
-- Partager un connecteur entre toute une équipe
-- Brancher Claude.ai (web) qui ne peut pas lancer de processus local
-- Intégrations SaaS où le serveur agrège plusieurs APIs
+1. Chaque message du client est un POST distinct, avec l'en-tête `Accept: application/json, text/event-stream`.
+2. Pour une requête, le serveur répond soit par **un objet JSON**, soit par un **flux SSE propre à cette requête** : notifications de progression puis réponse finale.
+3. Pour une notification, le serveur répond `202 Accepted` sans corps.
+4. Pour annuler, le client **ferme le flux de réponse**. Il n'y a pas de `notifications/cancelled` en HTTP.
 
-## Configuration côté client
+### Ce qui change avec la révision 2026-07-28
 
-Dans `claude_desktop_config.json` ou `~/.claude/mcp.json` :
+- **Plus de session** : l'en-tête `Mcp-Session-Id` disparaît. Chaque requête porte sa version et les capacités du client dans `_meta`. Un serveur qui a besoin d'un état entre deux appels renvoie un identifiant explicite que le client repasse en argument.
+- **Plus de flux GET** : les notifications de changement (liste d'outils modifiée, ressource mise à jour) arrivent sur un flux ouvert par la requête `subscriptions/listen`.
+- **Plus de reprise de flux** : `Last-Event-ID` n'existe plus. Un flux coupé perd la requête en cours ; le client la renvoie avec un nouvel identifiant.
+- **Plus de requêtes venant du serveur** : pour demander une saisie à l'utilisateur, le serveur renvoie un résultat `input_required` et le client rejoue la requête (voir [JSON-RPC sous le capot](/wiki/mcp/json-rpc-mapping)).
+- **En-têtes obligatoires** : `MCP-Protocol-Version`, `Mcp-Method` et, pour `tools/call`, `resources/read` et `prompts/get`, `Mcp-Name`. Ils recopient le corps de la requête pour que proxys et passerelles puissent router sans lire le JSON. Une incohérence entre en-tête et corps est rejetée (`400`, erreur `-32020`).
+
+Exemple de requête au niveau HTTP :
+
+```http
+POST /mcp HTTP/1.1
+Content-Type: application/json
+Accept: application/json, text/event-stream
+Authorization: Bearer eyJ...
+MCP-Protocol-Version: 2026-07-28
+Mcp-Method: tools/call
+Mcp-Name: get_weather
+
+{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{
+  "name":"get_weather","arguments":{"location":"Lyon"},
+  "_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28",
+           "io.modelcontextprotocol/clientCapabilities":{}}}}
+```
+
+Les serveurs sur une révision 2025 fonctionnent toujours avec une session et une poignée de main `initialize`. Les SDK v2 et Claude Code savent parler aux deux générations.
+
+### Sécurité côté serveur
+
+La spécification impose ou recommande :
+
+- de **valider l'en-tête `Origin`** et de répondre `403` s'il est invalide, contre les attaques par DNS rebinding ;
+- en local, d'écouter sur `127.0.0.1` et non sur `0.0.0.0` ;
+- d'authentifier toutes les connexions. Pour OAuth, le serveur publie ses métadonnées de ressource protégée (RFC 9728) et n'accepte que les jetons émis **pour lui** : pas de relais d'un jeton reçu vers une autre API ;
+- avec un proxy inverse comme nginx, d'envoyer `X-Accel-Buffering: no` sur les flux SSE pour éviter la mise en tampon.
+
+## L'ancien transport HTTP+SSE
+
+Le transport de 2024 utilisait deux points d'accès : un flux GET SSE pour recevoir et une URL de POST pour envoyer. Il est **déprécié** et ne doit plus être utilisé pour un nouveau serveur. Certains services l'exposent encore (souvent sur une URL en `/sse`).
+
+Dans Claude Code, `--transport sse` reste disponible. Depuis la v2.1.265, `--transport http` bascule de lui-même sur SSE si le serveur ne connaît que ce transport.
+
+## Configurer chaque transport dans Claude Code
+
+En ligne de commande :
+
+```bash
+# stdio : tout ce qui suit -- est la commande du serveur
+claude mcp add filesystem -- npx -y @modelcontextprotocol/server-filesystem ~/Documents
+
+# Streamable HTTP
+claude mcp add --transport http sentry https://mcp.sentry.dev/mcp
+
+# HTTP avec jeton fixe
+claude mcp add --transport http api-interne https://mcp.exemple.com/mcp \
+  --header "Authorization: Bearer ${API_TOKEN}"
+```
+
+Dans un `.mcp.json` partagé (racine du projet) :
 
 ```json
 {
   "mcpServers": {
     "filesystem": {
+      "type": "stdio",
       "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/Users/me/docs"]
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "${HOME}/Documents"]
     },
-    "company-api": {
-      "url": "https://mcp.acme.com/sse",
-      "headers": { "Authorization": "Bearer ${ACME_TOKEN}" }
+    "api-interne": {
+      "type": "http",
+      "url": "https://mcp.exemple.com/mcp",
+      "headers": { "Authorization": "Bearer ${API_TOKEN}" }
     }
   }
 }
 ```
 
-## Sécurité : ne pas mélanger les niveaux de confiance
+Deux pièges :
 
-Un serveur Stdio hérite des droits de l'utilisateur — il peut lire vos clés SSH. Un serveur SSE distant doit être traité comme une dépendance tierce : auditez son code, vérifiez son hébergeur, isolez les tokens.
+- **Oublier `type`** sur un serveur distant : une entrée avec `url` mais sans `type` est lue comme stdio, et Claude Code l'ignore avec une erreur.
+- **Mauvais fichier** : Claude Code lit `.mcp.json` (projet) et `~/.claude.json` (local et user), pas `~/.claude/mcp.json`. Le fichier `claude_desktop_config.json` est celui de Claude Desktop ; importez-le avec `claude mcp add-from-claude-desktop`.
 
-Évitez d'exposer un serveur Stdio sensible (filesystem complet, shell) via un wrapper HTTP sans authentification stricte — c'est le chemin le plus court vers une RCE.
+Claude Code accepte aussi un type `ws` (WebSocket) via `claude mcp add-json`. Ce n'est pas un transport standard de la spécification, mais une extension propre à Claude Code.
+
+## Comment choisir
+
+- **Le serveur a besoin de vos fichiers ou de vos outils locaux** : stdio.
+- **Le service est en ligne (SaaS, API d'entreprise)** : Streamable HTTP, avec le serveur officiel de l'éditeur s'il existe.
+- **Vous voulez partager un serveur interne avec toute l'équipe** : Streamable HTTP derrière OAuth ou votre passerelle d'entreprise.
+- **Vous utilisez claude.ai sur le web ou le mobile** : seuls les serveurs distants (connecteurs) sont possibles, l'application ne peut pas lancer de processus local.
+
+À ne pas faire : exposer un serveur stdio puissant (accès complet au disque, shell) derrière un simple pont HTTP sans authentification. Vous offririez un accès distant à votre machine.
 
 ## Pour aller plus loin
 
-- Documentation transports : [modelcontextprotocol.io/docs/concepts/transports](https://modelcontextprotocol.io)
-- Exemple de serveur SSE en TypeScript dans le SDK officiel
-- Cloudflare Workers et Vercel proposent des templates pour héberger un MCP HTTP
-- Étudier le passage de SSE à *streamable HTTP* (spec 2025) pour les nouveaux déploiements
+- [Architecture client/serveur de MCP](/wiki/mcp/architecture-client-serveur)
+- [JSON-RPC 2.0 sous le capot de MCP](/wiki/mcp/json-rpc-mapping)
+- [Installer un serveur MCP dans Claude Code](/wiki/mcp/installer-serveur-mcp)
+- [Déployer un serveur MCP en TypeScript](/wiki/mcp/creer-serveur-ts-deploiement)
+- [Sécurité des serveurs MCP](/wiki/mcp/securite-mcp)
+
+## Sources
+
+- Transports, vue d'ensemble : https://modelcontextprotocol.io/specification/2026-07-28/basic/transports
+- stdio : https://modelcontextprotocol.io/specification/2026-07-28/basic/transports/stdio
+- Streamable HTTP : https://modelcontextprotocol.io/specification/2026-07-28/basic/transports/streamable-http
+- Changelog 2026-07-28 : https://modelcontextprotocol.io/specification/2026-07-28/changelog
+- Autorisation : https://modelcontextprotocol.io/specification/2026-07-28/basic/authorization
+- MCP dans Claude Code : https://code.claude.com/docs/en/mcp

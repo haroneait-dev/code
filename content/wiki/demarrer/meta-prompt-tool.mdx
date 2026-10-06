@@ -1,88 +1,92 @@
 ---
-title: "Le Meta-Prompt Tool d'Anthropic"
-description: "Outil officiel Anthropic pour générer des prompts parfaits à partir d'une description de tâche."
-updatedAt: "2026-05-19"
-readingMinutes: 6
+title: "Générer un prompt avec Claude (meta-prompt)"
+description: "Faire rédiger un premier jet de prompt structuré par Claude à partir d'une description de tâche, puis le tester et l'affiner."
+updatedAt: "2026-10-03"
+readingMinutes: 4
 ---
 
-Écrire un bon prompt est l'une des compétences les plus rentables quand on travaille avec Claude — et l'une des plus difficiles à acquérir intuitivement. Pour combler ce gap, Anthropic propose le **Meta-Prompt Tool**, un générateur officiel qui transforme une description en langage naturel de votre tâche en un prompt structuré, prêt à l'emploi, conforme aux best practices internes d'Anthropic (rôle, instructions, exemples XML, contraintes).
+Un meta-prompt est un « prompt qui écrit des prompts ». Vous décrivez votre tâche en une ou deux phrases, Claude produit un prompt structuré (rôle, instructions, format de sortie, exemples). C'est un bon moyen d'obtenir un premier jet solide, à condition de le tester ensuite.
 
-## Pourquoi un meta-prompt
+## Où le faire
 
-Un meta-prompt, c'est un « prompt qui écrit des prompts ». Anthropic a entraîné un workflow spécifique qui :
+- **Dans la Console Claude** (`platform.claude.com`) : la Console a proposé un générateur de prompts intégré. L'ancienne page de documentation dédiée renvoie aujourd'hui vers le guide général des bonnes pratiques ; vérifiez dans votre Console ce qui est disponible.
+- **Avec n'importe quel modèle Claude**, via claude.ai ou l'API : un meta-prompt bien écrit suffit. C'est la méthode la plus fiable, car elle ne dépend d'aucun outil spécifique.
 
-- structure votre intention en sections claires (`<role>`, `<instructions>`, `<examples>`, `<output_format>`)
-- ajoute les balises XML que Claude affectionne particulièrement
-- insère des exemples few-shot quand le pattern le justifie
-- explicite les contraintes que vous auriez oubliées (longueur, format, ton)
-
-Le résultat se rapproche de ce qu'un prompt engineer Anthropic produirait en quelques heures de travail.
-
-## Où l'utiliser
-
-Le Meta-Prompt Tool est disponible à deux endroits :
-
-- Directement dans **Anthropic Console** (`console.anthropic.com`) sous l'onglet **Generate a prompt**.
-- Sous forme de **notebook Python** dans le cookbook officiel pour ceux qui veulent l'industrialiser.
-
-Côté Console, le flow est trivial : vous décrivez votre tâche en une ou deux phrases, vous cliquez sur **Generate**, et vous récupérez le system prompt complet. Vous pouvez ensuite l'essayer immédiatement dans le Playground avec différents inputs.
-
-## Exemple concret
-
-Description en entrée :
-
-> « Je veux un assistant qui reformule des emails professionnels en français pour les rendre plus concis et plus chaleureux. »
-
-Le Meta-Prompt Tool retourne un system prompt structuré dans ce style :
+## Un meta-prompt prêt à l'emploi
 
 ```text
-Tu es un assistant spécialisé dans la reformulation d'emails professionnels en français.
+Vous êtes un expert en prompt engineering pour les modèles Claude.
+Rédigez un system prompt pour la tâche décrite dans <tache>.
 
-<instructions>
-- Lis l'email original entre les balises <email>
-- Conserve l'information factuelle à 100%
-- Réduis la longueur de 30% minimum
-- Adopte un ton chaleureux et direct, sans formules trop guindées
-- Retourne uniquement l'email reformulé, sans préambule
-</instructions>
+Le prompt doit :
+- donner le contexte et le but de la tâche ;
+- lister des instructions claires et numérotées ;
+- utiliser des balises XML pour séparer les données d'entrée ;
+- préciser le format de sortie attendu ;
+- inclure 1 ou 2 exemples si le format est inhabituel.
 
-<output_format>
-Objet : <objet reformulé>
-Corps : <corps reformulé>
-</output_format>
+Retournez uniquement le prompt, entre balises <prompt>.
+
+<tache>
+Reformuler des emails professionnels en français pour les rendre plus
+concis et plus chaleureux, sans perdre d'information.
+</tache>
 ```
 
-C'est déjà bien meilleur que ce qu'un développeur écrirait spontanément en 30 secondes.
+Résultat typique :
 
-## L'appeler par API
+```text
+Vous reformulez des emails professionnels en français.
 
-Le pattern est trivial à reproduire dans votre code : un appel `messages.create` avec un system prompt « génère-moi un prompt pour... ». Mais Anthropic expose aussi un endpoint dédié dans la Console qui retourne directement le prompt formaté :
+<instructions>
+1. Lisez l'email fourni entre les balises <email>.
+2. Conservez toutes les informations factuelles (dates, montants, noms).
+3. Raccourcissez le texte en supprimant les formules redondantes.
+4. Adoptez un ton chaleureux et direct.
+5. Retournez uniquement l'email reformulé, sans préambule.
+</instructions>
+
+<format>
+Objet : ...
+Corps : ...
+</format>
+```
+
+## L'automatiser par API
+
+Il n'existe pas d'endpoint public dédié : un simple appel à l'API Messages suffit.
 
 ```bash
-curl https://api.anthropic.com/v1/experimental/generate_prompt \
+curl https://api.anthropic.com/v1/messages \
   -H "x-api-key: $ANTHROPIC_API_KEY" \
   -H "anthropic-version: 2023-06-01" \
   -H "content-type: application/json" \
   -d '{
-    "task": "Résume un article scientifique en 5 bullet points compréhensibles par un lycéen.",
-    "target_model": "claude-sonnet-5-5"
+    "model": "claude-sonnet-5-5",
+    "max_tokens": 2048,
+    "messages": [{
+      "role": "user",
+      "content": "Vous êtes un expert en prompt engineering. Rédigez un system prompt pour : résumer un article scientifique en 5 points compréhensibles par un lycéen. Retournez-le entre balises <prompt>."
+    }]
   }'
 ```
 
-Vous pouvez wrapper cet appel dans un script `npm run generate-prompt` pour standardiser la création de tous vos system prompts dans un repo.
+## Pièges et bonnes pratiques
 
-## Limites et bonnes pratiques
-
-Le Meta-Prompt Tool est un excellent point de départ, mais ce n'est pas une baguette magique :
-
-- **Itérez** : le premier jet est rarement final. Lancez 10 inputs représentatifs, regardez les ratés, raffinez le prompt à la main.
-- **Versionnez** : stockez vos prompts dans `prompts/*.txt` versionnés en Git, pas en dur dans le code.
-- **Mesurez** : utilisez l'évaluation intégrée à la Console pour comparer deux versions sur un dataset.
-- **Adaptez au modèle** : un prompt généré pour Sonnet n'est pas forcément optimal pour Haiku — précisez le `target_model`.
+- **Le premier jet n'est jamais final** : testez-le sur une dizaine d'entrées représentatives, notez les ratés, corrigez.
+- **Versionnez vos prompts** dans des fichiers (`prompts/*.txt`) suivis par Git plutôt qu'en dur dans le code.
+- **Évaluez** chaque version sur le même jeu de tests avant de la déployer.
+- **Méfiez-vous du sur-cadrage** : les modèles récents suivent les instructions à la lettre. Un prompt généré trop rigide ou plein de MAJUSCULES peut dégrader le résultat ; allégez-le.
+- **Testez sur le modèle cible** : un prompt réglé pour Opus 5.5 peut demander des ajustements sur Haiku 4.5.
 
 ## Pour aller plus loin
 
-- Console Anthropic : `console.anthropic.com`
-- Documentation « Prompt generator » : `docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/prompt-generator`
-- Notebook cookbook : `github.com/anthropics/anthropic-cookbook` → `misc/prompt_engineering`
-- Guide « Prompt engineering » officiel pour comprendre les patterns générés
+- [Le meta-prompting en détail](/wiki/prompt-engineering/meta-prompting)
+- [Anatomie d'un prompt](/wiki/prompt-engineering/anatomie-prompt)
+- [Les balises XML](/wiki/prompt-engineering/balises-xml)
+- [Tester un prompt](/wiki/prompt-engineering/tester-prompt)
+
+## Sources
+
+- [Prompting best practices (Anthropic)](https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/claude-prompting-best-practices)
+- [API Messages](https://platform.claude.com/docs/en/api/overview)

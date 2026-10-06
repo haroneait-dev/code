@@ -1,137 +1,190 @@
 ---
-title: "Output formatting : obtenir du JSON ou du Markdown strict"
-description: "Forcer Claude à produire un format de sortie parsable : JSON schema, prefilling, balises XML, validation et tool use."
-updatedAt: "2026-05-19"
-readingMinutes: 6
+title: "Formater la sortie : prose, Markdown, tableaux et JSON fiable"
+description: "Obtenir de Claude exactement la forme voulue : consignes de format dans claude.ai, sorties structurées (output_config.format) et strict tool use via l'API, et ce qui remplace le prefill sur les modèles récents."
+updatedAt: "2026-10-03"
+readingMinutes: 8
 ---
 
-Quand Claude alimente une chaîne de traitement automatisée, la sortie doit être **parsable à 100 %**. Une virgule en trop, un préambule *"Bien sûr, voici…"*, un bloc Markdown autour du JSON, et tout casse. Cet article couvre les patterns qui rendent les sorties Claude fiables en production.
+La forme d'une réponse compte autant que son contenu : un tableau à coller dans un tableur, un e-mail sans titres, un JSON qu'un programme doit lire sans erreur. Cet article couvre les deux situations : guider le format dans une conversation (claude.ai), et **garantir** un format machine via l'API.
 
-## Le problème : Claude est conversationnel par défaut
+## Les quatre leviers de la documentation
 
-Sans instruction explicite, Claude a tendance à :
+Anthropic recommande quatre façons d'orienter le format, valables partout :
 
-- Ajouter un préambule poli (*"Voici le JSON demandé :"*)
-- Envelopper le JSON dans ```` ```json ````
-- Ajouter un commentaire de fin (*"N'hésitez pas si…"*)
-- Inventer des champs non demandés
+1. **Dire quoi faire plutôt que quoi éviter.** Au lieu de « N'utilisez pas de Markdown », écrivez « Répondez en paragraphes de prose fluide ».
+2. **Utiliser des balises comme indicateurs de format**, par exemple « Écrivez la partie rédigée dans des balises `<prose>` ».
+3. **Écrire votre prompt dans le style voulu.** Un prompt sans Markdown obtient moins de Markdown en retour.
+4. **Être détaillé** quand vous avez des préférences précises (titres autorisés, listes seulement pour des éléments distincts, etc.).
 
-Ces comportements sont incompatibles avec un parsing strict. Trois familles de solutions : **instructions explicites**, **prefilling**, et **tool use**.
+## Dans claude.ai : des consignes prêtes à copier
 
-## Solution 1 : instructions explicites + schéma
+Pas de paramètre technique dans l'interface : tout passe par la formulation.
 
-Décrivez précisément le schéma attendu, avec un exemple.
+**Un tableau à coller dans un tableur**
 
 ```text
-Tu réponds UNIQUEMENT avec un objet JSON valide, sans Markdown,
-sans préambule, sans commentaire. Schéma attendu :
-
-{
-  "intent": "string (l'un de : 'question', 'commande', 'plainte')",
-  "confidence": "number entre 0 et 1",
-  "entities": ["string"]
-}
-
-Si tu ne peux pas répondre, renvoie : {"error": "raison courte"}
+Comparez ces trois offres d'assurance habitation dans un tableau avec
+les colonnes : assureur, prix annuel, franchise, garanties incluses,
+exclusions notables. Une ligne par offre. Pas de texte avant ni après
+le tableau.
 ```
 
-Cette approche fonctionne dans 90 % des cas avec Sonnet 4. Pour atteindre 99 %, passez au prefilling.
+**Un e-mail sans mise en forme**
 
-## Solution 2 : prefilling (la technique la plus puissante)
+```text
+Rédigez la réponse à ce client en texte simple, prêt à coller dans
+Gmail : pas de titres, pas de gras, pas de listes à puces. Trois
+paragraphes courts au maximum.
+```
 
-Le prefilling consiste à **commencer la réponse de Claude vous-même**. Le modèle continue à partir de votre amorce. C'est mécaniquement impossible pour lui d'ajouter un préambule.
+**Un squelette imposé**
+
+```text
+Présentez votre analyse avec exactement ces sections :
+## Résumé (2 phrases)
+## Points clés (3 puces)
+## Recommandation (un paragraphe)
+```
+
+**Des formules mathématiques lisibles hors de l'interface.** Les modèles récents écrivent par défaut les maths en LaTeX. Si vous copiez la réponse ailleurs :
+
+```text
+Écrivez les calculs en texte brut, sans LaTeX : utilisez / pour la
+division, * pour la multiplication et ^ pour les puissances.
+```
+
+Si vous redemandez souvent le même format, mettez la consigne dans les **instructions d'un projet** (voir [Créer un projet](/wiki/claude-ai/projects-creation)). Pour un document long à mettre en page, Claude peut aussi produire directement un fichier ou un document (voir [Docs, Slides et Design](/wiki/claude-ai/docs-slides-design)).
+
+## Moins de listes, plus de prose
+
+Les anciens modèles abusaient des puces et du gras, et beaucoup de prompts contiennent encore des règles anti-formatage. Attention : Claude Fable 5.1 formate déjà **moins** que ses prédécesseurs. Sur ce modèle, Anthropic conseille de remplacer les longues règles anti-Markdown par une règle qui dit **quand** formater :
+
+```text
+Utilisez des listes quand on vous le demande ou quand le contenu a
+plusieurs facettes distinctes. Si la personne demande une mise en forme
+minimale, n'utilisez ni puces, ni titres, ni gras. Dans un échange
+personnel ou émotionnel, restez en prose simple.
+```
+
+## Via l'API : garantir un JSON valide
+
+### Option 1 : les sorties structurées (recommandé)
+
+Les *structured outputs* contraignent la génération pour que la réponse respecte votre schéma JSON. Le paramètre est `output_config.format`, disponible sans en-tête bêta sur tous les modèles actuels (Fable 5.1, Opus 5.5, Sonnet 5.5, Opus 5, Sonnet 5, Haiku 4.5…).
+
+```python
+import json
+import anthropic
+
+client = anthropic.Anthropic()
+
+response = client.messages.create(
+    model="claude-sonnet-5-5",
+    max_tokens=4000,
+    messages=[{
+        "role": "user",
+        "content": "Classez ce message client : « Mon colis n'est "
+                   "toujours pas arrivé, je veux être remboursé. »",
+    }],
+    output_config={
+        "format": {
+            "type": "json_schema",
+            "schema": {
+                "type": "object",
+                "properties": {
+                    "intention": {
+                        "type": "string",
+                        "enum": ["question", "commande", "reclamation"],
+                    },
+                    "urgence": {"type": "string", "enum": ["basse", "haute"]},
+                    "entites": {"type": "array", "items": {"type": "string"}},
+                },
+                "required": ["intention", "urgence", "entites"],
+                "additionalProperties": False,
+            },
+        }
+    },
+)
+
+if response.stop_reason in ("refusal", "max_tokens"):
+    raise RuntimeError(f"Réponse inutilisable : {response.stop_reason}")
+
+texte = next(b.text for b in response.content if b.type == "text")
+print(json.loads(texte))
+```
+
+Avec le SDK Python, `client.messages.parse(..., output_format=MonModelePydantic)` renvoie directement un objet validé dans `response.parsed_output`.
+
+Points à connaître :
+
+- **Limites du schéma** : pas de schéma récursif, pas de contraintes numériques (`minimum`, `maximum`) ni de longueur de chaîne (`minLength`, `maxLength`). Validez ces règles côté code.
+- **`stop_reason`** : une réponse `refusal` ou `max_tokens` peut ne pas respecter le schéma. Traitez-la comme un échec et relancez (avec un `max_tokens` plus grand si besoin).
+- **Casse des `enum`** : une valeur peut différer seulement par la majuscule initiale. Comparez sans tenir compte de la casse.
+- **Ordre des champs** : les propriétés obligatoires sortent en premier, quel que soit l'ordre du schéma.
+- **Incompatibilités** : les sorties structurées ne fonctionnent ni avec les citations, ni avec le prefill.
+
+### Option 2 : le strict tool use
+
+Si votre application utilise déjà des outils, ajoutez `"strict": true` à la définition de l'outil : le nom de l'outil et ses paramètres sont alors garantis conformes au schéma. Pour une classification, un outil avec un champ `enum` contenant vos étiquettes est une solution recommandée par Anthropic.
 
 ```json
 {
-  "model": "claude-sonnet-5-5",
-  "messages": [
-    { "role": "user", "content": "Classifie : 'Mon colis n'arrive pas'" },
-    { "role": "assistant", "content": "{" }
-  ]
+  "name": "classer_message",
+  "description": "Classe un message client.",
+  "strict": true,
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "intention": { "type": "string", "enum": ["question", "commande", "reclamation"] }
+    },
+    "required": ["intention"],
+    "additionalProperties": false
+  }
 }
 ```
 
-La réponse commencera par `"intent": ...` directement. Pour fermer proprement, ajoutez `stop_sequences: ["}"]` (et reconcaténez l'accolade fermante côté client) si vous voulez un contrôle maximal.
+Voir [Tool use](/wiki/api/tool-use) pour la boucle complète.
 
-Pour du **XML strict**, prefillez avec `<answer>` :
+### Option 3 : demander le JSON dans le prompt
 
-```json
-{
-  "messages": [
-    { "role": "user", "content": "Extrais les entités de : ..." },
-    { "role": "assistant", "content": "<answer>" }
-  ]
-}
-```
+Sans sorties structurées, décrivez le schéma et donnez un exemple. Les modèles récents suivent bien ce type de consigne, mais le JSON n'est pas garanti : il peut être précédé d'un raisonnement ou d'un brouillon. La documentation de Sonnet 5.5 conseille alors de **parser la dernière valeur JSON** de la réponse (et non tout ce qui va du premier `{` au dernier `}`), de vérifier les champs attendus, et de relancer une fois en cas d'échec.
 
-## Solution 3 : Tool Use (le plus robuste)
+### Et le prefill ?
 
-Pour du JSON garanti structurellement valide, déclarez un **tool** avec un JSON Schema. Claude est forcé de respecter le schéma.
+Commencer soi-même la réponse de Claude par `{` était la technique classique. Elle **ne fonctionne plus** sur les modèles récents : depuis la génération 4.6, un dernier message `assistant` pré-rempli renvoie une **erreur 400**. Voir [Prefilling](/wiki/prompt-engineering/prefilling) pour les alternatives.
 
-```json
-{
-  "model": "claude-sonnet-5-5",
-  "tools": [
-    {
-      "name": "classify_message",
-      "description": "Classifie un message client",
-      "input_schema": {
-        "type": "object",
-        "properties": {
-          "intent": {
-            "type": "string",
-            "enum": ["question", "commande", "plainte"]
-          },
-          "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
-          "entities": { "type": "array", "items": { "type": "string" } }
-        },
-        "required": ["intent", "confidence", "entities"]
-      }
-    }
-  ],
-  "tool_choice": { "type": "tool", "name": "classify_message" }
-}
-```
+## Tâches de calcul avec sortie JSON (Sonnet 5.5)
 
-Avec `tool_choice` forcé, Claude **doit** appeler le tool. L'argument `input` du `tool_use` block est garanti valide selon le schéma. C'est le pattern recommandé en production pour les pipelines critiques.
-
-## Markdown structuré
-
-Pour des sorties Markdown destinées à un rendu (docs, emails), instruisez la structure attendue :
+Avec les sorties structurées, le texte de la réponse ne contient que le JSON : Claude ne peut raisonner que dans sa réflexion. Sur une tâche qui demande quelques étapes (totaliser des montants, appliquer une règle), Sonnet 5.5 répond parfois sans réfléchir, surtout aux efforts `low` et `medium`. Anthropic recommande d'ajouter à la fin du prompt système :
 
 ```text
-Réponds avec exactement cette structure Markdown :
-
-## Résumé
-(2-3 phrases)
-
-## Points clés
-- (bullet 1)
-- (bullet 2)
-- (bullet 3)
-
-## Recommandation
-(1 paragraphe)
+Réfléchissez au problème avant de répondre.
 ```
 
-Plus la structure est explicite, plus Claude la respectera. Évitez les *"sois clair et bien organisé"* : trop vague.
+ou de passer à l'effort `xhigh`. Voir [Faire réfléchir Claude](/wiki/prompt-engineering/chain-of-thought).
 
-## Validation côté client (ceinture + bretelles)
+## Supprimer les préambules
 
-Même avec tool use, validez systématiquement avec **Zod**, **Pydantic** ou équivalent. En cas d'échec, retry avec un message qui inclut l'erreur de validation :
+Pour éviter « Voici le résumé demandé : », sans prefill :
 
 ```text
-Ta réponse précédente a échoué la validation :
-{erreur_zod}
-
-Recommence en respectant strictement le schéma.
+Répondez directement, sans préambule. Ne commencez pas par
+« Voici… » ou « D'après… ».
 ```
 
-Un single retry corrige 95 % des cas pathologiques restants.
+Si un préambule passe quand même de temps en temps, retirez-le en post-traitement, ou demandez la réponse dans une balise (`<resume>…</resume>`) que votre code extrait.
 
 ## Pour aller plus loin
 
-- Migrer vos pipelines critiques vers le pattern **Tool Use + `tool_choice` forcé**.
-- Mettre en place un wrapper qui log les échecs de parsing pour identifier les prompts à durcir.
-- Lire la doc Anthropic *"JSON output"* et *"Tool use"* pour les options avancées (`disable_parallel_tool_use`, etc.).
-- Pour les sorties très longues, combiner prefilling + streaming pour réduire la latence perçue.
+- [Prefilling : pourquoi il ne marche plus et quoi faire](/wiki/prompt-engineering/prefilling)
+- [Balises XML](/wiki/prompt-engineering/balises-xml)
+- [Few-shot prompting](/wiki/prompt-engineering/few-shot)
+- [Tool use](/wiki/api/tool-use)
+- [Tester un prompt](/wiki/prompt-engineering/tester-prompt)
+
+## Sources
+
+- [Prompting best practices : Output and formatting (Anthropic)](https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/claude-prompting-best-practices)
+- [Structured outputs (Anthropic)](https://platform.claude.com/docs/en/build-with-claude/structured-outputs)
+- [Prompting Claude Sonnet 5.5 : Reasoning tasks with JSON output (Anthropic)](https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-sonnet-5-5)
+- [Prompting Claude Fable 5.1 : Formatting in chat (Anthropic)](https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5-1)

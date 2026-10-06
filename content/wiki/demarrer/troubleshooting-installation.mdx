@@ -1,93 +1,193 @@
 ---
-title: "Résolution des conflits d'installation"
-description: "Erreurs Node.js/NPM, conflits Python, pare-feu, permissions — debug install."
-updatedAt: "2026-05-19"
-readingMinutes: 6
+title: "Dépanner l'installation et la connexion"
+description: "Les erreurs d'installation et de connexion les plus fréquentes de Claude Code (PATH, réseau, proxy, npm, Windows, WSL, OAuth) et la commande exacte pour corriger chacune."
+updatedAt: "2026-10-03"
+readingMinutes: 8
 ---
 
-L'installation de Claude Code échoue rarement, mais lorsqu'elle bloque c'est presque toujours pour les mêmes raisons : version de Node trop ancienne, droits insuffisants sur le dossier global NPM, conflit avec une installation Python qui shadow le binaire, ou pare-feu d'entreprise qui filtre `registry.npmjs.org`. Voici un parcours de diagnostic pour reprendre la main en quelques minutes.
+L'installation de Claude Code échoue rarement, et presque toujours pour les mêmes raisons : dossier absent du PATH, réseau ou proxy d'entreprise, installation en double, ou mauvaise commande selon le shell. Ce guide part du message d'erreur et donne la correction.
 
-## Vérifier l'environnement
-
-Avant toute chose, capturez l'état du système :
+## Le premier réflexe : `claude doctor`
 
 ```bash
-node -v        # >= 20.10
-npm -v         # >= 10
-which claude   # doit pointer vers ~/.npm-global/bin ou /usr/local/bin
-claude --version
+claude --version   # doit afficher un numéro, par exemple 2.1.288 (Claude Code)
+claude doctor      # diagnostic en lecture seule : installation, PATH, réglages invalides, mises à jour
 ```
 
-Si `node -v` retourne moins que 20.10, mettez à jour via `nvm install 20 --lts` puis `nvm use 20`. Une version trop ancienne provoque l'erreur classique `SyntaxError: Unexpected token '?'`.
+`claude doctor` s'exécute sans ouvrir de session. Dans une session, `/doctor` va plus loin : il détecte les installations en double et propose des corrections.
 
-## Erreurs NPM courantes
+## Tableau des erreurs courantes
 
-| Erreur                            | Cause probable                       | Correctif                                        |
-|-----------------------------------|--------------------------------------|--------------------------------------------------|
-| `EACCES: permission denied`       | NPM global dans `/usr/local`         | Configurer un prefix utilisateur (voir ci-bas)   |
-| `ETIMEDOUT` / `ECONNRESET`        | Proxy ou pare-feu                    | Définir `HTTPS_PROXY` et `npm config set proxy`  |
-| `ENOTFOUND registry.npmjs.org`    | DNS bloqué                           | Tester `npm config set registry https://...`     |
-| `EBADENGINE`                      | Mauvaise version Node                | `nvm use 20`                                     |
+| Vous voyez | Cause | Section à lire |
+|---|---|---|
+| `command not found: claude` ou `'claude' is not recognized` | Dossier d'installation absent du PATH | Claude introuvable |
+| `syntax error near unexpected token '<'` | Le script d'installation a renvoyé une page HTML (filtrage réseau, région) | Réseau, proxy et certificats |
+| `curl: (22) ... error: 403` | Proxy ou pays non pris en charge | Réseau, proxy et certificats |
+| `unable to get local issuer certificate`, `SELF_SIGNED_CERT_IN_CHAIN` | Proxy d'entreprise qui inspecte le TLS | Réseau, proxy et certificats |
+| `irm is not recognized` ou `The token '&&' is not a valid statement separator` | Commande PowerShell lancée dans CMD (ou l'inverse) | Windows |
+| `Killed` ou `exit code 137` pendant l'installation | Mémoire insuffisante (serveur de petite taille) | Linux et serveurs |
+| `Error: claude native binary not installed` | Installation npm incomplète | Installation npm |
+| `EACCES: permission denied` | Droits sur le dossier d'installation | Installation npm |
+| `App unavailable in region` | Pays non pris en charge | [Liste des pays](https://www.anthropic.com/supported-countries) |
+| `This organization has been disabled` alors que vous êtes abonné | Une ancienne `ANTHROPIC_API_KEY` prend le dessus | Problèmes de connexion |
+| `OAuth error: Invalid code` | Code de connexion expiré ou tronqué | Problèmes de connexion |
+| `API Error: 403 Request not allowed` | Abonnement inactif ou rôle Console manquant | Problèmes de connexion |
 
-Pour éviter `sudo` à vie, basculez NPM en mode utilisateur :
+## `claude` introuvable après l'installation
+
+L'installeur natif place le binaire dans `~/.local/bin/claude` (macOS, Linux, WSL) ou `%USERPROFILE%\.local\bin\claude.exe` (Windows). Si ce dossier n'est pas dans votre PATH :
 
 ```bash
-mkdir -p ~/.npm-global
-npm config set prefix ~/.npm-global
-echo 'export PATH=~/.npm-global/bin:$PATH' >> ~/.zshrc
+# Zsh (macOS par défaut)
+echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zshrc
 source ~/.zshrc
-npm install -g @anthropic-ai/claude-code
+
+# Bash sous Linux
+echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
+source ~/.bashrc
 ```
 
-## Conflits Python et binaires fantômes
+Sous macOS avec Bash, utilisez `~/.bash_profile` au lieu de `~/.bashrc`.
 
-Certains environnements (notamment macOS avec Homebrew + pyenv) installent un wrapper `claude` non lié à Anthropic. Inspectez le PATH :
+Sous Windows (PowerShell) :
+
+```powershell
+$currentPath = [Environment]::GetEnvironmentVariable('PATH', 'User')
+[Environment]::SetEnvironmentVariable('PATH', "$currentPath;$env:USERPROFILE\.local\bin", 'User')
+```
+
+Fermez puis rouvrez le terminal.
+
+> L'extension VS Code n'installe pas `claude` dans le PATH : elle embarque sa propre copie. Pour utiliser `claude` dans un terminal, lancez l'installeur natif.
+
+## Installations en double
+
+Plusieurs installations (npm ancienne, installeur natif, Homebrew) provoquent des versions incohérentes. Listez-les :
 
 ```bash
-type -a claude
-echo $PATH | tr ':' '\n'
+which -a claude                          # toutes les commandes claude du PATH
+ls -la ~/.local/bin/claude               # installeur natif (lien vers ~/.local/share/claude/versions/)
+ls -la ~/.claude/local/                  # ancienne installation npm locale
+npm -g ls @anthropic-ai/claude-code      # installation npm globale
 ```
 
-Si plusieurs binaires apparaissent, supprimez ceux qui ne sont pas dans `~/.npm-global/bin` ou réordonnez le PATH. Sur Windows, vérifiez aussi `where claude` dans PowerShell — un alias chocolatey peut intercepter la commande.
+Sous Windows : `where.exe claude`. Gardez l'installeur natif et supprimez les autres, par exemple `npm uninstall -g @anthropic-ai/claude-code`.
 
-## Pare-feu d'entreprise et certificats
+## Réseau, proxy et certificats
 
-Derrière un proxy MITM (Zscaler, Netskope), Claude Code échoue à l'authentification ou au streaming. Exportez le certificat racine de l'entreprise et indiquez-le à Node :
+L'installeur télécharge depuis `downloads.claude.ai`. Testez l'accès :
 
 ```bash
-export NODE_EXTRA_CA_CERTS=/etc/ssl/certs/corporate-root.pem
-export HTTPS_PROXY=http://proxy.corp:3128
-export NO_PROXY=localhost,127.0.0.1
+curl -sI https://downloads.claude.ai/claude-code-releases/latest
 ```
 
-Ajoutez ces lignes à votre `.zshrc` ou `.bashrc` pour qu'elles persistent. Si le proxy bloque les WebSockets, le streaming SSE de l'API échouera avec `socket hang up` — il faudra demander un bypass sur `api.anthropic.com`.
+Une première ligne en `200` signifie que le serveur est joignable. Un `403` indique généralement un filtrage réseau ou un pays non pris en charge.
 
-## Permissions macOS et Windows
-
-Sur macOS, le premier lancement déclenche Gatekeeper. Si le binaire est « damaged », purgez la quarantaine :
+Derrière un proxy d'entreprise :
 
 ```bash
-xattr -dr com.apple.quarantine ~/.npm-global/bin/claude
+export HTTP_PROXY=http://proxy.example.com:8080
+export HTTPS_PROXY=http://proxy.example.com:8080
+curl -fsSL https://claude.ai/install.sh | bash
 ```
 
-Sur Windows, exécutez PowerShell en administrateur pour la première install globale, puis revenez à un terminal utilisateur. Activez le mode développeur si la création de symlinks échoue.
+Si le proxy inspecte le TLS (Zscaler, Netskope…), faites confiance au certificat de l'entreprise pour l'installation, puis pour Claude Code lui-même :
+
+```bash
+curl --cacert /chemin/vers/ca-entreprise.pem -fsSL https://claude.ai/install.sh | bash
+export NODE_EXTRA_CA_CERTS=/chemin/vers/ca-entreprise.pem
+```
+
+Ajoutez ces `export` à votre `~/.zshrc` ou `~/.bashrc`. Sous Ubuntu, mettre à jour les certificats système aide souvent : `sudo apt-get install ca-certificates`.
+
+## Windows
+
+- **Bonne commande pour le bon shell.** PowerShell (invite `PS C:\>`) : `irm https://claude.ai/install.ps1 | iex`. CMD (invite `C:\>`) : `curl -fsSL https://claude.ai/install.cmd -o install.cmd && install.cmd && del install.cmd`.
+- **Pas besoin d'être administrateur.**
+- **Git for Windows est facultatif.** Sans lui, Claude Code utilise PowerShell pour les commandes shell. Avec lui, il utilise Git Bash ; s'il ne le trouve pas, indiquez le chemin :
+
+```json
+{
+  "env": {
+    "CLAUDE_CODE_GIT_BASH_PATH": "C:\\Program Files\\Git\\bin\\bash.exe"
+  }
+}
+```
+
+- **Erreurs TLS en PowerShell** : activez TLS 1.2 avant l'installation avec `[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12`.
+- **Alternative** : `winget install Anthropic.ClaudeCode` (pas de mise à jour automatique : `winget upgrade Anthropic.ClaudeCode`).
+
+## WSL
+
+- Installez et lancez `claude` **dans le terminal WSL**, avec l'installeur Linux.
+- `Exec format error` : votre distribution est en WSL1. Passez-la en WSL2 (`wsl --set-version <distribution> 2`).
+- Si le navigateur ne s'ouvre pas pour la connexion, définissez `BROWSER` vers votre navigateur Windows, ou collez le code affiché (voir plus bas).
+
+## Linux et serveurs
+
+- **`Killed` / code 137** : l'installation a besoin d'environ 512 Mo de mémoire libre. Ajoutez du swap sur les petits serveurs.
+- **Alpine et distributions musl** : installez `bash curl libgcc libstdc++ ripgrep`, puis définissez `USE_BUILTIN_RIPGREP=0` dans le bloc `env` de vos réglages.
+- **Paquets officiels** : des dépôts signés apt, dnf et apk existent (mise à jour via le gestionnaire de paquets).
+
+## Installation npm
+
+L'installeur natif est recommandé. Si vous passez par npm :
+
+- Node.js 22 ou plus est requis ;
+- n'utilisez jamais `sudo npm install -g` ;
+- `Error: claude native binary not installed` signifie que l'étape postinstall ou la dépendance optionnelle de la plateforme a été ignorée (`--ignore-scripts`, `--omit=optional`, certaines configurations pnpm). Réinstallez sans ces options ;
+- pour mettre à jour : `npm install -g @anthropic-ai/claude-code@latest` (évitez `npm update -g`).
+
+En cas d'erreurs de droits avec npm, le plus simple est de passer à l'installeur natif :
+
+```bash
+curl -fsSL https://claude.ai/install.sh | bash
+```
+
+## Problèmes de connexion
+
+**Repartir de zéro** : `/logout`, fermez Claude Code, relancez `claude` et reconnectez-vous.
+
+**WSL2, SSH, conteneurs** : le navigateur s'ouvre sur une autre machine et affiche un code. Collez-le à l'invite `Paste code here if prompted`. Si le collage ne marche pas, utilisez :
+
+```bash
+claude auth login
+```
+
+**Abonné mais facturé à l'usage, ou « organization disabled »** : une variable `ANTHROPIC_API_KEY` traîne.
+
+```bash
+unset ANTHROPIC_API_KEY
+grep -n ANTHROPIC_API_KEY ~/.zshrc ~/.bashrc ~/.profile 2>/dev/null
+```
+
+Supprimez les lignes trouvées, puis vérifiez avec `/status`.
+
+**`403 Request not allowed`** : vérifiez que votre abonnement est actif, ou que votre compte Console a le rôle « Claude Code » ou « Developer ».
+
+**Déconnexions fréquentes** : vérifiez l'horloge système. Sous macOS, si le trousseau est verrouillé, `claude doctor` affiche `macOS Keychain is not writable` ; déverrouillez-le avec `security unlock-keychain ~/Library/Keychains/login.keychain-db`, puis `/logout` et `/login`.
 
 ## Réinstallation propre
 
-En dernier recours, repartez de zéro sans casser le reste :
+En dernier recours (installeur natif, macOS, Linux, WSL) :
 
 ```bash
-npm uninstall -g @anthropic-ai/claude-code
-rm -rf ~/.claude/cache ~/.npm/_logs
-npm cache clean --force
-npm install -g @anthropic-ai/claude-code@latest
+rm -f ~/.local/bin/claude
+rm -rf ~/.local/share/claude
+curl -fsSL https://claude.ai/install.sh | bash
 claude doctor
 ```
 
-La commande `claude doctor` (intégrée) effectue un check-up automatique : versions, permissions, accès réseau, dossier `~/.claude`. Lisez son rapport avant d'ouvrir un ticket support.
+Vos réglages (`~/.claude/`, `~/.claude.json`) sont conservés. Ne les supprimez que si vous voulez vraiment tout perdre : réglages, serveurs MCP, historique.
 
 ## Pour aller plus loin
 
-- [Guide officiel de troubleshooting](https://docs.claude.com/claude-code/troubleshooting)
-- [Configurer NPM derrière un proxy](https://docs.npmjs.com/cli/v10/using-npm/config#proxy)
-- [Forum communautaire Claude Code](https://github.com/anthropics/claude-code/discussions)
+- [Installer Claude Code](/wiki/demarrer/installation)
+- [Authentification et clés API](/wiki/demarrer/authentification)
+- [Mises à jour et versions](/wiki/cli/update-versions)
+
+## Sources
+
+- [Troubleshoot installation and login](https://code.claude.com/docs/en/troubleshoot-install)
+- [Advanced setup](https://code.claude.com/docs/en/setup)
+- [Authentication](https://code.claude.com/docs/en/authentication)

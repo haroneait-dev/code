@@ -1,77 +1,148 @@
 ---
-title: "MCP en 2026 : Apps, élicitation, sampling & Streamable HTTP"
-description: "L'évolution du Model Context Protocol : don à l'Agentic AI Foundation, MCP Apps (UI interactives), élicitation, sampling, et le passage au transport Streamable HTTP sans état."
-updatedAt: "2026-07-08"
+title: "MCP en 2026 : protocole sans état, élicitation, MCP Apps et extensions"
+description: "Ce qui a changé dans MCP en 2026 : gouvernance à l'Agentic AI Foundation, révision 2026-07-28 sans état, élicitation par allers-retours, dépréciation du sampling, MCP Apps, Tasks et la feuille de route, avec l'impact concret dans Claude Code."
+updatedAt: "2026-10-03"
 readingMinutes: 9
 ---
 
-Le [Model Context Protocol](/wiki/mcp/introduction-mcp) a beaucoup mûri en 2026. Il est passé du statut de standard d'Anthropic à celui de standard neutre de l'industrie, et de simple canal de données à une véritable **chorégraphie agentique** avec interfaces interactives. Tour d'horizon des évolutions clés.
+Le Model Context Protocol a plus évolué en 2026 que depuis sa création. Le protocole est devenu sans état, les interactions avec l'utilisateur passent par un nouveau mécanisme, et des **extensions officielles** (MCP Apps, Tasks) ajoutent interfaces graphiques et tâches longues. Cet article fait le point et indique ce que cela change pour vous dans Claude Code.
 
-## Un standard désormais neutre
+## Repères chronologiques
 
-Le **9 décembre 2025**, Anthropic a **fait don du MCP à l'Agentic AI Foundation (AAIF)**, sous l'égide de la Linux Foundation. Le protocole cesse d'être « celui d'Anthropic » pour devenir un standard ouvert et neutre.
+| Date | Événement |
+|---|---|
+| Novembre 2024 | Anthropic publie MCP en open source |
+| Mars 2025 | Révision 2025-03-26 : transport Streamable HTTP, l'ancien HTTP+SSE est déprécié |
+| Novembre 2025 | Révision 2025-11-25 : élicitation en mode URL, Client ID Metadata Documents pour OAuth |
+| 9 décembre 2025 | Anthropic confie MCP à l'**Agentic AI Foundation** (Linux Foundation) |
+| 26 janvier 2026 | Première version stable de la spécification **MCP Apps** |
+| 28 juillet 2026 | Révision **2026-07-28** : protocole sans état, extensions Tasks et MCP Apps |
 
-- **Cofondateurs de l'AAIF** : Anthropic, Block, OpenAI.
-- **Membres Platinum** : Google, Microsoft, AWS, Cloudflare, Bloomberg.
+## Une gouvernance neutre
 
-L'adoption suit : en mars 2026, le standard enregistrait des dizaines de millions de téléchargements mensuels de SDK et plus de 10 000 serveurs publics actifs. Comparaison courante : le MCP est « le port USB-C de la connectivité IA » — on implémente le protocole une fois, et toute application IA compatible s'y connecte.
+L'Agentic AI Foundation (AAIF) est un fonds dirigé hébergé par la Linux Foundation. Elle a été cofondée par Anthropic, Block et OpenAI, avec le soutien de Google, Microsoft, AWS, Cloudflare et Bloomberg. Elle accueille MCP, goose (Block) et AGENTS.md (OpenAI).
 
-## MCP Apps : des interfaces interactives dans le chat
+Concrètement, la spécification évolue par propositions publiques (les **SEP**), relues par des groupes de travail. Le code est progressivement relicencié de MIT vers Apache 2.0. Pour vous, c'est un signal de stabilité : un serveur MCP écrit aujourd'hui fonctionnera avec Claude, ChatGPT, VS Code, Cursor et les autres clients compatibles.
 
-Le protocole de base était limité au texte et aux données structurées JSON. **MCP Apps** (livré en janvier 2026, bâti sur **mcp-ui**) permet aux serveurs de renvoyer des **interfaces utilisateur interactives complètes** : tableaux de bord, graphiques, formulaires. Ces composants HTML sont rendus dans des **iframes isolés (sandboxed)** directement dans l'interface de chat de l'hôte (comme Claude Desktop), unifiant l'expérience sans quitter la conversation.
+## La révision 2026-07-28 : un protocole sans état
 
-## Élicitation : le serveur peut demander à l'utilisateur
+C'est le changement le plus profond depuis 2024.
 
-L'**élicitation** permet à un serveur de **suspendre son exécution** pour solliciter une intervention de l'utilisateur :
+- **Plus de poignée de main** `initialize`. Chaque requête porte dans `_meta` la version du protocole et les capacités du client.
+- **Nouvelle méthode `server/discover`**, obligatoire côté serveur, qui décrit versions, capacités et identité.
+- **Plus de session HTTP** (`Mcp-Session-Id` disparaît). Un serveur distant devient une application HTTP ordinaire : n'importe quelle instance derrière un répartiteur de charge peut traiter n'importe quelle requête, sans session collante.
+- **Notifications sur abonnement** : `subscriptions/listen` remplace le flux GET et `resources/subscribe`.
+- **Résultats mis en cache** : `ttlMs` et `cacheScope` sur les listes et les lectures de resources.
+- **`ping` et `logging/setLevel` supprimés** ; le niveau de log se règle par requête.
 
-- **Mode URL** : pour les interactions à sécurité critique (flux OAuth, configuration de paiement), le serveur redirige l'utilisateur vers une page web externe sécurisée, puis reprend la tâche.
-- **Mode formulaire** : le serveur présente une interface structurée pour lever une ambiguïté quand la requête initiale du modèle est incomplète.
+Le détail des messages est dans [JSON-RPC 2.0 sous le capot de MCP](/wiki/mcp/json-rpc-mapping) et celui des transports dans [Transports MCP](/wiki/mcp/transports-stdio-sse).
 
-Depuis la spécification **2026-07-28** (release candidate), l'élicitation évolue : au lieu de maintenir un flux SSE ouvert, le serveur renvoie un `InputRequiredResult` avec les demandes d'entrée et un état de requête (SEP-2322, *Multi Round-Trip Requests*).
+### Ce qui est déprécié
 
-## Sampling : le serveur peut demander au modèle de raisonner
+La spécification adopte une politique de cycle de vie : une fonction dépréciée reste utilisable **au moins 12 mois**. Sont dépréciés en 2026-07-28 :
 
-Le **sampling** inverse la relation habituelle : un serveur MCP peut demander des **complétions intermédiaires au modèle** pendant l'exécution d'une tâche. Plutôt que le modèle décide seul de tout, le serveur peut lui demander de raisonner sur un état de données précis, de valider des hypothèses, ou de générer du contenu avant de poursuivre un processus multi-étapes.
+| Fonction | Alternative conseillée |
+|---|---|
+| **Sampling** (le serveur demande une complétion au modèle du client) | appeler directement l'API d'un fournisseur de modèles |
+| **Roots** (le client indique ses dossiers de travail) | passer chemins ou URI en paramètres d'outil ou en configuration |
+| **Logging** côté protocole | logs sur stderr (stdio) ou OpenTelemetry |
+| Transport **HTTP+SSE** | Streamable HTTP |
+| Enregistrement dynamique de client OAuth (DCR) | Client ID Metadata Documents |
 
-Combinés, sampling + élicitation transforment le serveur en **participant actif** de la boucle agentique, et non plus en simple fournisseur passif de données.
+Si vous lisez un tutoriel qui présente le sampling comme l'avenir de MCP, il date d'avant cette révision.
 
-## Transports : le passage à Streamable HTTP
+## Élicitation : demander quelque chose à l'utilisateur
 
-L'évolution des couches de transport suit les besoins de déploiement :
+L'élicitation permet à un serveur de demander une information à l'utilisateur **pendant** un appel d'outil. Deux modes existent :
 
-| Transport | Latence typique | Usage principal | Authentification |
-|---|---|---|---|
-| `stdio` | < 10 ms | Développement local, sur la machine de l'utilisateur | Jeton via variable d'env |
-| SSE *(historique)* | 100–500 ms | Serveur distant partagé | En-tête HTTP Bearer |
-| **Streamable HTTP** | 80–400 ms | Production, API cloud à grande échelle | OAuth 2.1, clé API |
+- **Formulaire** (`form`) : le serveur décrit un petit formulaire avec un JSON Schema simplifié (objet plat, champs texte, nombre, booléen ou liste de choix). Exemple : choisir l'environnement de déploiement, confirmer une suppression.
+- **URL** (`url`) : le client propose d'ouvrir une page web. Les données saisies sur cette page ne transitent pas par le client. C'est **obligatoire** pour tout ce qui est sensible : mot de passe, clé d'API, jeton, paiement. Le mode formulaire est interdit pour ces données.
 
-Depuis la spec de 2025-06-18, le **Streamable HTTP** est le transport de production : un point de terminaison HTTP unique avec streaming bidirectionnel, plus résilient aux déconnexions que SSE.
+L'utilisateur peut toujours accepter, refuser ou annuler, et le client doit afficher clairement quel serveur demande quoi.
 
-Nouveauté majeure de la RC **2026-07-28** : le protocole devient **sans état (stateless)** au niveau transport. Avant, un client établissait une session, le serveur renvoyait un `Mcp-Session-Id`, et le client le transportait dans les requêtes suivantes — imposant des sessions persistantes (*sticky sessions*), des stores partagés et une gestion fine des gateways. Le passage au sans-état **simplifie drastiquement le scale-out** des serveurs MCP en production.
+### Le nouveau mécanisme : les allers-retours (MRTR)
 
-## Sécurité : permissions granulaires
+Depuis 2026-07-28, le serveur n'envoie plus de requête au client. Il répond à l'appel d'outil par un résultat `input_required` qui contient sa question. Le client interroge l'utilisateur, puis **rejoue l'appel d'origine** avec la réponse :
 
-Côté hôte, [Claude Code](/wiki/mcp/securite-mcp) applique un système à trois niveaux :
+```json
+{"jsonrpc":"2.0","id":7,"result":{
+  "resultType":"input_required",
+  "inputRequests":{"env":{"method":"elicitation/create","params":{
+    "mode":"form",
+    "message":"Sur quel environnement déployer ?",
+    "requestedSchema":{"type":"object",
+      "properties":{"cible":{"type":"string","enum":["staging","production"]}},
+      "required":["cible"]}}}},
+  "requestState":"eyJ…"}}
+```
 
-1. **Autorisation systématique** (défaut) : confirmation demandée avant chaque exécution d'outil.
-2. **Autorisation de session** : valable pour la durée d'utilisation en cours.
-3. **Autorisation permanente** : liste blanche pour les outils de confiance absolue.
+Le `requestState` est opaque pour le client : le serveur y encode où il en était. Il doit le signer ou le chiffrer, car le client pourrait le modifier.
 
-La feuille de route du groupe de travail se concentre sur la migration de session lors du scale-out et sur des **pistes d'audit structurées** pour les environnements SIEM d'entreprise.
+### Dans Claude Code
 
-## À retenir
+- Les demandes d'élicitation s'affichent dans une boîte de dialogue, sans configuration. En mode URL, Claude Code vous demande s'il peut ouvrir le lien dans votre navigateur.
+- Sur les connexions en 2026-07-28, Claude Code déclare les deux modes (`form` et `url`).
+- Pour répondre automatiquement (en CI par exemple), utilisez le hook `Elicitation`. Voir [Introduction aux hooks](/wiki/hooks/introduction-hooks).
 
-- MCP n'est plus « un connecteur de données » : avec Apps, sampling et élicitation, c'est un **framework d'interaction agentique** complet.
-- Pour la **production**, vise le **Streamable HTTP** (et bientôt le mode sans état) plutôt que SSE.
-- Le don à l'AAIF sécurise la **pérennité** du standard — un bon signal pour investir dans des serveurs MCP maison.
+## MCP Apps : des interfaces dans la conversation
+
+**MCP Apps** est une extension officielle (`io.modelcontextprotocol/ui`). Un outil déclare dans son `_meta.ui.resourceUri` une ressource `ui://` qui contient une page HTML. L'hôte affiche cette page dans une **iframe isolée** à côté de la réponse : tableau de bord, formulaire de configuration, visionneuse de PDF, carte interactive.
+
+Fonctionnement :
+
+1. l'hôte peut précharger la ressource `ui://` avant même l'appel d'outil ;
+2. il affiche la page dans un bac à sable (pas d'accès au DOM, aux cookies ni au stockage de l'hôte) ;
+3. la page dialogue avec l'hôte par `postMessage`, avec des messages JSON-RPC (`ui/initialize`, `tools/call`…). Elle peut appeler les outils du serveur, avec l'accord de l'hôte ;
+4. `_meta.ui.csp` liste les origines externes autorisées, `_meta.ui.permissions` les accès supplémentaires (micro, caméra).
+
+Le paquet `@modelcontextprotocol/ext-apps` fournit une classe `App` pratique, mais n'importe quel framework web convient.
+
+**Où ça s'affiche** : Claude (web), Claude Desktop, ChatGPT, VS Code avec GitHub Copilot, Microsoft 365 Copilot, Cursor, Goose, Postman et d'autres. **Claude Code dans le terminal n'affiche pas ces interfaces** : il masque les ressources `ui://` de la liste des resources, mais les outils restent utilisables normalement. Pour tester le rendu d'une App, utilisez l'onglet Apps de [MCP Inspector](/wiki/mcp/debugging-inspector).
+
+## Les autres extensions officielles
+
+Les extensions sont optionnelles et négociées dans le champ `extensions` des capacités. Les principales :
+
+| Extension | Rôle |
+|---|---|
+| **Tasks** (`io.modelcontextprotocol/tasks`) | Opérations longues : le serveur renvoie un identifiant de tâche, le client interroge avec `tasks/get` et répond avec `tasks/update` |
+| **OAuth Client Credentials** | Authentification machine à machine, sans utilisateur devant un navigateur |
+| **Enterprise-Managed Authorization** | Accès piloté par le fournisseur d'identité de l'entreprise |
+| **Skills over MCP** | Un serveur expose des skills (instructions et fichiers associés) |
+
+Tasks était une fonction expérimentale du cœur en 2025 ; elle a été sortie du cœur et redessinée en extension.
+
+## Ce qui arrive : la feuille de route
+
+La feuille de route publiée par les mainteneurs (mise à jour le 22 août 2026) fixe cinq priorités. Ce sont des intentions, pas des engagements :
+
+- **Messagerie agentique** : faire converger Tasks, abonnements et progression, et ajouter des événements poussés par le serveur (webhooks).
+- **Transport unifié** : un seul modèle HTTP, y compris en local (HTTP sur stdio), et un cache avec ETags.
+- **Identité des agents** : DPoP, délégation d'identité, échange de jetons pour les agents qui agissent sans utilisateur présent.
+- **Primitives améliorées** : refonte de la forme des résultats de `tools/call` (aujourd'hui `content` et `structuredContent` coexistent) et **découverte progressive** des outils.
+- **SDK** : génération et validation automatiques à partir de la spécification et d'une suite de conformité.
+
+## Ce que cela change pour vous
+
+- **Vous utilisez Claude Code** : rien à faire. Claude Code (runtime v2) négocie la révision 2026-07-28 avec les serveurs HTTP qui la supportent, et l'étend progressivement aux serveurs stdio et aux connecteurs ; les autres serveurs restent sur l'ancienne poignée de main (variable `MCP_SDK_GENERATION` pour forcer un runtime, `MCP_PROTOCOL_NEGOTIATION` pour la négociation). Préférez les serveurs distants officiels en Streamable HTTP.
+- **Vous écrivez un serveur** : partez sur un SDK v2, n'utilisez ni sampling ni roots, passez par l'élicitation en mode URL pour toute donnée sensible, et prévoyez Streamable HTTP pour un déploiement partagé.
+- **Vous exploitez des serveurs en production** : le sans-état simplifie la montée en charge, mais les serveurs qui gardaient un état de session doivent le rendre explicite (identifiants passés en arguments).
+
+## Pour aller plus loin
+
+- [Qu'est-ce que MCP ?](/wiki/mcp/introduction-mcp)
+- [Architecture client/serveur de MCP](/wiki/mcp/architecture-client-serveur)
+- [Limites du protocole MCP](/wiki/mcp/limites-protocole)
+- [Sécurité des serveurs MCP](/wiki/mcp/securite-mcp)
 
 ## Sources
 
-- [MCP Is Growing Up — Agentic AI Foundation](https://aaif.io/blog/mcp-is-growing-up/)
-- [The 2026-07-28 MCP Specification Release Candidate — MCP Blog](https://blog.modelcontextprotocol.io/posts/2026-07-28-release-candidate/)
-- [Everything your team needs to know about MCP in 2026 — WorkOS](https://workos.com/blog/everything-your-team-needs-to-know-about-mcp-in-2026)
-- [Roadmap — Model Context Protocol](https://modelcontextprotocol.io/development/roadmap)
-
----
-
-*Cet article fait partie du wiki Claude Mastery. Non affilié à Anthropic. Claude™ est une marque d'Anthropic, PBC.*
+- Changelog de la révision 2026-07-28 : https://modelcontextprotocol.io/specification/2026-07-28/changelog
+- Élicitation : https://modelcontextprotocol.io/specification/2026-07-28/client/elicitation
+- Allers-retours multiples (MRTR) : https://modelcontextprotocol.io/specification/2026-07-28/basic/patterns/mrtr
+- MCP Apps : https://modelcontextprotocol.io/extensions/apps/overview
+- Matrice de support des extensions : https://modelcontextprotocol.io/extensions/client-matrix
+- Tasks : https://modelcontextprotocol.io/extensions/tasks/overview
+- Feuille de route : https://modelcontextprotocol.io/development/roadmap
+- Annonce de l'AAIF par Anthropic : https://www.anthropic.com/news/donating-the-model-context-protocol-and-establishing-of-the-agentic-ai-foundation
+- MCP dans Claude Code (élicitation, runtimes, MCP Apps) : https://code.claude.com/docs/en/mcp

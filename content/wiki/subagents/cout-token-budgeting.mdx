@@ -1,42 +1,85 @@
 ---
-title: "Coût et token budgeting des subagents"
-description: "Comprendre ce que coûte vraiment un subagent en tokens input et output, comment estimer le budget et l'optimiser."
-updatedAt: "2026-05-19"
-readingMinutes: 6
+title: "Coût et budget de tokens des subagents"
+description: "Ce que consomme réellement un subagent, comment le mesurer avec /usage et /tasks, et comment le réduire : modèle adapté, cache, briefs cadrés, forks."
+updatedAt: "2026-10-03"
+readingMinutes: 5
 ---
 
-Un subagent n'est pas gratuit. Il consomme des tokens en entrée (prompt système, prompt utilisateur, fichiers lus, résultats d'outils) et en sortie (raisonnement, appels d'outils, résumé final). Comprendre cette structure permet de décider en connaissance de cause et d'éviter les mauvaises surprises sur la facture.
+Un subagent ne coûte pas moins cher par magie : il envoie ses propres requêtes, décomptées sur les mêmes limites d'usage (ou la même facture API) que votre conversation. Son intérêt est de garder la conversation principale légère. Cet article explique d'où viennent les tokens et comment garder la main.
 
-## Anatomie du coût d'un subagent
+## D'où viennent les tokens d'un subagent
 
-Quatre postes composent le coût d'un subagent. D'abord le prompt système : c'est une base incompressible, généralement de l'ordre de quelques milliers de tokens, qui décrit les outils disponibles et le comportement attendu. Ensuite le prompt utilisateur que vous lui envoyez, typiquement quelques centaines de tokens. Puis le contenu des fichiers et résultats d'outils qu'il lit pendant l'exécution, qui peut exploser : un fichier de 500 lignes pèse facilement 5000 tokens. Enfin la sortie : raisonnement intermédiaire, appels d'outils, et résumé final renvoyé à la conversation principale.
+À chaque requête, un subagent envoie tout son contexte courant :
 
-L'input est généralement 5 à 10 fois plus volumineux que l'output, mais l'output est facturé 5 fois plus cher. Les deux postes finissent souvent au même ordre de grandeur sur la facture.
+- **son prompt système** (le corps du fichier d'agent) et les détails d'environnement ;
+- **vos fichiers CLAUDE.md** et un instantané `git status` (sauf Explore, Plan et les agents avec `omitClaudeMd: true`) ;
+- **les skills préchargées** via le champ `skills` ;
+- **le message de délégation** rédigé par Claude ;
+- **les résultats d'outils accumulés** : chaque fichier lu, chaque sortie de commande.
 
-## Estimer avant de lancer
+Puis il produit des tokens de sortie : raisonnement (la réflexion étendue suit le réglage de la session), appels d'outils et rapport final. Ce rapport est ensuite ajouté à la conversation principale, où il sera relu à chaque requête suivante.
 
-Pour estimer rapidement, posez-vous trois questions. Combien de fichiers le subagent va-t-il devoir lire ? À 5000 tokens par fichier en moyenne, dix fichiers = 50k tokens d'input. Combien d'appels d'outils ? Chaque appel ajoute son résultat au contexte du subagent pour le tour suivant, donc les tokens s'accumulent. Combien de lignes attendez-vous en sortie ? Un résumé de 30 lignes = environ 600 tokens, un rapport détaillé peut monter à 3000.
+## Les tarifs à garder en tête
 
-Ordre de grandeur typique pour une tâche d'exploration moyenne : 30k à 80k tokens d'input, 1k à 5k tokens d'output. Pour un audit large multi-fichiers, comptez 100k à 300k tokens d'input.
+Prix API par million de tokens (entrée / sortie), octobre 2026 :
 
-## Comparer avec faire la tâche soi-même
+| Modèle | Alias | Entrée | Sortie | Lecture cache |
+| --- | --- | --- | --- | --- |
+| Opus 5.5 | `opus` | 4 $ | 20 $ | 0,20 $ |
+| Sonnet 5.5 | `sonnet` | 2 $ | 10 $ | 0,20 $ |
+| Haiku 4.5 | `haiku` | 1 $ | 5 $ | 0,10 $ |
 
-Le subagent est rentable quand le ratio `tokens_lus / tokens_renvoyés` est élevé. Si le subagent lit 50k tokens et vous renvoie 500 tokens de synthèse, vous économisez 49.5k tokens dans votre contexte principal. Si à l'inverse il lit 5k tokens et vous renvoie 4k tokens, l'isolation ne vaut pas grand-chose et vous auriez aussi bien fait de lire vous-même.
+La sortie coûte cinq fois l'entrée sur ces trois modèles. Avec un abonnement Pro ou Max, vous ne payez pas au token, mais ces volumes pèsent sur vos limites d'usage de la même façon.
 
-Règle empirique : déléguez quand le ratio dépasse 10x. En dessous, lisez directement.
+## Le cache de prompt
 
-## Optimisations concrètes
+- Un subagent classique a son propre préfixe (prompt système et outils différents) : sa première requête ne lit pas le cache de la conversation principale. Il chauffe ensuite son propre cache au fil de ses tours.
+- Ce cache dure 5 minutes par défaut, même avec un abonnement. Vous pouvez choisir 1 heure par agent avec `experimental: { cacheTtl: 1h }` dans le frontmatter, ou globalement avec le réglage `subagentPromptCacheTtl`. L'écriture en cache 1 heure est facturée plus cher.
+- Un **fork** (`/subtask`) a exactement le même préfixe que la session : sa première requête lit le cache principal. Pour une tâche qui a besoin du même contexte, il revient moins cher qu'un subagent neuf.
+- Reprendre un subagent terminé (Claude lui envoie un message avec `SendMessage`) permet de relire le cache que sa première exécution a chauffé.
 
-Plusieurs leviers réduisent significativement le coût. Cadrez le périmètre dans le prompt : « ne lis que les fichiers `.ts` dans `app/api/` » évite l'exploration sauvage. Demandez explicitement un format de sortie compact : « réponds en 10 lignes maximum, format liste ». Évitez de faire faire au subagent ce que `grep` ou `ls` font instantanément : un outil shell coûte 100 fois moins cher qu'une lecture LLM.
+## Mesurer
 
-Activez le prompt caching côté Anthropic si vous lancez plusieurs subagents similaires d'affilée : la partie système est mise en cache et les appels suivants coûtent 10 % du prix normal sur cette portion.
+- `/usage` : le bloc Session donne les tokens et un coût estimé ; la répartition d'usage attribue un pourcentage aux subagents, skills, plugins et serveurs MCP. La ligne « Prompt cache (main) » ne couvre que la conversation principale.
+- `/tasks` : modèle (et effort s'il est fixé) de chaque subagent en cours.
+- `/workflows` : tokens par agent pour un dynamic workflow.
+- Hooks `SubagentStart` et `SubagentStop` pour journaliser chaque délégation, et l'export OpenTelemetry pour un suivi d'équipe.
 
-## Surveiller la dérive
+## Réduire la facture
 
-Sur une session longue, les coûts de subagents s'accumulent silencieusement. Si vous lancez 20 subagents à 50k tokens d'input chacun, vous êtes à 1M de tokens d'input juste en délégations. Pensez à regrouper les tâches similaires dans un seul subagent plutôt que d'en lancer dix petits, et préférez deux vagues séquentielles à dix parallèles si la latence n'est pas critique.
+1. **Choisir le bon modèle** : `model: haiku` pour une recherche ou un tri simple. Pour tout router vers un modèle : `CLAUDE_CODE_SUBAGENT_MODEL=haiku` plus `CLAUDE_CODE_SUBAGENT_MODEL_FORCE=1`.
+2. **Cadrer le périmètre** : « ne lisez que `app/api/**/*.ts` » évite l'exploration sauvage.
+3. **Exiger un rapport court** : « 10 lignes maximum, format tableau ». Le rapport est relu à chaque tour de la conversation principale.
+4. **Limiter les tours** : `maxTurns` arrête un agent qui tourne en rond ; sa sortie revient marquée partielle et peut être reprise.
+5. **Alléger le démarrage** : `omitClaudeMd: true` pour un agent qui reçoit tout dans son brief ; descriptions d'agents courtes (avertissement au-delà de 15 000 tokens cumulés).
+6. **Ne pas déléguer un `grep`** : une commande shell renvoie quelques lignes, un subagent démarre tout un contexte.
+7. **Prétraiter** : un hook ou un script qui filtre un log avant lecture réduit le volume de dizaines de milliers de tokens à quelques centaines.
+
+## Exemple de calcul (ordre de grandeur)
+
+Un subagent Sonnet 5.5 lit 15 fichiers d'environ 4 000 tokens en 10 tours, puis renvoie un rapport de 800 tokens.
+
+- Le contexte grossit à chaque tour et est renvoyé à chaque requête : une grande partie est lue depuis le cache (0,20 $ le million), seuls les nouveaux tokens passent au tarif d'écriture.
+- La conversation principale ne reçoit que les 800 tokens du rapport, au lieu des quelque 60 000 tokens de fichiers.
+
+Le gain est net si vous n'avez pas besoin de ces fichiers ensuite. Si vous comptez les modifier juste après, lisez-les directement dans la conversation principale.
+
+## Multiplicateurs à connaître
+
+- **Parallélisme** : dix subagents, ce sont dix contextes et dix rapports qui reviennent d'un coup.
+- **Imbrication** : chaque niveau ajoute des contextes complets ; voir [Sous-traitance récursive](/wiki/subagents/sous-traitance-recursive).
+- **Dynamic workflows** : un avertissement « Large workflow » apparaît au-delà de 25 agents ou de 1,5 million de tokens prévus.
+- **Équipes d'agents** : selon la documentation des coûts, environ 7 fois plus de tokens qu'une session standard quand les coéquipiers travaillent en mode plan. Ce chiffre concerne les équipes, pas les subagents.
 
 ## Pour aller plus loin
 
-- Article voisin : `quand-deleguer` pour décider quand l'investissement en tokens vaut le coup.
-- Article voisin : `parallelisation` pour comprendre l'effet multiplicateur sur la facture.
-- Article voisin : `erreurs-courantes` pour éviter les subagents qui consomment sans rien renvoyer d'utile.
+- [Quand déléguer à un subagent ?](/wiki/subagents/quand-deleguer)
+- [Paralléliser les subagents](/wiki/subagents/parallelisation)
+- [Tarifs et tokens](/wiki/modeles/pricing-tokens)
+
+## Sources
+
+- https://code.claude.com/docs/en/costs
+- https://code.claude.com/docs/en/sub-agents
+- https://code.claude.com/docs/en/prompt-caching
+- https://platform.claude.com/docs/en/about-claude/pricing

@@ -1,43 +1,163 @@
 ---
-title: "Faux positifs en audit de sécurité"
-description: "Calibrer la commande /security-review de Claude pour réduire le bruit grâce au whitelisting contextuel."
-updatedAt: "2026-05-19"
-readingMinutes: 6
+title: "Réduire les faux positifs d'un audit de sécurité avec Claude"
+description: "Rendre /security-review, le plugin security-guidance, le plugin Claude Security et l'Action GitHub moins bruyants : décrire votre contexte, exiger un scénario d'exploitation, faire vérifier chaque alerte et tenir un registre d'exceptions."
+updatedAt: "2026-10-03"
+readingMinutes: 8
 ---
 
-Un audit de sécurité automatisé qui crie au loup à chaque revue finit ignoré. La commande `/security-review` de Claude Code, comme tout SAST, produit son lot de faux positifs : findings théoriquement valides mais sans impact réel dans le contexte du projet. Apprendre à les calibrer est ce qui sépare un outil utile d'un générateur de tickets fantômes.
+Un audit de sécurité qui signale dix problèmes dont huit sans impact finit ignoré, y compris le jour où l'alerte est réelle. Les outils de sécurité de Claude Code filtrent déjà une partie du bruit, mais aucun ne connaît votre architecture tant que vous ne la lui décrivez pas. Cet article montre où agir, outil par outil, pour garder des rapports courts et crédibles.
 
-## Comprendre pourquoi un faux positif apparaît
+## Les outils et leur levier anti-bruit
 
-Trois causes dominent. Le contexte manquant : Claude ne sait pas qu'une URL est purement interne, qu'une fonction n'est jamais appelée avec une entrée utilisateur, ou qu'un secret apparent est une fixture de test. La signature trop large : un pattern `eval(` déclenche une alerte même quand l'argument est une constante littérale. Et l'ignorance des contrôles compensatoires : un middleware d'authentification global rend obsolète la plupart des alertes "endpoint non protégé" sur les routes downstream.
+| Outil | Quand il tourne | Ce qui réduit les faux positifs |
+|---|---|---|
+| Plugin `security-guidance` | Pendant que Claude écrit du code (à chaque édition, fin de tour, commit) | `.claude/claude-security-guidance.md`, `.claude/security-patterns.yaml` ; la revue au commit lit le code environnant avant de signaler |
+| `/security-review` | À la demande, sur le diff de votre branche | Le `CLAUDE.md`, une version personnalisée de la commande |
+| Plugin Claude Security (`/claude-security`) | À la demande, scan profond d'un dépôt ou d'un diff | Vérification indépendante de chaque alerte, périmètre ciblé |
+| Code Review (offres Team et Enterprise) | Sur chaque pull request | `REVIEW.md`, réactions pouce levé et pouce baissé |
+| Action `claude-code-security-review` | Dans votre CI, sur les PR | Fichier `false-positive-filtering-instructions` |
 
-## Documenter le périmètre dans CLAUDE.md
+Pour l'installation de chaque outil, voir [Code review automatisée avec Claude](/wiki/workflows/code-review-auto). Ici, on se concentre sur le réglage.
 
-La première étape consiste à enrichir `CLAUDE.md` avec une section "Sécurité et hypothèses". Listez les contrôles transverses (auth gateway, rate limiting, WAF), les zones publiques versus internes, les conventions de nommage des fixtures (`*_test.py`, `fixtures/**`, `__mocks__/**`). Claude lit ce fichier avant chaque revue et adapte sa sensibilité. Une seule ligne "tous les endpoints sous `/api/internal/` sont protégés par mTLS au niveau de l'ingress" élimine des dizaines de faux positifs.
+## Pourquoi un faux positif apparaît
 
-## Whitelisting structuré
+Trois causes reviennent presque toujours :
 
-Maintenez un fichier `.claude/security-allowlist.yml` versionné. Chaque entrée comporte un chemin (ou glob), une règle ignorée, un motif justifiant l'exception, et une date d'expiration. L'expiration force une relecture périodique : aucune exception n'est éternelle. Claude doit refuser d'ignorer une alerte si l'entrée d'allowlist n'a pas de justification écrite.
+- **Le contexte manquant.** Claude ne sait pas qu'une route est interne, qu'une fonction ne reçoit jamais d'entrée utilisateur ou qu'un « secret » est une donnée de test.
+- **Le motif trop large.** `eval(` ou `dangerouslySetInnerHTML` déclenchent une alerte même quand l'argument est une constante.
+- **Les protections invisibles.** Un middleware d'authentification global, un WAF ou une politique réseau rendent sans objet beaucoup d'alertes « route non protégée ».
 
-```yaml
-- path: "scripts/seed.ts"
-  rule: "hardcoded-credentials"
-  reason: "Credentials de seed pour env local uniquement, jamais déployés."
-  expires: "2026-12-31"
-  owner: "team-platform"
+Chaque levier ci-dessous attaque l'une de ces causes.
+
+## Levier 1 : décrire votre modèle de menace
+
+Tous les outils lisent du contexte écrit en langage naturel. Rédigez-le une fois, précisément.
+
+**Dans `CLAUDE.md`** (lu par `/security-review` et par Code Review), une courte section suffit :
+
+```markdown
+## Sécurité : hypothèses du projet
+- Toutes les routes `/api/*` passent par `middleware.ts`, qui vérifie le token
+  Supabase. Exception volontaire : `/api/health` (public, sans données).
+- Les routes `/api/admin/*` vérifient en plus le rôle `admin` côté serveur.
+- `scripts/seed.ts` et `tests/fixtures/**` contiennent des identifiants factices,
+  jamais déployés.
+- Les requêtes SQL passent par le client Supabase (paramétrées). Toute
+  concaténation de chaîne dans une requête est un vrai problème.
 ```
 
-## Affiner le prompt de /security-review
+**Pour le plugin `security-guidance`**, créez `.claude/claude-security-guidance.md` (8 Ko maximum, tous emplacements confondus). Ses revues de fin de tour et de commit le chargent en plus de leur liste de contrôle intégrée.
 
-Personnalisez la slash-command dans `.claude/commands/security-review.md`. Précisez le modèle de menace (qui est l'attaquant, qu'est-ce qui est exposé), demandez à Claude de classer chaque finding selon DREAD ou CVSS, et exigez un champ "exploitabilité concrète dans ce repo" qui force le raisonnement contextuel. Une alerte sans scénario d'exploitation crédible est automatiquement marquée comme informative plutôt que bloquante.
+Point important : ces fichiers **ajoutent** des règles, ils n'en retirent pas. La documentation du plugin le précise : une consigne qui demande d'ignorer une classe de vulnérabilité ne supprime pas ces alertes. Décrivez donc vos protections (« le middleware vérifie le token ») plutôt que d'écrire « ne signalez pas les routes sans auth ». C'est aussi plus sûr : une protection décrite reste vérifiable, une exclusion aveugle masque les vrais oublis.
 
-## Boucler avec les vrais incidents
+## Levier 2 : exiger un scénario d'exploitation
 
-Le meilleur calibrage vient de la réalité. À chaque incident de sécurité ou audit externe, mettez à jour la base de connaissance : ajoutez un exemple de vrai positif manqué, ou au contraire un faux positif récurrent. Une revue mensuelle des findings produit deux livrables : la liste des règles à durcir (trop permissives) et celles à assouplir (trop bruyantes). Sur trois à six mois, le ratio signal/bruit devient exploitable et les équipes commencent à lire les rapports.
+Une alerte sans chemin d'attaque concret est une hypothèse, pas une vulnérabilité. Demandez-le explicitement :
+
+```text
+Pour chaque problème signalé, donnez :
+1. le fichier et la ligne ;
+2. un scénario d'exploitation concret dans CE dépôt : qui est l'attaquant,
+   quelle entrée il contrôle, par quel chemin elle arrive jusqu'au code ;
+3. les protections existantes que vous avez vérifiées (middleware, validation,
+   RLS) et pourquoi elles ne suffisent pas ;
+4. une sévérité (haute, moyenne, basse) et votre niveau de confiance.
+Si vous ne pouvez pas décrire de scénario crédible, classez le point en
+« information » et ne le comptez pas comme vulnérabilité.
+```
+
+## Levier 3 : faire vérifier chaque alerte par un autre agent
+
+Un relecteur à qui l'on demande des problèmes en trouve toujours, la documentation de Claude Code le rappelle. La parade : séparer celui qui cherche de celui qui vérifie.
+
+- **Le plugin Claude Security** le fait d'office : une équipe d'agents cartographie le dépôt, construit un modèle de menace, cherche, puis des agents vérificateurs indépendants analysent chaque alerte avant qu'elle n'entre dans le rapport. Lancez `/claude-security`, puis **Scan codebase**, ou ciblez un diff (« scan my branch »). Sur un gros dépôt, scannez une zone à la fois (API, authentification).
+- **Un workflow dynamique** fait de même pour un audit maison :
+
+```text
+use a workflow to audit every route handler under app/api/ for missing
+authentication checks, and adversarially verify each finding before
+reporting it
+```
+
+- **Un sous-agent de vérification** suffit pour un petit diff : « Utilisez un sous-agent pour tenter de réfuter chacune de ces alertes à partir du code. Ne gardez que celles qu'il ne parvient pas à réfuter. »
+
+Deux limites à garder en tête : les scans ne sont pas déterministes (deux passes peuvent trouver des choses différentes), et la vérification réduit le bruit sans garantir qu'aucune vraie faille n'est écartée.
+
+## Levier 4 : personnaliser /security-review et l'Action CI
+
+**`/security-review`.** Le dépôt `anthropics/claude-code-security-review` publie le prompt de la commande (`.claude/commands/security-review.md`). Il contient déjà des consignes de filtrage des faux positifs. Copiez-le dans votre projet et ajoutez vos règles à cette section. Pour éviter toute confusion avec la commande intégrée, enregistrez-le sous un autre nom, par exemple en skill `.claude/skills/security-review-projet/SKILL.md`, puis lancez `/security-review-projet`.
+
+**L'Action GitHub.** Elle accepte un fichier de filtrage en texte libre, organisé en trois parties : exclusions strictes, critères de qualité du signal, précédents propres à votre environnement.
+
+```yaml
+# .github/workflows/security.yml (extrait)
+- uses: anthropics/claude-code-security-review@main
+  with:
+    claude-api-key: ${{ secrets.CLAUDE_API_KEY }}
+    comment-pr: true
+    exclude-directories: "tests/fixtures,scripts/seed"
+    false-positive-filtering-instructions: .github/false-positive-filtering.txt
+```
+
+```text
+HARD EXCLUSIONS
+- Fichiers sous tests/fixtures/ : données factices.
+
+SIGNAL QUALITY CRITERIA
+- L'entrée vient-elle réellement d'un utilisateur ou d'un tiers ?
+- Une protection existante (middleware.ts, RLS Supabase) bloque-t-elle déjà le chemin ?
+
+PRECEDENTS
+- L'authentification est vérifiée dans middleware.ts pour toutes les routes /api/*.
+- Les requêtes passent par le client Supabase, paramétré par défaut.
+```
+
+Le README de l'Action précise qu'elle n'est pas protégée contre l'injection de prompt : réservez-la aux PR de confiance et activez sur GitHub l'approbation obligatoire des workflows pour les contributeurs externes.
+
+**Code Review.** Dans `REVIEW.md`, une section « Ne pas signaler » (fichiers générés, ce que la CI vérifie déjà) et une définition stricte de « Important » limitent le bruit. Les réactions pouce levé et pouce baissé sur chaque commentaire servent à mesurer la pertinence.
+
+## Levier 5 : tenir un registre d'exceptions qui expirent
+
+Quand une alerte est jugée sans impact, notez-le dans un fichier versionné. Ce n'est pas un format reconnu par Claude Code : c'est une convention d'équipe, que vous référencez dans `CLAUDE.md` pour que Claude la lise.
+
+```yaml
+# security/exceptions.yml
+- path: "scripts/seed.ts"
+  regle: "identifiants en dur"
+  raison: "Identifiants de la base locale de démonstration, jamais déployés."
+  expire: "2027-03-31"
+  responsable: "equipe-plateforme"
+```
+
+Et dans `CLAUDE.md` : « Avant de signaler un problème, consultez `security/exceptions.yml`. Une exception expirée ou sans raison écrite ne compte pas : signalez le problème. » L'expiration force une relecture : aucune exception n'est éternelle.
+
+## Mesurer pour savoir si le réglage marche
+
+- **Triez chaque alerte** pendant quelques semaines : vrai positif, faux positif, ou déjà couvert. Notez la cause du faux positif (contexte manquant, motif trop large, protection invisible).
+- **Corrigez à la source** : contexte manquant, complétez le `CLAUDE.md` ; motif trop large, précisez les `paths` de vos règles ; protection invisible, décrivez-la.
+- **Ajoutez les vrais incidents.** Une faille trouvée par un audit externe ou en production devient un exemple dans votre fichier de consignes, pour qu'elle ne passe plus.
+
+## Pièges fréquents
+
+- **Exclure une classe entière** (« ignorer les XSS ») pour faire taire le bruit : vous perdez les vraies failles de cette classe.
+- **Confondre les couches.** `security-guidance` ne bloque rien : il renvoie ses remarques à Claude, qui corrige. Pour une interdiction stricte, utilisez une règle `permissions.deny` ou un hook `PreToolUse` (voir [Hooks PreToolUse et PostToolUse](/wiki/hooks/pre-post-tool-use)).
+- **Oublier `origin`.** `/security-review` compare votre branche à la branche par défaut d'`origin` : sans ce remote, la commande échoue.
+- **Prendre un refus pour un faux négatif.** Chercher des vulnérabilités dans votre code est autorisé, mais certaines demandes offensives à double usage peuvent être refusées par les garde-fous cyber des modèles récents.
 
 ## Pour aller plus loin
 
-- OWASP Top 10 et CWE Top 25 pour aligner la taxonomie des findings.
-- Article "How to triage SAST findings" de Semgrep, transposable à `/security-review`.
-- Méthodologie STRIDE pour formaliser un modèle de menace réutilisable par Claude.
-- Intégration avec Defect Dojo ou GitHub Advanced Security pour centraliser le suivi.
+- [Code review automatisée avec Claude](/wiki/workflows/code-review-auto)
+- [/init, /code-review, /security-review](/wiki/slash-commands/init-review-security)
+- [Prompt injection](/wiki/workflows/prompt-injection)
+- [Protéger ses secrets et fichiers .env](/wiki/workflows/secrets-env)
+
+## Sources
+
+- [Catch security issues as Claude writes code (security-guidance), documentation Claude Code](https://code.claude.com/docs/en/security-guidance)
+- [Scan your codebase for vulnerabilities (Claude Security), documentation Claude Code](https://code.claude.com/docs/en/claude-security)
+- [Security, documentation Claude Code](https://code.claude.com/docs/en/security)
+- [Commands : /security-review, documentation Claude Code](https://code.claude.com/docs/en/commands)
+- [Dynamic workflows, documentation Claude Code](https://code.claude.com/docs/en/workflows)
+- [Best practices : Add an adversarial review step, documentation Claude Code](https://code.claude.com/docs/en/best-practices)
+- [Code Review, documentation Claude Code](https://code.claude.com/docs/en/code-review)
+- [anthropics/claude-code-security-review (GitHub)](https://github.com/anthropics/claude-code-security-review)

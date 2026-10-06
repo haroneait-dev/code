@@ -1,23 +1,19 @@
 ---
-title: "Streaming"
-description: "Recevoir une réponse Claude token par token via le streaming SSE et gérer les events."
-updatedAt: "2026-05-19"
-readingMinutes: 6
+title: "Streaming des réponses (SSE)"
+description: "Recevoir la réponse de Claude au fil de l'eau via Server-Sent Events : types d'événements, helpers Python et TypeScript, réflexion, erreurs en cours de flux et relais vers un front Next.js."
+updatedAt: "2026-10-03"
+readingMinutes: 7
 ---
 
-Quand vous construisez une interface conversationnelle, attendre la réponse complète avant de l'afficher donne une impression de lenteur. Le **streaming** permet à Claude d'envoyer sa réponse au fur et à mesure qu'il la génère — exactement comme dans claude.ai. Voici comment l'utiliser.
+Avec `"stream": true`, l'API envoie la réponse morceau par morceau au lieu d'attendre la fin de la génération. C'est indispensable pour une interface de chat réactive, et c'est aussi la façon recommandée de gérer les longues réponses sans risque de timeout HTTP.
 
 ## Pourquoi streamer
 
-Le streaming repose sur le protocole **Server-Sent Events (SSE)**. Au lieu d'une seule réponse JSON, l'API envoie une suite d'événements typés que vous traitez à la volée. Les bénéfices :
+- **Réactivité** : le texte s'affiche dès les premiers tokens générés.
+- **Longues générations** : les SDK refusent les requêtes non streamées dont la durée prévue dépasse environ 10 minutes. Pour un `max_tokens` élevé (jusqu'à 128K sur Opus 5.5 et Sonnet 5.5), streamez.
+- **Annulation** : vous pouvez couper la connexion si l'utilisateur change d'avis.
 
-- **UX réactive** : le texte apparaît dès les premiers tokens (TTFT très court).
-- **Réponses longues** : pas de timeout HTTP sur des générations de plusieurs minutes.
-- **Annulation** : on peut fermer la connexion si l'utilisateur change d'avis.
-
-## Activer le streaming en curl
-
-Ajoutez simplement `"stream": true` au body :
+## En curl
 
 ```bash
 curl https://api.anthropic.com/v1/messages \
@@ -25,58 +21,83 @@ curl https://api.anthropic.com/v1/messages \
   -H "anthropic-version: 2023-06-01" \
   -H "content-type: application/json" \
   -d '{
-    "model": "claude-sonnet-5-5",
-    "max_tokens": 1024,
+    "model": "claude-opus-5-5",
+    "max_tokens": 4096,
     "stream": true,
-    "messages": [
-      {"role": "user", "content": "Raconte une courte histoire."}
-    ]
+    "messages": [{"role": "user", "content": "Raconte une histoire courte."}]
   }'
 ```
 
-Vous verrez défiler des lignes du type `event: content_block_delta` suivies de `data: {...}`.
+Chaque événement arrive sous la forme `event: <type>` suivi de `data: {...}`.
 
-## Les types d'événements
+## Les événements
 
-Une réponse en streaming suit toujours la même séquence :
+| Événement | Contenu |
+|---|---|
+| `message_start` | Objet `Message` avec `content` vide |
+| `content_block_start` | Début d'un bloc (`text`, `thinking`, `tool_use`...) avec son `index` |
+| `content_block_delta` | Fragment du bloc en cours |
+| `content_block_stop` | Fin du bloc |
+| `message_delta` | `stop_reason` et `usage` (compteurs **cumulés**) |
+| `message_stop` | Fin du flux |
+| `ping` | Keep-alive, à ignorer |
+| `error` | Erreur survenue après le 200 (par exemple `overloaded_error`) |
 
-1. `message_start` — métadonnées initiales (id, modèle, usage partiel).
-2. `content_block_start` — début d'un bloc (texte, tool_use, thinking...).
-3. `content_block_delta` — fragments successifs (le vrai contenu).
-4. `content_block_stop` — fin du bloc en cours.
-5. `message_delta` — mise à jour finale (stop_reason, output_tokens).
-6. `message_stop` — événement terminal.
-7. `ping` — keep-alive envoyé périodiquement, à ignorer.
+Types de `delta` :
 
-Le champ `delta.text` dans chaque `content_block_delta` contient le morceau de texte à concaténer.
+- `text_delta` : champ `text`, le texte à concaténer ;
+- `input_json_delta` : champ `partial_json`, arguments d'un outil en cours ;
+- `thinking_delta` puis `signature_delta` : réflexion et sa signature ;
+- `citations_delta` : une citation à ajouter au bloc texte courant.
 
-## Streaming en Python
+L'API peut ajouter de nouveaux types d'événements : ignorez ceux que vous ne connaissez pas au lieu de planter.
 
-Le SDK propose deux APIs : `stream()` (contextuelle, recommandée) et `create(stream=True)` (itérable bas niveau).
+## Réflexion et streaming sur Opus 5.5
+
+Sur Opus 5.5, la réflexion est toujours active et son affichage est `omitted` par défaut : le flux ouvre d'abord un bloc `thinking` qui ne contient qu'un `thinking_delta` vide et une signature, puis le texte arrive. Pour l'utilisateur, cela ressemble à une pause. Deux remèdes :
+
+- `thinking: {"type": "adaptive", "display": "summarized"}` pour streamer un résumé de la réflexion ;
+- un effort plus bas (`output_config: {"effort": "low"}`) pour les échanges simples.
+
+## En Python
 
 ```python
-from anthropic import Anthropic
+import anthropic
 
-client = Anthropic()
+client = anthropic.Anthropic()
 
 with client.messages.stream(
-    model="claude-sonnet-5-5",
-    max_tokens=1024,
-    messages=[
-        {"role": "user", "content": "Écris un poème sur Paris."}
-    ],
+    model="claude-opus-5-5",
+    max_tokens=16000,
+    messages=[{"role": "user", "content": "Écrivez un poème sur Paris."}],
 ) as stream:
     for text in stream.text_stream:
         print(text, end="", flush=True)
-
-    # Récupérer le message complet une fois terminé
     final = stream.get_final_message()
-    print(f"\nTotal : {final.usage.output_tokens} tokens")
+
+print(f"\n{final.stop_reason} - {final.usage.output_tokens} tokens")
 ```
 
-L'itérateur `text_stream` ne yield que les fragments de texte — pratique pour les cas simples. Pour gérer les tool_use ou le thinking, utilisez `stream` (sans `.text_stream`) qui yield tous les événements.
+`text_stream` ne renvoie que le texte. Pour traiter réflexion et outils, itérez sur `stream` lui-même :
 
-## Streaming en TypeScript
+```python
+with client.messages.stream(
+    model="claude-opus-5-5",
+    max_tokens=16000,
+    thinking={"type": "adaptive", "display": "summarized"},
+    messages=[{"role": "user", "content": "Analysez ce problème..."}],
+) as stream:
+    for event in stream:
+        if event.type == "content_block_delta":
+            if event.delta.type == "thinking_delta":
+                print(event.delta.thinking, end="", flush=True)
+            elif event.delta.type == "text_delta":
+                print(event.delta.text, end="", flush=True)
+```
+
+Si vous voulez seulement éviter les timeouts sans traiter les événements, appelez directement `stream.get_final_message()`.
+
+## En TypeScript
 
 ```ts
 import Anthropic from "@anthropic-ai/sdk";
@@ -84,36 +105,20 @@ import Anthropic from "@anthropic-ai/sdk";
 const client = new Anthropic();
 
 const stream = client.messages.stream({
-  model: "claude-sonnet-5-5",
-  max_tokens: 1024,
-  messages: [
-    { role: "user", content: "Écris un poème sur Paris." },
-  ],
+  model: "claude-opus-5-5",
+  max_tokens: 16000,
+  messages: [{ role: "user", content: "Écrivez un poème sur Paris." }],
 });
 
-for await (const event of stream) {
-  if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
-    process.stdout.write(event.delta.text);
-  }
-}
+stream.on("text", (text) => process.stdout.write(text));
 
 const final = await stream.finalMessage();
-console.log(`\nTokens : ${final.usage.output_tokens}`);
+console.log(`\n${final.stop_reason} - ${final.usage.output_tokens} tokens`);
 ```
 
-Le SDK expose aussi des helpers événementiels :
+Vous pouvez aussi itérer avec `for await (const event of stream)` et filtrer `event.type === "content_block_delta" && event.delta.type === "text_delta"`.
 
-```ts
-stream
-  .on("text", (text) => process.stdout.write(text))
-  .on("finalMessage", (msg) => console.log("Terminé :", msg.usage));
-
-await stream.finalMessage();
-```
-
-## Streamer vers le navigateur (Next.js)
-
-Pour propager le stream à votre frontend, renvoyez un `ReadableStream` depuis une route handler :
+## Relayer le flux vers le navigateur (Next.js)
 
 ```ts
 // app/api/chat/route.ts
@@ -122,23 +127,28 @@ import Anthropic from "@anthropic-ai/sdk";
 const client = new Anthropic();
 
 export async function POST(req: Request) {
-  const { prompt } = await req.json();
-
+  const { prompt } = (await req.json()) as { prompt: string };
   const encoder = new TextEncoder();
+
   const readable = new ReadableStream({
     async start(controller) {
       const stream = client.messages.stream({
         model: "claude-sonnet-5-5",
-        max_tokens: 1024,
+        max_tokens: 8000,
         messages: [{ role: "user", content: prompt }],
       });
+      req.signal.addEventListener("abort", () => stream.abort());
 
-      for await (const event of stream) {
-        if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
-          controller.enqueue(encoder.encode(event.delta.text));
+      try {
+        for await (const event of stream) {
+          if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
+            controller.enqueue(encoder.encode(event.delta.text));
+          }
         }
+        controller.close();
+      } catch (err) {
+        controller.error(err);
       }
-      controller.close();
     },
   });
 
@@ -148,8 +158,23 @@ export async function POST(req: Request) {
 }
 ```
 
-Côté client, lisez le stream avec `response.body.getReader()` et un `TextDecoder`, puis mettez à jour votre état React au fur et à mesure.
+Côté client, lisez `response.body.getReader()` avec un `TextDecoder` et mettez à jour l'état React à chaque morceau.
+
+## Erreurs et reprise
+
+- Une erreur peut survenir **après** le statut 200, sous forme d'événement `error` : les SDK la lèvent comme une exception pendant l'itération. Prévoyez un `try/catch` autour de la boucle.
+- Les retries automatiques du SDK ne s'appliquent pas à un flux déjà commencé.
+- Pour reprendre un flux interrompu sur un modèle 4.6 ou plus récent, sauvegardez le texte reçu, puis envoyez un nouveau message **utilisateur** contenant ce texte et une consigne du type « Votre réponse précédente a été interrompue après [texte]. Reprenez là où vous vous êtes arrêté. » Le préremplissage assistant n'est plus accepté. Les blocs `tool_use` et `thinking` partiels ne peuvent pas être repris.
 
 ## Pour aller plus loin
 
-Le streaming peut transporter bien plus que du texte : **tool calls partiels** (les arguments arrivent en delta JSON), blocs de **thinking étendu** (extended thinking), citations en temps réel... Consultez la [documentation officielle du streaming](https://docs.anthropic.com/en/api/messages-streaming) ainsi que le [AI SDK de Vercel](https://ai-sdk.dev) qui fournit des helpers React (`useChat`, `useCompletion`) compatibles avec le format Anthropic.
+- [Time-To-First-Token](/wiki/api/ttft-tuning)
+- [Tool use](/wiki/api/tool-use) (streaming des arguments d'outils)
+- [SDK TypeScript](/wiki/api/sdk-typescript)
+- [Effort et réflexion adaptative](/wiki/modeles/adaptive-thinking-effort)
+
+## Sources
+
+- Streaming messages : https://platform.claude.com/docs/en/build-with-claude/streaming
+- Errors (long requests) : https://platform.claude.com/docs/en/api/errors
+- Models overview : https://platform.claude.com/docs/en/about-claude/models/overview

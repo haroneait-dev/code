@@ -1,135 +1,159 @@
 ---
-title: "Gérer le contexte long : stratégies pour 100K+ tokens"
-description: "Structurer un prompt massif avec balises XML, position critique en fin, citations forcées et prompt caching pour exploiter pleinement la fenêtre de 200K."
-updatedAt: "2026-05-19"
-readingMinutes: 6
+title: "Travailler avec un contexte long : documents, rapports et gros dossiers"
+description: "Structurer un prompt de dizaines de milliers de tokens pour que Claude exploite vraiment vos documents : données en haut, question à la fin, balises par document, citations, cache et compaction."
+updatedAt: "2026-10-03"
+readingMinutes: 8
 ---
 
-Claude Sonnet 4 et Opus 4 acceptent jusqu'à **200 000 tokens** en entrée, soit environ 500 pages. Mais "accepter" ne veut pas dire "exploiter pleinement". Sans structuration, le modèle perd en précision sur les détails enfouis au milieu du contexte (effet *"lost in the middle"*). Voici les patterns qui tiennent en production sur des prompts de 100K+ tokens.
+Les modèles Claude actuels (Fable 5.1, Opus 5.5, Sonnet 5.5, Opus 5, Sonnet 5) acceptent jusqu'à **1 million de tokens** de contexte, soit plusieurs milliers de pages. Mais plus de contexte n'est pas automatiquement mieux : la documentation d'Anthropic rappelle que la précision et le rappel se dégradent quand le nombre de tokens augmente (*context rot*). Cet article montre comment structurer un prompt long pour que Claude exploite réellement ce que vous lui donnez.
 
-## Le problème : lost in the middle
+## Ce qu'il faut savoir sur la fenêtre
 
-Tous les LLM, y compris Claude, accordent plus d'attention au **début** et à la **fin** du contexte qu'au milieu. Sur un prompt de 100K tokens, un détail crucial placé au token 50 000 peut être manqué dans 20 à 30 % des cas. La conséquence : il faut **architecturer** la position de l'information.
+| Point | Détail |
+|---|---|
+| Taille | 1M de tokens pour les modèles actuels (sauf Haiku 4.5 : 200k) |
+| Sortie maximale | 128k tokens par requête sur les modèles à 1M |
+| Prix | Tarif standard sur toute la fenêtre, sans supplément « long contexte » ni en-tête bêta |
+| Ce qui compte dans la fenêtre | Prompt système, messages, documents, images, définitions d'outils, réflexion et réponse |
+| Fichiers | Jusqu'à 600 images ou pages de PDF par requête (100 pour les modèles à 200k) |
 
-## Règle 1 : information critique en fin
+Un contexte immense coûte cher et ralentit la première réponse. Envoyez ce qui est **utile**, pas tout ce qui est disponible.
 
-Placez la **question** et les **instructions clés** juste avant la zone de génération, après tous les documents.
+## Règle 1 : les documents en haut, la question à la fin
+
+C'est le conseil le plus rentable de la documentation : placez les documents longs **au début** du prompt, au-dessus de la question, des consignes et des exemples. Selon Anthropic, poser la question à la fin peut améliorer la qualité des réponses **jusqu'à 30 %** dans leurs tests, surtout avec plusieurs documents complexes.
+
+## Règle 2 : une balise par document, avec ses métadonnées
+
+Entourez chaque document de balises `<document>`, avec la source et le contenu dans des sous-balises. Claude sait alors exactement de quel document vient chaque passage.
 
 ```xml
 <documents>
-  <document index="1" title="Contrat_2024.pdf">
-    {contenu document 1, 30K tokens}
+  <document index="1">
+    <source>contrat_2025.pdf</source>
+    <document_content>
+      {{CONTRAT}}
+    </document_content>
   </document>
-  <document index="2" title="Avenant_2025.pdf">
-    {contenu document 2, 25K tokens}
+  <document index="2">
+    <source>avenant_2026.pdf</source>
+    <document_content>
+      {{AVENANT}}
+    </document_content>
   </document>
 </documents>
 
-<instructions>
-Identifie les clauses qui ont changé entre le contrat 2024 et
-l'avenant 2025. Pour chaque changement, cite la phrase exacte des
-deux versions.
-</instructions>
+Comparez le contrat et l'avenant. Listez chaque clause modifiée avec
+l'ancienne et la nouvelle formulation.
 ```
 
-Les instructions sont en **dernière position** : c'est la zone où Claude est le plus attentif au moment de générer.
+Voir [Balises XML](/wiki/prompt-engineering/balises-xml) pour les conventions de nommage.
 
-## Règle 2 : balises XML pour la structure
+## Règle 3 : faire citer avant de répondre
 
-Claude est entraîné à reconnaître les balises XML comme délimiteurs sémantiques. Utilisez-les pour :
-
-- Isoler chaque document (`<document>`)
-- Délimiter les instructions (`<instructions>`)
-- Marquer les exemples (`<example>`)
-- Réserver l'espace de raisonnement (`<thinking>`)
-
-```xml
-<context>
-  <user_profile>...</user_profile>
-  <conversation_history>...</conversation_history>
-  <retrieved_docs>...</retrieved_docs>
-</context>
-
-<task>...</task>
-```
-
-Cette structure est **drastiquement** plus efficace qu'un mur de texte. Sur 100K tokens, la différence de précision peut atteindre 15 %.
-
-## Règle 3 : citations forcées (grounding)
-
-Sur du Q&A documentaire, exigez que Claude **cite** ses sources textuelles. Cela réduit les hallucinations et permet de vérifier les réponses.
+Pour une tâche sur un document long, demandez à Claude d'**extraire d'abord les passages pertinents**, puis de travailler à partir d'eux. Cela l'aide à se concentrer sur ce qui compte et réduit les inventions.
 
 ```text
-Avant de répondre, extrais dans <quotes> les 1 à 5 citations
-EXACTES (mot pour mot) des documents qui supportent ta réponse.
-Numérote-les. Réponds ensuite dans <answer> en référençant les
-numéros : [1], [2], etc.
-
-Si aucune citation ne supporte une réponse, dis-le explicitement.
+Trouvez dans les documents les passages qui concernent la résiliation
+et placez-les mot pour mot dans des balises <citations>, numérotés.
+Si aucun passage ne correspond, écrivez « Aucun passage trouvé ».
+Ensuite, en vous appuyant uniquement sur ces citations, répondez dans
+<reponse> en renvoyant aux numéros : [1], [2]…
 ```
 
-Sortie type :
+Via l'API, la fonction **Citations** fait ce travail de façon native : Claude renvoie des références précises vers les passages des documents fournis (voir [Citations API](/wiki/api/citations-api)). Elle n'est pas compatible avec les sorties structurées.
 
-```xml
-<quotes>
-[1] "Le préavis est de trois mois à compter de la notification."
-[2] "Toute modification doit être notifiée par écrit."
-</quotes>
+## Règle 4 : autoriser « je ne sais pas »
 
-<answer>
-Oui, le préavis est de 3 mois [1] et nécessite une notification
-écrite [2].
-</answer>
-```
-
-## Règle 4 : prompt caching pour économiser
-
-Sur un contexte de 100K tokens réutilisé sur plusieurs questions, le **prompt caching** divise le coût par 10 et la latence par 2.
-
-```json
-{
-  "model": "claude-sonnet-5-5",
-  "system": [
-    {
-      "type": "text",
-      "text": "Tu es un analyste contractuel..."
-    },
-    {
-      "type": "text",
-      "text": "{100K tokens de documents}",
-      "cache_control": { "type": "ephemeral" }
-    }
-  ],
-  "messages": [
-    { "role": "user", "content": "Question 1 : ..." }
-  ]
-}
-```
-
-Le cache vit 5 minutes par défaut (ou 1 heure avec le tier `ephemeral_1h`). Idéal pour les sessions interactives sur un corpus stable.
-
-## Règle 5 : index et table des matières
-
-Pour les très longs contextes, fournissez en **tête** un index des sections avec leurs titres. Claude l'utilisera pour naviguer plus efficacement.
+Un long dossier ne contient pas forcément la réponse. Dites-le explicitement :
 
 ```text
-<index>
-- Section 1 (lignes 1-500) : Conditions générales
-- Section 2 (lignes 501-1200) : Annexes techniques
-- Section 3 (lignes 1201-1800) : Tarifs
-</index>
+Si les documents ne permettent pas de répondre, écrivez : « Les
+documents fournis ne contiennent pas cette information. » N'utilisez
+pas vos connaissances générales pour compléter.
 ```
 
-## Anti-patterns courants
+## Dans claude.ai
 
-- **Concaténer 50 PDFs sans balises** : Claude ne sait plus où commence/finit chaque document.
-- **Mettre la question en tête, documents en queue** : exactement l'inverse de ce qu'il faut.
-- **Ne pas réutiliser le cache** : payer plein tarif sur des contextes identiques.
-- **Charger 200K tokens "au cas où"** : la latence explose. Préférez un RAG ciblé sur 20-30K tokens pertinents.
+Les mêmes principes s'appliquent quand vous joignez des fichiers à une conversation :
+
+1. Joignez les documents, puis écrivez votre question **après**, en une fois.
+2. Nommez les fichiers dans votre demande : « Dans le fichier *budget_2026.xlsx*… ».
+3. Demandez des citations : « Citez le passage exact qui justifie chaque point. »
+
+Exemple prêt à l'emploi :
+
+```text
+Je vous ai joint trois comptes rendus de réunion (janvier, mars, juin).
+Je prépare un point d'avancement pour la direction.
+
+1. Pour chaque décision prise, citez la phrase exacte et le compte
+   rendu d'où elle vient.
+2. Signalez les décisions qui se contredisent d'une réunion à l'autre.
+3. Terminez par les actions encore ouvertes, sous forme de tableau
+   (action, responsable, date prévue).
+```
+
+Pour des documents que vous interrogez souvent, utilisez un **projet** : son contenu est mis en cache et réutilisé, ce qui consomme moins de vos limites d'usage que de le renvoyer à chaque conversation (voir [Bien nourrir un projet](/wiki/claude-ai/projects-knowledge-base)).
+
+## Via l'API : cache, comptage et compaction
+
+**Mettez en cache le contexte stable.** Si vous posez plusieurs questions sur le même corpus, le [prompt caching](/wiki/prompt-engineering/prompt-caching-concepts) facture les lectures suivantes à une fraction du prix (0,1 fois le prix d'entrée en général, 0,05 fois sur Opus 5.5).
+
+```python
+import anthropic
+
+client = anthropic.Anthropic()
+
+with open("rapport_annuel.txt", encoding="utf-8") as f:
+    rapport = f.read()
+
+response = client.messages.create(
+    model="claude-sonnet-5-5",
+    max_tokens=8000,
+    system="Vous êtes analyste financier. Répondez uniquement à partir "
+           "du document fourni et citez vos sources.",
+    messages=[{
+        "role": "user",
+        "content": [
+            {
+                "type": "text",
+                "text": f"<document>\n<source>rapport_annuel.txt</source>\n"
+                        f"<document_content>\n{rapport}\n</document_content>\n"
+                        f"</document>",
+                "cache_control": {"type": "ephemeral"},
+            },
+            {"type": "text", "text": "Quels sont les trois principaux risques cités ?"},
+        ],
+    }],
+)
+
+print(response.usage)  # cache_creation_input_tokens, cache_read_input_tokens
+```
+
+**Comptez avant d'envoyer.** L'endpoint de comptage de tokens estime la taille d'une requête. Si l'entrée seule dépasse la fenêtre, l'API renvoie une erreur 400 « prompt is too long ».
+
+**Laissez le serveur compacter les longues conversations.** Pour un agent ou une conversation qui grossit, la *compaction* côté serveur (bêta) résume automatiquement les échanges anciens. Le *context editing* permet aussi d'effacer d'anciens résultats d'outils.
+
+## Les erreurs fréquentes
+
+- **Concaténer des dizaines de fichiers sans balises** : Claude ne sait plus où commence chaque document.
+- **Poser la question en premier, les documents ensuite** : c'est l'inverse de la recommandation.
+- **Tout charger « au cas où »** : le coût et la latence montent, la précision baisse. Une recherche ciblée (RAG) qui ne garde que les passages pertinents donne souvent de meilleurs résultats.
+- **Changer le début du prompt à chaque requête** (date, identifiant) : le cache ne sert plus.
 
 ## Pour aller plus loin
 
-- Mesurer l'effet "lost in the middle" sur votre cas en injectant un fait connu à 3 positions (début/milieu/fin) et observer le taux de récupération.
-- Activer le **prompt caching** sur tout système prompt > 1024 tokens — ROI quasi immédiat.
-- Tester le **contextual retrieval** (Anthropic, 2024) qui ajoute un mini-contexte à chaque chunk pour améliorer le rappel RAG de 35 à 50 %.
-- Pour les corpus > 200K, basculer vers un pipeline RAG + reranking plutôt que tout charger dans le contexte.
+- [Lost in the middle](/wiki/prompt-engineering/lost-in-the-middle)
+- [Prompt caching : concepts](/wiki/prompt-engineering/prompt-caching-concepts)
+- [Citations API](/wiki/api/citations-api)
+- [Fenêtre de contexte : 200K, 1M et compaction](/wiki/modeles/contexte-200k)
+
+## Sources
+
+- [Prompting best practices : Long context prompting (Anthropic)](https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/claude-prompting-best-practices)
+- [Context windows (Anthropic)](https://platform.claude.com/docs/en/build-with-claude/context-windows)
+- [Reduce hallucinations (Anthropic)](https://platform.claude.com/docs/en/test-and-evaluate/strengthen-guardrails/reduce-hallucinations)
+- [Prompt caching (Anthropic)](https://platform.claude.com/docs/en/build-with-claude/prompt-caching)
+- [Pricing : Long context pricing (Anthropic)](https://platform.claude.com/docs/en/about-claude/pricing)
+- [Usage limit best practices (Centre d'aide Claude)](https://support.claude.com/en/articles/9797557-usage-limit-best-practices)

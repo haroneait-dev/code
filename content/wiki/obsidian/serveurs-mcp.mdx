@@ -1,40 +1,95 @@
 ---
-title: "Serveurs MCP Obsidian : installation & config"
-description: "Local REST API, mcp-obsidian, obsidian-claude-code-mcp — configuration pour Claude Desktop et Claude Code, et dépannage."
-updatedAt: "2026-06-05"
-readingMinutes: 8
+title: "Serveurs MCP Obsidian : installation et configuration"
+description: "Connecter Claude Code et Claude Desktop à un vault Obsidian via MCP : serveur intégré au plugin Local REST API, mcp-obsidian, obsidian-claude-code-mcp, certificat et dépannage."
+updatedAt: "2026-10-03"
+readingMinutes: 7
 ---
 
-Le **Model Context Protocol (MCP)** est un protocole ouvert créé par Anthropic qui permet à des assistants comme Claude de se connecter de façon sécurisée à des sources de données externes. Pour Obsidian, on l'utilise pour exposer le vault « vivant » : Claude lit et écrit dans tes notes pendant qu'Obsidian est ouvert, avec accès au contexte (note active, recherche, backlinks).
+Le Model Context Protocol (MCP) permet à Claude d'utiliser des outils externes. Pour Obsidian, un serveur MCP donne à Claude un accès « à chaud » au vault pendant que l'application est ouverte : lecture, écriture, recherche, note active, commandes. Cette page explique comment l'installer pour Claude Code et Claude Desktop, et comment résoudre les problèmes courants.
 
-> Pour la vue d'ensemble et l'approche directe (sans MCP), voir [Obsidian + Claude : le guide complet](/wiki/obsidian/guide-complet).
+> Pour la vue d'ensemble (fichiers directs, CLI officielle, MCP), voir [Obsidian et Claude : le guide complet](/wiki/obsidian/guide-complet).
 
-## Prérequis commun : le plugin Local REST API
+## Quelle solution choisir ?
 
-Obsidian n'a pas d'API REST native. La plupart des serveurs MCP s'appuient donc sur le plugin communautaire **Local REST API** :
+| Solution | Type | Transport | Pour qui |
+|---|---|---|---|
+| **Local REST API** (MCP intégré) | Plugin Obsidian | Streamable HTTP sur `https://127.0.0.1:27124/mcp/` | Recommandé : Claude Code et Claude Desktop |
+| `mcp-obsidian` (MarkusPfundstein) | Serveur Python, via le plugin Local REST API | stdio | Si vous préférez un serveur stdio lancé par `uvx` |
+| `obsidian-claude-code-mcp` (iansinnott) | Plugin Obsidian | WebSocket (Claude Code) et HTTP+SSE (Claude Desktop) | Connexion à Claude Code via `/ide` |
 
-1. Ouvre Obsidian et le vault souhaité.
-2. Va dans **Paramètres → Modules complémentaires tiers** (Community plugins).
-3. Active les modules tiers si ce n'est pas déjà fait.
-4. Clique sur **Parcourir** et cherche « **Local REST API** ».
-5. Installe-le, active-le, puis récupère ta **clé d'API** dans ses réglages (tu en auras besoin pour configurer le serveur MCP).
+## Étape commune : installer le plugin Local REST API
 
-Note aussi le **port** utilisé par le plugin (par défaut, une API HTTPS locale).
+1. Dans Obsidian, ouvrez **Paramètres → Modules complémentaires tiers** et activez-les si besoin.
+2. Cliquez sur **Parcourir**, cherchez « Local REST API », installez puis activez le plugin.
+3. Dans les réglages du plugin, copiez la **clé d'API**.
 
-## Comment ça marche (architecture)
+Par défaut, le plugin écoute en HTTPS sur le port **27124** (le port HTTP **27123** est optionnel et désactivé par défaut). Il crée sa propre autorité de certification au premier démarrage, limitée à `127.0.0.1` et `localhost`.
 
-```text
-Claude Desktop / Claude Code   →   Serveur MCP   →   Plugin Local REST API   →   Vault Obsidian
-        (client MCP)                (passerelle)         (backend dans Obsidian)      (tes .md)
+## Solution 1 : le serveur MCP intégré à Local REST API
+
+Le plugin embarque désormais un serveur MCP qui tourne dans Obsidian et accède directement aux métadonnées du vault, à la note active et à la palette de commandes. Il expose une quinzaine d'outils : lister, lire, écrire, modifier partiellement, déplacer, copier et supprimer des notes, chercher, lister les tags, exécuter une commande Obsidian, ouvrir une note.
+
+### Dans Claude Code
+
+```bash
+claude mcp add --transport http obsidian https://127.0.0.1:27124/mcp/ \
+  --header "Authorization: Bearer <votre-cle-api>"
 ```
 
-Quand Claude doit lire ou écrire une note, il envoie une requête structurée via MCP au serveur, qui dialogue ensuite avec Obsidian par son API REST. Cela permet création de notes, recherche, lecture du contexte courant, etc.
+Par défaut, le serveur est enregistré pour le projet courant uniquement (portée `local`). Ajoutez `--scope user` pour l'avoir dans tous vos projets. Évitez `--scope project` : il écrirait la clé d'API dans `.mcp.json`, un fichier destiné à être versionné.
 
-## Les serveurs MCP Obsidian de référence
+**Le certificat.** Claude Code doit faire confiance à l'autorité de certification du plugin. Téléchargez-la puis indiquez son chemin :
 
-### a) `mcp-obsidian` (MarkusPfundstein)
+```bash
+curl -k -o ~/obsidian-local-rest-api.crt https://127.0.0.1:27124/obsidian-local-rest-api.crt
+export NODE_EXTRA_CA_CERTS=~/obsidian-local-rest-api.crt
+claude
+```
 
-Un serveur MCP Python qui dialogue avec le plugin Local REST API. Configuration typique côté Claude Desktop, via `uvx` (gestionnaire de paquets Python `uv`) :
+Vous pouvez aussi ajouter ce certificat au magasin de certificats de votre système : Claude Code le lit aussi (installeur natif, ou Node 22.15+ pour une installation npm). Autre option, moins sûre : activer le port HTTP 27123 et utiliser `http://127.0.0.1:27123/mcp/`.
+
+Vérifiez ensuite avec `/mcp` dans Claude Code : le serveur `obsidian` doit apparaître comme connecté.
+
+### Dans Claude Desktop
+
+Claude Desktop passe par la passerelle `mcp-remote` (Node.js requis) :
+
+```json
+{
+  "mcpServers": {
+    "obsidian": {
+      "command": "npx",
+      "args": [
+        "mcp-remote@latest",
+        "https://127.0.0.1:27124/mcp/",
+        "--header",
+        "Authorization: Bearer <votre-cle-api>"
+      ],
+      "env": {
+        "NODE_EXTRA_CA_CERTS": "/chemin/vers/obsidian-local-rest-api.crt"
+      }
+    }
+  }
+}
+```
+
+Redémarrez complètement Claude Desktop après chaque modification.
+
+## Solution 2 : `mcp-obsidian` (serveur Python)
+
+Un serveur stdio qui dialogue avec le plugin Local REST API. Il faut `uv` installé (pour `uvx`). Outils proposés : `list_files_in_vault`, `list_files_in_dir`, `get_file_contents`, `search`, `patch_content`, `append_content`, `delete_file`.
+
+Dans Claude Code :
+
+```bash
+claude mcp add mcp-obsidian \
+  -e OBSIDIAN_API_KEY=<votre-cle-api> \
+  -e OBSIDIAN_HOST=127.0.0.1 \
+  -e OBSIDIAN_PORT=27124 \
+  -- uvx mcp-obsidian
+```
+
+Dans Claude Desktop :
 
 ```json
 {
@@ -43,71 +98,74 @@ Un serveur MCP Python qui dialogue avec le plugin Local REST API. Configuration 
       "command": "uvx",
       "args": ["mcp-obsidian"],
       "env": {
-        "OBSIDIAN_API_KEY": "<TA_CLE_API>",
-        "OBSIDIAN_HOST": "<ton_host_obsidian>",
-        "OBSIDIAN_PORT": "<ton_port_obsidian>"
+        "OBSIDIAN_API_KEY": "<votre-cle-api>",
+        "OBSIDIAN_HOST": "127.0.0.1",
+        "OBSIDIAN_PORT": "27124"
       }
     }
   }
 }
 ```
 
-Astuce d'usage : commence par dire explicitement à Claude « utilise Obsidian » au début de la conversation — il appellera alors systématiquement les outils du serveur. Exemple : « Cherche tous les fichiers où *Azure CosmosDB* est mentionné et résume-moi le contexte. »
+`OBSIDIAN_HOST` et `OBSIDIAN_PORT` valent par défaut `127.0.0.1` et `27124` : vous pouvez les omettre.
 
-### b) `obsidian-claude-code-mcp` (iansinnott)
+## Solution 3 : `obsidian-claude-code-mcp` (plugin dédié)
 
-Un **plugin Obsidian** qui implémente directement un serveur MCP, pensé pour Claude Code. Points clés :
+Ce plugin implémente lui-même un serveur MCP, sur le port **22360** par défaut (modifiable ; un port différent par vault si vous en ouvrez plusieurs). Il fournit la note active et la structure du vault.
 
-- **Double transport** : WebSocket (pour Claude Code) et HTTP/SSE (pour Claude Desktop).
-- **Auto-découverte** : Claude Code trouve et se connecte automatiquement au vault via WebSocket.
-- **Opérations sur fichiers** : lecture/écriture des notes via MCP.
-- **Contexte d'espace de travail** : fournit la note active et la structure du vault à Claude.
-- **Multi-clients** : Claude Code et Claude Desktop peuvent se connecter en même temps.
-- **Ports configurables** : par défaut **22360** (changeable dans les réglages ; un port unique par vault si tu en ouvres plusieurs).
-
-Pour **Claude Desktop**, comme il ne gère pas directement le transport HTTP, on passe par `mcp-remote` (une passerelle stdio locale, lancée par `npx`, qui nécessite Node.js) :
+- **Claude Code** : lancez `claude`, tapez `/ide` et choisissez « Obsidian » dans la liste. La connexion WebSocket est automatique.
+- **Claude Desktop** : passez par `mcp-remote` vers l'ancien transport HTTP+SSE.
 
 ```json
 {
   "mcpServers": {
     "obsidian": {
       "command": "npx",
-      "args": ["mcp-remote", "http://localhost:22360/sse"],
-      "env": {}
+      "args": ["mcp-remote", "http://localhost:22360/sse"]
     }
   }
 }
 ```
 
-Redémarre Claude Desktop après modification de la config. (À noter : ce plugin utilise volontairement la spécification MCP « HTTP avec SSE » 2024-11-05, car le « Streamable HTTP » plus récent n'était pas encore pris en charge par tous les clients.)
+Ce plugin utilise volontairement le transport HTTP+SSE (spécification 2024-11-05), désormais déprécié au profit de Streamable HTTP. Préférez la solution 1 pour une nouvelle installation.
 
-## Où se trouve le fichier de config de Claude Desktop ?
+## Où se trouve la configuration de Claude Desktop ?
 
 - **macOS** : `~/Library/Application Support/Claude/claude_desktop_config.json`
 - **Windows** : `%APPDATA%\Claude\claude_desktop_config.json`
 
-## Et avec Claude.ai (web) ?
+Vous pouvez aussi l'ouvrir depuis Claude Desktop : **Paramètres → Développeur → Modifier la configuration**. Pour réutiliser dans Claude Code des serveurs déjà déclarés dans Claude Desktop : `claude mcp add-from-claude-desktop`.
 
-Historiquement, la version **web** de Claude ne pouvait pas se connecter à un serveur MCP **local** : seul Claude Desktop jouait le rôle de client MCP local. Depuis, l'écosystème a évolué et des serveurs MCP **distants** permettent de relier un vault à Claude.ai via des connecteurs. Si tu vises Claude.ai, oriente-toi vers une solution MCP **remote/hébergée** plutôt que vers un serveur purement local. Pour un usage local pur, Claude Desktop ou Claude Code restent la voie la plus directe.
+## Et Claude sur le web ?
+
+Les connecteurs personnalisés de claude.ai se connectent depuis les serveurs d'Anthropic : ils ne peuvent pas joindre un serveur qui écoute sur `127.0.0.1`. Pour Claude sur le web ou mobile, il faut un serveur MCP distant accessible par Internet, ce qui suppose d'exposer votre vault avec une authentification solide. Pour un usage local, restez sur Claude Code ou Claude Desktop.
 
 ## Dépannage
 
-- **Le binaire/serveur n'est pas trouvé** : vérifie que `uv`/`uvx` (pour les serveurs Python) ou Node.js + `npx` (pour `mcp-remote`) sont bien installés et dans ton PATH.
-- **Claude n'appelle pas les outils** : redémarre le client après modification de la config, et demande explicitement à Claude d'utiliser Obsidian.
-- **Échec de connexion (Claude Desktop)** : Claude Desktop ne gère pas le HTTP direct — assure-toi de passer par `mcp-remote`.
-- **Conflit de port** : change le port dans les réglages du plugin (par défaut 22360 pour `obsidian-claude-code-mcp`).
-- **Logs MCP (macOS)** : `tail -n 20 -f ~/Library/Logs/Claude/mcp-server-mcp-obsidian.log` pour diagnostiquer.
-- **Débogage MCP** : l'outil **MCP Inspector** aide beaucoup, car les serveurs MCP tournent souvent sur stdio.
+| Symptôme | Piste |
+|---|---|
+| `uvx` ou `npx` introuvable | Installez `uv` ou Node.js et vérifiez qu'ils sont dans le `PATH`. Sur macOS, Claude Desktop ne voit pas toujours le `PATH` du terminal : indiquez le chemin complet de la commande. |
+| Erreur de certificat (`self-signed certificate`, `UNABLE_TO_VERIFY_LEAF_SIGNATURE`) | Configurez `NODE_EXTRA_CA_CERTS` avec le certificat du plugin, ou ajoutez-le au magasin système. |
+| Erreur 401 | Clé d'API absente ou erronée dans l'en-tête `Authorization: Bearer ...`. |
+| Connexion refusée | Obsidian est fermé, le plugin est désactivé ou le port est différent. |
+| Claude n'utilise pas les outils | Vérifiez l'état avec `/mcp`, puis demandez explicitement « utilise les outils obsidian ». |
+| Réponses tronquées sur de grosses notes | Augmentez `MAX_MCP_OUTPUT_TOKENS` (25 000 par défaut dans Claude Code). |
+| Serveur lent à démarrer | Augmentez `MCP_TIMEOUT` (en millisecondes), par exemple `MCP_TIMEOUT=10000 claude`. |
 
-## Ressources externes
+Pour inspecter un serveur hors de Claude, utilisez MCP Inspector : `npx @modelcontextprotocol/inspector`. Les journaux MCP de Claude Desktop se trouvent dans `~/Library/Logs/Claude/` sur macOS et `%APPDATA%\Claude\logs\` sur Windows.
 
-- **`mcp-obsidian` (MarkusPfundstein)** — serveur MCP Python : [github.com/MarkusPfundstein/mcp-obsidian](https://github.com/MarkusPfundstein/mcp-obsidian)
-- **`obsidian-claude-code-mcp` (iansinnott)** — plugin Obsidian + serveur MCP pour Claude Code : [github.com/iansinnott/obsidian-claude-code-mcp](https://github.com/iansinnott/obsidian-claude-code-mcp)
-- **Forum Obsidian — serveurs MCP : retours & recommandations** : [forum.obsidian.md](https://forum.obsidian.md/t/obsidian-mcp-servers-experiences-and-recommendations/99936)
-- **Forum Obsidian — automatiser la génération de notes (Claude Desktop + MCP)** : [forum.obsidian.md](https://forum.obsidian.md/t/automate-note-generation-in-obsidian-with-claude-desktop-and-mcp-servers/99542)
-- **Retour d'expérience — écrire 2 000 mots en 90 min** : [haihai.ai/obsidian-mcp](https://www.haihai.ai/obsidian-mcp/)
-- **Annuaires de serveurs MCP** : [mcpservers.org](https://mcpservers.org) · [mcp.so](https://mcp.so)
+## Pour aller plus loin
 
----
+- [Obsidian et Claude : le guide complet](/wiki/obsidian/guide-complet)
+- [Installer un serveur MCP](/wiki/mcp/installer-serveur-mcp)
+- [Déboguer avec MCP Inspector](/wiki/mcp/debugging-inspector)
+- [Sécurité MCP](/wiki/mcp/securite-mcp)
 
-*Cet article fait partie du wiki Claude Mastery. Non affilié à Anthropic. Claude™ est une marque d'Anthropic, PBC.*
+## Sources
+
+- [Obsidian Local REST API, serveur MCP intégré (GitHub)](https://github.com/coddingtonbear/obsidian-local-rest-api)
+- [mcp-obsidian (GitHub)](https://github.com/MarkusPfundstein/mcp-obsidian)
+- [obsidian-claude-code-mcp (GitHub)](https://github.com/iansinnott/obsidian-claude-code-mcp)
+- [Connecter Claude Code à des outils via MCP (documentation Claude Code)](https://code.claude.com/docs/en/mcp)
+- [Configuration réseau et certificats (documentation Claude Code)](https://code.claude.com/docs/en/network-config)
+- [Model Context Protocol](https://modelcontextprotocol.io)

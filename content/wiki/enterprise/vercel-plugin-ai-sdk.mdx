@@ -1,59 +1,173 @@
 ---
-title: "Claude Code × Vercel : plugin, AI SDK & Gateway"
-description: "Le plugin Vercel pour agents de codage (47+ skills, validation PostToolUse), l'AI SDK 7 avec HarnessAgent en sandbox, et le routage via AI Gateway."
-updatedAt: "2026-07-08"
-readingMinutes: 8
+title: "Claude Code et Vercel : plugin, AI SDK et AI Gateway"
+description: "Installer le plugin Vercel dans Claude Code, appeler Claude depuis une app avec l'AI SDK 7, piloter Claude Code en sandbox avec HarnessAgent et faire passer son trafic par Vercel AI Gateway."
+updatedAt: "2026-10-03"
+readingMinutes: 9
 ---
 
-Pour une plateforme hébergée sur Vercel (comme ce site), la synergie avec Claude Code est directe : l'agent génère nativement des structures Next.js (App Router, route handlers, middleware) que Vercel construit sans configuration additionnelle. En 2026, trois briques renforcent cette intégration.
+Si vous déployez sur Vercel, quatre briques relient votre travail avec Claude à la plateforme : le plugin Vercel pour Claude Code, l'AI SDK pour appeler Claude depuis votre application, l'abstraction expérimentale `HarnessAgent` pour faire tourner Claude Code dans une sandbox, et AI Gateway pour centraliser clés, coûts et journaux. Cette page fait le point sur chacune, avec des exemples à jour (AI SDK 7, `@ai-sdk/anthropic` 4.x).
 
-## Le déploiement continu piloté par Claude Code
+## Le flux de base : Git, previews, variables
 
-Le flux automatisé repose sur quatre prérequis : un dépôt Git local, un `package.json` avec les scripts de build, un `.gitignore` robuste (exclure `node_modules` et les `.env` locaux), et un compte Vercel connecté à GitHub.
+Rien de spécifique à Claude ici, mais c'est le socle : un dépôt GitHub (ou GitLab, Bitbucket) importé dans Vercel produit un **déploiement de prévisualisation** à chaque push sur une branche, et un déploiement de production à chaque merge sur la branche principale. Claude Code s'insère naturellement dans ce flux :
 
-Claude Code orchestre le reste via des invites simples : il enchaîne `git init`, `git commit`, `gh repo create` pour initialiser un dépôt et pousser le code. Une fois le repo importé dans Vercel, **chaque push sur une branche de feature génère une URL de prévisualisation unique** — parfait pour des tests de bout en bout. Claude Code aide aussi à cartographier les **variables d'environnement** : un tableau listant chaque variable, son rôle, et si elle doit être exposée côté client (préfixe `NEXT_PUBLIC_`) ou rester serveur.
+- il crée la branche, commite et ouvre la PR (`gh pr create`) ; vous testez l'URL de preview avant de fusionner ;
+- il peut dresser la liste des variables d'environnement d'un projet et indiquer celles qui doivent rester côté serveur ; seules les variables préfixées `NEXT_PUBLIC_` sont exposées au navigateur dans Next.js ;
+- il ne doit jamais lire ni recopier vos secrets : protégez `.env*` par une règle `deny` dans `.claude/settings.json`.
 
-## Le plugin Vercel pour agents de codage (mars 2026)
+## Le plugin Vercel pour Claude Code
 
-Vercel a publié un **plugin officiel** compatible Claude Code (et Cursor) qui injecte un **graphe de connaissances relationnel** de la plateforme directement dans le contexte de l'agent. Il apporte :
-
-- **Plus de 47 compétences spécialisées** couvrant l'écosystème Vercel (Next.js, AI SDK, Turborepo, Vercel Functions…).
-- **Trois experts virtuels** : *AI Architect*, *Deployment Expert*, *Performance Optimizer*.
-- Des **commandes directes** comme `/bootstrap` ou `/deploy`.
-- Un **moteur de validation « PostToolUse »** : il vérifie en temps réel le code généré pour s'assurer que l'agent n'utilise **pas de modèles obsolètes, de paquets dépréciés ou d'API périmées**. C'est ce qui garantit du code conforme aux standards de production actuels (ex. éviter les vieux patterns Edge au profit de Fluid Compute).
-
-> Ce plugin est déjà actif dans cet environnement : c'est lui qui fournit les skills `vercel:*` et les corrections de connaissances Vercel injectées en début de session.
-
-## AI SDK 7 & HarnessAgent
-
-Pour construire **ta propre plateforme d'agents**, Vercel a introduit l'**AI SDK 7** avec l'abstraction **HarnessAgent**. Elle permet d'exécuter des harnais d'agents établis — y compris Claude Code — dans des **sandboxes hautement sécurisées**. Le SDK normalise l'accès aux compétences, aux flux de permissions et à la compaction de contexte.
-
-Concrètement, on instancie un agent en liant le harnais `claudeCode` à un `createVercelSandbox()`, exécutant les tâches dans un environnement isolé (runtime `node24`) — ce qui protège le serveur hôte de toute exécution de code potentiellement malveillante générée par l'IA. C'est le pattern recommandé pour faire tourner du code généré par agent sans exposer ton infrastructure.
-
-## Routage via Vercel AI Gateway
-
-L'infrastructure se sécurise et se monitore via le **Vercel AI Gateway**, qui expose des points de terminaison compatibles Anthropic. En configurant les variables d'environnement de Claude Code :
+Vercel maintient un plugin open source (`vercel/vercel-plugin`), disponible dans la marketplace officielle d'Anthropic sous le nom `vercel` :
 
 ```bash
-export ANTHROPIC_BASE_URL="https://<ton-gateway>.vercel.app/anthropic"
-export ANTHROPIC_CUSTOM_HEADERS="..."
+/plugin install vercel@claude-plugins-official
 ```
 
-…tout le trafic de l'agent passe par la passerelle Vercel. Bénéfices : **observabilité fine**, gestion des **limites de taux**, et **clés API centralisées** — même en utilisant un abonnement personnel Claude Max. Pour l'AI SDK, la recommandation par défaut est d'utiliser des chaînes `"provider/model"` (ex. `anthropic/claude-sonnet-5`) via le gateway, plutôt que d'ancrer un package provider-spécifique.
+Il apporte (version 0.54 au moment de la rédaction) :
 
-## À retenir pour ce site
+| Composant | Contenu |
+|---|---|
+| Graphe de l'écosystème | Un fichier `vercel.md` décrivant les produits Vercel, leurs relations et les produits abandonnés |
+| 32 skills | `ai-sdk`, `ai-gateway`, `vercel-functions`, `vercel-sandbox`, `env-vars`, `deployments-cicd`, `workflow`, `vercel-storage`, `vercel-firewall`, etc. |
+| 3 sous-agents | `deployment-expert`, `performance-optimizer`, `ai-architect` |
+| 4 commandes | `bootstrap`, `deploy`, `env`, `status`, appelées avec l'espace de noms du plugin, par exemple `/vercel:deploy` |
+| Hooks | Au `SessionStart`, injection d'un contexte Vercel et profilage du dépôt, uniquement dans un dossier vide ou un projet Vercel, Next.js ou eve détecté |
 
-1. **Le plugin fait déjà le gros du travail** : profite des skills `vercel:*` et de la validation PostToolUse pour rester à jour (Next.js 16, Fluid Compute, AI SDK v6/7).
-2. **Preview URLs = ton filet de sécurité** : chaque branche de feature se teste en isolation avant merge sur `main`.
-3. **Si tu ajoutes des features IA** (assistant, génération de contenu), route via l'AI Gateway pour l'observabilité et le contrôle des coûts — cohérent avec la roadmap de monétisation.
+Deux précisions utiles :
+
+- Les versions récentes ont **allégé** le comportement automatique : les skills ne sont plus injectées à chaque appel d'outil ou à chaque prompt, et le hook après outil se contente d'observer. Vous invoquez les skills à la demande.
+- La télémétrie est active par défaut (noms des skills du plugin utilisées, sans contenu de prompt). Désactivez-la avec `VERCEL_PLUGIN_TELEMETRY=off`.
+
+Pour Next.js, le plugin renvoie vers la documentation versionnée fournie par Next.js lui-même (dans `node_modules/next/dist/docs/`) plutôt que vers ses propres skills.
+
+## Appeler Claude depuis votre app avec l'AI SDK
+
+L'AI SDK (`ai`, version 7) exige Node.js 22 ou plus. Deux façons d'appeler Claude :
+
+**Via le fournisseur Anthropic**, avec votre propre clé `ANTHROPIC_API_KEY` :
+
+```bash
+npm i ai @ai-sdk/anthropic
+```
+
+```ts
+import { anthropic, type AnthropicLanguageModelOptions } from '@ai-sdk/anthropic';
+import { streamText } from 'ai';
+
+export async function POST(req: Request) {
+  const { prompt } = await req.json();
+
+  const result = streamText({
+    model: anthropic('claude-sonnet-5-5'),
+    system: 'Vous êtes un formateur Claude Code. Répondez en français, clairement.',
+    prompt,
+    maxOutputTokens: 4000,
+    providerOptions: {
+      anthropic: {
+        effort: 'medium',
+      } satisfies AnthropicLanguageModelOptions,
+    },
+  });
+
+  return result.toTextStreamResponse();
+}
+```
+
+**Via AI Gateway**, avec une simple chaîne `fournisseur/modèle` (par exemple `anthropic/claude-sonnet-5-5`) passée à `model` : l'authentification passe alors par `AI_GATEWAY_API_KEY` ou par le jeton OIDC de Vercel en déploiement. Vérifiez l'identifiant exact dans la liste renvoyée par `https://ai-gateway.vercel.sh/v1/models`.
+
+Points spécifiques aux modèles Claude actuels, gérés par `@ai-sdk/anthropic` :
+
+| Modèle | Réflexion | Effort par défaut (API) |
+|---|---|---|
+| `claude-opus-5-5` | Toujours adaptative, impossible à désactiver | `medium` |
+| `claude-sonnet-5-5` | Toujours adaptative (niveau minimal `between_tools`) | `high` |
+
+- `effort` accepte `low`, `medium`, `high`, `xhigh` et `max` (selon le modèle). C'est le levier principal de coût et de latence.
+- Sur les modèles à réflexion adaptative uniquement, le fournisseur retire `thinking: { type: 'disabled' }` et convertit un budget `budgetTokens` en mode adaptatif, avec un avertissement.
+- La réflexion compte dans `maxOutputTokens` : laissez de la marge.
+- Une réponse peut commencer par un bloc de réflexion : lisez les parties par type (`text`, `reasoning`, `tool-call`).
+- Le cache de prompt se pose avec `providerOptions: { anthropic: { cacheControl: { type: 'ephemeral' } } }` sur un message ou une partie ; les jetons lus et écrits en cache sont dans `usage.inputTokenDetails`.
+
+## Piloter Claude Code en sandbox : `HarnessAgent` (expérimental)
+
+Le paquet `@ai-sdk/harness` (marqué **expérimental**) fournit `HarnessAgent`, une interface commune pour piloter des agents de code existants. L'adaptateur `@ai-sdk/harness-claude-code` s'appuie sur le Claude Agent SDK et fait tourner le CLI `claude` **dans une Vercel Sandbox** (microVM), ce qui isole votre serveur du code généré.
+
+```bash
+npm i ai zod @ai-sdk/harness @ai-sdk/harness-claude-code @ai-sdk/sandbox-vercel
+```
+
+```ts
+import { HarnessAgent } from '@ai-sdk/harness/agent';
+import { claudeCode } from '@ai-sdk/harness-claude-code';
+import { createVercelNetworkSandboxSession } from '@ai-sdk/sandbox-vercel';
+
+const agent = new HarnessAgent({
+  harness: claudeCode,
+  id: 'refactor-agent',
+  model: 'claude-sonnet-5-5',
+  instructions: 'Vous êtes un assistant de refactoring prudent. Diffs minimaux.',
+});
+
+const sandboxSession = await createVercelNetworkSandboxSession({
+  runtime: 'node24',
+  ports: [4000],
+  template: await agent.getSandboxTemplate(),
+});
+const session = await agent.createSession({ sandboxSession });
+
+try {
+  const result = await agent.generate({
+    session,
+    prompt: 'Corrige le test qui échoue dans src/auth.ts',
+  });
+  console.log(result.text);
+} finally {
+  await session.destroy();
+  await sandboxSession.destroy();
+}
+```
+
+L'adaptateur installe `@anthropic-ai/claude-agent-sdk` et `@anthropic-ai/claude-code` dans la sandbox au premier démarrage. C'est vous qui gérez le cycle de vie de la sandbox : fermer la session de l'agent ne l'arrête pas, d'où le bloc `finally`. L'API étant expérimentale, épinglez les versions et relisez le changelog avant chaque mise à jour. Pour un agent qui n'a pas besoin de Claude Code lui-même, `ToolLoopAgent` du paquet `ai` reste la voie standard.
+
+## Faire passer Claude Code par AI Gateway
+
+AI Gateway expose un point d'accès compatible Anthropic. Y router Claude Code donne des journaux par requête, des budgets par clé et une facturation centralisée. La méthode recommandée est l'assistant du CLI Vercel, qui crée ou réutilise une clé, détecte les agents installés et montre le diff avant d'écrire :
+
+```bash
+vercel ai-gateway setup --dry-run   # aperçu des changements
+vercel ai-gateway setup             # application, après confirmation
+```
+
+Configuration manuelle équivalente :
+
+```bash
+export ANTHROPIC_BASE_URL="https://ai-gateway.vercel.sh/claude-code"
+export ANTHROPIC_API_KEY=""                      # doit rester vide
+export ANTHROPIC_AUTH_TOKEN="<votre clé AI Gateway>"
+export CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY=1
+```
+
+- `ANTHROPIC_API_KEY` doit être **vide** : une valeur non vide serait utilisée à la place du jeton de la passerelle.
+- `ANTHROPIC_AUTH_TOKEN` est envoyé dans l'en-tête `Authorization: Bearer`.
+- `CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY=1` remplit le sélecteur `/model` à partir des modèles de la passerelle.
+- Les sessions d'agent consomment beaucoup de tokens : fixez un budget ou une expiration sur la clé (`--budget`, `--expiration`).
+- En cas d'échec, consultez les journaux AI Gateway : `401` = authentification, `402` = crédits ou budget, `429` = limite de débit.
+
+Vérifiez `vercel ai-gateway setup --help` : `--agent <nom>` limite la configuration à un agent, et c'est l'aide du CLI qui fait foi pour la liste des agents pris en charge.
+
+## Pour aller plus loin
+
+- [Passerelles d'API LLM](/wiki/enterprise/api-gateways)
+- [Introduction aux plugins](/wiki/plugins/introduction-plugins)
+- [SDK TypeScript d'Anthropic](/wiki/api/sdk-typescript)
+- [Prompt caching en pratique](/wiki/api/prompt-caching-implementation)
+- [Claude Code en CI/CD](/wiki/cli/cicd-execution)
 
 ## Sources
 
-- [Introducing the Vercel plugin for coding agents — Vercel](https://vercel.com/blog/introducing-the-vercel-plugin-for-coding-agents)
-- [Program Claude Code and other agent harnesses with AI SDK — Vercel](https://vercel.com/blog/program-claude-code-codex-and-other-agent-harnesses-with-ai-sdk)
-- [Claude Code and Claude Agent SDK — AI Gateway, Vercel](https://vercel.com/docs/ai-gateway/claude-code)
-- [Déployer un site sur Vercel avec Claude : guide complet — Ottho](https://ottho.co/blog/deployer-site-vercel-claude)
-
----
-
-*Cet article fait partie du wiki Claude Mastery. Non affilié à Anthropic. Claude™ est une marque d'Anthropic, PBC.*
+- [vercel/vercel-plugin (README et manifeste)](https://github.com/vercel/vercel-plugin)
+- [Marketplace officielle de plugins Claude Code](https://github.com/anthropics/claude-plugins-official)
+- [AI SDK : fournisseur Anthropic](https://ai-sdk.dev/providers/ai-sdk-providers/anthropic)
+- [AI SDK : harnesses (`@ai-sdk/harness`)](https://ai-sdk.dev/docs/ai-sdk-harnesses)
+- [Vercel AI Gateway : Claude Code](https://vercel.com/docs/ai-gateway/claude-code)
+- [Claude Code : variables d'environnement](https://code.claude.com/docs/en/env-vars)

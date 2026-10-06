@@ -1,97 +1,179 @@
 ---
-title: "Prompter les modèles 2026 (Opus 4.6+ / Sonnet 5)"
-description: "Les nouvelles règles du prompt engineering : fin du sur-prompting, positivité prescriptive, prompt matching, contrôle par effort, et résolution des échecs courants."
-updatedAt: "2026-07-08"
-readingMinutes: 9
+title: "Prompter les modèles Claude 5.5 (Opus 5.5, Sonnet 5.5, Fable 5.1)"
+description: "Les règles de prompt propres aux modèles actuels : effort à recalibrer, réflexion toujours active, fin du prefill et du tool_choice forcé, progression entre les outils, refus reasoning_extraction et consignes prêtes à copier."
+updatedAt: "2026-10-03"
+readingMinutes: 10
 ---
 
-Les modèles Claude de 2026 (Opus 4.6, 4.7, 4.8, [Sonnet 5](/wiki/modeles/sonnet-5)) sont **plus directs, plus concis et plus ancrés dans les faits** que leurs prédécesseurs. Conséquence : ils **pénalisent l'ambiguïté et le sur-prompting** qui fonctionnaient avant. Voici comment adapter ta pratique.
+Les modèles Claude actuels (Opus 5.5, Sonnet 5.5, Fable 5.1) comprennent bien des consignes simples et directes. Les prompts écrits pour Sonnet 5 ou Opus 5 fonctionnent en général sans changement, mais plusieurs habitudes héritées des anciens modèles deviennent inutiles ou provoquent des erreurs. Cet article rassemble ce qui change, avec des consignes officielles prêtes à copier.
 
-## La règle d'or : l'ambiguïté est l'ennemie
+## Les modèles concernés
 
-L'analogie officielle d'Anthropic : si une instruction confuse était donnée à un collègue humain avec un contexte minimal, elle le désorienterait — le modèle réagit pareil.
+| Modèle | Identifiant API | Effort par défaut (API) | Points de prompt propres |
+|---|---|---|---|
+| Opus 5.5 (22 sept. 2026) | `claude-opus-5-5` | `medium` | Réflexion toujours active, arrêts anticipés en agent autonome |
+| Sonnet 5.5 (28 sept. 2026) | `claude-sonnet-5-5` | `high` | Réflexion désactivable avec `between_tools`, ajouts non demandés en code |
+| Fable 5.1 et Mythos 5.1 (1er sept. 2026) | `claude-fable-5-1`, `claude-mythos-5-1` | `high` | Peu de messages de progression, prose parfois dense |
+| Sonnet 5 et Opus 5 | `claude-sonnet-5`, `claude-opus-5` | `high` | Génération précédente, toujours disponible |
 
-### Clarté, directivité, contexte
+Les modèles 4.x (Opus 4.6 à 4.8, Sonnet 4.6) sont des modèles historiques : si vos prompts ont été écrits pour eux, lisez la section « Nettoyer un ancien prompt » ci-dessous. Pour les caractéristiques et les prix, voir [Opus 5.5 et Sonnet 5.5](/wiki/modeles/opus-sonnet-5-5).
 
-- **Verbes d'action directs** : commence par « Génère », « Analyse », « Extrais », « Rédige ». Pas de préambule conversationnel.
-- **Motivation contextuelle** : explique **pourquoi** la tâche est faite et **pour qui**. Le modèle en déduit les paramètres non spécifiés (ton, niveau technique) et généralise mieux vers ton intention.
+## Les principes qui ne changent pas
 
-### Positivité prescriptive
+La documentation d'Anthropic les applique à tous les modèles actuels :
 
-Évite les consignes négatives. Dire « N'utilise pas de Markdown » ou « Ne sois pas verbeux » concentre l'attention du modèle sur le concept interdit et **augmente paradoxalement** le risque qu'il le produise. Prescris le comportement voulu :
+- **Soyez clair et direct.** Imaginez un collègue brillant mais nouveau, sans contexte : s'il serait perdu avec votre consigne, Claude le sera aussi.
+- **Expliquez pourquoi.** Le but et le public de la tâche permettent au modèle de deviner les paramètres que vous n'avez pas précisés.
+- **Dites quoi faire, pas quoi éviter.** Plutôt que « N'utilisez pas de Markdown », écrivez « Répondez en paragraphes de prose continue ».
+- **Écrivez votre prompt dans le style voulu.** Un prompt sans Markdown réduit le Markdown dans la réponse.
+- **Séparez consignes et données** avec des [balises XML](/wiki/prompt-engineering/balises-xml), et donnez des [exemples variés](/wiki/prompt-engineering/few-shot) qui couvrent les cas limites.
 
-> ❌ « N'utilise pas de listes à puces. »
-> ✅ « Ta réponse doit être composée exclusivement de paragraphes en prose fluide, en texte brut. »
+## Règle 1 : l'effort est le premier réglage
 
-### Prompt matching
+Le paramètre `effort` (`low`, `medium`, `high`, `xhigh`, `max`) est le levier principal sur la quantité de réflexion, donc sur la qualité, la latence et le coût. Deux points à retenir :
 
-Claude **calque souvent le style de sa réponse sur celui de ta requête**. Si tu veux une sortie en prose simple sans formatage, rédige ta demande elle-même en prose simple, sans listes ni titres.
+- **Les niveaux ne se transposent pas d'un modèle à l'autre.** Selon Anthropic, Opus 5.5 en `medium` égale ou dépasse Opus 5 en `high` sur le code et le travail documentaire. Refaites un balayage des niveaux sur vos propres tests au lieu de reprendre l'ancien réglage.
+- **Baisser l'effort marche mieux que de demander « réfléchissez moins ».** Sur Sonnet 5.5, une consigne de ce type dans le prompt système ne réduit pas la réflexion de façon fiable.
 
-## Structuration sémantique par balises XML
+Points de départ recommandés pour Sonnet 5.5 :
 
-Claude est entraîné à reconnaître la ségrégation sémantique via des **balises XML**. Structurer une requête complexe autour de balises élimine la confusion instructions/données :
+| Usage | Effort de départ |
+|---|---|
+| Code agentique bien spécifié, outils en plusieurs étapes | `medium`, puis `high` pour les tâches longues ou difficiles |
+| Chat et usages sensibles à la latence | `medium` ou `low` |
+| Le reste | `high` |
+| `xhigh` et `max` | Seulement si vos tests montrent un gain |
 
-```xml
-<instructions>
-Extrais les entités nommées du texte fourni.
-</instructions>
+Prévoyez un `max_tokens` assez large : la réflexion compte dans cette limite, même quand elle n'est pas renvoyée. Pour du code agentique, Anthropic indique 128 000 tokens (le maximum) avec streaming. Enfin, changer l'`effort` de premier niveau entre deux requêtes invalide le cache de prompt ; pour changer un seul tour, utilisez le changement d'effort par message (bêta). Détails dans [Raisonnement adaptatif et paramètre effort](/wiki/modeles/adaptive-thinking-effort).
 
-<input_data>
-{{ texte source ici }}
-</input_data>
+## Règle 2 : la réflexion n'est plus un interrupteur
 
-<constraints>
-- Réponds en JSON valide uniquement.
-- Si une entité est absente, utilise null.
-</constraints>
+- **Opus 5.5** : la réflexion adaptative est toujours active. `thinking: {"type": "disabled"}` et `budget_tokens` renvoient une erreur 400. Pour réduire la latence, commencez en `low`.
+- **Sonnet 5.5** : le réglage le plus bas est `thinking: {"type": "between_tools"}` (pas de réflexion initiale, uniquement des notes entre les appels d'outils). Il n'est accepté qu'en effort `high` ou inférieur.
+- **Toutes les générations depuis 4.7** : `budget_tokens` renvoie une erreur 400.
 
-<output_format>
-{"personnes": [], "organisations": [], "lieux": []}
-</output_format>
+Conséquence sur vos prompts : **supprimez les consignes « ne réfléchissez pas »**. Avec `between_tools`, elles rendent plus probable l'apparition de balises XML internes dans la réponse visible.
+
+Et côté code : lisez la réponse **par type de bloc**. Elle peut commencer par un bloc `thinking` vide (affichage `omitted` par défaut). Renvoyez ces blocs inchangés au tour suivant et gardez l'historique en ajout seul : modifier un message antérieur, le prompt système ou la liste d'outils invalide les blocs de réflexion suivants.
+
+## Règle 3 : ne demandez plus le raisonnement dans la réponse
+
+Opus 5.5 et Sonnet 5.5 peuvent refuser une requête qui leur demande de **reproduire leur raisonnement interne** dans le texte de la réponse. Le refus arrive avec `stop_reason: "refusal"` et la catégorie `reasoning_extraction`.
+
+| Avant | Maintenant |
+|---|---|
+| « Réfléchissez étape par étape dans `<thinking>`, puis répondez dans `<answer>` » | Laissez la réflexion adaptative travailler, et lisez son résumé avec `display: "summarized"` |
+| « Écrivez tout votre raisonnement avant la conclusion » | « Expliquez brièvement votre réponse » ou « Résumez les actions effectuées » (autorisé) |
+
+Voir [Faire réfléchir Claude](/wiki/prompt-engineering/chain-of-thought).
+
+## Règle 4 : remplacez prefill et tool_choice forcé
+
+- **Prefill** : terminer `messages` par un début de réponse de l'assistant renvoie une erreur 400 depuis la génération 4.6. Utilisez les sorties structurées (`output_config.format`) ou une consigne de format (voir [Prefilling](/wiki/prompt-engineering/prefilling)).
+- **`tool_choice` forcé** : sur Opus 5.5 et Sonnet 5.5, `{"type": "any"}` et `{"type": "tool"}` renvoient une erreur 400. Passez en `auto`, marquez l'outil `strict: true` et dites dans le prompt quand l'utiliser.
+- **`temperature`, `top_p`, `top_k`** : une valeur non par défaut est refusée. Guidez le ton et la variété par des consignes.
+
+## Règle 5 : du JSON sur une tâche de raisonnement
+
+Quand vous demandez un JSON pour une tâche qui exige quelques étapes de calcul (additionner des montants, appliquer une règle, classer), Sonnet 5.5 répond souvent sans réfléchir, surtout en `low` et `medium`. Avec les sorties structurées, ajoutez à la fin du prompt système :
+
+```text
+Think the problem through before you answer.
 ```
 
-Voir aussi l'article dédié [Balises XML](/wiki/prompt-engineering/balises-xml).
+En `high`, cette ligne rapproche la précision de celle obtenue en `xhigh`. Traitez toute réponse arrêtée sur `stop_reason: "max_tokens"` comme un échec, même si le JSON semble valide. Sans sorties structurées, analysez la **dernière** valeur JSON de la réponse, pas tout ce qui va du premier `{` au dernier `}` : le modèle écrit parfois un brouillon avant le JSON final. Voir [Formater la sortie](/wiki/prompt-engineering/output-format).
 
-## Few-shot : couvrir les cas limites
+## Règle 6 : réglez l'initiative avec des consignes précises
 
-Pour les tâches d'extraction complexes (ex. alimenter une base de données), fournir **3 à 5 exemples** de sortie attendue améliore drastiquement la constance. Encapsule-les dans `<examples>` avec des sous-balises `<example>`. **Impératif** : les exemples doivent couvrir la diversité des cas — y compris les *edge cases* — sinon le modèle sur-apprend un motif restreint.
+Les modèles 5.5 répondent bien aux consignes qui **nomment le comportement** à obtenir ou à éviter. Les formules alarmistes (« CRITIQUE : vous DEVEZ… ») et « en cas de doute, utilisez l'outil » provoquent au contraire un sur-déclenchement. Les consignes ci-dessous viennent de la documentation officielle, en anglais : vous pouvez les traduire, puis vérifiez l'effet sur vos tests.
 
-## Prefilling : forcer un format strict
+**Sonnet 5.5 s'arrête pour demander avant d'avoir fini (en `low` et `medium`)** :
 
-> ⚠️ **Attention aux modèles récents.** Le prefilling du message assistant **n'est plus supporté sur Sonnet 5** (ni Sonnet 4.6) et renvoie une erreur 400. Utilise plutôt les **structured outputs** ou `output_config.format`.
+```text
+Keep working until everything the user asked for is done, and only stop to ask when you can't go on without the user or before a risky step.
+```
 
-Sur les modèles qui l'acceptent encore, terminer la requête par la chaîne exacte qui doit débuter la réponse (ex. `{` pour du JSON) contraint le modèle à démarrer là, court-circuitant les phrases d'introduction (« Voici les données demandées : »).
+**Sonnet 5.5 ajoute tests, docs ou fichiers non demandés** :
 
-## Réduire le sur-prompting
+```text
+When the work the user asked for is done and checked, stop and report. Don't add features, tests, files, docs or refactors that weren't asked for. If you think one would help, mention it at the end instead of doing it.
+```
 
-Avant, on forçait l'usage d'outils : « Au moindre doute, lance une recherche web ou lis les logs. » Sur **Opus 4.6+ et Sonnet 5**, cela provoque du **sur-déclenchement** : le modèle exécute des commandes bash parallèles massives et risque de saturer les ressources. Rends l'instruction **conditionnelle et ciblée** :
+**En `xhigh` ou `max`, le modèle lance ses propres tours de relecture** (dans les tests d'Anthropic, cette consigne a réduit le coût d'environ un tiers sans perte de qualité) :
 
-> ✅ « Utilise l'outil de recherche **uniquement si** c'est indispensable pour améliorer ta compréhension factuelle du problème. »
+```text
+When the work the user asked for is done and its checks pass, stop and report. Don't start extra rounds of review or hardening on your own, and don't launch reviewer sub-agents unless the user asked for a review. If you think a deeper review is worth doing, say so at the end.
+```
 
-## Contrôle du raisonnement par effort
+**Une demande ouverte part en production alors que vous vouliez des idées** :
 
-Ne force plus la réflexion via `budget_tokens` (erreur 400 sur les modèles 2026). Le contrôle passe par le [paramètre effort](/wiki/modeles/adaptive-thinking-effort) (`low` → `max`, dont `xhigh`). Un `high` (défaut) demande au modèle de raisonner presque systématiquement avant de répondre, tout en activant la pensée imbriquée pour utiliser des outils en cours de route.
+```text
+When the user asks for ideas, options or a plan, give them that and stop. Don't start building or changing anything until they say to go ahead.
+```
 
-## Résolution des échecs courants
+**Le code est déclaré terminé sans test** : demandez de lancer une vraie vérification (tests, vérificateur de types, build) avant de conclure, et de dire laquelle n'a pas pu tourner et pourquoi. La documentation de Sonnet 5.5 fournit un paragraphe complet pour cela.
 
-| Problème | Technique de résolution |
+**Opus 5.5 en agent sans surveillance s'arrête après un rapport d'étape** : côté harnais, traitez une fin de tour sans appel d'outil comme un rapport, pas comme la fin de la tâche. Gardez une liste de tâches, relancez avec les points encore ouverts, et arrêtez-vous après deux ou trois relances automatiques. La documentation d'Opus 5.5 propose aussi un paragraphe de prompt système dédié, à réserver aux agents vraiment autonomes.
+
+## Règle 7 : recherche et outils dans le chat
+
+Sonnet 5.5 répond parfois de mémoire alors qu'une recherche trouverait une information plus récente (tarifs, règles, obligations). Retirez d'abord les consignes du type « n'utilisez les outils qu'en cas de stricte nécessité ». Puis, si votre produit fournit un outil de recherche :
+
+```text
+Use the search tool to check specifics that may have changed since your training, such as what is allowed, required or charged, even when you feel confident. For researched work such as a report or a comparison, gather current sources rather than writing from your training knowledge.
+```
+
+Fable 5.1 cherche moins souvent en effort `low` : testez ce niveau si votre usage dépend de la recherche.
+
+## Règle 8 : messages de progression et texte collé
+
+**Progression.** Entre deux appels d'outils, Opus 5.5 et Sonnet 5.5 écrivent des notes pour l'utilisateur. Les notes de plus d'une ou deux phrases arrivent dans des blocs `thinking` de progression, **vides** avec l'affichage par défaut. Une interface qui n'affiche que les blocs `text` paraît donc muette. Activez `display: "updates"` (bêta). Si vous voulez des points d'étape réguliers (une ligne avant le premier outil, un récapitulatif à la fin), demandez-le dans le prompt système. À l'inverse, Fable 5.1 écrit peu pendant les longues tâches : demandez-lui explicitement ces messages.
+
+**Texte collé.** Opus 5.5 résiste mieux à l'injection de prompt quand il sait quel texte vient de l'utilisateur et quel texte a été collé (un e-mail, une page web). Entourez chaque bloc collé d'une balise portant un identifiant aléatoire, et expliquez la convention dans le prompt système :
+
+```text
+Résumez les réclamations principales de ce fil.
+
+<pasted_content id="ab12">
+...texte collé par l'utilisateur...
+</pasted_content id="ab12">
+```
+
+Cette balise n'est qu'un garde-fou parmi d'autres : elle peut être imitée. Voir [Prompt injection](/wiki/workflows/prompt-injection).
+
+## Nettoyer un ancien prompt : la liste de contrôle
+
+| À retirer ou changer | Pourquoi |
 |---|---|
-| Réponse générique / superficielle | Augmenter la spécificité des contraintes, donner des exemples de haut niveau, demander explicitement de « dépasser les concepts de base » |
-| Hallucination | Autoriser l'ignorance : « Si l'information n'est pas dans le texte, réponds exactement "Je ne sais pas" ou utilise `null` » |
-| Tâche trop complexe qui échoue | **Prompt chaining** : découper en appels API séquentiels, la sortie de l'étape 1 devenant l'entrée stricte de l'étape 2 |
-| Besoin de transparence | Demander un bloc `<thinking>` détaillé avant la conclusion en `<answer>` |
-| Erreurs de logique / code | Boucle d'auto-évaluation : « Avant de finaliser, vérifie tes conclusions par rapport aux contraintes initiales et aux critères de test » |
+| Prefill du message assistant | Erreur 400 |
+| `budget_tokens`, `thinking: disabled` (Opus 5.5) | Erreur 400 ; utilisez `effort` |
+| `tool_choice` de type `any` ou `tool` (5.5) | Erreur 400 ; `auto` + `strict: true` |
+| `temperature` et consorts | Erreur 400 si valeur non par défaut |
+| « Écrivez votre raisonnement dans la réponse » | Refus `reasoning_extraction` possible |
+| « CRITIQUE : vous DEVEZ… », « en cas de doute, utilisez l'outil » | Sur-déclenchement des outils |
+| « N'utilisez les outils qu'en cas de stricte nécessité » | Réponses de mémoire, parfois obsolètes |
+| « Réfléchissez soigneusement avant de répondre » dans un chat | Sur Opus 5.5, ralentit la première réponse sans gain net |
+| Règles anti-formatage héritées (Fable 5.1) | Fable 5.1 formate déjà peu ; préférez une règle qui dit quand formater |
+| Niveau d'effort recopié de l'ancien modèle | Les niveaux sont recalibrés |
 
-## Architecture d'un méta-prompt d'extraction
+Dans Claude Code, la commande `/claude-api prompt-audit` fait ce tri dans votre projet et propose les corrections sous forme de diff (voir [Meta-prompting](/wiki/prompt-engineering/meta-prompting)).
 
-Pour un pipeline de données fiable (ex. alimenter automatiquement un wiki), combine ces techniques : définir le **rôle système** (expert veille IA), fournir le **contexte de la cible** (site éducatif exigeant des données denses), encapsuler les sources en **XML strict**, donner un **exemple few-shot** de sortie JSON parfaite, imposer des **règles positives** sur le ton et la profondeur, et — sur les modèles compatibles — pré-remplir la structure de sortie. Sur Sonnet 5, remplace le prefilling par des **structured outputs**.
+## Pour aller plus loin
+
+- [Opus 5.5 et Sonnet 5.5](/wiki/modeles/opus-sonnet-5-5)
+- [Fable 5.1 et Mythos 5.1](/wiki/modeles/fable-5-mythos-5)
+- [Claude Sonnet 5](/wiki/modeles/sonnet-5)
+- [Raisonnement adaptatif et paramètre effort](/wiki/modeles/adaptive-thinking-effort)
+- [Anti-patterns](/wiki/prompt-engineering/anti-patterns)
+- [Itérer sur un prompt](/wiki/prompt-engineering/iterer-prompt)
 
 ## Sources
 
-- [Prompting best practices — Claude Platform Docs](https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/overview)
-- [Prompting Claude Sonnet 5 — Claude Platform Docs](https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-sonnet-5)
-- [Bonnes pratiques de prompting — Claude Platform Docs (FR)](https://platform.claude.com/docs/fr/build-with-claude/prompt-engineering/overview)
-
----
-
-*Cet article fait partie du wiki Claude Mastery. Non affilié à Anthropic. Claude™ est une marque d'Anthropic, PBC.*
+- [Prompt engineering overview (Anthropic)](https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/overview)
+- [Prompting best practices (Anthropic)](https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/claude-prompting-best-practices)
+- [Prompting Claude Opus 5.5 (Anthropic)](https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-opus-5-5)
+- [Prompting Claude Sonnet 5.5 (Anthropic)](https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-sonnet-5-5)
+- [Prompting Claude Fable 5.1 (Anthropic)](https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5-1)
+- [Prompting Claude Sonnet 5 (Anthropic)](https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-sonnet-5)
+- [Migrating to Claude Opus 5.5 (Anthropic)](https://platform.claude.com/docs/en/models/opus-5-5/migration-guide)
+- [Migrating to Claude Sonnet 5.5 (Anthropic)](https://platform.claude.com/docs/en/models/sonnet-5-5/migration-guide)

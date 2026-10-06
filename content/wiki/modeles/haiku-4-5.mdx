@@ -1,32 +1,39 @@
 ---
-title: "Claude Haiku 4.5 — vitesse et coût"
-description: "Le modèle rapide pour les tâches simples et le grand volume."
-updatedAt: "2026-05-19"
+title: "Claude Haiku 4.5 : le modèle rapide et économique"
+description: "Fiche pratique de Haiku 4.5 (1 $ / 5 $, 200K de contexte) : cas d'usage, exemples de code, réflexion manuelle, limites et quand passer à Sonnet 5.5."
+updatedAt: "2026-10-03"
 readingMinutes: 6
 ---
 
-`claude-haiku-4-5-20251001` est le modèle compact de la famille Claude 4.x. Pensé pour la **latence faible** et le **coût minimal**, Haiku 4.5 est l'option de référence pour le volume : classification, extraction structurée, modération, premiers tris, ou couche de routage devant des modèles plus chers.
+Claude Haiku 4.5 (`claude-haiku-4-5-20251001`) est le plus rapide et le moins cher des modèles Claude actuels. Il reste le petit modèle de la gamme en octobre 2026 : Haiku 5.5 est annoncé, mais pas encore sorti. On l'utilise pour le volume : classification, extraction, routage, sous-agents d'exploration.
 
-## Pourquoi Haiku
+## Fiche technique
 
-La promesse de Haiku tient en trois mots : **rapide, pas cher, suffisant**. Un appel Haiku coûte une fraction d'un appel Sonnet pour des tâches qui ne nécessitent pas de raisonnement profond. À l'échelle (millions d'appels par jour), le coût total peut être 10 à 30 fois inférieur à Sonnet [à vérifier].
-
-| Métrique | Haiku 4.5 |
+| | Haiku 4.5 |
 |---|---|
-| ID modèle | `claude-haiku-4-5-20251001` |
-| Latence typique | < 1s pour réponses courtes |
+| ID API | `claude-haiku-4-5-20251001` (alias `claude-haiku-4-5`) |
+| Bedrock / Google Cloud | `anthropic.claude-haiku-4-5` / `claude-haiku-4-5@20251001` |
+| Sortie | 15 octobre 2025 |
+| Prix (par million de tokens) | 1 $ en entrée, 5 $ en sortie |
+| Cache | 1,25 $ en écriture (5 min), 0,10 $ en lecture |
+| API Batch | 0,50 $ / 2,50 $ |
 | Contexte | 200K tokens |
-| Vision | Oui |
-| Tool use | Oui |
-| Extended thinking | Supporté (avec budget réduit) |
+| Sortie max | 64K tokens |
+| Réflexion | Manuelle (`budget_tokens`), pas de raisonnement adaptatif |
+| Paramètre `effort` | Non pris en charge |
+| Connaissances fiables | jusqu'à février 2025 |
+| Entrées | Texte et images |
 
-## Cas d'usage idéaux
+**Cycle de vie.** La page officielle indique un retrait « pas avant le 15 octobre 2026 ». Aucune dépréciation n'est annoncée à ce jour, mais surveillez la page [Model deprecations](https://platform.claude.com/docs/en/about-claude/model-deprecations) : Anthropic prévient au moins 60 jours avant un retrait.
 
-1. **Classification** : intent detection, catégorisation produit, tri de support
-2. **Extraction structurée** : entités nommées, parsing de factures, scraping
-3. **Modération de contenu** : filtres pre-LLM avant un modèle plus cher
-4. **Résumés courts** : tl;dr d'emails, synthèses de transcripts
-5. **Routage agentique** : décider quel sous-agent invoquer
+## Cas d'usage
+
+1. **Classification** : intention d'un message, catégorie de ticket, tri de support.
+2. **Extraction structurée** : entités, champs de facture, données d'un e-mail.
+3. **Pré-filtre de modération** devant un modèle plus cher.
+4. **Résumés courts** : e-mails, transcriptions, notes.
+5. **Routage** : décider quel modèle ou quel sous-agent traite la suite.
+6. **Sous-agents d'exploration** dans Claude Code (recherche de fichiers, lecture rapide).
 
 ## Exemple : extraction JSON
 
@@ -37,73 +44,86 @@ const client = new Anthropic();
 
 const res = await client.messages.create({
   model: "claude-haiku-4-5-20251001",
-  max_tokens: 1024,
-  system: "Tu extrais des entités au format JSON strict.",
+  max_tokens: 300,
+  system:
+    "Extrais nom, téléphone et e-mail. Réponds uniquement avec un objet JSON " +
+    '{"nom": string|null, "telephone": string|null, "email": string|null}.',
   messages: [
-    {
-      role: "user",
-      content: "Email: Bonjour, je suis Sophie, +33612345678, sophie@acme.fr",
-    },
+    { role: "user", content: "Bonjour, je suis Sophie, +33 6 12 34 56 78, sophie@acme.fr" },
   ],
 });
+
+const text = res.content.find((b) => b.type === "text")?.text ?? "{}";
+console.log(JSON.parse(text));
 ```
 
-## Exemple : routeur d'intent
+Pour un JSON garanti conforme au schéma, préférez les sorties structurées (`output_config.format`) quand votre plateforme les propose, plutôt que de compter sur la consigne seule. Sinon, validez le JSON côté code.
+
+## Exemple : routeur d'intention
 
 ```python
 from anthropic import Anthropic
 
 client = Anthropic()
+CATEGORIES = {"facturation", "technique", "commercial"}
 
-def route_intent(user_msg: str) -> str:
+def route(message: str) -> str:
     msg = client.messages.create(
         model="claude-haiku-4-5-20251001",
-        max_tokens=20,
-        messages=[{
-            "role": "user",
-            "content": f"Catégorie unique parmi [billing, technical, sales]: {user_msg}"
-        }],
+        max_tokens=10,
+        system="Réponds par un seul mot parmi : facturation, technique, commercial.",
+        messages=[{"role": "user", "content": message}],
     )
-    return msg.content[0].text.strip()
+    label = msg.content[0].text.strip().lower()
+    return label if label in CATEGORIES else "technique"  # repli sûr
 ```
 
-## Pattern : Haiku en amont, Sonnet en aval
+## Le pattern « Haiku devant, Sonnet derrière »
 
-```bash
-# Pseudo-flow
-incoming_request
-  → Haiku (classify + sanity check)
-  → if "complex": Sonnet
-  → if "simple": Haiku répond directement
+```text
+requête entrante
+  -> Haiku 4.5 : classe la demande et vérifie qu'elle est complète
+  -> simple    : Haiku répond directement
+  -> complexe  : Sonnet 5.5 (ou Opus 5.5) prend le relais
 ```
 
-Ce pattern réduit drastiquement la facture mensuelle d'un produit IA grand public.
+Sonnet 5.5 coûte deux fois plus cher par token (2 $ / 10 $) et produit plus de tokens pour le même texte (tokenizer plus récent). Envoyer les cas simples à Haiku réduit donc nettement la facture, à condition de mesurer que la qualité tient sur vos données.
 
-> Astuce : Haiku répond souvent en **moins de 800 ms**. C'est suffisamment rapide pour des UX interactives type autocomplete ou ghost text.
+## Réflexion étendue sur Haiku
+
+Haiku 4.5 ne connaît que la réflexion manuelle :
+
+```python
+response = client.messages.create(
+    model="claude-haiku-4-5-20251001",
+    max_tokens=8000,
+    thinking={"type": "enabled", "budget_tokens": 4000},  # minimum 1024, inférieur à max_tokens
+    messages=[{"role": "user", "content": "Vérifie la cohérence de ce planning : ..."}],
+)
+```
+
+`thinking: {"type": "adaptive"}` et `output_config.effort` renvoient une erreur sur ce modèle. Haiku 4.5 ne fait pas non plus de réflexion entrelacée entre les appels d'outils.
 
 ## Limites
 
-- **Raisonnement multi-étapes** : Haiku peut sauter des étapes sur les problèmes complexes. Pour de la logique non triviale, monte en Sonnet.
-- **Code long** : génération > 200 lignes — la qualité chute par rapport à Sonnet.
-- **Suivi d'instructions très subtiles** : Haiku est plus littéral et moins « créatif » dans son interprétation.
+- **Raisonnement multi-étapes** : il peut sauter des étapes. Au-delà d'une logique simple, passez à Sonnet 5.5.
+- **Code long ou architecture** : la qualité baisse vite par rapport à Sonnet et Opus.
+- **Contexte de 200K** : pour un gros dépôt ou un long corpus, les modèles 5.x offrent 1M.
+- **Connaissances arrêtées début 2025** : ne lui demandez pas l'état actuel d'une bibliothèque.
 
 ## Bonnes pratiques
 
-- Donner des **exemples in-context** (few-shot) : Haiku y est très sensible.
-- Imposer un **format de sortie strict** (JSON schema, balises XML).
-- Limiter `max_tokens` au strict nécessaire — pas besoin de 8k tokens pour un label.
-- Activer le **prompt caching** sur les prompts système répétés.
+- Donnez 2 à 5 exemples (few-shot) : Haiku y est très sensible.
+- Imposez un format strict (sorties structurées, balises XML).
+- Gardez `max_tokens` bas pour les réponses courtes.
+- Mettez en cache vos longs prompts système. Attention : sur Haiku 4.5, le préfixe minimal pour le cache est de **4 096 tokens**. En dessous, `cache_control` n'a aucun effet.
 
 ```ts
 const res = await client.messages.create({
   model: "claude-haiku-4-5-20251001",
   max_tokens: 100,
   system: [
-    {
-      type: "text",
-      text: longSystemPrompt,
-      cache_control: { type: "ephemeral" },
-    },
+    { type: "text", text: longSystemPrompt, cache_control: { type: "ephemeral" } },
   ],
   messages: [{ role: "user", content: userQuery }],
 });
@@ -111,7 +131,15 @@ const res = await client.messages.create({
 
 ## Pour aller plus loin
 
-- Pricing : https://www.anthropic.com/pricing
-- Doc modèles : https://docs.anthropic.com/en/docs/about-claude/models
-- Article voisin : [Pricing et tokens](/wiki/modeles/pricing-tokens)
-- Article voisin : [Choisir le bon modèle](/wiki/modeles/choisir-bon-modele)
+- [Choisir le bon modèle](/wiki/modeles/choisir-bon-modele)
+- [Tarification et tokens](/wiki/modeles/pricing-tokens)
+- [Claude Opus 5.5 et Sonnet 5.5](/wiki/modeles/opus-sonnet-5-5)
+- [Few-shot prompting](/wiki/prompt-engineering/few-shot)
+
+## Sources
+
+- [Claude Haiku 4.5 : fiche modèle (Claude Platform Docs)](https://platform.claude.com/docs/en/models/haiku-4-5/overview)
+- [Models overview](https://platform.claude.com/docs/en/models/overview)
+- [Pricing](https://platform.claude.com/docs/en/about-claude/pricing)
+- [Extended thinking](https://platform.claude.com/docs/en/build-with-claude/extended-thinking)
+- [Migrating to Claude Sonnet 5.5 (section Haiku 4.5)](https://platform.claude.com/docs/en/models/sonnet-5-5/migration-guide)

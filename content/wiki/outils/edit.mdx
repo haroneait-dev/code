@@ -1,138 +1,140 @@
 ---
 title: "L'outil Edit"
-description: "Modifier un fichier existant via remplacement exact — syntaxe, replace_all, et pièges d'unicité."
-updatedAt: "2026-05-19"
-readingMinutes: 7
+description: "Comment Claude Code modifie un fichier par remplacement exact avec Edit : les trois vérifications, replace_all, fichiers modifiés sur disque et erreurs courantes."
+updatedAt: "2026-10-03"
+readingMinutes: 6
 ---
 
-`Edit` est probablement l'outil le plus utilisé de Claude Code après `Read`. Il effectue un remplacement exact de chaîne dans un fichier existant : `old_string` → `new_string`. Sa philosophie est radicalement simple — pas de diff fuzzy, pas de patch context, pas de heuristique. Si la chaîne d'origine n'est pas trouvée exactement, l'édition échoue. Cette rigueur est ce qui rend Edit fiable.
+`Edit` modifie un fichier existant par **remplacement exact de texte** : il cherche `old_string` et le remplace par `new_string`. Pas d'expression régulière, pas de correspondance approximative. Si le texte n'est pas trouvé tel quel, rien ne change : c'est cette rigueur qui rend l'outil fiable.
 
-## À quoi sert Edit
+## Quand Claude utilise Edit
 
-Edit sert à modifier précisément une portion d'un fichier déjà existant. C'est l'outil par défaut pour :
+C'est l'outil par défaut pour toute modification ciblée :
 
-- corriger un bug sur une ligne ;
-- ajouter un import, un export, une prop ;
-- renommer une variable (via `replace_all`) ;
-- mettre à jour une valeur de configuration ;
-- refactorer une fonction sans toucher au reste du fichier.
+- corriger une ligne, ajouter un import ou une prop ;
+- renommer une variable dans un fichier (avec `replace_all`) ;
+- changer une valeur de configuration ;
+- réécrire une fonction sans toucher au reste.
 
-Pour créer un fichier ou tout réécrire, utilisez `Write`. Pour un notebook Jupyter, utilisez `NotebookEdit`.
+Pour créer un fichier ou tout réécrire, Claude utilise `Write`. Pour un notebook Jupyter, `NotebookEdit`.
 
-## Syntaxe et paramètres
+## Paramètres
 
-| Paramètre | Type | Obligatoire | Description |
-|-----------|------|-------------|-------------|
-| `file_path` | string | oui | Chemin absolu du fichier à modifier |
-| `old_string` | string | oui | Texte à remplacer (doit exister tel quel) |
-| `new_string` | string | oui | Texte de remplacement (doit différer de `old_string`) |
-| `replace_all` | boolean | non | Remplace toutes les occurrences (défaut: `false`) |
+| Paramètre | Obligatoire | Rôle |
+|-----------|-------------|------|
+| `file_path` | oui | Chemin absolu du fichier |
+| `old_string` | oui | Texte à remplacer, à l'identique |
+| `new_string` | oui | Texte de remplacement, différent de `old_string` |
+| `replace_all` | non | `true` pour remplacer toutes les occurrences (défaut `false`) |
 
-Trois règles cruciales :
+Exemple d'appel tel que Claude l'envoie :
 
-1. **Le fichier doit avoir été lu** au préalable avec `Read` dans la conversation.
-2. **`old_string` doit être unique** dans le fichier — sinon erreur. Pour gérer plusieurs occurrences, soit ajouter du contexte (lignes voisines), soit utiliser `replace_all`.
-3. **`new_string` doit être différent** de `old_string`.
-
-## Exemples concrets
-
-### Corriger une typo
-
-```ts
-Edit(
-  file_path="/Users/harone/projet/lib/format.ts",
-  old_string="export function formatDte(d: Date) {",
-  new_string="export function formatDate(d: Date) {"
-)
+```json
+{
+  "file_path": "/home/vous/projet/lib/format.ts",
+  "old_string": "export function formatDte(d: Date) {",
+  "new_string": "export function formatDate(d: Date) {"
+}
 ```
 
-### Renommer une variable partout
+## Les trois vérifications
 
-```ts
-Edit(
-  file_path="/Users/harone/projet/components/Hero.tsx",
-  old_string="userName",
-  new_string="displayName",
-  replace_all=true
-)
+Avant tout, un chemin couvert par une règle `Read(...)` en `deny` est refusé. Ensuite, trois conditions doivent être réunies :
+
+1. **Lecture préalable.** Claude doit avoir lu le fichier dans la conversation, et une lecture tronquée (`PARTIAL view`) ne compte pas. Claude Opus 4.6, Haiku 4.5 et les modèles plus anciens exigent toujours cette lecture. Les modèles plus récents peuvent éditer un fichier non lu si sa lecture ne demanderait pas d'autorisation.
+2. **Correspondance.** `old_string` doit apparaître exactement : une espace ou une tabulation de différence suffit à rater.
+3. **Unicité.** `old_string` doit apparaître une seule fois. Sinon, Claude ajoute du contexte autour ou passe `replace_all: true`.
+
+Une lecture par Bash compte aussi (`cat`, `nl`, `bat`, `head`, `tail`, `sed -n 'X,Yp'`, `grep`, `rg` sur un seul fichier, sans pipe ni redirection).
+
+## Fichier modifié sur disque depuis la lecture
+
+Depuis la version 2.1.208, un fichier qui a changé après la lecture de Claude peut quand même être édité si `old_string` correspond exactement et sans ambiguïté au contenu **actuel**. Le résultat signale alors que le fichier contient d'autres changements, pour que Claude le relise avant une modification qui dépend du contexte. Dans les autres cas (texte périmé, plusieurs correspondances), Claude relit le fichier avant de réessayer.
+
+## Exemples
+
+### Lever une ambiguïté avec du contexte
+
+Si `return null;` apparaît dans cinq fonctions, Claude inclut la signature englobante :
+
+```json
+{
+  "file_path": "/home/vous/projet/app/page.tsx",
+  "old_string": "function LoadingState() {\n  return null;\n}",
+  "new_string": "function LoadingState() {\n  return <p>Chargement…</p>;\n}"
+}
 ```
 
-`replace_all` est parfait pour les renommages — un seul appel, toutes les occurrences mises à jour.
+### Renommer dans un fichier
 
-### Ajouter un import en haut d'un fichier
-
-```ts
-Edit(
-  file_path="/Users/harone/projet/app/page.tsx",
-  old_string="import { useState } from 'react';",
-  new_string="import { useState, useEffect } from 'react';"
-)
+```json
+{
+  "file_path": "/home/vous/projet/components/Hero.tsx",
+  "old_string": "userName",
+  "new_string": "displayName",
+  "replace_all": true
+}
 ```
 
-Quand la cible est suffisamment unique (une ligne d'import existante), on peut s'appuyer dessus comme ancre.
+Attention : `replace_all` ne connaît pas le contexte. Il renomme aussi `userNameLabel` ou une chaîne de texte qui contient `userName`. Pour un renommage de symbole sûr à l'échelle du projet, l'outil `LSP` (avec un plugin d'intelligence de code) ou l'outil de refactoring de votre IDE sont plus précis.
 
-### Désambiguïser avec du contexte
+## Erreurs courantes
 
-Si vous voulez remplacer `return null;` dans une fonction parmi cinq qui contiennent la même ligne, ajoutez les lignes voisines :
+| Message ou symptôme | Cause | Solution |
+|---------------------|-------|----------|
+| Texte introuvable | Indentation, espaces de fin, CRLF/LF, fichier changé | Relire le fichier, copier le passage exact |
+| Plusieurs occurrences | `old_string` trop court | Ajouter les lignes voisines ou `replace_all` |
+| Fichier non lu | Modèle ancien ou lecture partielle | Lire le fichier (en entier ou la zone concernée) |
+| Refus par règle | `Read(...)` en `deny` sur ce chemin | Vérifier `/permissions` |
 
-```ts
-Edit(
-  file_path="/Users/harone/projet/app/page.tsx",
-  old_string=`function LoadingState() {
-  return null;
-}`,
-  new_string=`function LoadingState() {
-  return <div>Chargement...</div>;
-}`
-)
+Rappel : les numéros de ligne affichés par Read ne font pas partie du fichier. Ils ne doivent jamais se retrouver dans `old_string`.
+
+## Permissions
+
+En mode Manuel, chaque Edit demande votre accord ; « oui, ne plus demander » vaut jusqu'à la fin de la session. En `acceptEdits` ou `auto`, les éditions dans le répertoire de travail passent sans question. Les règles de chemin s'écrivent avec `Edit(...)` et couvrent aussi Write et NotebookEdit :
+
+```json
+{
+  "permissions": {
+    "allow": ["Edit(/src/**)"],
+    "deny": ["Edit(/.github/workflows/**)"]
+  }
+}
 ```
 
-L'unicité est garantie par la signature de la fonction englobante.
+Une règle `Edit(...)` en `allow` accorde aussi la lecture du même chemin.
 
-## Pièges courants
+## Automatiser après chaque édition
 
-**Indentation et numéros de ligne.** Quand vous lisez un fichier avec `Read`, chaque ligne est préfixée par `<numéro>\t`. Ne copiez **jamais** le numéro dans `old_string` — seul le contenu après la tabulation compte. L'indentation (espaces ou tabs) doit être préservée exactement.
+Un hook `PostToolUse` avec le matcher `Edit|Write` peut lancer votre formateur après chaque modification :
 
-**Chaînes non uniques.** L'erreur la plus fréquente. Symptôme : "old_string not unique". Solution : élargir `old_string` pour inclure le contexte ou utiliser `replace_all`.
-
-**Fichier non lu.** Edit refuse de modifier un fichier dont il n'a pas vu le contenu actuel. Faites un `Read` d'abord, même si vous croyez le connaître — le disque peut avoir changé.
-
-**Caractères invisibles.** Espaces en fin de ligne, tabulations vs espaces, CRLF vs LF — un seul caractère différent fait échouer le match. En cas de doute, copiez-collez depuis le retour de `Read`.
-
-**`new_string == old_string`.** Erreur évidente mais courante quand on duplique mentalement. Vérifiez qu'il y a bien une différence.
-
-**Caractères spéciaux dans les regex.** Edit n'est **pas** une regex. `[`, `(`, `.`, `$` sont littéraux. Pas de groupes de capture, pas de backreferences. C'est volontaire : zéro magie, zéro surprise.
-
-## replace_all vs édition multiple
-
-Pour renommer `oldName` en `newName` dans un fichier avec 12 occurrences :
-
-- ✅ `Edit(... old_string="oldName", new_string="newName", replace_all=true)` — un appel, rapide.
-- ❌ 12 appels Edit successifs — lent, sujet aux erreurs d'unicité.
-
-Mais attention : `replace_all=true` ne distingue pas le contexte. Si `oldName` apparaît aussi dans un commentaire ou une string que vous ne voulez **pas** changer, faites du cas par cas.
-
-## Combiner Edit avec Grep
-
-Workflow classique pour un renommage cross-fichiers :
-
-```bash
-# 1. Trouver les fichiers concernés
-Grep(pattern="oldName", output_mode="files_with_matches")
-
-# 2. Pour chaque fichier
-Read(file_path="...")
-Edit(file_path="...", old_string="oldName", new_string="newName", replace_all=true)
+```json
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          { "type": "command", "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/format.sh" }
+        ]
+      }
+    ]
+  }
+}
 ```
 
-Pour un renommage global multi-fichiers, certains préfèrent un `sed -i` via Bash, mais Edit reste plus sûr car il garantit que chaque fichier a été lu et le diff est explicite.
+Le formateur modifie alors le fichier juste après Claude : c'est attendu, et la règle « fichier modifié sur disque » ci-dessus gère ce cas.
 
-## Performance
+## Articles liés
 
-Edit n'envoie que le diff au modèle — pas le fichier entier. C'est beaucoup plus économe en tokens que Write. Sur un fichier de 2000 lignes, modifier 3 lignes coûte ~50 tokens via Edit vs 25k tokens via Write.
+- [L'outil Write](/wiki/outils/write)
+- [L'outil Read](/wiki/outils/read)
+- [NotebookEdit](/wiki/outils/notebook-edit)
+- [Conflits d'édition](/wiki/outils/merge-conflicts-handling)
+- [Hooks PreToolUse et PostToolUse](/wiki/hooks/pre-post-tool-use)
 
-## Pour aller plus loin
+## Sources
 
-- [Documentation Claude Code](https://docs.claude.com/en/docs/claude-code)
-- Voir aussi : `Write` pour réécriture totale, `NotebookEdit` pour `.ipynb`, `Grep` pour repérer les cibles.
-- Astuce : pour un refactoring où vous hésitez sur la stratégie, demandez à Claude de planifier avec `ExitPlanMode` avant d'enchaîner les Edit.
+- [Tools reference : Edit tool behavior](https://code.claude.com/docs/en/tools-reference#edit-tool-behavior)
+- [Configure permissions](https://code.claude.com/docs/en/permissions#read-and-edit)
+- [Hooks reference](https://code.claude.com/docs/en/hooks)

@@ -1,134 +1,159 @@
 ---
-title: "Mise à jour et versions"
-description: "Mettre à jour Claude Code, revenir à une version antérieure, et gérer plusieurs versions en parallèle."
-updatedAt: "2026-05-19"
+title: "Mises à jour et versions de Claude Code"
+description: "Vérifier sa version, choisir le canal latest ou stable, épingler ou installer une version précise, désactiver les mises à jour et revenir en arrière."
+updatedAt: "2026-10-03"
 readingMinutes: 6
 ---
 
-Claude Code évolue vite : nouvelles features, corrections, changements de modèle par défaut. Savoir gérer ses versions évite les mauvaises surprises en équipe ou en CI. Ce guide couvre la mise à jour, le downgrade, l'épinglage et l'installation parallèle.
+Claude Code publie plusieurs versions par semaine (2.1.288 au 2 octobre 2026). Les mises à jour apportent des fonctions et des correctifs, mais peuvent aussi changer un comportement entre deux exécutions de CI. Voici comment garder la main sur la version que vous utilisez.
 
-## Vérifier la version installée
-
-Avant tout, on inspecte la version courante.
+## Connaître sa version
 
 ```bash
-claude --version
+claude --version     # ex. 2.1.288 (Claude Code)
+claude doctor        # diagnostic : installation, réglages, résultat de la dernière mise à jour
 ```
 
-Sortie type :
+Dans une session : `/status` affiche la version, `/release-notes` ouvre le journal des modifications par version, et `/doctor` lance un diagnostic qui peut aussi corriger les problèmes.
+
+## Comment Claude Code se met à jour
+
+Cela dépend de la méthode d'installation :
+
+| Installation | Mise à jour |
+|---|---|
+| Installeur natif (recommandé) | Automatique en arrière-plan, appliquée au prochain lancement |
+| npm | `npm install -g @anthropic-ai/claude-code@latest` (évitez `npm update -g`) |
+| Homebrew | `brew upgrade claude-code` (ou `claude-code@latest`) |
+| WinGet | `winget upgrade Anthropic.ClaudeCode` |
+| apt, dnf, apk | Commande d'upgrade du gestionnaire de paquets |
+
+Rappel de l'installation native :
 
 ```bash
-2.0.14 (Claude Code)
+# macOS, Linux, WSL
+curl -fsSL https://claude.ai/install.sh | bash
 ```
 
-On peut aussi obtenir des infos plus détaillées avec `claude doctor`, qui vérifie l'installation, l'auth et la connectivité réseau.
-
-```bash
-claude doctor
+```powershell
+# Windows PowerShell
+irm https://claude.ai/install.ps1 | iex
 ```
 
-## Mettre à jour vers la dernière version
+Sous Windows, Git for Windows est désormais facultatif : sans lui, Claude Code exécute les commandes via l'outil PowerShell.
 
-L'installation officielle se fait via npm en global. La mise à jour utilise le tag `@latest`.
-
-```bash
-npm i -g @anthropic-ai/claude-code@latest
-```
-
-Si vous avez utilisé l'installeur natif (`curl -fsSL claude.ai/install.sh | bash`), la commande embarquée fait le job.
+Pour forcer une mise à jour immédiate :
 
 ```bash
 claude update
 ```
 
-Claude affiche les changelog notables après une mise à jour majeure. Pensez à relire les notes avant d'appliquer en production.
+Pour Homebrew et WinGet, `CLAUDE_CODE_PACKAGE_MANAGER_AUTO_UPDATE=1` laisse Claude Code lancer lui-même l'upgrade en arrière-plan.
 
-## Épingler une version précise
+## Choisir un canal : latest ou stable
 
-En CI ou en équipe, on épingle pour garantir la reproductibilité.
+| Canal | Contenu |
+|---|---|
+| `latest` (défaut) | Chaque version dès sa sortie |
+| `stable` | Une version d'environ une semaine, sans les versions ayant eu des régressions majeures |
 
-```bash
-npm i -g @anthropic-ai/claude-code@2.0.10
-```
-
-Dans une GitHub Action :
-
-```bash
-- name: Install Claude Code
-  run: npm i -g @anthropic-ai/claude-code@2.0.10
-```
-
-Pour vérifier que l'épinglage tient :
-
-```bash
-npm list -g @anthropic-ai/claude-code
-```
-
-## Downgrade vers une version antérieure
-
-Si une nouvelle release casse votre workflow, on revient en arrière par le même mécanisme.
-
-```bash
-npm uninstall -g @anthropic-ai/claude-code
-npm i -g @anthropic-ai/claude-code@2.0.8
-```
-
-Pour lister les versions publiées :
-
-```bash
-npm view @anthropic-ai/claude-code versions --json
-```
-
-Pensez à signaler le bug rencontré sur le repo `anthropics/claude-code` avant de figer une vieille version trop longtemps.
-
-## Gérer plusieurs versions en parallèle
-
-Plusieurs approches existent selon vos besoins.
-
-### Avec npx (sans installation globale)
-
-```bash
-npx -y @anthropic-ai/claude-code@2.0.12 -p "Test sur cette version"
-```
-
-Utile pour tester ponctuellement sans toucher à votre install globale.
-
-### Avec un alias shell
-
-On peut maintenir une version stable globale et une version preview via alias.
-
-```bash
-alias claude-next="npx -y @anthropic-ai/claude-code@latest"
-alias claude-stable="claude"
-```
-
-### Avec un version manager Node
-
-Si vous utilisez `nvm`, chaque version de Node a son propre dossier global. On peut donc avoir plusieurs Claude Code installés en parallèle.
-
-```bash
-nvm use 20
-npm i -g @anthropic-ai/claude-code@2.0.8
-
-nvm use 22
-npm i -g @anthropic-ai/claude-code@latest
-```
-
-## Auto-update et configuration
-
-Claude Code peut s'auto-mettre à jour. Le comportement se contrôle via `settings.json`.
+Réglez-le via `/config` (Auto-update channel) ou dans `settings.json` :
 
 ```json
 {
-  "autoUpdates": false
+  "autoUpdatesChannel": "stable"
 }
 ```
 
-En CI, désactivez `autoUpdates` pour éviter qu'une mise à jour silencieuse change le comportement entre deux runs.
+Avec Homebrew, le canal dépend du cask : `claude-code` suit `stable`, `claude-code@latest` suit `latest`. Avec apt, dnf et apk, il dépend du dépôt configuré.
+
+Attention : un modèle tout juste sorti peut exiger une version plus récente que celle du canal `stable`. Repassez temporairement sur `latest` si `/model` ne le propose pas.
+
+## Installer une version précise
+
+L'installeur natif accepte un numéro de version ou un canal :
+
+```bash
+curl -fsSL https://claude.ai/install.sh | bash -s 2.1.280
+curl -fsSL https://claude.ai/install.sh | bash -s stable
+```
+
+```powershell
+& ([scriptblock]::Create((irm https://claude.ai/install.ps1))) 2.1.280
+```
+
+Si Claude Code est déjà installé, `claude install 2.1.280` (ou `claude install stable`) fait de même. Avec npm : `npm install -g @anthropic-ai/claude-code@2.1.280`.
+
+Ces commandes servent aussi à **revenir en arrière** quand une version casse votre flux de travail. Pensez alors à couper les mises à jour automatiques, sinon la version suivante sera réinstallée.
+
+## Fixer un plancher : minimumVersion
+
+```json
+{
+  "autoUpdatesChannel": "stable",
+  "minimumVersion": "2.1.270"
+}
+```
+
+Les mises à jour refusent d'installer une version inférieure. Si vous passez de `latest` à `stable` via `/config`, Claude Code propose de rester sur la version actuelle et règle ce plancher pour vous.
+
+Côté entreprise, les réglages gérés `requiredMinimumVersion` et `requiredMaximumVersion` empêchent carrément Claude Code de démarrer hors de la plage autorisée.
+
+## Désactiver les mises à jour
+
+```json
+{
+  "env": {
+    "DISABLE_AUTOUPDATER": "1"
+  }
+}
+```
+
+| Variable | Effet |
+|---|---|
+| `DISABLE_AUTOUPDATER=1` | Coupe la vérification en arrière-plan ; `claude update` et `claude install` restent possibles |
+| `DISABLE_UPDATES=1` | Bloque toutes les mises à jour, y compris manuelles |
+
+Vérifiez avec `claude doctor` : la ligne `Auto-updates` doit indiquer `disabled`.
+
+## En CI : une version épinglée
+
+Une mise à jour silencieuse entre deux exécutions rend les résultats difficiles à comparer. Épinglez la version et coupez les mises à jour :
+
+```yaml
+- name: Installer Claude Code
+  run: curl -fsSL https://claude.ai/install.sh | bash -s 2.1.288
+  env:
+    DISABLE_AUTOUPDATER: "1"
+```
+
+Mettez à jour cette version volontairement, après l'avoir testée sur un projet bac à sable. L'action officielle `anthropics/claude-code-action` gère sa propre installation : voir [Exécution en CI/CD](/wiki/cli/cicd-execution).
+
+## Faire tourner deux versions
+
+L'installeur natif garde les versions dans `~/.local/share/claude/versions/` et pointe `~/.local/bin/claude` vers l'une d'elles. Pour tester ponctuellement une autre version sans toucher à votre installation, `npx` reste pratique :
+
+```bash
+npx -y @anthropic-ai/claude-code@2.1.280 --version
+```
+
+Pour séparer aussi les réglages et l'historique, combinez avec `CLAUDE_CONFIG_DIR` (voir [Variables d'environnement](/wiki/cli/variables-env)).
+
+## En cas de problème après une mise à jour
+
+1. `claude doctor` : installations en double, problème de `PATH`, réglages invalides.
+2. `claude --safe-mode` : démarre sans aucune personnalisation (CLAUDE.md, hooks, plugins, MCP) pour savoir si le problème vient de votre configuration.
+3. Revenir à la version précédente avec `claude install <version>` et ouvrir un ticket sur `github.com/anthropics/claude-code` (ou `/feedback`) en joignant la sortie de `claude doctor`.
 
 ## Pour aller plus loin
 
-- Suivre le repo `anthropics/claude-code` pour les release notes et les breaking changes.
-- Tester chaque nouvelle version sur un projet bac à sable avant de l'imposer en équipe.
-- Documenter la version cible dans le `README.md` ou un `.tool-versions` du projet.
-- En cas de bug, capturer la sortie de `claude doctor` et de `claude --version` dans votre rapport d'issue.
+- [Installation](/wiki/demarrer/installation)
+- [Dépannage de l'installation](/wiki/demarrer/troubleshooting-installation)
+- [Le fichier settings.json](/wiki/cli/settings-json)
+
+## Sources
+
+- [Advanced setup](https://code.claude.com/docs/en/setup)
+- [CLI reference](https://code.claude.com/docs/en/cli-reference)
+- [Environment variables](https://code.claude.com/docs/en/env-vars)
+- [Changelog](https://code.claude.com/docs/en/changelog)

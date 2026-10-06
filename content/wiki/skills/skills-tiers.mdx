@@ -1,60 +1,91 @@
 ---
 title: "Skills tiers populaires"
-description: "Sélection des meilleurs skills communautaires pour Claude Code : claude-mem, vercel, supabase et autres incontournables."
-updatedAt: "2026-05-19"
-readingMinutes: 6
+description: "Où trouver des skills communautaires pour Claude Code (Vercel, Supabase, claude-mem, marketplace communautaire) et comment les évaluer avant installation."
+updatedAt: "2026-10-03"
+readingMinutes: 4
 ---
 
-L'écosystème des skills tiers de Claude Code a explosé en 2026. Plusieurs projets communautaires se distinguent par leur qualité, leur maintenance régulière et leur adoption massive. Voici une sélection des skills incontournables, classés par catégorie d'usage.
+Au-delà des skills d'Anthropic, de nombreux éditeurs et développeurs publient des skills au format ouvert [Agent Skills](https://agentskills.io), compatibles avec Claude Code. Cette page présente quelques sources sérieuses et, surtout, une méthode pour juger un skill avant de lui donner accès à votre machine.
 
-## claude-mem : la mémoire persistante
+## Où chercher
 
-`claude-mem` est probablement le skill tiers le plus populaire. Il dote Claude Code d'une mémoire persistante cross-session, capturant automatiquement les observations de chaque conversation pour les rendre interrogeables plus tard.
+| Source | Ce que vous y trouvez | Comment l'utiliser |
+|---|---|---|
+| Marketplace communautaire d'Anthropic (`claude-community`) | Plugins tiers soumis à Anthropic | `/plugin marketplace add anthropics/claude-plugins-community` |
+| Marketplace officielle (`claude-plugins-official`) | Plugins d'Anthropic et de partenaires | Déjà ajoutée : `/plugin`, onglet **Discover** |
+| Claude Marketplace | Catalogue web avec nombre d'installations et mention « Anthropic verified » | claude.com/marketplace/plugins |
+| skills.sh | Annuaire et classement de skills de l'écosystème ouvert | Installation via `npx skills add` |
+| Dépôts GitHub d'éditeurs | Skills maintenus par l'éditeur d'un outil | `npx skills add` ou leur propre marketplace |
 
-```bash
-npx claude-mem install
-```
+## Vercel : agent-skills
 
-Le skill expose plusieurs commandes utiles : `mem-search` pour retrouver des solutions passées, `learn-codebase` pour primer un nouveau projet, `make-plan` pour générer un plan détaillé phasé, et `do` pour exécuter ce plan via des subagents. Sa sous-commande `pathfinder` audite l'architecture d'un projet et propose une unification des duplications.
+Vercel Labs publie le dépôt `vercel-labs/agent-skills` et la CLI `skills`. Parmi les skills proposés :
 
-C'est typiquement le premier skill tiers à installer après une fresh install de Claude Code.
-
-## La suite Vercel
-
-Vercel maintient une **suite officielle non-Anthropic** très complète. Bien que développée par Vercel, elle est considérée comme tierce vis-à-vis d'Anthropic. Elle couvre tout le cycle de vie d'un projet Next.js déployé sur la plateforme.
-
-Les skills les plus utilisés sont `vercel:deploy` (déploiement preview ou prod), `vercel:env` (gestion des variables d'environnement), `vercel:nextjs` (guidance experte App Router), et `vercel:shadcn` pour shadcn/ui. La suite inclut aussi `vercel:ai-sdk` pour les apps IA, `vercel:turbopack` pour le bundler, et `vercel:workflow` pour les workflows durables.
-
-```bash
-claude /vercel:deploy prod
-claude /vercel:env pull
-```
-
-## Les skills Supabase
-
-Supabase fournit ses propres skills d'agent, focalisés sur les workflows backend critiques. Le projet recommande d'installer son skill agent pour bénéficier de garde-fous sur les migrations et la sécurité RLS.
+- `react-best-practices` : règles de performance React et Next.js classées par impact ;
+- `web-design-guidelines` : audit d'interface (accessibilité, focus, formulaires, UX) ;
+- `vercel-optimize` : audit coût et performance d'un projet déployé sur Vercel.
 
 ```bash
-npx skills add supabase/agent-skills
+npx skills add vercel-labs/agent-skills --list
+npx skills add vercel-labs/agent-skills --skill react-best-practices -a claude-code
 ```
 
-Ces skills couvrent l'application de migrations, le branching de bases de données, la génération de types TypeScript et le déploiement d'edge functions. Pour un projet utilisant Supabase en production, ils évitent beaucoup d'erreurs classiques sur les politiques de sécurité.
+## Supabase : agent-skills
 
-## Les skills GitHub et CI/CD
+Supabase maintient `supabase/agent-skills`, avec notamment un skill `supabase` et un skill `supabase-postgres-best-practices`. Deux façons de l'installer :
 
-Plusieurs skills tiers améliorent l'expérience GitHub au-delà de ce qu'offre `gh-init`. `babysit` (de la suite claude-mem) surveille une PR jusqu'à sa fusion, en répondant aux commentaires de review et en relançant les CI échouées.
+```bash
+# Via la CLI skills
+npx skills add supabase/agent-skills --skill supabase-postgres-best-practices
 
-D'autres skills communautaires gèrent la génération de changelogs sémantiques, la création de release notes à partir de commits conventionnels, ou l'automatisation de releases multi-packages dans les monorepos.
+# Ou comme plugin Claude Code
+claude plugin marketplace add supabase/agent-skills
+claude plugin install supabase@supabase-agent-skills
+```
 
-## Skills spécialisés par framework
+Utile sur un projet Supabase pour éviter les erreurs courantes de migrations et de politiques RLS.
 
-L'écosystème compte désormais des skills dédiés pour la plupart des frameworks majeurs. Au-delà de Next.js (couvert par Vercel), on trouve des skills tiers pour Remix, SvelteKit, Astro, Nuxt et Solid. Côté backend, des skills existent pour FastAPI, NestJS, Rails et Django.
+## claude-mem : mémoire persistante entre sessions
 
-Côté outils de dev, des skills populaires aident à la migration entre ORMs (Prisma vers Drizzle est devenu un classique), à la configuration de Tailwind v4, ou à la mise en place de pipelines de tests Playwright. La qualité varie fortement : privilégiez les skills avec plus de 1000 downloads hebdomadaires et un commit récent.
+`claude-mem` (dépôt `thedotmack/claude-mem`) est un **plugin** plutôt qu'un simple skill : il s'appuie sur des hooks pour observer les sessions, compresse ces observations et réinjecte le contexte utile dans les sessions suivantes. Installation recommandée par son auteur :
+
+```text
+/plugin marketplace add thedotmack/claude-mem
+/plugin install claude-mem
+```
+
+Un `npm install -g claude-mem` n'installe que la bibliothèque, pas les hooks. Avant de l'adopter, comparez avec la mémoire native de Claude Code (`CLAUDE.md`, mémoire automatique, `/memory`) : vous n'en aurez peut-être pas besoin.
+
+## Partenaires mis en avant par Anthropic
+
+Le README de `anthropics/skills` cite par exemple les skills Notion. D'autres éditeurs (bases de données, outils de design, CI) publient leurs plugins dans la marketplace officielle : cherchez le nom de votre outil dans `/plugin` avant d'installer une version communautaire.
+
+## Évaluer un skill tiers avant de l'installer
+
+Anthropic est explicite : un skill malveillant peut pousser Claude à exécuter du code ou à exfiltrer des données. Anthropic ne vérifie pas les marketplaces tierces. Checklist :
+
+1. **Lisez `SKILL.md`** en entier, en particulier `allowed-tools`, `hooks` et les commandes `` !`...` `` exécutées avant même que Claude lise le skill.
+2. **Lisez chaque script** de `scripts/` et cherchez les appels réseau inattendus.
+3. **Méfiez-vous des URL externes** : un skill qui charge des instructions depuis le Web peut changer de comportement sans changer de code.
+4. **Vérifiez la maintenance** : commits récents, issues traitées, licence claire.
+5. **Mesurez le coût** : chaque skill ajoute sa description au contexte à chaque tour. `/skill-doctor` montre ensuite ce que chaque skill coûte et s'il sert.
+6. **Épinglez une version** pour un usage en équipe (référence Git, ou `ref`/`sha` dans votre propre marketplace), car l'auto-update peut modifier des fichiers déjà relus.
+
+Les organisations peuvent restreindre les marketplaces autorisées via les managed settings, et désactiver l'exécution des commandes `` !`...` `` des skills avec `disableSkillShellExecution`.
 
 ## Pour aller plus loin
 
-- Registry communautaire `claude-skills.dev` pour découvrir et noter les skills
-- Liste curated `awesome-claude-skills` sur GitHub
-- Critères de sélection : maintenance active, provenance npm signée, README clair, SKILL.md déterministe
-- Toujours auditer le contenu d'un skill tiers avant installation : il a accès à votre shell et vos fichiers
+- [Skills officiels Anthropic](/wiki/skills/skills-officiels)
+- [Installer un skill](/wiki/skills/installer-skill)
+- [Secrets et skills](/wiki/skills/secrets-skills)
+- [Introduction aux plugins](/wiki/plugins/introduction-plugins)
+
+## Sources
+
+- Marketplaces d'Anthropic et tiers : https://code.claude.com/docs/en/plugins/anthropic-marketplaces
+- Sécurité des plugins : https://code.claude.com/docs/en/plugins/security
+- Sécurité des skills : https://docs.claude.com/en/docs/agents-and-tools/agent-skills/overview
+- Vercel agent-skills : https://github.com/vercel-labs/agent-skills
+- CLI skills : https://github.com/vercel-labs/skills
+- Supabase agent-skills : https://github.com/supabase/agent-skills
+- claude-mem : https://github.com/thedotmack/claude-mem

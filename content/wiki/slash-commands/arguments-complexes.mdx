@@ -1,210 +1,202 @@
 ---
-title: "Slash commands avec arguments complexes"
-description: "Parser des regex, des chemins multiples, des flags personnalisés dans une slash command."
-updatedAt: "2026-05-19"
-readingMinutes: 6
+title: "Commandes personnalisées avec arguments complexes"
+description: "Gérer flags, chemins multiples, regex et JSON dans une commande /nom : ce que Claude Code découpe pour vous, ce que Claude doit parser, et comment écrire une grammaire fiable."
+updatedAt: "2026-10-03"
+readingMinutes: 7
 ---
 
-`$ARGUMENTS` est une simple substitution de chaîne. Pour des commandes sophistiquées — flags optionnels, chemins multiples, expressions régulières, options structurées — il faut transformer Claude en parseur d'arguments. La bonne nouvelle : le modèle est meilleur qu'un `getopt` pour ça, à condition de définir clairement la grammaire dans le prompt.
+Claude Code ne fournit pas de parseur d'options : il découpe les arguments selon les règles de guillemets du shell, puis les remplace dans le texte du prompt. Pour des flags, des listes de fichiers ou des regex, c'est Claude qui fait le parsing. Il s'en sort très bien si vous lui donnez une grammaire précise et des exemples. Cet article part de ce que fait réellement Claude Code, puis montre comment écrire des commandes à arguments riches.
 
-## Définir une grammaire explicite
+## Ce que Claude Code fait (et ne fait pas)
 
-La règle d'or : ne laissez pas la convention implicite. Énoncez-la dans le prompt avec des exemples. `.claude/commands/find-and-replace.md` :
+| Élément | Comportement |
+| --- | --- |
+| `$ARGUMENTS` | La chaîne complète, exactement telle que tapée |
+| `$0`, `$1`, `$ARGUMENTS[N]` | Positions découpées avec les guillemets du shell : `"hello world"` compte pour un |
+| `$nom` (champ `arguments`) | Nom donné à une position ; vide si absent |
+| Position absente (`$2`) | Reste écrite telle quelle dans le prompt |
+| Aucun emplacement dans le texte | Claude Code ajoute `ARGUMENTS: <votre texte>` à la fin |
+| `\$1` | Dollar littéral, pas de substitution |
+| Validation, valeurs par défaut, flags | Rien : c'est à Claude de le faire |
+
+Exemple : avec `/remplacer "use client" "use server" --dry-run`, on obtient `$0` = `use client`, `$1` = `use server`, `$2` = `--dry-run`, et `$ARGUMENTS` contient la ligne entière.
+
+Les bases (positions, arguments nommés, namespacing) sont détaillées dans [Arguments et namespacing](/wiki/slash-commands/arguments-namespacing).
+
+## Règle d'or : une grammaire explicite avec exemples
+
+Ne laissez rien d'implicite. Décrivez chaque argument, ses valeurs possibles, ses valeurs par défaut, et donnez des exemples valides et invalides.
+
+`.claude/skills/remplacer/SKILL.md` :
 
 ```md
 ---
-description: "Cherche et remplace dans des fichiers"
-argument-hint: "<pattern> <remplacement> [--dry-run] [--regex] [glob...]"
-allowed-tools: [Read, Edit, Glob, Grep]
+description: Cherche et remplace un motif dans des fichiers du projet
+argument-hint: <motif> <remplacement> [--dry-run] [--regex] [glob...]
+disable-model-invocation: true
+allowed-tools: Read Grep Glob
 ---
 
-Parse les arguments suivants : $ARGUMENTS
+Arguments reçus : $ARGUMENTS
 
-Grammaire attendue :
-  <pattern>        : premier argument (entre guillemets si espaces)
-  <remplacement>   : deuxième argument
-  --dry-run        : flag optionnel, n'écrit rien, affiche seulement
-  --regex          : flag optionnel, traite pattern comme une regex
-  [glob...]        : zéro ou plusieurs globs cibles (défaut: **/*.{ts,tsx})
+## Grammaire
+- `<motif>` : premier argument, entre guillemets s'il contient des espaces.
+- `<remplacement>` : deuxième argument.
+- `--dry-run` : n'écrit rien, liste seulement les occurrences.
+- `--regex` : traite le motif comme une expression régulière.
+- `[glob...]` : zéro ou plusieurs motifs de fichiers. Défaut : `**/*.{ts,tsx}`.
+- Les flags peuvent apparaître n'importe où après les deux premiers arguments.
 
-Exemples valides :
-  "oldName" "newName"
-  "oldName" "newName" --dry-run
-  "/foo.*bar/" "baz" --regex "src/**/*.ts"
+## Exemples valides
+- `"oldName" "newName"`
+- `"oldName" "newName" --dry-run`
+- `"foo.*bar" "baz" --regex "src/**/*.ts"`
 
-Refuse poliment si la grammaire n'est pas respectée.
+## Exemple invalide
+- `"oldName"` seul : remplacement manquant.
+
+## Déroulé
+1. Affichez la lecture que vous faites des arguments (motif, remplacement, flags, fichiers).
+2. Listez les occurrences trouvées avec Grep.
+3. Sans `--dry-run`, demandez confirmation puis appliquez les modifications avec Edit.
 ```
 
-Usage :
+Afficher l'interprétation à l'étape 1 coûte trois lignes et évite la plupart des mauvaises surprises.
 
-```bash
-> /find-and-replace "useEffect" "useLayoutEffect" --dry-run "src/**/*.tsx"
-Parsing:
-  pattern     = useEffect
-  replacement = useLayoutEffect
-  dry-run     = true
-  globs       = ["src/**/*.tsx"]
-Scanning... 14 occurrences in 6 files.
-(Aucune modification — dry run)
-```
+`allowed-tools` ne liste volontairement pas `Edit` : les modifications passent par la demande de confirmation habituelle. C'est un second filet de sécurité.
 
-## Parser des flags style Unix
+## Flags de style Unix
 
-```md
-Convention des flags :
-- `--key=value` : option avec valeur
-- `--flag` : booléen
-- `-x` : raccourci équivalent à `--xxx`
-- `--` : sépare flags des arguments positionnels
-```
-
-Exemple, `.claude/commands/generate-component.md` :
+Fixez la convention une fois pour toutes dans le prompt :
 
 ```md
 ---
-description: "Génère un composant React"
-argument-hint: "<nom> [--type=server|client] [--style=css|tailwind] [--with-test]"
-allowed-tools: [Write, Read]
+description: Génère un composant React
+argument-hint: <Nom> [--type=server|client] [--with-test]
+arguments: [nom]
+allowed-tools: Read Edit(app/components/**)
 ---
 
-Parse : $ARGUMENTS
+Nom du composant : $nom
+Arguments complets : $ARGUMENTS
 
-Defaults :
-  type   = server
-  style  = tailwind
-  test   = false
+## Options
+- `--type=server|client` : défaut `server`. Avec `client`, ajoutez "use client".
+- `--with-test` : crée aussi `app/components/$nom.test.tsx`.
+- Toute autre option : arrêtez-vous et listez les options valides.
 
-Génère :
-  app/components/<nom>.tsx (selon type)
-  app/components/<nom>.test.tsx (si --with-test)
+Créez `app/components/$nom.tsx` en suivant les conventions du CLAUDE.md.
 ```
 
-Usage :
-
-```bash
-> /generate-component Header --type=client --with-test
-Creating app/components/Header.tsx (client component)
-Creating app/components/Header.test.tsx
+```text
+> /composant Header --type=client --with-test
 ```
 
-## Parser une regex
+Combiner un argument nommé (`$nom`, toujours en première position) et `$ARGUMENTS` (pour les flags) donne un prompt lisible sans perdre d'information.
 
-Les regex dans `$ARGUMENTS` sont délicates : caractères spéciaux, guillemets, backslashes. Convention recommandée : entourer la regex par `/.../ ` style sed.
+Pour les fichiers, pré-autorisez `Edit(...)` et non `Write(...)` : seuls les motifs `Edit` et `Read` sont vérifiés pour les chemins.
+
+## Expressions régulières
+
+Les guillemets sont votre meilleur allié : `$0` reçoit la regex entière, backslashes compris, tant qu'elle est entre guillemets.
 
 ```md
 ---
-description: "Liste les TODOs matchant une regex"
-argument-hint: "/<regex>/"
-allowed-tools: [Grep, Read]
+description: Liste les TODO correspondant à une regex
+argument-hint: "\"<regex>\""
+arguments: [regex]
+allowed-tools: Grep
 ---
 
-L'utilisateur a passé : $ARGUMENTS
+Cherchez dans tout le dépôt les lignes correspondant à l'expression régulière suivante : `$regex`
 
-Format attendu : `/<regex>/`
-Extrait la regex entre slashes. Si pas de slashes, traite tout
-$ARGUMENTS comme une chaîne littérale.
-
-Lance `grep -rE` avec la regex extraite, dans le repo.
+Utilisez l'outil Grep (syntaxe ripgrep), pas le shell.
+Si l'expression est invalide, dites-le et proposez une correction.
 ```
 
-Usage :
-
-```bash
-> /grep-todo "/TODO\(@\w+\):/"
-Extracted regex: TODO\(@\w+\):
-6 matches in 3 files...
+```text
+> /todos "TODO\(@\w+\):"
 ```
 
-## Parser des chemins multiples
+Passer par l'outil Grep plutôt que par `grep` dans le shell évite tout problème d'échappement et toute injection.
 
-Plusieurs fichiers en argument = découper sur les espaces, mais respecter les guillemets et les globs.
+## Listes de fichiers
 
 ```md
 ---
-description: "Lit plusieurs fichiers et résume chacun"
-argument-hint: "<fichier1> <fichier2> ... ou <glob>"
-allowed-tools: [Read, Glob]
+description: Lit plusieurs fichiers et résume chacun
+argument-hint: <fichier ou glob> [...]
+allowed-tools: Read Glob
 ---
 
-L'utilisateur a passé : $ARGUMENTS
+Fichiers demandés : $ARGUMENTS
 
-Découpe en chemins :
-- Si tout est sur une seule ligne, split sur les espaces (en respectant les guillemets)
-- Si un argument contient `*` ou `?`, expand le glob avec le tool Glob
-- Pour chaque fichier résolu, lis et fais un résumé en 3 lignes
+- Chaque argument est un chemin ou un motif glob.
+- Résolvez les motifs avec l'outil Glob.
+- Ignorez les chemins hors du projet et signalez-les.
+- Pour chaque fichier, résumez son rôle en trois lignes.
 ```
 
-Usage :
-
-```bash
-> /summarize "app/page.tsx" "lib/curriculum.ts" "lib/exercises.ts"
-> /summarize "app/**/*.tsx"
+```text
+> /resumer app/page.tsx lib/curriculum.ts
+> /resumer "app/**/*.tsx"
 ```
 
-## Argument JSON pour les cas vraiment complexes
+Mettez le glob entre guillemets pour qu'il reste un seul argument.
 
-Quand la grammaire devient touffue, demandez un JSON. C'est moins joli mais sans ambiguïté :
+## Arguments JSON pour les cas touffus
+
+Quand les options s'accumulent, un objet JSON supprime toute ambiguïté :
 
 ```md
 ---
-description: "Configure et déclenche un déploiement"
-argument-hint: '{"env": "...", "skipTests": true, "tags": [...]}'
+description: Prépare un déploiement paramétré
+argument-hint: '{"env": "staging|prod", "skipTests": false, "tags": []}'
+disable-model-invocation: true
 ---
 
-L'utilisateur a passé un objet JSON : $ARGUMENTS
+Configuration reçue : $ARGUMENTS
 
-Parse-le, valide les champs :
-  env         (obligatoire, "staging"|"prod")
-  skipTests   (booléen, défaut: false)
-  tags        (array de strings, défaut: [])
+Validez l'objet :
+- `env` : obligatoire, `staging` ou `prod`.
+- `skipTests` : booléen, défaut `false`. Refusez `true` si `env` vaut `prod`.
+- `tags` : liste de chaînes, défaut `[]`.
 
-Si invalide, affiche un message d'erreur clair avec un exemple.
+Si l'objet est invalide, n'exécutez rien et affichez un exemple correct.
 ```
 
-Usage :
-
-```bash
-> /deploy {"env": "prod", "skipTests": false, "tags": ["v1.3.0"]}
+```text
+> /deployer {"env": "staging", "tags": ["v1.3.0"]}
 ```
 
-## Gestion des erreurs d'argument
+## Erreurs et confirmation
 
-Une commande robuste explique ce qu'elle attend quand l'argument est mal formé. Pattern recommandé en fin de prompt :
+Terminez le prompt par une consigne d'erreur claire :
 
 ```md
-Si la grammaire n'est pas respectée :
-- N'exécute aucune action
-- Affiche un message du type :
-    "Format attendu : /<commande> <arg1> <arg2> [--flag]
-     Exemple : /find-and-replace 'old' 'new' --dry-run
-     Reçu : $ARGUMENTS"
-- Termine immédiatement.
+Si les arguments ne respectent pas la grammaire :
+- n'exécutez aucune action ;
+- affichez le format attendu et un exemple ;
+- rappelez ce que vous avez reçu.
 ```
 
-## Validation avant exécution
-
-Pour les commandes destructrices, ajoutez une étape de confirmation :
-
-```md
-Une fois les arguments parsés, AFFICHE un récapitulatif :
-  Pattern     : ...
-  Remplacement: ...
-  Fichiers    : ...
-  Mode        : dry-run / write
-
-Demande "Confirmer ? (y/n)" avant d'écrire quoi que ce soit.
-Si l'utilisateur ne répond pas explicitement `y`, abandonne.
-```
+Pour une commande destructrice, demandez un récapitulatif puis une confirmation avant d'écrire. Claude peut poser la question avec son outil de questions à choix (AskUserQuestion), plus fiable qu'un « tapez y ».
 
 ## Anti-patterns
 
-- **Parsing implicite** : "tu sauras ce que je veux dire". Non. Définissez la grammaire.
-- **Flags ambigus** : `-r` qui signifie tantôt "recursive" tantôt "regex" selon la position.
-- **Pas d'exemple** : sans exemple concret dans le prompt, Claude invente une convention différente à chaque appel.
-- **Confier la validation au shell** : Claude ne lance pas un vrai parseur. C'est lui le parseur. Donnez-lui les règles.
+- **Grammaire implicite** : « vous comprendrez ». Claude invente alors une convention différente à chaque appel.
+- **Flags ambigus** : `-r` qui veut dire tantôt « récursif », tantôt « regex ».
+- **Argument dans un bloc `` !`…` ``** : cela peut l'exécuter dans un shell. Voir [Bash injection](/wiki/slash-commands/bash-injection-securisee).
+- **Compter sur `$2` absent** : il reste écrit `$2` dans le prompt. Utilisez un argument nommé si vous voulez une valeur vide.
+- **Trop d'options** : au-delà de cinq ou six, découpez en plusieurs commandes.
 
 ## Pour aller plus loin
 
-- Guide "Arguments et namespacing" pour les bases
-- Guide "Bash injection sécurisée" pour les implications sécurité
-- Doc officielle : https://docs.claude.com/en/docs/claude-code/slash-commands
+- [Arguments et namespacing](/wiki/slash-commands/arguments-namespacing)
+- [Le frontmatter des commandes](/wiki/slash-commands/markdown-frontmatter)
+- [Créer une commande personnalisée](/wiki/slash-commands/creer-slash-command)
+
+## Sources
+
+- [Skills : pass arguments to skills](https://code.claude.com/docs/en/skills)
+- [Permissions](https://code.claude.com/docs/en/permissions)

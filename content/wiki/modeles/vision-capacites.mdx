@@ -1,49 +1,113 @@
 ---
-title: "Claude Vision : capacités de lecture graphique"
-description: "Tour d'horizon des capacités visuelles de Claude 4.x : OCR, lecture de diagrammes, analyse d'UI et limites techniques."
-updatedAt: "2026-05-19"
+title: "Claude Vision : lire des images, captures et schémas"
+description: "Formats, limites de taille, coût en tokens (haute résolution depuis Opus 4.7), cas d'usage UI et documents, et limites connues de la vision de Claude."
+updatedAt: "2026-10-03"
 readingMinutes: 6
 ---
 
-Depuis Claude 3, l'API Anthropic accepte nativement les images en entrée, et la famille Claude 4.x (Opus 4.7, Sonnet 4.6, Haiku 4.5) pousse encore plus loin la qualité du raisonnement visuel. Que ce soit pour transformer un mockup Figma en code, extraire des données d'un PDF scanné ou comprendre un diagramme d'architecture, Vision est devenu un pilier des workflows. Voici ce qu'il faut savoir pour bien l'exploiter.
+Tous les modèles Claude actuels lisent les images : captures d'écran, maquettes, schémas, graphiques, documents scannés. Depuis Opus 4.7, les modèles récents les traitent en **haute résolution**, ce qui change la précision et le coût. Voici l'essentiel pour bien s'en servir.
 
-## Formats supportés et limites de résolution
+## Envoyer une image
 
-Claude accepte les formats classiques : JPEG, PNG, GIF (non animé) et WebP. Vous pouvez envoyer une image en base64 directement dans le message, ou via une URL publique. La limite par image est de 5 Mo en base64, et un message peut contenir jusqu'à 100 images (20 recommandées pour rester fluide).
+En API, une image est un bloc de contenu `image` avec trois sources possibles :
 
-Côté résolution, Claude redimensionne automatiquement les images dont le plus grand côté dépasse 1568 pixels. Au-delà, vous payez plus de tokens sans gagner en précision. À l'inverse, une image trop petite (sous 200 px) perd en lisibilité OCR. La règle pratique : viser 1000-1500 px sur le côté le plus long, en PNG pour le texte fin et en JPEG pour les photos.
+1. `base64` : l'image encodée dans la requête ;
+2. `url` : une image en ligne ;
+3. `file` : un `file_id` obtenu via la [Files API](/wiki/api/files-api), à privilégier quand l'image revient dans plusieurs tours.
 
-## OCR et lecture de texte
+Sur Amazon Bedrock et Google Cloud, seule la source `base64` est disponible.
 
-Claude 4.x lit le texte imprimé avec une fiabilité proche d'un OCR dédié, et il dépasse largement les solutions classiques sur le texte manuscrit, les tableaux complexes et les langues mixtes. Contrairement à Tesseract, il comprend le contexte : il peut corriger une faute d'OCR évidente, restituer la structure d'un tableau en Markdown, ou extraire uniquement les champs pertinents d'une facture.
+```python
+import anthropic
 
-Pour les documents longs scannés, mieux vaut découper page par page et passer chaque image dans un appel séparé — cela évite la saturation du contexte visuel et améliore nettement la précision.
+client = anthropic.Anthropic()
 
-## Lecture de diagrammes et schémas
+message = client.messages.create(
+    model="claude-sonnet-5-5",
+    max_tokens=2048,
+    messages=[{
+        "role": "user",
+        "content": [
+            {"type": "image", "source": {"type": "url", "url": "https://exemple.fr/maquette.png"}},
+            {"type": "text", "text": "Liste les composants de cette maquette et propose une structure React."},
+        ],
+    }],
+)
+print(message.content[0].text)
+```
 
-C'est l'un des points forts du modèle. Claude lit avec aisance les diagrammes UML, les schémas d'architecture cloud, les graphiques matplotlib, les organigrammes ou les flowcharts. Il identifie les nœuds, les flèches, les labels et reconstitue la logique. Sur Opus 4.7, il peut même critiquer un diagramme (composant manquant, cycle non géré) ou le transcrire en code Mermaid.
+Placez de préférence l'image **avant** la question. Pour plusieurs images, précédez chacune d'une étiquette (`Image 1 :`, `Image 2 :`) pour pouvoir les citer.
 
-Les graphiques avec axes (barres, courbes, scatter) sont également bien interprétés : Claude lit les ordres de grandeur, identifie les tendances, et extrait des valeurs approximatives. Pour des valeurs exactes, joignez toujours le dataset brut en complément.
+## Formats et limites
 
-## Cas d'usage UI/UX
+| Élément | Limite |
+|---|---|
+| Formats | JPEG, PNG, GIF, WebP (pour un GIF animé, seule la première image est lue) |
+| Taille par image | 10 Mo en API directe, 5 Mo sur Bedrock et Google Cloud |
+| Dimensions max | 8000 x 8000 px |
+| Images par requête | 600 (100 pour les modèles à 200K de contexte, comme Haiku 4.5) |
+| Images par message sur claude.ai | 20 |
+| Taille totale de requête | 32 Mo (moins sur certaines plateformes partenaires) |
 
-C'est probablement le domaine où Vision a le plus d'impact :
+Au-delà de 20 images dans une requête, une limite de dimension plus stricte s'applique à chaque image. Le plus simple : redimensionner à 2000 px maximum par côté, ou rester à 20 images.
 
-- **Mockup → code** : envoyer un screenshot Figma et demander un composant React/Tailwind fidèle.
-- **Audit d'interface** : pointer les problèmes d'accessibilité, de contraste, de hiérarchie visuelle.
-- **Recette visuelle** : comparer une maquette et un rendu réel pour détecter les écarts pixel-near.
-- **Reverse engineering** : reconstituer la structure DOM d'une capture d'écran d'app concurrente.
+## Résolution et coût
 
-Opus 4.7 est nettement supérieur sur ces tâches : il identifie correctement les composants shadcn/ui, distingue un padding 4 d'un padding 6, et propose des structures sémantiques propres.
+Claude découpe l'image en carrés de 28 x 28 pixels. Chaque carré est un token visuel : une image coûte `⌈largeur / 28⌉ x ⌈hauteur / 28⌉` tokens, au prix des tokens d'entrée du modèle.
 
-## Limites à connaître
+| Niveau | Modèles | Bord long max | Tokens max par image |
+|---|---|---|---|
+| Haute résolution | Opus 4.7 et suivants (Opus 5.5, Sonnet 5, Sonnet 5.5, Fable...) | 2576 px | 4784 |
+| Standard | Haiku 4.5 et modèles plus anciens | 1568 px | 1568 |
 
-Claude reste limité sur quelques points : il ne lit pas les vidéos (uniquement des frames extraites), il a du mal avec les très petits éléments d'interface (icônes 16x16, badges), et il ne renvoie pas de coordonnées pixel-précises pour faire du bounding box fiable. Pour ces cas, des modèles spécialisés (YOLO, Florence-2) restent plus adaptés.
+Quelques exemples tirés de la documentation :
 
-Autre point : pas de génération d'image. Claude lit, mais n'écrit pas — il faut un modèle dédié (Imagen, FLUX, etc.) pour produire des visuels.
+| Image | Standard | Haute résolution |
+|---|---|---|
+| 1000 x 1000 px | 1296 tokens | 1296 tokens |
+| 1920 x 1080 px | réduite à 1456 x 819, 1560 tokens | non réduite, 2691 tokens |
+| 3840 x 2160 px (4K) | 1560 tokens | réduite à 2576 x 1449, 4784 tokens |
+
+Une image trop grande est réduite automatiquement en gardant ses proportions. En haute résolution, une même image peut coûter jusqu'à environ trois fois plus de tokens. Si vous n'avez pas besoin du détail (photo d'ambiance, illustration), réduisez l'image avant l'envoi. Gardez la pleine résolution pour les captures d'écran denses, les documents et le computer use.
+
+## Ce que Claude fait bien
+
+- **Lecture de texte** : texte imprimé, tableaux, documents scannés, avec restitution de la structure (Markdown, JSON).
+- **Schémas et diagrammes** : architecture, UML, organigrammes, graphiques. Claude identifie les éléments et la logique, et peut transcrire un schéma en Mermaid.
+- **Graphiques** : tendances et ordres de grandeur. Pour des valeurs exactes, joignez les données brutes.
+- **Interfaces** : maquette vers composant, audit de hiérarchie visuelle et de contraste, comparaison maquette / rendu réel.
+
+Pour un PDF, envoyez plutôt le document lui-même (bloc `document`) : Claude lit alors le texte et les pages en image.
+
+## Limites connues
+
+D'après la documentation officielle :
+
+- **Identification de personnes** : Claude refuse de nommer des personnes sur une image.
+- **Images petites ou de mauvaise qualité** : erreurs possibles sous 200 px, sur une image floue ou tournée.
+- **Raisonnement spatial et coordonnées** : approximatifs. Pour des boîtes englobantes, suivez le guide « Coordinates and bounding boxes » et vérifiez les résultats.
+- **Comptage** : approximatif sur de nombreux petits objets.
+- **Images générées par IA** : Claude ne sait pas les détecter de façon fiable.
+- **Imagerie médicale** : pas conçu pour interpréter scanners ou IRM.
+- **Pas de génération d'image** : Claude lit, mais ne crée ni ne modifie d'images.
+- **Métadonnées** : Claude ne reçoit pas les métadonnées EXIF.
+
+## Bonnes pratiques
+
+1. Recadrez sur la zone utile plutôt que d'envoyer un écran entier.
+2. Évitez la compression JPEG forte sur du texte : les artefacts gênent la lecture.
+3. Pour un document long, envoyez le PDF ou une page par image, avec une question précise.
+4. Dans une conversation longue, utilisez la Files API pour éviter de renvoyer les octets à chaque tour.
+5. Vérifiez toujours les extractions sensibles (montants, identifiants) par un contrôle côté code.
 
 ## Pour aller plus loin
 
-- Documentation officielle : [docs.anthropic.com/en/docs/build-with-claude/vision](https://docs.anthropic.com/en/docs/build-with-claude/vision)
-- Article wiki [Choisir le bon modèle](/wiki/modeles/choisir-bon-modele) pour décider quand utiliser Opus vs Sonnet sur du visuel
-- Article wiki [Pricing et tokens](/wiki/modeles/pricing-tokens) pour comprendre le coût des images (~1600 tokens pour une image 1000x1000)
+- [Intégrer la vision en API](/wiki/api/vision-integration)
+- [La Files API](/wiki/api/files-api)
+- [Choisir le bon modèle](/wiki/modeles/choisir-bon-modele)
+- [Tarification et tokens](/wiki/modeles/pricing-tokens)
+
+## Sources
+
+- [Vision (Claude Platform Docs)](https://platform.claude.com/docs/en/build-with-claude/vision)
+- [Models overview](https://platform.claude.com/docs/en/models/overview)

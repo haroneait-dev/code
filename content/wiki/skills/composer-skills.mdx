@@ -1,77 +1,115 @@
 ---
 title: "Composer plusieurs skills"
-description: "Faire collaborer plusieurs skills Claude Code sans accroc : ordre d'activation, conflits de noms, mécanismes d'override et patterns d'orchestration."
-updatedAt: "2026-05-19"
-readingMinutes: 6
+description: "Faire cohabiter et collaborer plusieurs skills dans Claude Code : priorité entre emplacements, conflits de noms, enchaînement, skills préchargés dans un subagent et budget de contexte."
+updatedAt: "2026-10-03"
+readingMinutes: 5
 ---
 
-Un skill isolé est utile. Plusieurs skills bien composés transforment Claude Code en assistant spécialisé sur votre stack. Mais dès que deux skills se chevauchent — mots-clés communs, scripts partagés, fichiers de référence concurrents — il faut comprendre comment Claude arbitre. Cette page décrit l'ordre d'activation, les conflits typiques et les patterns d'override que vous pouvez réutiliser.
+Un skill isolé rend service. Plusieurs skills bien découpés font de Claude Code un assistant adapté à votre stack. Encore faut-il savoir lequel s'exécute quand deux portent le même nom, comment les enchaîner et ce que coûte leur accumulation. Cette page s'appuie uniquement sur le comportement documenté.
 
-## Ordre d'activation
+## Comment Claude choisit un skill
 
-Quand une requête arrive, Claude Code parcourt les skills disponibles dans un ordre précis :
+Il n'y a ni score de pertinence publié ni règle « premier trouvé ». À chaque tour, Claude voit la **liste des noms et descriptions** des skills qu'il peut invoquer, et décide lui-même s'il en charge un, comme il choisit un outil. Conséquences :
 
-1. **Skills du projet** (`.claude/skills/` à la racine du repo)
-2. **Skills locaux** (`~/.claude/skills/`)
-3. **Skills globaux** installés via plugin
-4. **Skills built-in** fournis avec le CLI
+- deux skills aux descriptions proches se font concurrence : Claude peut hésiter ou choisir le mauvais ;
+- le champ `paths` réduit un skill aux fichiers concernés, ce qui limite les chevauchements ;
+- `disable-model-invocation: true` retire un skill de la liste vue par Claude.
 
-Le premier match gagne. Cela signifie qu'un skill local override toujours un skill global de même nom — pratique pour patcher un comportement sans forker le plugin. Si plusieurs skills correspondent à la même requête, Claude utilise un score de pertinence basé sur la `description` et les `triggers` pour choisir.
+Vous pouvez aussi forcer le choix en tapant `/nom`.
 
-## Conflits de noms
+## Même nom à plusieurs endroits
 
-Deux skills nommés `git-helper` dans des scopes différents : pas de problème, le scope le plus proche gagne. Deux skills nommés `git-helper` dans le même scope : Claude Code affiche une erreur au démarrage et n'active aucun des deux. La règle est simple, le débogage l'est moins quand un utilisateur installe sans le savoir un skill qui collisionne avec le vôtre.
+| Même nom dans | Ce qui s'exécute |
+|---|---|
+| Entreprise, personnel et projet | Entreprise avant personnel, personnel avant projet |
+| Un de ces emplacements et un skill intégré | Votre skill remplace la commande intégrée (mais pas ses alias) |
+| Un skill et un fichier `.claude/commands/` | Le skill |
+| Racine du dépôt et sous-dossier (skill imbriqué) | Les deux restent disponibles : `/deploy` et `/apps/web:deploy` |
+| Un skill de plugin et un skill local | Les deux, car le plugin est préfixé : `/mon-plugin:deploy` |
+| Un skill synchronisé depuis claude.ai et un autre | L'autre ; le skill synchronisé reste accessible via `/anthropic-skills:<nom>` |
 
-Bonnes pratiques pour éviter les collisions :
+Attention au sens : un skill **personnel** l'emporte sur un skill **de projet** du même nom. Si un collègue a un `~/.claude/skills/deploy`, il n'exécute pas le `/deploy` de l'équipe. Pour un skill d'équipe critique, choisissez un nom distinctif ou distribuez-le en plugin.
 
-- **Préfixer** les skills par votre namespace : `acme/git-helper` plutôt que `git-helper`.
-- **Documenter** le nom complet dans le README pour que les utilisateurs sachent comment l'invoquer explicitement.
-- **Vérifier** au démarrage avec `/skills list --conflicts` qui affiche les doublons potentiels.
+Le format standard de `name` (minuscules, chiffres et tirets) exclut les barres obliques comme `acme/deploy`. Pour un espace de noms, utilisez un plugin (préfixe automatique) ou un préfixe dans le nom (`acme-deploy`).
 
-## Override partiel
+## Enchaîner des skills
 
-Un pattern puissant : créer un skill local qui hérite d'un skill global et override uniquement quelques champs. Le frontmatter accepte un champ `extends` :
+### Empiler à l'invocation
+
+Vous pouvez charger plusieurs skills dans un même message :
+
+```text
+/ecrire-tests /corriger-issue 123
+```
+
+Les deux skills sont chargés et reçoivent `123` comme `$ARGUMENTS`. Claude Code développe le premier skill et jusqu'à cinq autres. L'empilement s'arrête au premier élément qui n'est pas un skill exécuté en ligne : un skill en `context: fork` comme `/code-review` termine la chaîne.
+
+### Renvoyer d'un skill à l'autre
+
+Dans le corps d'un skill orchestrateur, nommez explicitement les skills suivants :
+
+```markdown
+---
+name: preparer-release
+description: Prépare une release (version, changelog, tag). À utiliser quand l'utilisateur annonce une nouvelle version.
+disable-model-invocation: true
+---
+
+1. Incrémentez la version dans `package.json` selon SemVer.
+2. Invoquez ensuite le skill `rediger-changelog` pour générer les notes.
+3. Une fois le changelog validé par l'utilisateur, invoquez `creer-tag`.
+```
+
+Claude suit ces instructions avec jugement. Si une étape doit **toujours** avoir lieu (un contrôle avant chaque commit, par exemple), mettez-la dans un hook, éventuellement déclaré dans le `hooks` du skill.
+
+### Précharger des skills dans un subagent
+
+Un subagent peut recevoir le contenu complet de skills dès son démarrage, via son champ `skills` :
 
 ```yaml
 ---
-name: acme/deploy
-extends: vercel/deploy
-version: 1.0.0
-overrides:
-  description: "Deploy spécifique à Acme avec checks SOC2"
-  triggers:
-    - "déployer staging acme"
+name: dev-api
+description: Implémente des endpoints selon les conventions de l'équipe
+skills:
+  - conventions-api
+  - gestion-erreurs
 ---
+
+Implémentez l'endpoint demandé en suivant les conventions préchargées.
 ```
 
-Les éléments non listés dans `overrides` sont hérités tels quels. C'est l'équivalent d'une classe enfant en POO : vous gardez 90 % du comportement et changez ce qui vous est propre.
+Un skill en `disable-model-invocation: true` ne peut pas être préchargé. L'inverse existe aussi : un skill en `context: fork` s'exécute dans un subagent choisi par `agent`.
 
-## Faire collaborer deux skills
+## Découper : atomique ou orchestrateur
 
-Claude n'active généralement qu'un seul skill par tour, mais il peut chaîner plusieurs skills sur une conversation. Pour orchestrer une collaboration :
+- **Skills de référence** (conventions, glossaire métier) : courts, déclenchés par Claude, idéalement limités par `paths`.
+- **Skills de tâche** (déploiement, release) : invoqués par vous, souvent en `disable-model-invocation: true`.
+- **Un orchestrateur** léger qui renvoie vers les skills de tâche plutôt que de tout dupliquer.
 
-- **Skill orchestrateur** : un skill de haut niveau qui détecte l'intention globale et délègue. Son `SKILL.md` mentionne explicitement les autres skills disponibles, ce qui guide Claude vers le bon enchaînement.
-- **Skill atomique** : chaque skill spécialisé fait une seule chose. Plus c'est petit, plus c'est composable.
-- **Référence croisée** : dans `SKILL.md`, ajoutez une section "Skills connexes" listant les noms exacts à invoquer pour la suite. Claude lit cette section et la suit naturellement.
+Le partage de fichiers entre skills se fait par le plugin : `${CLAUDE_PLUGIN_ROOT}` pointe vers sa racine, accessible à tous ses skills.
 
-Exemple : un skill `release-prep` peut citer dans ses instructions "Une fois la version bumpée, invoquer le skill `changelog-write` pour générer les notes de release".
+## Le coût de l'accumulation
 
-## Détecter et résoudre les conflits
+Chaque skill que Claude peut invoquer ajoute son nom et sa description au contexte **à chaque tour**. La liste a un budget d'environ 1 % de la fenêtre de contexte. Au-delà, Claude Code supprime d'abord les descriptions des skills les moins utilisés, et Claude ne peut plus les choisir correctement.
 
-Symptômes typiques d'un conflit :
+Outils pour garder la maîtrise :
 
-- Un skill cesse de se déclencher après installation d'un autre.
-- Claude hésite ou répond de façon hybride entre deux comportements.
-- Les triggers se chevauchent sur les mêmes mots-clés.
+- `/skill-doctor` : coût et fréquence d'usage de chaque skill ;
+- `/doctor` : estimation du coût total de la liste ;
+- `skillOverrides` : `"name-only"` pour les skills secondaires, `"off"` pour ceux à masquer ;
+- `skillListingBudgetFraction` pour élever le budget si vraiment nécessaire.
 
-La commande `/skills doctor` parcourt les manifestes et signale les triggers en conflit. Pour résoudre :
-
-1. Restreindre les triggers du skill le plus générique.
-2. Renommer pour clarifier la frontière de responsabilité.
-3. Utiliser `extends` pour fusionner deux skills proches en un seul avec des modes.
+Après une compaction, Claude Code ne réattache que les 5 000 premiers tokens de chaque skill invoqué, dans un budget total de 25 000 tokens, en partant du plus récent. Avec beaucoup de skills invoqués, les plus anciens peuvent disparaître : invoquez-les de nouveau si besoin.
 
 ## Pour aller plus loin
 
-- La page **versioning des skills** explique comment gérer les dépendances entre skills qui s'overridenent mutuellement.
-- Voir **tester un skill localement** pour mettre en place des snapshot tests qui couvrent les scénarios multi-skills.
-- Le dépôt `anthropics/claude-code-skills` propose un exemple `skills/orchestrator/` montrant un skill de haut niveau qui en chaîne quatre autres — une référence à étudier avant de bâtir votre propre orchestration.
+- [Cycle de vie d'un skill](/wiki/skills/cycle-de-vie)
+- [Skill, subagent, MCP ou plugin](/wiki/skills/skill-vs-agent-vs-mcp)
+- [Frontmatter d'un agent](/wiki/subagents/frontmatter-agent)
+- [Tester un skill](/wiki/skills/tester-skill)
+
+## Sources
+
+- Noms partagés, empilement, budget de la liste : https://code.claude.com/docs/en/skills
+- Précharger des skills dans un subagent : https://code.claude.com/docs/en/sub-agents
+- Hooks dans les skills : https://code.claude.com/docs/en/hooks

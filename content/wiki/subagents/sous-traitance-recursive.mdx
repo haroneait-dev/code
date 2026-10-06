@@ -1,62 +1,111 @@
 ---
-title: "Sous-traitance récursive : agents qui créent des agents"
-description: "Comprendre les limites de profondeur, les boucles infinies et les arbres de dépendances quand un subagent en spawn un autre."
-updatedAt: "2026-05-19"
-readingMinutes: 6
+title: "Sous-traitance récursive : des subagents qui lancent des subagents"
+description: "Imbrication des subagents dans Claude Code : limite de profondeur par défaut (3 niveaux), variable CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH, comportement en arrière-plan, garde-fous contre les boucles et suivi par hooks."
+updatedAt: "2026-10-03"
+readingMinutes: 4
 ---
 
-La sous-traitance récursive désigne le cas où un subagent Claude Code délègue à son tour une partie de sa tâche à un autre subagent. Cette technique est puissante : elle permet de décomposer un problème complexe en arborescence de spécialistes (un agent "architecte" qui appelle un agent "backend" qui appelle un agent "DB"). Mais sans garde-fous, elle vire vite au cauchemar : explosion du contexte, coût qui dérape, boucles infinies. Voyons comment l'utiliser sans tout faire exploser.
+Un subagent peut lui-même déléguer une partie de sa tâche à d'autres subagents. C'est utile quand une tâche déléguée se découpe à son tour en sous-tâches parallèles, par exemple un relecteur qui lance un vérificateur par problème trouvé. Sans garde-fous, l'arbre grossit vite et les tokens avec lui.
 
-## Pourquoi déléguer en cascade
+## Ce que permet Claude Code
 
-L'intérêt principal est l'isolation de contexte. Chaque subagent reçoit uniquement le brief qu'on lui transmet, pas l'historique du parent. Cela permet :
+Par défaut, un subagent peut lancer des subagents jusqu'à **trois niveaux sous la conversation principale**. Au niveau limite, Claude Code retire l'outil `Agent` au subagent : il fait lui-même le travail et renvoie un seul résumé.
 
-- de paralléliser plusieurs explorations (un agent par module à analyser),
-- de garder le contexte du parent léger (on ne renvoie qu'un résumé),
-- de spécialiser chaque niveau (un orchestrateur, des exécutants, des vérificateurs).
+| Version de Claude Code | Comportement par défaut |
+| --- | --- |
+| v2.1.172 à v2.1.216 | Imbrication jusqu'à 5 niveaux, non réglable |
+| v2.1.217 et v2.1.218 | 1 niveau (pas d'imbrication sans réglage) |
+| v2.1.219 et suivantes | 3 niveaux, réglable |
 
-Quand un agent backend a besoin d'un audit SQL pointu, il est plus efficace de spawn un agent "dba-reviewer" dédié que de polluer son propre contexte avec 12 fichiers de migration.
+Vérifiez votre version avec `claude --version` : un ancien tutoriel peut décrire un autre comportement.
 
-## Limites de profondeur
+## Régler la profondeur
 
-Claude Code applique une limite implicite à la profondeur d'imbrication (généralement 2 à 3 niveaux selon la configuration). Au-delà, l'appel Task échoue ou est refusé. Cette limite n'est pas un caprice : chaque niveau ajoute de la latence, multiplie les tokens et complique le debug.
-
-Bonne pratique : restez à **2 niveaux maximum** en production. Un orchestrateur, des exécutants. Si vous sentez le besoin d'un troisième niveau, c'est souvent que votre arbre est mal découpé — un exécutant fait trop de choses, ou l'orchestrateur sous-décompose. Aplatissez l'arbre plutôt que de l'allonger.
-
-## Boucles infinies et détection
-
-Le scénario classique : l'agent A spawn B avec le prompt "résous X". B échoue partiellement et spawn A pour "réessayer X". A re-spawn B. Boom — coût exponentiel, contexte qui ne progresse pas.
-
-Pour s'en prémunir :
-
-1. **Pas d'auto-référence par nom** : un subagent ne devrait jamais invoquer un subagent du même type que lui.
-2. **Compteur de profondeur dans le prompt** : passez `depth: 2` et exigez que l'agent refuse de descendre plus bas.
-3. **Critère d'arrêt explicite** : chaque délégation doit avoir une condition de succès vérifiable (test qui passe, fichier qui existe, valeur retournée non vide).
-4. **Budget en tokens** : surveillez le compteur ; au-delà d'un seuil, l'agent doit remonter un état partiel au parent au lieu de relancer.
-
-## Arbres de dépendances
-
-Visualisez toujours votre arbre avant de coder. Un schéma simple :
-
-```
-orchestrator
-  ├── explorer (lit le repo)
-  ├── planner (produit la todo)
-  └── executor
-        ├── coder
-        └── tester
+```json
+{
+  "env": {
+    "CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH": "2"
+  }
+}
 ```
 
-Chaque nœud a une responsabilité unique et une interface claire (entrée = prompt, sortie = résumé structuré). Si deux nœuds frères ont besoin de partager un état, c'est au parent de l'orchestrer — jamais une communication horizontale entre subagents, qui n'existe pas dans le modèle.
+Avec `2`, vos subagents peuvent déléguer à un second niveau, qui ne peut pas aller plus loin. Avec `1`, l'imbrication est désactivée.
 
-Attention aux **dépendances en losange** : si l'agent A appelle B et C, et que B et C ont tous deux besoin d'un agent D, ne spawn pas D deux fois. Soit le parent exécute D une fois et passe le résultat aux deux, soit D devient un outil partagé (MCP, script).
+Pour empêcher un seul agent de déléguer (un relecteur qui doit rester en lecture seule, par exemple), retirez `Agent` de sa liste `tools` ou ajoutez-le à `disallowedTools`. La syntaxe `Agent(worker, researcher)`, qui restreint les types lançables, ne fonctionne que pour un agent lancé en session principale avec `claude --agent` ; dans une définition de subagent, la liste entre parenthèses est ignorée.
 
-## Coût et observabilité
+## Comment remontent les résultats
 
-Chaque subagent = un appel API complet, souvent avec son propre system prompt long. Une cascade à 3 niveaux peut facilement multiplier la facture par 10. Loggez systématiquement le `depth`, le `parent_id` et le prompt initial de chaque spawn pour pouvoir reconstituer l'arbre a posteriori et identifier les branches inutiles.
+- **Session interactive** : seul le résumé du subagent de premier niveau vous parvient. Un subagent qui lance des subagents en arrière-plan attend leurs résultats avant de terminer.
+- **Mode `-p` et Agent SDK** : le subagent lanceur n'attend pas. Un sous-subagent qui termine après lui envoie son rapport directement à la conversation principale.
+- **Forks** : un fork ne peut pas lancer d'autres forks.
+
+Dans le terminal, le panneau sous la zone de saisie affiche les subagents en arbre ; un compteur `(+N)` indique le nombre de descendants encore actifs.
+
+## Concevoir l'arbre
+
+Dessinez l'arbre avant de lancer :
+
+```text
+conversation principale
+  └── reviewer (lit le diff, liste les problèmes)
+        ├── verifier n°1 (confirme ou infirme le problème 1)
+        ├── verifier n°2
+        └── verifier n°3
+```
+
+Règles utiles :
+
+- **Une responsabilité par nœud**, une entrée claire (le brief) et une sortie claire (le rapport).
+- **Aplatir plutôt qu'allonger** : si vous avez besoin d'un troisième niveau, un nœud fait souvent trop de choses.
+- **Pas de communication implicite entre frères** : c'est le parent qui transmet. Des subagents nommés peuvent s'écrire avec `SendMessage`, mais gardez ce cas pour des besoins précis.
+- **Dépendances en losange** : si B et C ont besoin du même résultat D, faites calculer D une fois par le parent et transmettez-le.
+
+## Éviter les boucles et la dérive
+
+La limite de profondeur empêche une récursion infinie, mais pas une cascade coûteuse. Dans vos prompts d'agents :
+
+1. **Critère d'arrêt vérifiable** : test qui passe, fichier qui existe, liste non vide.
+2. **Pas d'auto-délégation** : un agent ne doit pas relancer un agent du même type pour « réessayer ».
+3. **Budget de tours** : `maxTurns` dans le frontmatter arrête un agent qui tourne en rond ; sa sortie revient marquée partielle.
+4. **Rapport partiel plutôt que relance** : en cas d'échec, l'agent remonte ce qu'il a trouvé au parent.
+
+Rappel : 20 subagents simultanés au maximum par session par défaut (`CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS`), tous niveaux confondus.
+
+## Observer l'arbre avec des hooks
+
+Les hooks `SubagentStart` et `SubagentStop` reçoivent `agent_id` et `agent_type`. `SubagentStop` reçoit aussi `agent_transcript_path` et `last_assistant_message`. Un journal minimal :
+
+```json
+{
+  "hooks": {
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "jq -c '{t: now, id: .agent_id, type: .agent_type}' >> .claude/subagents.log"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+Les transcripts de chaque subagent sont aussi conservés dans `~/.claude/projects/<projet>/<session>/subagents/agent-<id>.jsonl`.
+
+## Quand passer à un workflow
+
+Si votre arbre devient un vrai pipeline (des dizaines d'agents, étapes répétables, recoupement des résultats), un [dynamic workflow](/wiki/cli/dynamic-workflows-agents-arriere-plan) est plus adapté : le plan vit dans un script, les résultats intermédiaires restent dans des variables et la conversation ne reçoit que la réponse finale.
 
 ## Pour aller plus loin
 
-- Lire l'article wiki sur le partage d'état entre agents pour orchestrer les retours sans tout faire remonter manuellement.
-- Configurer un hook `SubagentStop` qui logge la profondeur et le coût de chaque branche.
-- Tester l'arbre sur une tâche jouet avant de le lancer sur un vrai repo : un cycle à blanc révèle 80 % des boucles avant qu'elles ne coûtent.
+- [Partage d'état entre agents](/wiki/subagents/state-sharing)
+- [Paralléliser les subagents](/wiki/subagents/parallelisation)
+- [Coût et budget de tokens](/wiki/subagents/cout-token-budgeting)
+
+## Sources
+
+- https://code.claude.com/docs/en/sub-agents
+- https://code.claude.com/docs/en/hooks
+- https://code.claude.com/docs/en/workflows

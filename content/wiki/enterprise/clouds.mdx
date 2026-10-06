@@ -1,62 +1,133 @@
 ---
-title: "Claude sur Bedrock, Vertex & Foundry"
-description: "Déployer Claude et Claude Code via les fournisseurs cloud : Amazon Bedrock, Google Cloud Vertex AI et Microsoft Foundry. Prérequis (accès modèle, IAM, réseau, garde-fous), réglages gérés, IDs de modèles et limites de fonctionnalités."
+title: "Claude Code sur Bedrock, Google Cloud et Microsoft Foundry"
+description: "Faire tourner Claude Code via Amazon Bedrock, Google Cloud (Agent Platform, ex-Vertex AI), Microsoft Foundry ou Claude Platform on AWS : variables à poser, épinglage des modèles, IAM, fonctions indisponibles et pièges de déploiement."
 updatedAt: "2026-10-03"
-readingMinutes: 8
+readingMinutes: 9
 ---
 
-> **Changement de nom (2026).** Google a renommé Vertex AI en **Agent Platform** (« Google Cloud's Agent Platform »). Les API, les ID de modèles et la configuration décrits ici restent les mêmes ; seuls les noms dans la console changent. Anthropic propose aussi désormais **Claude Platform on AWS**, l'API d'Anthropic facturée via AWS Marketplace avec une authentification IAM.
+Pour rester dans votre gouvernance, votre région et votre facturation cloud, vous pouvez utiliser les [modèles](/wiki/modeles) Claude via **Amazon Bedrock**, **Google Cloud** ou **Microsoft Foundry** plutôt que par l'[API Anthropic](/wiki/api) directe. Claude Code fonctionne avec ces trois fournisseurs, ainsi qu'avec **Claude Platform on AWS**. Cet article résume ce qui change d'un fournisseur à l'autre.
 
-Pour rester dans ta gouvernance, ta région et ta facturation existantes, tu peux consommer les [modèles](/wiki/modeles) Claude via **Amazon Bedrock**, **Google Cloud Vertex AI** ou **Microsoft Foundry**, plutôt que par l'[API Anthropic](/wiki/api) directe. Claude Code fonctionne avec ces fournisseurs (`CLAUDE_CODE_USE_BEDROCK=1`, `CLAUDE_CODE_USE_VERTEX=1`, etc.).
+> **Changement de nom.** Google a renommé Vertex AI en **Agent Platform** (« Google Cloud's Agent Platform »). Les variables `CLAUDE_CODE_USE_VERTEX`, les ID de modèles et la configuration ne changent pas ; l'écran de connexion de Claude Code affiche encore « Google Vertex AI ».
 
-## Les quatre prérequis d'un déploiement
+## Les quatre options en un coup d'œil
 
-Avant un déploiement (l'exemple type est AWS, mais la logique vaut pour les trois) :
+| Fournisseur | Opéré par | Variable d'activation | Facturation |
+|---|---|---|---|
+| Amazon Bedrock | AWS | `CLAUDE_CODE_USE_BEDROCK=1` | Facture AWS |
+| Claude Platform on AWS | Anthropic | `CLAUDE_CODE_USE_ANTHROPIC_AWS=1` + `ANTHROPIC_AWS_WORKSPACE_ID` | AWS Marketplace |
+| Google Cloud (Agent Platform) | Google | `CLAUDE_CODE_USE_VERTEX=1` + `CLOUD_ML_REGION` + `ANTHROPIC_VERTEX_PROJECT_ID` | Facture Google Cloud |
+| Microsoft Foundry | Anthropic (ressource Azure) | `CLAUDE_CODE_USE_FOUNDRY=1` + `ANTHROPIC_FOUNDRY_RESOURCE` | Azure Marketplace |
 
-1. **Accès au modèle** — active les modèles Anthropic dans Bedrock / Vertex / Foundry (ou expose un endpoint compatible dans ton VPC).
-2. **Permissions** — IAM (AWS) ou équivalent, pour autoriser les appels.
-3. **Chemin réseau** — connectivité (VPC, passerelle). Côté Claude Code, on pointe souvent `ANTHROPIC_BASE_URL` vers une passerelle interne (voir [variables d'environnement](/wiki/cli/variables-env)).
-4. **Garde-fous opérationnels** — permissions, sandbox, audit (voir [Workflows & Sécurité](/wiki/workflows)).
+**Claude Platform on AWS** est l'API d'Anthropic elle-même, avec une authentification AWS (SigV4 ou clé de workspace) et une facturation via AWS Marketplace. Vous y obtenez les mêmes modèles et fonctions API, au même rythme de sortie. À ne pas confondre avec Bedrock, qui est un service AWS.
 
-## Réglages gérés (managed settings)
+## Mise en route rapide
 
-Pour Bedrock/Vertex/Foundry, distribue la configuration de façon **centralisée** via des **réglages gérés** (fichier, plist macOS, ou registre Windows selon l'OS et le MDM). Les équipes plateforme y définissent versions de modèles, politiques d'authentification et réglages de sécurité que les utilisateurs **ne peuvent pas** outrepasser localement. Ces politiques **priment** sur les réglages utilisateur et projet ([hiérarchie settings.json](/wiki/cli/settings-json)).
+Bedrock et Google Cloud ont un **assistant de connexion** : lancez `claude`, choisissez « 3rd-party platform » puis le fournisseur. Il détecte vos identifiants, vérifie les modèles accessibles et enregistre la configuration dans `~/.claude/settings.json`. Pour le relancer : `/setup-bedrock` ou `/setup-vertex`. Foundry n'a pas d'assistant : tout passe par les variables d'environnement.
 
-Configure aussi des **permissions gérées** pour contrôler finement les [outils](/wiki/outils) et actions autorisés, et un **épinglage de modèle** (model pinning) pour figer la version utilisée.
+Pour un déploiement scripté ou en CI, posez les variables vous-même :
 
-## IDs de modèles : attention au préfixe
+```bash
+# Amazon Bedrock
+export CLAUDE_CODE_USE_BEDROCK=1
+export AWS_REGION=eu-west-3          # sinon la région du profil AWS
 
-Le format de l'ID dépend du fournisseur :
+# Google Cloud (Agent Platform)
+export CLAUDE_CODE_USE_VERTEX=1
+export CLOUD_ML_REGION=global        # ou eu, us, europe-west1...
+export ANTHROPIC_VERTEX_PROJECT_ID=mon-projet
 
-- **Amazon Bedrock** (partenaire) : les IDs portent un préfixe `anthropic.` — par exemple `anthropic.claude-opus-4-8`. Utiliser un ID first-party (`claude-opus-4-8`) sur un client Bedrock renvoie une erreur.
-- **Claude Platform on AWS** (opéré par Anthropic, parité d'API totale) : IDs **bruts** (`claude-opus-4-8`), **sans** préfixe. À ne pas confondre avec Bedrock.
-- **Vertex / Foundry** : IDs propres au fournisseur — consulte leur console.
+# Microsoft Foundry
+export CLAUDE_CODE_USE_FOUNDRY=1
+export ANTHROPIC_FOUNDRY_RESOURCE=ma-ressource   # le nom seul, pas l'URL
+```
 
-## Modèles & fonctionnalités supportés : les limites
+Vérifiez ensuite avec `/status` : la ligne « API provider » doit afficher le bon fournisseur.
 
-Les fonctionnalités ne sont pas toutes identiques selon le fournisseur. Points notables :
+## Les prérequis côté cloud
 
-- Pour certaines fonctionnalités récentes (dont le **mode auto**), seuls **Opus 4.7 et 4.8** sont pris en charge sur Bedrock/Vertex/Foundry — et le mode auto y est **désactivé** tant que `CLAUDE_CODE_ENABLE_AUTO_MODE` n'est pas posé (voir [modes de permission](/wiki/cli/permissions-modes)).
-- Les modèles plus anciens (Sonnet 4.5, Opus 4.5, Haiku, claude-3) ne sont pas pris en charge pour ces fonctionnalités.
-- **Bedrock, Vertex et Foundry ne supportent pas les outils côté serveur d'Anthropic** (code execution, web search/fetch hébergés) ni les **Managed Agents**. Pour des agents sur ces providers, on passe par l'API Claude + tool use côté client.
-- Certaines capacités liées à un abonnement claude.ai (ex. dépôt GitHub connecté) ne sont **pas** disponibles sur ces providers.
+1. **Accès aux modèles.** Bedrock : formulaire de cas d'usage dans le catalogue de modèles (une fois par compte AWS ; accès immédiat). Google Cloud : activer l'API `aiplatform.googleapis.com` puis demander l'accès dans le Model Garden (jusqu'à 24-48 h). Foundry : créer une ressource et un déploiement par modèle.
+2. **Identité et droits.**
+   - Bedrock : `bedrock:InvokeModel`, `bedrock:InvokeModelWithResponseStream`, `bedrock:ListInferenceProfiles`, `bedrock:GetInferenceProfile`. Authentification par profil AWS, SSO, clés d'accès ou clé API Bedrock (`AWS_BEARER_TOKEN_BEDROCK`).
+   - Google Cloud : rôle `roles/aiplatform.user`. Authentification par Application Default Credentials (`gcloud auth application-default login`) ou compte de service.
+   - Foundry : rôles `Azure AI User` ou `Cognitive Services User`. Authentification par clé API, Microsoft Entra ID (`az login`) ou jeton.
+3. **Chemin réseau.** VPC, proxy d'entreprise, ou passerelle LLM interne via `ANTHROPIC_BASE_URL` (voir [passerelles API](/wiki/enterprise/api-gateways)).
+4. **Garde-fous.** Permissions, sandbox, audit : voir [Workflows & Sécurité](/wiki/workflows).
 
-> Avant un choix d'architecture, vérifie la **matrice de compatibilité** (modèles × fonctionnalités × fournisseur) dans la doc officielle : elle évolue.
+Conseil de la documentation officielle : dédiez un compte AWS ou un projet Google Cloud à Claude Code pour suivre facilement les coûts et les accès.
 
-## Observabilité & coûts
+## Épingler les versions de modèles
 
-Claude Code supporte la télémétrie **OpenTelemetry** pour envoyer des métriques détaillées vers ta stack. Sur AWS, les **profils d'inférence applicatifs** Bedrock permettent un suivi de coûts taggé et des métriques CloudWatch par équipe, projet ou environnement. AWS propose aussi de la capacité réservée et de l'inférence batch.
+Sans épinglage, les alias `opus` et `sonnet` pointent vers le modèle par défaut de Claude Code pour ce fournisseur, qui peut changer à chaque mise à jour. Sur Bedrock et Google Cloud, `opus` vise aujourd'hui **Opus 5.5** ; sur Foundry, **Opus 4.6**. Pour un déploiement d'équipe, épinglez :
 
-## Auto-hébergement
+```bash
+# Bedrock : ID de profil d'inférence, avec préfixe de région
+export ANTHROPIC_DEFAULT_OPUS_MODEL='eu.anthropic.claude-opus-5-5'
+export ANTHROPIC_DEFAULT_SONNET_MODEL='eu.anthropic.claude-sonnet-4-6'
+export ANTHROPIC_DEFAULT_HAIKU_MODEL='eu.anthropic.claude-haiku-4-5-20251001-v1:0'
 
-Quand un contrôle maximal est requis, des modèles auto-hébergés peuvent être exposés dans ton propre **VPC** via un endpoint compatible — au prix d'une complexité opérationnelle supérieure.
+# Google Cloud et Foundry : ID sans préfixe (sur Foundry, le nom de votre déploiement)
+export ANTHROPIC_DEFAULT_OPUS_MODEL='claude-opus-5-5'
+export ANTHROPIC_DEFAULT_SONNET_MODEL='claude-sonnet-5'
+```
+
+Les formats d'ID diffèrent :
+
+- **Bedrock** : `anthropic.` précédé d'un préfixe de profil d'inférence (`us.`, `eu.`, `apac.`, `global.`, `us-gov.` en GovCloud). `ANTHROPIC_BEDROCK_REGION_PREFIX` change le préfixe sans épingler. Un ARN de profil d'inférence applicatif est aussi accepté.
+- **Claude Platform on AWS** : les mêmes ID que l'API Anthropic (`claude-opus-5-5`), sans préfixe.
+- **Google Cloud** : ID sans préfixe, parfois avec une date (`claude-haiku-4-5@20251001`).
+- **Foundry** : le nom de déploiement que vous avez choisi dans Azure.
+
+Coût : depuis la version 2.1.207, un déploiement Bedrock ou Google Cloud sans épinglage démarre sur Opus, plus cher que Sonnet. Pour rester sur Sonnet, fixez `ANTHROPIC_MODEL`.
+
+Au démarrage, Bedrock et Google Cloud vérifient que les modèles sont accessibles et basculent sur une version antérieure si besoin. Foundry n'a pas cette vérification : un modèle absent provoque directement des erreurs.
+
+## Contexte de 1 million de tokens
+
+Sur Bedrock et Google Cloud, Sonnet 5 tourne toujours avec 1M de tokens. Pour Opus 4.6 et plus récents ou Sonnet 4.6, ajoutez le suffixe `[1m]` à l'ID épinglé (l'assistant de connexion le propose). Sans ce suffixe, ces modèles compactent la conversation à 200 000 tokens. Détails : [Fenêtre de contexte](/wiki/modeles/contexte-200k).
+
+## Ce qui n'est pas disponible
+
+Le cœur de Claude Code fonctionne partout : CLI, extensions VS Code et JetBrains, sous-agents, hooks, skills, plugins, MCP, checkpoints, sandbox, OpenTelemetry, fichier de réglages gérés. En revanche :
+
+| Fonction | Bedrock | Google Cloud | Foundry | Claude Platform on AWS |
+|---|---|---|---|---|
+| Fonctions liées à un abonnement claude.ai (sessions cloud, Routines `/schedule`, Remote Control, Ultrareview, extension Chrome) | Non | Non | Non | Non |
+| Recherche web (`WebSearch`) | Non | Modèles Claude 4 et plus | Déploiements hébergés par Anthropic | Oui |
+| Fast mode, advisor | Non | Non | Non | Non |
+| Réglages gérés côté serveur | Non | Non | Non | Non |
+| Mode `auto` | Sonnet 5+, Opus 4.7+, Fable | Sonnet 5+, Opus 4.7+, Fable | Sonnet 5+, Opus 4.7+, Fable | Comme l'API Anthropic |
+
+Sur Bedrock, remplacez la recherche web par `WebFetch` avec une URL précise, et `/schedule` par `/loop` ou une [CI GitHub Actions](/wiki/cli/cicd-execution). Le mode `auto` est actif par défaut sur ces fournisseurs ; l'ancienne variable `CLAUDE_CODE_ENABLE_AUTO_MODE` n'a plus d'effet (voir [modes de permission](/wiki/cli/permissions-modes)).
+
+> La matrice évolue vite. Avant un choix d'architecture, vérifiez la page officielle de disponibilité des fonctions (lien en fin d'article).
+
+## Gouvernance : réglages gérés
+
+Distribuez la configuration de façon centralisée avec le **fichier de réglages gérés** (déployé par MDM, plist macOS ou registre Windows). Il prime sur les réglages utilisateur et projet ([hiérarchie settings.json](/wiki/cli/settings-json)). Vous y fixez notamment :
+
+- les variables `env` (fournisseur, région, modèles épinglés) ;
+- `availableModels` et `enforceAvailableModels` pour limiter les modèles autorisés ;
+- les règles `permissions.deny` et, si besoin, `permissions.disableAutoMode` ;
+- un `CLAUDE.md` d'organisation (clé `claudeMd`).
+
+## Observabilité et coûts
+
+- Claude Code exporte des métriques **OpenTelemetry** vers votre outil de supervision (voir [observabilité OTel](/wiki/hooks/observabilite-otel)).
+- Sur Bedrock, les **profils d'inférence applicatifs** permettent de suivre les coûts par équipe ou projet ; `modelOverrides` associe chaque version de modèle à un ARN.
+- Bedrock propose des niveaux de service (`ANTHROPIC_BEDROCK_SERVICE_TIER` : `default`, `flex`, `priority`) et les garde-fous **Bedrock Guardrails**.
+- Les points de terminaison régionaux coûtent 10 % de plus que les points globaux sur Bedrock et Google Cloud.
 
 ## Pour aller plus loin
 
-- [Architecture & Enterprise](/wiki/enterprise)
+- [Claude Code sur AWS Bedrock](/wiki/enterprise/aws-bedrock) · [Claude Code sur Google Cloud](/wiki/enterprise/gcp-vertex)
+- [Hébergement souverain](/wiki/enterprise/sovereign-hosting) · [Résilience multi-cloud](/wiki/enterprise/resilience-multi-cloud)
 - [Variables d'environnement](/wiki/cli/variables-env) · [Le fichier settings.json](/wiki/cli/settings-json)
-- [Modes de permission](/wiki/cli/permissions-modes) · [Workflows & Sécurité](/wiki/workflows)
 
-### Sources officielles
-- Documentation Claude Code : https://docs.claude.com/en/docs/claude-code/overview
-- Contact commercial Enterprise : https://www.anthropic.com/contact-sales
+## Sources
+
+- Amazon Bedrock : https://code.claude.com/docs/en/amazon-bedrock
+- Google Cloud's Agent Platform : https://code.claude.com/docs/en/google-vertex-ai
+- Microsoft Foundry : https://code.claude.com/docs/en/microsoft-foundry
+- Claude Platform on AWS : https://code.claude.com/docs/en/claude-platform-on-aws
+- Disponibilité des fonctions par fournisseur : https://code.claude.com/docs/en/feature-availability
+- Tarifs cloud : https://platform.claude.com/docs/en/about-claude/pricing

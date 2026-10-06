@@ -1,66 +1,119 @@
 ---
-title: "Tester un skill localement"
-description: "Workflow de développement pour itérer rapidement sur vos skills Claude Code : symlink, rechargement à chaud, snapshot tests et débogage."
-updatedAt: "2026-05-19"
-readingMinutes: 6
+title: "Tester un skill : déclenchement, résultats et évaluations"
+description: "Itérer sur un skill Claude Code : rechargement à chaud, test du déclenchement, comparaison avec et sans skill, skill-creator et claude plugin eval."
+updatedAt: "2026-10-03"
+readingMinutes: 5
 ---
 
-Développer un skill sans boucle de feedback rapide, c'est marcher dans le brouillard. Cette page rassemble le workflow que les contributeurs Claude Code utilisent pour itérer en quelques secondes : lien symbolique vers le projet en cours, rechargement à chaud via `/skills reload`, tests de non-régression sous forme de snapshots, et techniques de débogage quand un skill ne se déclenche pas comme prévu.
+Voir un skill se déclencher prouve seulement que Claude l'a trouvé, pas qu'il fait ce que vous voulez. Un bon test mesure deux choses séparément : Claude l'invoque-t-il **quand il le faut** (et seulement à ce moment), et le résultat est-il **meilleur que sans le skill** ? Voici la boucle de travail recommandée, des tests manuels aux évaluations automatisées.
 
-## Mettre en place un symlink vers le repo
+## Une boucle d'édition rapide
 
-Plutôt que de copier votre dossier de skill dans `~/.claude/skills/` à chaque modification, créez un lien symbolique vers votre repo de développement :
+Claude Code surveille `~/.claude/skills/`, `.claude/skills/` et les dossiers ajoutés avec `--add-dir`. Une modification de `SKILL.md` est prise en compte **dans la session en cours**, sans redémarrage.
 
-```bash
-ln -s ~/code/mon-skill ~/.claude/skills/mon-skill
+- Développez le skill dans son propre dépôt et reliez-le : `ln -s ~/code/mon-skill ~/.claude/skills/mon-skill`.
+- Si vous créez un dossier `skills/` qui n'existait pas au lancement, tapez `/reload-skills`.
+- Pour un skill de plugin, lancez `claude --plugin-dir ./mon-plugin`, puis `/reload-plugins` après chaque modification.
+
+## Tester le déclenchement à la main
+
+1. Ouvrez une **nouvelle session** : le contexte accumulé pendant l'écriture du skill masque les manques des instructions.
+2. Formulez la demande comme un utilisateur, **sans nommer le skill** : « Qu'est-ce que j'ai changé ? » plutôt que « utilise summarize-changes ».
+3. Vérifiez que Claude appelle le skill, puis testez une demande proche qui ne doit **pas** le déclencher.
+4. En cas de doute, demandez « Quels skills sont disponibles ? » ou ouvrez `/skills`.
+
+## Diagnostiquer un skill qui ne se déclenche pas
+
+| Symptôme | Cause probable | Correction |
+|---|---|---|
+| Absent de `/skills` | Mauvais chemin ou dossier non surveillé | `.claude/skills/<nom>/SKILL.md`, puis `/reload-skills` |
+| `/nom` marche, mais Claude ne l'utilise jamais seul | YAML invalide (le skill se charge sans métadonnées) ou `disable-model-invocation: true` | `claude --debug` pour voir l'erreur de parsing ; `claude plugin validate .claude/skills` |
+| Rarement choisi | Description vague | Ajoutez ce que fait le skill **et** quand l'utiliser, avec les mots que l'utilisateur emploie |
+| Choisi seulement sur certains fichiers | Champ `paths` trop restrictif | Élargissez les globs |
+| Description coupée | Trop de skills : la liste dépasse son budget (1 % du contexte) | `/doctor`, `/skill-doctor`, passez des skills en `"name-only"` dans `skillOverrides` |
+| Se déclenche trop souvent | Description trop large | Précisez-la, ou `disable-model-invocation: true` |
+
+## Comparer avec et sans le skill
+
+La méthode officielle est une **comparaison avec référence** : quelques prompts réalistes, chacun lancé dans une session neuve avec le skill, puis sans. Pour désactiver temporairement un skill personnel ou de projet :
+
+```json
+{
+  "skillOverrides": {
+    "mon-skill": "off"
+  }
+}
 ```
 
-Claude Code suit le lien à chaque démarrage de session. Toute modification de `SKILL.md`, `description.yml` ou des scripts associés est visible immédiatement, sans étape de build. Pour un monorepo qui contient plusieurs skills, faites pointer le lien vers le sous-dossier `skills/` et chaque enfant sera détecté automatiquement.
+Le menu `/skills` le fait aussi : sélectionnez le skill, `Espace` pour changer d'état, `Échap` pour enregistrer dans `.claude/settings.local.json`.
 
-## Recharger sans relancer la session
+Anthropic recommande de construire **au moins trois scénarios d'évaluation avant** d'écrire beaucoup d'instructions, et de tester avec les modèles que vous comptez utiliser (Haiku, Sonnet, Opus).
 
-La commande intégrée `/skills reload` invalide le cache de découverte et relit le manifeste de chaque skill. C'est la commande à mémoriser : elle évite de fermer/rouvrir le CLI pour tester un changement de `description`, de `triggers`, ou de fichier de référence.
+## Automatiser avec skill-creator
 
-Workflow type :
+Le plugin `skill-creator` automatise cette boucle dans une conversation Claude Code :
 
-1. Éditer `SKILL.md`
-2. `/skills reload` dans la session active
-3. `/skills list` pour confirmer que le skill apparaît bien
-4. Poser une question qui devrait déclencher le skill
-5. Observer si Claude l'invoque (un badge apparaît dans la trace)
-
-Si le skill n'apparaît pas après reload, vérifiez la sortie de `/skills doctor` : elle signale les erreurs de parsing YAML, les chemins manquants ou les triggers en conflit.
-
-## Snapshot tests pour les prompts
-
-Un skill est avant tout du contenu textuel injecté dans le contexte. Pour éviter les régressions, traitez son `SKILL.md` comme un fichier de configuration testable. La convention émergente : un dossier `__snapshots__/` à côté du skill avec des prompts d'exemple et la trace attendue.
-
-```bash
-skills/mon-skill/
-  SKILL.md
-  __snapshots__/
-    case-1-trigger.md    # prompt → doit déclencher
-    case-2-skip.md       # prompt → ne doit PAS déclencher
+```text
+/plugin install skill-creator@claude-plugins-official
 ```
 
-Un petit script Node qui appelle l'API Anthropic avec votre prompt + le manifeste du skill permet de vérifier en CI que les déclencheurs ne dérivent pas après une refonte.
+Demandez ensuite « évalue mon skill summarize-changes avec skill-creator ». Il :
 
-## Déboguer un skill qui ne se déclenche pas
+- stocke les cas de test dans `evals/evals.json` dans le dossier du skill ;
+- lance un subagent par cas pour partir d'un contexte propre ;
+- note chaque assertion dans `grading.json` et agrège avec ou sans skill dans `benchmark.json` ;
+- compare deux versions du skill en aveugle ;
+- génère des prompts qui doivent ou non déclencher le skill, et propose des retouches de description.
 
-Les trois causes les plus fréquentes :
+## Automatiser avec `claude plugin eval`
 
-- **Description trop générique.** Si votre `description` dit "aide avec du code", il entre en concurrence avec tout. Soyez spécifique : "aide à migrer du code React Router v5 vers v6".
-- **Triggers manquants.** Ajoutez des mots-clés explicites dans le champ `triggers` du frontmatter. Claude compare la requête utilisateur à ces ancres avant d'invoquer le skill.
-- **Conflit avec un autre skill.** Lancez `/skills list --verbose` pour voir l'ordre de priorité. Le premier match gagne, donc un skill très large peut masquer un skill spécialisé.
+Pour un skill livré dans un plugin (v2.1.269 et plus), `claude plugin eval` lance chaque cas dans une session non interactive isolée, avec et sans le plugin, et calcule l'apport (`Δ`).
 
-Pour aller plus loin dans le débogage, activez la variable `CLAUDE_DEBUG_SKILLS=1` avant de lancer la session : chaque tentative de matching apparaît dans les logs avec son score.
+```bash
+claude plugin eval init          # Claude propose les cas et les graders
+claude plugin eval .             # lance toute la suite
+claude plugin eval . --case premier-cas --runs 1 --ablation none   # itération rapide
+```
 
-## Boucle d'itération idéale
+Un cas est un dossier sous `evals/` :
 
-L'objectif est une boucle inférieure à 30 secondes : éditer, recharger, tester. Gardez deux terminaux ouverts — un avec votre éditeur sur le fichier `SKILL.md`, l'autre avec la session Claude Code. Évitez d'écrire des skills de plus de 200 lignes : si vous y êtes contraint, c'est probablement deux skills déguisés en un.
+```markdown
+<!-- evals/message-commit/prompt.md -->
+---
+max_turns: 10
+allowed_tools: [Read, Glob, Grep, Skill]
+---
+
+Rédigez un message de commit : j'ai renommé getUser en fetchUser et mis à jour les trois appels.
+```
+
+```markdown
+<!-- evals/message-commit/graders/skill-declenche.md -->
+---
+type: tool_used
+tool: Skill
+input_match: '"skill"\s*:\s*"(?:[\w-]+:)?message-commit"'
+---
+```
+
+Chaque cas tourne trois fois par défaut, avec et sans plugin. Le résumé affiche `WITH`, `W/OUT` et `Δ`. Un `Δ` proche de zéro avec le grader `tool_used: Skill` en échec signifie presque toujours que la description n'est pas assez précise. La commande sort avec un code non nul sous le seuil (`--threshold`, 1.0 par défaut) : vous pouvez bloquer une CI dessus. Chaque exécution consomme de vrais appels au modèle.
+
+Ajoutez `evals/results/` à votre `.gitignore`. Les deux formats (skill-creator et `claude plugin eval`) ne sont pas interchangeables.
+
+## Mesurer l'usage réel
+
+Une fois le skill déployé, `/skill-doctor` (v2.1.252 et plus) montre ce que chaque skill coûte en contexte et combien de fois il est invoqué. Un skill jamais utilisé est un candidat à la désactivation.
 
 ## Pour aller plus loin
 
-- Lisez la page wiki sur le **versioning des skills** pour gérer les évolutions de votre `SKILL.md` sans casser les utilisateurs existants.
-- Consultez **composer plusieurs skills** pour comprendre comment vos tests doivent couvrir les scénarios multi-skills.
-- Le dépôt `anthropics/claude-code-skills` contient des exemples de skills avec leurs snapshots — un excellent point de départ pour calibrer vos propres tests.
+- [Frontmatter de SKILL.md](/wiki/skills/skill-md-frontmatter)
+- [Versioning des skills](/wiki/skills/versioning)
+- [Composer plusieurs skills](/wiki/skills/composer-skills)
+- [Mode headless](/wiki/cli/headless-mode)
+
+## Sources
+
+- Évaluer et itérer sur un skill, dépannage : https://code.claude.com/docs/en/skills
+- Évaluations de plugins : https://code.claude.com/docs/en/plugin-evals
+- Bonnes pratiques (évaluations d'abord) : https://platform.claude.com/docs/en/agents-and-tools/agent-skills/best-practices
+- Plugin skill-creator : https://github.com/anthropics/claude-plugins-official/tree/main/plugins/skill-creator

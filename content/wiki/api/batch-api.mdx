@@ -1,49 +1,98 @@
 ---
 title: "L'API Batch (Message Batches)"
-description: "Traiter de gros volumes à -50 % avec l'API Message Batches de Claude : structure d'une requête (custom_id, params), limites (100 000 requêtes / 256 Mo / 29 jours), traitement asynchrone sous 24 h, et combinaison avec le prompt caching."
-updatedAt: "2026-06-08"
+description: "Traiter jusqu'à 100 000 requêtes Claude en asynchrone à moitié prix : création d'un batch, suivi, lecture des résultats par custom_id, limites et combinaison avec le prompt caching."
+updatedAt: "2026-10-03"
 readingMinutes: 7
 ---
 
-L'API **Message Batches** traite de nombreuses requêtes [Messages](/wiki/api) de façon **asynchrone et concurrente**, à **50 % du prix standard**. C'est l'outil idéal pour les charges non urgentes : classification, génération en masse, enrichissement de données, évaluations.
+L'API **Message Batches** traite un grand nombre de requêtes Messages en asynchrone, à **50 % du prix standard**. Elle convient à tout ce qui n'a pas besoin d'une réponse immédiate : classification en masse, enrichissement de données, génération de fiches, évaluations.
 
-## La remise de 50 %
+## Combien ça coûte
 
-Toute l'utilisation d'un batch est facturée à **la moitié** des prix standard de l'API, sur l'input **et** l'output. La remise est **inconditionnelle** : pas de seuil de volume à atteindre. Elle se cumule avec le [prompt caching](/wiki/api/prompt-caching-implementation).
+Tous les tokens d'un batch (entrée et sortie) sont facturés à la moitié du tarif normal, sans seuil de volume :
 
-## Délai et limites
+| Modèle | ID API | Entrée / sortie en batch (par million de tokens) |
+|---|---|---|
+| Claude Opus 5.5 | `claude-opus-5-5` | 2 $ / 10 $ |
+| Claude Sonnet 5.5 | `claude-sonnet-5-5` | 1 $ / 5 $ |
+| Claude Haiku 4.5 | `claude-haiku-4-5-20251001` | 0,50 $ / 2,50 $ |
 
-- Les batchs sont traités **sous 24 heures** (souvent quelques minutes à 1–2 h en pratique). Au-delà de 24 h, les requêtes restantes passent en `expired`.
-- **100 000 requêtes** ou **256 Mo** par batch — divise si nécessaire.
-- Les résultats restent disponibles **29 jours** après création.
-- Comme un batch peut dépasser 5 minutes, privilégie la durée de cache **1 heure** si tu utilises le caching, pour de meilleurs taux de hit.
+Les requêtes `errored`, `canceled` ou `expired` ne sont pas facturées. La remise se cumule avec celle du [prompt caching](/wiki/api/prompt-caching-implementation).
 
-## Structure d'une requête
+## Limites à connaître
 
-Un Message Batch est une **liste de requêtes**. Chaque requête comprend :
+- **100 000 requêtes ou 256 Mo** par batch, la première limite atteinte s'applique. Au-delà, l'API renvoie une erreur 413 `request_too_large` : découpez en plusieurs batchs.
+- La plupart des batchs se terminent **en moins d'une heure**. Si le traitement n'est pas fini au bout de **24 heures**, les requêtes restantes passent en `expired`.
+- Les résultats restent téléchargeables **29 jours** après la création du batch (et non après sa fin).
+- Les batchs sont rattachés à un **workspace** de la Console.
+- Un batch soumis ne peut pas être modifié : annulez-le et soumettez-en un nouveau.
 
-- un **`custom_id`** unique pour identifier la requête au retour (1 à 64 caractères, motif `^[a-zA-Z0-9_-]{1,64}$`) ;
-- un objet **`params`** avec les paramètres standard de l'API Messages.
+## Créer un batch
 
-```javascript
-const batch = await client.messages.batches.create({
-  requests: [
-    { custom_id: "ticket-001",
-      params: { model: "claude-haiku-4-5", max_tokens: 256,
-                messages: [{ role: "user", content: "Classe ce ticket : …" }] } },
-    { custom_id: "ticket-002",
-      params: { model: "claude-haiku-4-5", max_tokens: 256,
-                messages: [{ role: "user", content: "Classe ce ticket : …" }] } }
-  ]
-});
-console.log(batch.id, batch.processing_status);
-```
+Un batch est une liste de requêtes. Chacune contient :
 
-## Suivre le statut, récupérer les résultats
-
-Le batch passe par `in_progress` puis `ended`. Le champ `request_counts` détaille `processing`, `succeeded`, `errored`, `canceled`, `expired`. On **interroge** (poll) jusqu'à complétion — un intervalle de 30 s à 2 min suffit.
+- un **`custom_id`** unique (1 à 64 caractères : lettres, chiffres, `-` et `_`) ;
+- un objet **`params`** identique au corps d'un appel `messages.create`.
 
 ```python
+import anthropic
+from anthropic.types.message_create_params import MessageCreateParamsNonStreaming
+from anthropic.types.messages.batch_create_params import Request
+
+client = anthropic.Anthropic()
+
+tickets = {"ticket-001": "Ma facture est fausse", "ticket-002": "Le site est lent"}
+
+batch = client.messages.batches.create(
+    requests=[
+        Request(
+            custom_id=ticket_id,
+            params=MessageCreateParamsNonStreaming(
+                model="claude-haiku-4-5-20251001",
+                max_tokens=256,
+                messages=[{
+                    "role": "user",
+                    "content": f"Classe ce ticket (facturation, technique, autre) : {texte}",
+                }],
+            ),
+        )
+        for ticket_id, texte in tickets.items()
+    ]
+)
+print(batch.id, batch.processing_status)  # msgbatch_..., in_progress
+```
+
+La même chose en TypeScript :
+
+```ts
+import Anthropic from "@anthropic-ai/sdk";
+
+const client = new Anthropic();
+
+const batch = await client.messages.batches.create({
+  requests: [
+    {
+      custom_id: "ticket-001",
+      params: {
+        model: "claude-haiku-4-5-20251001",
+        max_tokens: 256,
+        messages: [{ role: "user", content: "Classe ce ticket : Ma facture est fausse" }],
+      },
+    },
+  ],
+});
+console.log(batch.id);
+```
+
+Conseil : testez d'abord une requête type avec l'API Messages classique. Une erreur de validation se voit tout de suite, au lieu d'apparaître une heure plus tard dans les résultats.
+
+## Suivre le batch et lire les résultats
+
+`processing_status` vaut `in_progress`, puis `canceling` si vous annulez, puis `ended`. Le champ `request_counts` compte les requêtes `processing`, `succeeded`, `errored`, `canceled` et `expired`. Interrogez le batch toutes les 30 à 60 secondes :
+
+```python
+import time
+
 while True:
     batch = client.messages.batches.retrieve(batch.id)
     if batch.processing_status == "ended":
@@ -51,33 +100,80 @@ while True:
     time.sleep(60)
 
 for entry in client.messages.batches.results(batch.id):
-    if entry.result.type == "succeeded":
-        save(entry.custom_id, entry.result.message.content[0].text)
-    else:
-        log_error(entry.custom_id, entry.result)   # errored | expired | canceled
+    match entry.result.type:
+        case "succeeded":
+            texte = "".join(
+                b.text for b in entry.result.message.content if b.type == "text"
+            )
+            print(entry.custom_id, texte)
+        case "errored":
+            print("Erreur", entry.custom_id, entry.result.error)
+        case "expired" | "canceled":
+            print("À relancer", entry.custom_id)
 ```
 
-Chaque résultat est rattaché à son `custom_id` ; loguer systématiquement `custom_id` ↔ `message.id` simplifie le rapprochement comptable et le debug.
+Deux règles importantes :
 
-## Paramètres non supportés
+- **L'ordre des résultats n'est pas garanti.** Rapprochez toujours par `custom_id`, jamais par position.
+- **Filtrez sur `type == "text"`.** Sur Opus 5.5, un bloc `thinking` peut précéder le texte : `content[0].text` n'est pas fiable.
 
-Un petit nombre de paramètres de l'API Messages ne sont **pas** acceptés en batch ; les inclure renvoie une erreur de validation. Vérifie la doc officielle pour la liste à jour avant de bâtir ton pipeline.
+Les résultats sont un fichier JSONL (accessible aussi via `results_url`). La méthode `results()` des SDK les lit en streaming, ce qui évite de tout charger en mémoire.
+
+## Annuler, lister, supprimer
+
+| Action | Python | Endpoint |
+|---|---|---|
+| Lister les batchs du workspace | `client.messages.batches.list(limit=20)` | `GET /v1/messages/batches` |
+| Annuler un batch en cours | `client.messages.batches.cancel(batch_id)` | `POST /v1/messages/batches/{id}/cancel` |
+| Supprimer un batch terminé | `client.messages.batches.delete(batch_id)` | `DELETE /v1/messages/batches/{id}` |
+
+Un batch annulé finit en `ended` avec des résultats partiels pour les requêtes déjà traitées. Pour supprimer un batch en cours, annulez-le d'abord.
+
+## Ce qui passe (et ne passe pas) en batch
+
+Presque tout ce que fait l'API Messages fonctionne en batch : vision, tool use, outils serveur (web search, web fetch, code execution, connecteur MCP), prompt système, conversations multi-tours, réflexion, et la plupart des fonctions bêta. Vous pouvez mélanger des requêtes de types et de modèles différents dans un même batch.
+
+Paramètres refusés (erreur de validation) :
+
+- `stream: true` : les résultats arrivent dans un fichier, pas en flux ;
+- `speed` (fast mode) : sans objet en asynchrone ;
+- `max_tokens: 0` (préchauffage du cache) : le cache écrit expirerait avant la requête suivante.
+
+Les règles propres à chaque modèle s'appliquent aussi : par exemple, `tool_choice` de type `any` ou `tool` renvoie une erreur sur Opus 5.5 et Sonnet 5.5, en batch comme ailleurs.
+
+Si une requête utilisant des outils serveur revient avec `stop_reason: "pause_turn"`, le tour n'est pas fini : renvoyez le contenu de l'assistant dans une nouvelle requête (batch ou synchrone) pour le poursuivre.
+
+### Sorties très longues (bêta)
+
+Avec l'en-tête bêta `output-300k-2026-03-24`, une requête batch peut demander jusqu'à **300 000 tokens** de sortie (contre 128 000 normalement) sur Opus 5.5 et Sonnet 5.5, entre autres. C'est réservé à l'API Batch (Claude API et Claude Platform on AWS). Une telle génération peut dépasser une heure : gardez la fenêtre de 24 heures en tête.
 
 ## Combiner avec le prompt caching
 
-Les remises [caching](/wiki/api/prompt-caching-implementation) et batch **se cumulent** : l'effet combiné peut faire tomber le coût effectif autour d'un dixième du tarif non-caché. Comme le traitement est asynchrone, les hits de cache sont best-effort. Pour les maximiser : blocs `cache_control` **identiques** dans chaque requête, contexte partagé maximal, durée de cache **1 heure**, et flux de requêtes régulier.
+Les deux remises se cumulent. Comme les requêtes sont traitées en parallèle et dans n'importe quel ordre, les hits de cache sont « best effort » : la documentation cite des taux de 30 % à 98 % selon le trafic. Pour les maximiser :
 
-## Quand utiliser le Batch ?
+1. mettez des blocs `cache_control` **strictement identiques** dans chaque requête ;
+2. placez le contexte partagé (consignes, document de référence) en tête ;
+3. utilisez la durée de cache **1 heure** (`"ttl": "1h"`), car un batch dure souvent plus de 5 minutes.
 
-- ✅ Traitements **hors ligne** et **non urgents** (rapports nocturnes, ré-étiquetage massif, génération de descriptions, évaluations sur 10 000 exemples).
-- ✅ Gros volumes où le coût prime sur la latence.
-- ❌ Réponses **temps réel** (chatbot interactif) → reste sur l'API Messages standard avec le streaming.
+## Quand utiliser le batch
+
+| Situation | Batch ? |
+|---|---|
+| Rapport nocturne, ré-étiquetage de 50 000 lignes | Oui |
+| Évaluation d'un prompt sur 2 000 cas de test | Oui |
+| Génération de fiches produit en masse | Oui |
+| Chatbot, assistant interactif | Non : API Messages + [streaming](/wiki/api/streaming) |
+| Tâche urgente qui doit finir en quelques secondes | Non |
 
 ## Pour aller plus loin
 
-- [L'API Anthropic](/wiki/api)
-- [Le prompt caching](/wiki/api/prompt-caching-implementation)
-- [Tarification & optimisation des coûts](/wiki/modeles/pricing-tokens)
+- [Premier appel à l'API Claude](/wiki/api/premier-appel-api)
+- [Implémenter le prompt caching](/wiki/api/prompt-caching-implementation)
+- [Évals automatisées](/wiki/api/evals-automatisees)
+- [Tarification et tokens](/wiki/modeles/pricing-tokens)
 
-### Sources officielles
+## Sources
+
 - Batch processing : https://platform.claude.com/docs/en/build-with-claude/batch-processing
+- API Message Batches : https://platform.claude.com/docs/en/api/messages/batches/create
+- Pricing : https://platform.claude.com/docs/en/about-claude/pricing

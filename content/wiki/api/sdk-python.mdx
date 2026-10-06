@@ -1,127 +1,174 @@
 ---
-title: "SDK Python"
-description: "Installer et utiliser anthropic-sdk-python : client, messages.create et options principales."
-updatedAt: "2026-05-19"
-readingMinutes: 6
+title: "SDK Python (anthropic)"
+description: "Installer le SDK Python anthropic 1.x, configurer le client, envoyer des messages, régler l'effort, obtenir des sorties structurées et gérer les erreurs."
+updatedAt: "2026-10-03"
+readingMinutes: 7
 ---
 
-Le SDK Python officiel d'Anthropic simplifie énormément l'utilisation de l'API : pas besoin de gérer les headers, la sérialisation JSON ou les types de réponse à la main. Voici comment l'installer et l'utiliser efficacement.
+Le SDK Python officiel, `anthropic`, vous évite de gérer à la main les en-têtes, la sérialisation JSON, les retries et les types de réponse. Cette fiche couvre l'essentiel de la version 1.x : client, requêtes, options utiles, sorties structurées et erreurs.
 
 ## Installation
 
-Le package s'appelle simplement `anthropic` :
-
 ```bash
 pip install anthropic
-```
-
-Si vous utilisez `uv` (le gestionnaire de paquets moderne recommandé) :
-
-```bash
+# ou, avec uv
 uv add anthropic
 ```
 
-Le SDK requiert Python 3.8+ et embarque ses propres types via `pydantic`, ce qui vous donne de l'autocomplétion dans VS Code, PyCharm ou tout éditeur compatible.
+La branche 1.x demande **Python 3.10 ou plus**. Extras utiles : `anthropic[aiohttp]` (client asynchrone à forte concurrence), `anthropic[bedrock]` et `anthropic[vertex]` (clouds partenaires).
+
+> Vous migrez depuis 0.x ? Les changements principaux : la couche HTTP passe de `httpx` à `httpx2`, l'ancienne API Text Completions est supprimée, et `temperature`, `top_p`, `top_k` ne figurent plus dans la signature de `messages.create()`. Le guide officiel `MIGRATION.md` du dépôt détaille chaque point.
 
 ## Initialiser le client
 
-Le client lit automatiquement la variable d'environnement `ANTHROPIC_API_KEY`. Vous pouvez aussi passer la clé explicitement.
-
 ```python
-from anthropic import Anthropic
+import anthropic
 
-# Lit ANTHROPIC_API_KEY automatiquement
-client = Anthropic()
+client = anthropic.Anthropic()            # lit ANTHROPIC_API_KEY
+async_client = anthropic.AsyncAnthropic() # version asynchrone
 
-# Ou explicitement
-client = Anthropic(api_key="sk-ant-api03-...")
+# Réglages globaux
+client = anthropic.Anthropic(
+    timeout=60.0,     # secondes (défaut : 10 minutes)
+    max_retries=4,    # défaut : 2
+)
 ```
 
-Le client est thread-safe et peut être réutilisé pour plusieurs requêtes — créez-le une seule fois au démarrage de votre application.
+Créez le client une seule fois au démarrage et réutilisez-le. Le SDK relance automatiquement les erreurs de connexion, 408, 409, 429 et 5xx avec un backoff exponentiel, en respectant l'en-tête `retry-after`.
 
 ## Envoyer un message
 
-La méthode principale est `client.messages.create()`. Elle prend a minima un `model`, un `max_tokens` et une liste de `messages`.
-
 ```python
-from anthropic import Anthropic
+import anthropic
 
-client = Anthropic()
+client = anthropic.Anthropic()
 
 message = client.messages.create(
-    model="claude-sonnet-5-5",
-    max_tokens=1024,
-    messages=[
-        {"role": "user", "content": "Explique la récursion en une phrase."}
-    ],
+    model="claude-opus-5-5",
+    max_tokens=16000,
+    system="Vous êtes un assistant pédagogique. Répondez en français.",
+    messages=[{"role": "user", "content": "Expliquez la récursion en une phrase."}],
 )
 
-print(message.content[0].text)
-print(f"Tokens utilisés : {message.usage.input_tokens} in / {message.usage.output_tokens} out")
+text = next(b.text for b in message.content if b.type == "text")
+print(text)
+print(message.stop_reason, message.usage.input_tokens, message.usage.output_tokens)
+print(message._request_id)  # à fournir au support en cas de problème
 ```
 
-L'objet retourné est typé : `message.content` est une liste de `ContentBlock`, `message.usage` expose `input_tokens` et `output_tokens`, et `message.stop_reason` indique la raison de l'arrêt.
+`message.content` est une liste de blocs (`TextBlock`, `ThinkingBlock`, `ToolUseBlock`...). Testez toujours `block.type` avant de lire `.text`.
 
-## Options principales
-
-`messages.create()` accepte de nombreux paramètres pour piloter le comportement du modèle :
+## Les paramètres qui comptent en 2026
 
 ```python
 message = client.messages.create(
-    model="claude-sonnet-5-5",
-    max_tokens=2048,
-    system="Tu es un assistant pédagogique. Réponds toujours en français.",
-    messages=[
-        {"role": "user", "content": "Qu'est-ce qu'une API REST ?"}
-    ],
-    temperature=0.7,          # 0 = déterministe, 1 = créatif
-    top_p=0.95,               # nucleus sampling
-    stop_sequences=["\n\n"],  # arrête la génération sur ces séquences
+    model="claude-opus-5-5",
+    max_tokens=16000,
+    output_config={"effort": "high"},          # low | medium | high | xhigh | max
+    thinking={"type": "adaptive", "display": "summarized"},
+    stop_sequences=["</fin>"],
+    metadata={"user_id": "usr_7f3a"},          # identifiant opaque de l'utilisateur final
+    messages=[{"role": "user", "content": "Compare REST et GraphQL."}],
 )
 ```
 
-- **`system`** : un prompt système placé hors de la conversation, idéal pour définir le rôle, le ton ou les règles globales.
-- **`temperature`** : entre 0 et 1, contrôle l'aléatoire (utilisez 0 pour des tâches déterministes comme l'extraction de données).
-- **`max_tokens`** : limite stricte de la réponse, à ajuster selon votre cas d'usage et votre budget.
-- **`stop_sequences`** : liste de chaînes qui interrompent la génération dès qu'elles apparaissent.
+- **`output_config.effort`** remplace l'ancien réglage de « budget de réflexion ». Sur Opus 5.5, le défaut est `medium` ; sur Sonnet 5.5, `high`.
+- **`thinking`** : sur Opus 5.5 la réflexion est toujours active (`{"type": "disabled"}` renvoie une erreur 400). `display: "summarized"` renvoie un résumé lisible de la réflexion, sinon le bloc est vide.
+- **`temperature`, `top_p`, `top_k`** : dépréciés. Les modèles sortis après Opus 4.6 refusent toute valeur autre que le défaut. Pilotez le style par le prompt.
+- **Préremplissage (prefill)** : un dernier message `assistant` provoque une erreur 400 sur les modèles récents.
 
 ## Conversation multi-tours
 
-Pour maintenir un contexte, il suffit d'ajouter les messages précédents (utilisateur et assistant) à la liste :
+L'API est sans état : vous renvoyez tout l'historique à chaque appel.
 
 ```python
-messages = [
+history = [
     {"role": "user", "content": "Quel est le plus grand océan ?"},
-    {"role": "assistant", "content": "Le Pacifique."},
-    {"role": "user", "content": "Et sa profondeur maximale ?"},
 ]
+reply = client.messages.create(model="claude-opus-5-5", max_tokens=4000, messages=history)
 
-response = client.messages.create(
-    model="claude-sonnet-5-5",
-    max_tokens=512,
-    messages=messages,
-)
+history.append({"role": "assistant", "content": reply.content})  # renvoyez les blocs tels quels
+history.append({"role": "user", "content": "Et sa profondeur maximale ?"})
+reply = client.messages.create(model="claude-opus-5-5", max_tokens=4000, messages=history)
 ```
 
-C'est à votre application de stocker l'historique (base de données, session, mémoire). L'API est sans état : chaque appel doit contenir tout le contexte nécessaire.
+Renvoyez `reply.content` sans le modifier : les blocs `thinking` sont signés, et toute modification provoque une erreur.
+
+## Sorties structurées avec Pydantic
+
+`messages.parse()` contraint la réponse à votre schéma et la valide :
+
+```python
+from pydantic import BaseModel
+import anthropic
+
+class Contact(BaseModel):
+    nom: str
+    email: str
+    demo_demandee: bool
+
+client = anthropic.Anthropic()
+response = client.messages.parse(
+    model="claude-opus-5-5",
+    max_tokens=4000,
+    messages=[{"role": "user", "content": "Jeanne Martin (jeanne@exemple.fr) veut une démo."}],
+    output_format=Contact,
+)
+contact = response.parsed_output
+print(contact.nom, contact.demo_demandee)
+```
+
+C'est la méthode recommandée pour extraire du JSON fiable. Pour donner des outils à Claude, utilisez le **tool runner** (`client.beta.messages.tool_runner` avec le décorateur `@beta_tool`), décrit dans l'article [Tool use](/wiki/api/tool-use).
 
 ## Gestion des erreurs
 
-Le SDK lève des exceptions typées qu'il faut intercepter :
+Interceptez les classes typées, de la plus spécifique à la plus générale :
 
 ```python
-from anthropic import APIError, RateLimitError, APIConnectionError
+import anthropic
 
 try:
-    message = client.messages.create(...)
-except RateLimitError:
-    print("Limite de débit atteinte, réessayez plus tard.")
-except APIConnectionError:
-    print("Problème réseau.")
-except APIError as e:
-    print(f"Erreur API : {e.status_code} — {e.message}")
+    message = client.messages.create(
+        model="claude-opus-5-5",
+        max_tokens=4000,
+        messages=[{"role": "user", "content": "Bonjour"}],
+    )
+except anthropic.BadRequestError as e:      # 400 : requête invalide, ne pas relancer
+    print("Requête invalide :", e.message)
+except anthropic.RateLimitError as e:       # 429 : déjà relancée par le SDK
+    print("Limite atteinte :", e.response.headers.get("retry-after"))
+except anthropic.APIStatusError as e:       # autres codes HTTP (dont 529)
+    print(f"Erreur {e.status_code} :", e.message)
+except anthropic.APIConnectionError:
+    print("Problème réseau")
 ```
+
+## Lire les en-têtes de réponse
+
+```python
+raw = client.messages.with_raw_response.create(
+    model="claude-opus-5-5",
+    max_tokens=1000,
+    messages=[{"role": "user", "content": "Bonjour"}],
+)
+print(raw.headers.get("anthropic-ratelimit-input-tokens-remaining"))
+message = raw.parse()
+```
+
+Sur le client asynchrone 1.x, `parse()` doit être attendu (`await raw.parse()`).
 
 ## Pour aller plus loin
 
-Le SDK supporte aussi le **streaming** (`client.messages.stream()`), les **tool calls** pour donner à Claude la capacité d'appeler vos fonctions, la **vision** pour analyser des images, et le **prompt caching** pour réduire drastiquement vos coûts sur des prompts répétés. Consultez le [repo GitHub anthropic-sdk-python](https://github.com/anthropics/anthropic-sdk-python) et la [doc officielle](https://docs.anthropic.com/en/api/client-sdks) pour les exemples complets.
+- [Premier appel API](/wiki/api/premier-appel-api)
+- [Streaming](/wiki/api/streaming)
+- [Tool use](/wiki/api/tool-use)
+- [Prompt caching](/wiki/api/prompt-caching-implementation)
+- [Effort et réflexion adaptative](/wiki/modeles/adaptive-thinking-effort)
+
+## Sources
+
+- Client SDKs : https://platform.claude.com/docs/en/cli-sdks-libraries/overview
+- Dépôt anthropic-sdk-python : https://github.com/anthropics/anthropic-sdk-python
+- Structured outputs : https://platform.claude.com/docs/en/build-with-claude/structured-outputs
+- Messages API : https://platform.claude.com/docs/en/api/messages/create
+- Errors : https://platform.claude.com/docs/en/api/errors

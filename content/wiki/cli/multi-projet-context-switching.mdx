@@ -1,55 +1,58 @@
 ---
-title: "Multi-projet et context switching"
-description: "Comment Claude Code isole le contexte par repo Git, gère les .claude/ locaux et permet de jongler entre plusieurs projets sans polluer la mémoire."
-updatedAt: "2026-05-19"
-readingMinutes: 6
+title: "Travailler sur plusieurs projets avec Claude Code"
+description: "Comment Claude Code isole contexte, réglages et sessions par dossier, et comment passer d'un projet à l'autre avec /cd, /add-dir, les worktrees et --resume."
+updatedAt: "2026-10-03"
+readingMinutes: 7
 ---
 
-Quand on travaille sur trois clients différents dans la même journée, on veut que Claude oublie le contexte du projet A en arrivant sur le projet B. Bonne nouvelle : le CLI est conçu pour ça. Tout repose sur le dossier de travail courant, les fichiers `.claude/` locaux et un système d'héritage de configuration en cascade.
+Quand vous enchaînez trois clients dans la même journée, vous voulez que Claude Code oublie le projet A en arrivant sur le projet B. Le CLI est conçu pour cela : tout part du dossier de travail au lancement, des fichiers `.claude/` du projet et d'une hiérarchie de réglages. Cette page explique ce qui est chargé, où, et les bons réflexes pour changer de projet.
 
-## Le dossier courant fait foi
+## Le dossier de lancement fait foi
 
-Claude Code détermine son contexte à partir du `cwd` au lancement. Concrètement, à chaque démarrage il :
+Claude Code prend comme projet le dossier dans lequel vous le lancez. Au démarrage, il charge :
 
-1. Remonte l'arborescence jusqu'à trouver un `.git` (la racine du repo).
-2. Charge `CLAUDE.md` à la racine s'il existe.
-3. Charge `.claude/settings.json` puis `.claude/settings.local.json`.
-4. Charge les `CLAUDE.md` imbriqués des sous-dossiers que vous ouvrez.
+1. les `CLAUDE.md` et `CLAUDE.local.md` du dossier courant **et de tous ses dossiers parents** ;
+2. `AGENTS.md` à la place, si le dépôt n'a ni `CLAUDE.md` ni `CLAUDE.local.md` ;
+3. les réglages `.claude/settings.json` et `.claude/settings.local.json` du projet, plus vos réglages utilisateur ;
+4. les serveurs MCP de `.mcp.json`, les skills de `.claude/skills/` et les sous-agents de `.claude/agents/`.
+
+Les `CLAUDE.md` des **sous-dossiers** ne sont pas chargés au lancement : ils sont ajoutés quand Claude lit des fichiers dans ces sous-dossiers.
 
 ```bash
-cd ~/projets/client-a
-claude            # contexte = client-a
-# nouvelle fenêtre terminal
-cd ~/projets/client-b
-claude            # contexte = client-b, zéro fuite
+cd ~/projets/client-a && claude   # contexte = client-a
+# autre onglet de terminal
+cd ~/projets/client-b && claude   # contexte = client-b, aucun partage
 ```
 
-Aucune session n'est partagée entre les deux. Les historiques de conversations sont stockés sous `~/.claude/projects/<hash-du-path>/` ce qui garantit l'isolation.
+Les transcripts sont stockés par dossier de projet, sous `~/.claude/projects/`. Deux sessions lancées dans deux projets différents ne partagent ni conversation ni mémoire de projet.
 
-## La structure `.claude/` par projet
-
-Chaque repo peut avoir son propre dossier `.claude/` versionné (ou non). Voici une organisation typique :
+## La structure `.claude/` d'un projet
 
 ```
 projet-a/
+  CLAUDE.md                # instructions partagées (versionné)
+  CLAUDE.local.md          # notes perso pour ce projet (non versionné)
+  .mcp.json                # serveurs MCP du projet
   .claude/
-    settings.json          # commit : règles d'équipe
-    settings.local.json    # gitignore : préférences perso
-    commands/
-      deploy.md            # slash command /deploy
-      review.md            # /review
+    settings.json          # règles d'équipe (versionné)
+    settings.local.json    # vos surcharges locales (non versionné)
+    skills/
+      deploy/SKILL.md      # invocable avec /deploy
     agents/
-      security-reviewer.md # subagent spécialisé
-  CLAUDE.md                # instructions projet
+      security-reviewer.md # sous-agent spécialisé
+    rules/
+      testing.md           # règles thématiques, éventuellement limitées à certains chemins
 ```
 
-Le `settings.json` versionné permet à toute l'équipe de partager les mêmes hooks et permissions. Le `settings.local.json` reste sur la machine du dev et override le reste.
+Les anciennes commandes personnalisées de `.claude/commands/` fonctionnent toujours, mais elles sont désormais fusionnées dans les skills : pour un nouveau projet, créez directement une skill.
+
+Exemple de `.claude/settings.json` partagé :
 
 ```json
 {
   "permissions": {
-    "allow": ["Bash(npm test:*)", "Bash(git diff:*)", "Read", "Edit"],
-    "deny": ["Bash(rm -rf:*)", "Bash(curl:*)"]
+    "allow": ["Bash(npm test *)", "Bash(git diff *)"],
+    "deny": ["Bash(rm -rf *)", "Read(./.env)"]
   },
   "env": {
     "NODE_ENV": "development"
@@ -57,48 +60,84 @@ Le `settings.json` versionné permet à toute l'équipe de partager les mêmes h
 }
 ```
 
-## Cascade des configurations
+Quand Claude Code crée lui-même `settings.local.json` dans un dépôt git, il l'ajoute à vos exclusions git globales. Si vous créez ce fichier à la main, ajoutez-le vous-même à `.gitignore`.
 
-L'ordre de priorité, du plus faible au plus fort :
+## Ordre de priorité des réglages
 
-1. `~/.claude/settings.json` (global utilisateur)
-2. `.claude/settings.json` (projet, versionné)
-3. `.claude/settings.local.json` (projet, local)
-4. Variables d'environnement et flags CLI
+Du plus fort au plus faible :
 
-Les `CLAUDE.md` fonctionnent par concaténation : le global, puis le projet, puis ceux des sous-dossiers ouverts pendant la session.
+| Niveau | Fichier | Portée |
+|---|---|---|
+| 1. Réglages gérés | `managed-settings.json`, MDM ou console d'administration | Toute l'organisation, non contournable |
+| 2. Ligne de commande | flags, `claude --settings <fichier-ou-json>` | Cette session |
+| 3. Projet local | `.claude/settings.local.json` | Vous, ce projet |
+| 4. Projet partagé | `.claude/settings.json` | Toute l'équipe |
+| 5. Utilisateur | `~/.claude/settings.json` | Vous, tous vos projets |
 
-## Context switching sans douleur
+Une clé définie à un niveau supérieur remplace la même clé plus bas. Les **listes** (comme `permissions.allow`) sont en revanche **fusionnées** entre niveaux : une règle d'autorisation globale reste active dans chaque projet.
 
-Trois patterns courants pour passer d'un projet à l'autre.
+Les fichiers d'instructions, eux, s'additionnent : `~/.claude/CLAUDE.md` (vous, partout), puis ceux du projet et de ses parents, puis ceux des sous-dossiers au fil de la session.
 
-**Pattern 1 — Plusieurs terminaux.** Une fenêtre tmux ou iTerm par projet, chaque session Claude vit dans son onglet. Simple et efficace.
+## Changer de projet : quatre méthodes
 
-**Pattern 2 — Git worktrees.** Pour bosser sur deux branches du même repo en parallèle sans corrompre l'état :
+### 1. Un terminal par projet
+
+Une fenêtre ou un onglet (tmux, iTerm, Windows Terminal) par projet, chacun avec sa session `claude`. C'est simple et l'isolation est totale.
+
+### 2. `/cd` : déplacer la session en cours
+
+`/cd ../client-b` déplace la session vers un autre dossier **en gardant la conversation**. Claude Code applique aussitôt la configuration du nouveau projet (réglages, permissions, hooks, serveurs `.mcp.json`, skills, sous-agents) et déconnecte les serveurs MCP de l'ancien projet. Il vous demande de faire confiance au dossier si vous n'y avez jamais travaillé. La session est ensuite rangée avec le nouveau projet.
+
+Utile quand une tâche commencée dans un dépôt se poursuit dans un autre. À éviter si vous voulez justement repartir d'un contexte vierge : dans ce cas, `/clear` ou un nouveau terminal.
+
+### 3. `/add-dir` : travailler sur deux dépôts à la fois
+
+`/add-dir ../shared-lib` (ou `claude --add-dir ../shared-lib` au lancement) donne accès aux fichiers d'un second dossier **sans changer de projet**. Attention : la plupart de la configuration `.claude/` du dossier ajouté n'est pas chargée (ses skills le sont). Pour rendre l'ajout permanent, utilisez la clé `additionalDirectories` dans les réglages.
+
+### 4. Git worktrees : deux branches du même dépôt en parallèle
 
 ```bash
-git worktree add ../projet-feature-x feature-x
-cd ../projet-feature-x
-claude            # contexte isolé, même repo
+claude -w feature-auth          # crée <repo>/.claude/worktrees/feature-auth
+claude -w '#142'                # worktree à partir de la PR 142
+claude -w feature-auth --tmux   # dans une session tmux dédiée
 ```
 
-**Pattern 3 — Reprise de session.** `claude --resume` propose la liste des dernières conversations du dossier courant. Couplé à `claude --continue` pour reprendre la dernière session immédiatement.
+Chaque worktree a ses propres fichiers de travail : deux sessions peuvent modifier le code en parallèle sans se marcher dessus. Un `CLAUDE.local.md` non versionné n'existe que dans le worktree où vous l'avez créé ; pour partager des notes perso entre worktrees, importez un fichier de votre dossier personnel depuis `CLAUDE.local.md` (par exemple `@~/.claude/notes-projet-a.md`).
+
+## Reprendre la bonne session
 
 ```bash
 cd ~/projets/client-a
-claude --continue      # reprend là où vous vous étiez arrêté
+claude --continue            # dernière conversation de ce dossier
+claude --resume              # sélecteur de sessions
+claude --resume auth-refactor  # session nommée (via /rename)
 ```
+
+Dans le sélecteur, les sessions du worktree courant s'affichent par défaut. `Ctrl+W` élargit à tous les worktrees du dépôt, `Ctrl+A` à tous les projets de la machine. Une session d'un autre projet n'est pas ouverte sur place : Claude Code copie dans le presse-papiers la commande `cd` + reprise à exécuter. `claude --resume <session-id>` retrouve en revanche un identifiant depuis n'importe quel dossier.
+
+À la reprise, les fichiers `settings.json` sont relus, mais pas les flags du lancement d'origine (`--add-dir`, `--mcp-config`, `--settings`, `--plugin-dir`) : repassez-les si la session en dépendait.
 
 ## Pièges à éviter
 
-- **Lancer `claude` depuis `~`**. Le CLI prend votre home comme racine et tente d'indexer 200 Go de fichiers. Toujours `cd` dans le projet avant.
-- **Mettre des secrets dans `settings.json` versionné**. Utilisez `settings.local.json` ou des variables d'environnement.
-- **Oublier `.claude/` dans `.gitignore` pour les fichiers locaux**. Ajoutez au minimum `.claude/settings.local.json` et `.claude/.cache/`.
-- **Mélanger les `CLAUDE.md`**. Gardez la racine concise, déléguez aux sous-dossiers les règles spécifiques.
+- **Lancer `claude` depuis votre dossier personnel.** La confiance n'est alors accordée que pour la session et le contexte n'a rien de ciblé. Placez-vous toujours dans le projet.
+- **Mettre des secrets dans `settings.json` versionné.** Utilisez `settings.local.json`, des variables d'environnement ou un gestionnaire de secrets.
+- **Un `CLAUDE.md` racine trop long.** Visez moins de 200 lignes. Déplacez le spécifique dans `.claude/rules/` (avec un champ `paths`) ou dans des `CLAUDE.md` de sous-dossiers.
+- **Monorepo bruyant.** Si des `CLAUDE.md` parents ne vous concernent pas, excluez-les avec le réglage `claudeMdExcludes`.
+- **Deux comptes ou deux clients très cloisonnés.** La variable `CLAUDE_CONFIG_DIR` permet d'utiliser un dossier de configuration distinct (et donc des réglages, identifiants et historiques distincts) par profil, par exemple via un alias de shell.
 
 ## Pour aller plus loin
 
-- La doc [Memory & Settings](https://docs.claude.com/claude-code) détaille la hiérarchie complète.
-- Pour partager des slash commands entre projets, créez un repo de plugins et installez-le via `/plugin install`.
-- Les git worktrees combinés à Claude permettent de paralléliser plusieurs features sans changer de branche.
-- Si vous gérez beaucoup de projets, scriptez un alias `cdc` qui fait `cd` puis `claude --continue` automatiquement.
+- [Rédiger un bon CLAUDE.md](/wiki/demarrer/claude-md)
+- [Le fichier settings.json](/wiki/cli/settings-json)
+- [Reprendre une session](/wiki/cli/sessions-reprise)
+- [Agent view et sessions en arrière-plan](/wiki/cli/agent-view-sessions)
+- [Variables d'environnement](/wiki/cli/variables-env)
+
+## Sources
+
+- [Settings files and precedence](https://code.claude.com/docs/en/settings)
+- [Memory (CLAUDE.md, AGENTS.md)](https://code.claude.com/docs/en/memory)
+- [Sessions](https://code.claude.com/docs/en/sessions)
+- [Permissions : working directories et /cd](https://code.claude.com/docs/en/permissions)
+- [Git worktrees](https://code.claude.com/docs/en/worktrees)
+- [Commands](https://code.claude.com/docs/en/commands)

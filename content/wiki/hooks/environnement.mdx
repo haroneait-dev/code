@@ -1,107 +1,147 @@
 ---
 title: "Hooks et environnement d'exécution"
-description: "Quelles variables d'environnement, quel cwd, quel payload JSON sur stdin ? Comprendre le contexte d'exécution des hooks Claude Code."
-updatedAt: "2026-05-19"
-readingMinutes: 6
+description: "Ce que reçoit un hook : champs JSON communs, variables d'environnement (CLAUDE_PROJECT_DIR, CLAUDE_ENV_FILE, CLAUDE_EFFORT…), répertoire courant, shell utilisé et canaux de retour."
+updatedAt: "2026-10-03"
+readingMinutes: 7
 ---
 
-Un hook ne tombe pas du ciel : il s'exécute dans un environnement précis, avec un `cwd`, des variables d'environnement injectées, et un payload JSON poussé sur `stdin`. Comprendre ces canaux d'information est la clé pour écrire des hooks portables, qui ne cassent pas dès qu'on lance Claude Code depuis un autre répertoire.
+Un hook s'exécute dans un contexte précis : un JSON sur stdin, des variables d'environnement, un répertoire courant et un shell. Connaître ces canaux permet d'écrire des hooks portables, qui fonctionnent quel que soit le dossier où Claude travaille, sur macOS, Linux ou Windows.
 
-## Le payload JSON sur stdin
+## Les champs JSON communs
 
-Chaque hook reçoit, sur `stdin`, un objet JSON décrivant l'événement. La structure varie selon le type de hook (`PreToolUse`, `PostToolUse`, `UserPromptSubmit`, `Notification`, `Stop`, `SubagentStop`, `PreCompact`, `SessionStart`, `SessionEnd`) mais l'enveloppe est constante :
+Chaque événement envoie ses champs propres (`tool_input`, `prompt`, `source`…), plus une enveloppe commune :
 
-```bash
-#!/usr/bin/env bash
-INPUT="$(cat)"
-echo "$INPUT" | jq .
-# {
-#   "session_id": "abc-123",
-#   "transcript_path": "/Users/h/.claude/projects/.../session.jsonl",
-#   "cwd": "/Users/h/mon-projet",
-#   "hook_event_name": "PreToolUse",
-#   "tool_name": "Edit",
-#   "tool_input": { "file_path": "src/app.ts", "old_string": "...", "new_string": "..." }
-# }
-```
+| Champ | Contenu |
+|---|---|
+| `session_id` | Identifiant de la session |
+| `prompt_id` | UUID du prompt en cours, identique à l'attribut `prompt.id` de la télémétrie (absent avant le premier prompt) |
+| `transcript_path` | Chemin du transcript JSONL, écrit de façon asynchrone (peut avoir un temps de retard) |
+| `cwd` | Répertoire de travail au moment du hook |
+| `scratchpad_dir` | Répertoire de travail temporaire de la session, s'il existe |
+| `permission_mode` | `default`, `plan`, `acceptEdits`, `auto`, `dontAsk` ou `bypassPermissions` (pas sur tous les événements) |
+| `effort` | Objet `{"level": "..."}` avec le niveau d'effort, sur les événements liés aux outils et à `Stop` |
+| `hook_event_name` | Nom de l'événement |
+| `agent_id`, `agent_type` | Présents dans un sous-agent, ou avec `claude --agent` |
 
-Pour les hooks `PostToolUse`, on a en plus un `tool_response`. Pour `UserPromptSubmit`, un champ `prompt`. Pour `SessionStart`, un `source` qui vaut `startup`, `resume` ou `clear`.
+Le mode **Manual** de l'interface arrive sous la valeur `"default"`.
 
-## Les variables d'environnement injectées
-
-Claude Code expose plusieurs variables utiles dans tous les hooks :
-
-- **`CLAUDE_PROJECT_DIR`** : racine du projet, utile pour résoudre des chemins même quand le hook est lancé depuis un sous-dossier.
-- **`PATH`** : hérité du shell parent ayant lancé `claude`, donc attention si vous utilisez `nvm` ou `pyenv`.
-- **`HOME`, `USER`, `SHELL`** : standards Unix.
-
-`CLAUDE_PROJECT_DIR` est particulièrement précieux : elle pointe vers la racine que Claude Code considère comme le projet (généralement le dossier contenant `.claude/`), même si l'agent travaille dans `packages/web/src/`.
-
-```json
-{
-  "hooks": {
-    "PostToolUse": [
-      {
-        "matcher": "Write|Edit",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "$CLAUDE_PROJECT_DIR/.claude/scripts/post-edit.sh"
-          }
-        ]
-      }
-    ]
-  }
-}
-```
-
-## Le répertoire de travail
-
-Le `cwd` au moment de l'exécution du hook est le répertoire courant de la session Claude Code — pas forcément celui où vous avez tapé `claude`, car le modèle a pu faire `cd` via `Bash`. Pour éviter les surprises, deux approches :
-
-1. Lire `cwd` depuis le JSON (`jq -r .cwd`) et l'utiliser explicitement.
-2. Toujours préfixer les chemins par `$CLAUDE_PROJECT_DIR`.
+Pour lire le JSON une seule fois et en extraire plusieurs champs :
 
 ```bash
-#!/usr/bin/env bash
-set -euo pipefail
-INPUT="$(cat)"
-CWD="$(echo "$INPUT" | jq -r '.cwd')"
-cd "$CWD"
-# À partir d'ici, on est dans le bon dossier
+#!/bin/bash
+INPUT=$(cat)
+EVENT=$(jq -r '.hook_event_name' <<<"$INPUT")
+CWD=$(jq -r '.cwd' <<<"$INPUT")
+TOOL=$(jq -r '.tool_name // empty' <<<"$INPUT")
+```
+
+Le modèle actif n'est **pas** dans l'enveloppe. Seul `SessionStart` peut recevoir un champ `model` (pas toujours), et `PreModelSwitch` / `PostModelSwitch` reçoivent `from_model` et `to_model`. Il n'existe pas de variable `$CLAUDE_MODEL`.
+
+## Les variables d'environnement
+
+Un hook hérite de l'environnement du processus `claude`, auquel Claude Code ajoute :
+
+| Variable | Disponible | Rôle |
+|---|---|---|
+| `CLAUDE_PROJECT_DIR` | Tous les hooks | Racine du projet où la session a démarré |
+| `CLAUDE_PLUGIN_ROOT` | Hooks de plugin | Dossier d'installation du plugin |
+| `CLAUDE_PLUGIN_DATA` | Hooks de plugin | Dossier de données persistant du plugin |
+| `CLAUDE_PLUGIN_OPTION_<CLÉ>` | Hooks de plugin | Valeur d'une option configurée par l'utilisateur |
+| `CLAUDE_ENV_FILE` | `SessionStart`, `Setup`, `CwdChanged`, `FileChanged` | Fichier où écrire des `export` pour les commandes `Bash` suivantes |
+| `CLAUDE_EFFORT` | Hooks et outil Bash | Niveau d'effort en vigueur |
+| `CLAUDE_CODE_REMOTE` | Sessions web | Vaut `"true"` dans un environnement distant |
+| `CLAUDE_CODE_BRIDGE_SESSION_ID` | Remote Control actif | Identifiant de la session Remote Control |
+
+Deux familles de variables sont retirées : les variables d'export `OTEL_*`, que Claude Code supprime de tous ses sous-processus, et celles que filtre `CLAUDE_CODE_SUBPROCESS_ENV_SCRUB=1` si vous l'activez. Tout le reste, secrets compris, est hérité.
+
+Le `PATH` est celui du shell qui a lancé `claude`. Si vous utilisez `nvm`, `pyenv` ou `mise`, un `npx` qui marche dans votre terminal peut échouer dans un hook lancé depuis l'application de bureau ou un IDE. Donnez des chemins absolus en cas de doute.
+
+## `CLAUDE_PROJECT_DIR` contre `cwd`
+
+- `${CLAUDE_PROJECT_DIR}` désigne la racine où la session a démarré. Il **ne bouge pas**, même quand Claude entre dans un worktree ou fait `cd`. C'est le bon point d'ancrage pour trouver vos scripts.
+- `cwd` (dans le JSON) suit Claude : il devient la racine du worktree ou le nouveau dossier après un `cd`. Lisez-le quand le hook doit agir là où Claude travaille.
+
+```bash
+#!/bin/bash
+# Script trouvé via CLAUDE_PROJECT_DIR, action dans le dossier courant de Claude
+CWD=$(jq -r '.cwd')
+cd "$CWD" || exit 0
 git status --porcelain
 ```
 
-## Codes de sortie et communication retour
+Si le dossier courant a été supprimé entre-temps (worktree effacé), Claude Code lance les hooks `command` depuis le premier dossier encore existant parmi : dossier de départ, racine du projet, dossier personnel, dossier temporaire.
 
-Le hook communique son verdict via le code de sortie et `stdout`/`stderr` :
+## Shell, forme exec et Windows
 
-- `exit 0` : succès, on continue.
-- `exit 2` (sur un `PreToolUse`) : bloque l'appel d'outil et envoie `stderr` au modèle.
-- Autre code non-zéro : warning, mais n'interrompt pas.
+- **Forme shell** (pas de `args`) : la chaîne `command` est passée à `sh -c` sur macOS et Linux, à Git Bash sous Windows, ou à PowerShell si Git Bash est absent. Pipes, `&&` et variables fonctionnent.
+- **Forme exec** (`args` présent, même vide) : l'exécutable est lancé directement, sans shell. Les placeholders `${CLAUDE_PROJECT_DIR}`, `${CLAUDE_PLUGIN_ROOT}` et `${CLAUDE_PLUGIN_DATA}` sont substitués comme des chaînes simples, sans souci de guillemets.
 
-Pour `UserPromptSubmit`, `stdout` est ajouté au contexte du modèle — pratique pour injecter du contexte projet dynamique :
+```json
+{
+  "type": "command",
+  "command": "node",
+  "args": ["${CLAUDE_PROJECT_DIR}/.claude/hooks/check.js", "--strict"]
+}
+```
+
+Sous Windows, `"shell": "powershell"` exécute la commande dans PowerShell (`pwsh.exe` si présent, sinon `powershell.exe`). Écrivez `${CLAUDE_PROJECT_DIR}` ou `$env:CLAUDE_PROJECT_DIR`, jamais `$CLAUDE_PROJECT_DIR` nu, que PowerShell lit comme une variable locale vide. La forme exec exige un vrai exécutable : les raccourcis `.cmd` de `node_modules/.bin` ne se lancent pas sans shell.
+
+## Pas de terminal
+
+Sur macOS et Linux, les hooks tournent sans terminal de contrôle : impossible d'ouvrir `/dev/tty`, d'afficher un menu interactif ou d'écrire des séquences d'échappement directement. Pour parler à l'utilisateur, renvoyez `systemMessage` ; pour une notification ou un titre de fenêtre, renvoyez `terminalSequence`.
+
+## Les canaux de retour
+
+| Canal | Lu par Claude Code comme |
+|---|---|
+| Code de sortie `0` | Succès ; stdout analysé (JSON si l'objet commence par `{` et finit par `}`) |
+| Code de sortie `2` | Blocage sur les événements bloquants ; stderr sert de motif |
+| Autre code | Erreur non bloquante, notice `hook error` dans le transcript |
+| stdout en texte brut | Ajouté au contexte uniquement pour `SessionStart`, `UserPromptSubmit`, `UserPromptExpansion` et `PostModelSwitch` ; sinon journal de debug |
+| stderr avec exit 0 | Journal de debug uniquement, jamais montré à Claude |
+
+Pour un hook `http`, le JSON est envoyé en corps de requête POST et la réponse doit être un 2xx avec un corps JSON pour transmettre une décision.
+
+## Persister des variables : `CLAUDE_ENV_FILE`
 
 ```bash
-#!/usr/bin/env bash
-echo "Branche git actuelle: $(git -C "$CLAUDE_PROJECT_DIR" branch --show-current)"
-echo "Tâches TODO en cours: $(grep -r TODO "$CLAUDE_PROJECT_DIR/src" | wc -l)"
+#!/bin/bash
+# SessionStart : charger la bonne version de Node pour toute la session
+ENV_BEFORE=$(export -p | sort)
+source "$HOME/.nvm/nvm.sh" && nvm use 20 >/dev/null
+if [ -n "$CLAUDE_ENV_FILE" ]; then
+  comm -13 <(echo "$ENV_BEFORE") <(export -p | sort) >> "$CLAUDE_ENV_FILE"
+fi
 exit 0
 ```
 
-## Isolation et secrets
+Avec direnv, un hook `CwdChanged` qui exécute `direnv export bash > "$CLAUDE_ENV_FILE"` recharge l'environnement à chaque changement de dossier. Les variables écrites par `CwdChanged` ou `FileChanged` sont effacées au `CwdChanged` suivant.
 
-Les hooks héritent de l'environnement complet du shell parent, y compris les secrets. Si vous lancez Claude Code depuis un terminal où `OPENAI_API_KEY` est exporté, vos hooks y ont accès. Pour limiter la fuite :
+## Isoler un sous-processus
+
+Pour appeler un outil tiers sans lui transmettre vos secrets :
 
 ```bash
-#!/usr/bin/env bash
-# Nettoyer l'environnement avant d'appeler un sous-processus tiers
-env -i PATH="$PATH" HOME="$HOME" /usr/local/bin/script-tiers.sh
+env -i PATH="$PATH" HOME="$HOME" /usr/local/bin/outil-tiers --input "$FILE"
 ```
 
-## Pour aller plus loin
+## Cartographier votre environnement
 
-- Logger une fois `env | sort > /tmp/hook-env.txt` pour cartographier précisément ce qui est dispo dans votre setup.
-- Tester un hook isolément : `echo '{"cwd":"/tmp","tool_name":"Edit"}' | ./mon-hook.sh`.
-- Documenter en commentaire les champs JSON utilisés — le schéma peut évoluer entre versions.
-- Versionner `.claude/settings.json` mais pas `settings.local.json`, qui contient les overrides personnels.
+```bash
+# Hook temporaire : capturer une fois l'environnement et le JSON reçus
+{ env | sort; echo '---'; cat; } > /tmp/hook-env.txt
+```
+
+Supprimez-le ensuite : le fichier contient vos variables, secrets compris.
+
+## Articles liés
+
+- [Sécurité des hooks](/wiki/hooks/securite-rce)
+- [Debugging hooks](/wiki/hooks/debugging-hooks)
+- [Les variables d'environnement](/wiki/cli/variables-env)
+- [Le fichier settings.json](/wiki/cli/settings-json)
+
+## Sources
+
+- [Hooks reference : Common input fields, Reference scripts by path, Persist environment variables](https://code.claude.com/docs/en/hooks)
+- [Automate actions with hooks : Reload environment when directory or files change](https://code.claude.com/docs/en/hooks-guide)

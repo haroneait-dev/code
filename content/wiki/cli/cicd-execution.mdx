@@ -1,108 +1,206 @@
 ---
-title: "Mode non-interactif et CI/CD"
-description: "Automatiser des refactors et des revues de code avec Claude Code en pipeline grâce au flag -p et aux workflows GitHub Actions / GitLab CI."
-updatedAt: "2026-05-19"
-readingMinutes: 6
+title: "Claude Code en CI/CD : GitHub Actions et GitLab"
+description: "Lancer Claude Code dans vos pipelines avec claude -p, l'action officielle anthropics/claude-code-action@v1 et un job GitLab CI, en gardant coûts et permissions sous contrôle."
+updatedAt: "2026-10-03"
+readingMinutes: 8
 ---
 
-Claude Code n'est pas qu'un REPL : avec le flag `-p` (print mode), le CLI devient un binaire scriptable que vous pouvez brancher dans n'importe quel pipeline. Cette page montre comment automatiser des refactors, des audits de sécurité ou des génération de changelog directement depuis vos workflows CI.
+Avec le flag `-p` (ou `--print`), Claude Code devient une commande scriptable : il exécute une tâche, écrit le résultat sur `stdout` et rend la main avec un code de sortie. C'est la base de toute intégration CI/CD. Cette page montre les flags utiles en pipeline, l'action GitHub officielle et un job GitLab CI, avec les garde-fous indispensables.
 
-## Le flag `-p` en pratique
-
-Le mode non-interactif renvoie la réponse de Claude sur `stdout` puis quitte avec un code de sortie standard. Aucun TTY, aucune session persistante.
+## Le mode non-interactif en pratique
 
 ```bash
-# Refactor déterministe d'un fichier
-claude -p "Refactor src/auth.ts pour extraire la logique JWT dans un module séparé" \
-  --output-format json \
-  --max-turns 8 \
-  > refactor.json
+# Question simple, réponse texte
+claude -p "Que fait le module auth ?"
 
-# Avec restriction d'outils
-claude -p "Liste les TODO du repo" \
-  --allowedTools "Read,Grep,Glob" \
-  --permission-mode plan
+# Refactor borné, sortie JSON exploitable
+claude --bare -p "Extrais la logique JWT de src/auth.ts dans un module séparé" \
+  --allowedTools "Read,Edit" \
+  --max-turns 8 \
+  --max-budget-usd 2.00 \
+  --output-format json > refactor.json
 ```
 
-Les flags clés à connaître :
+Le code de sortie vaut `0` en cas de succès et une valeur non nulle en cas d'échec : votre script peut donc brancher dessus. Un flag invalide est signalé sur `stderr` avant le démarrage ; une erreur pendant l'exécution (authentification manquante par exemple) apparaît comme résultat sur `stdout`.
 
-- `--output-format json|stream-json|text` : pour piper la sortie vers `jq` ou un parseur.
-- `--max-turns` : limite stricte pour éviter une boucle infinie qui ferait exploser votre facture.
-- `--allowedTools` / `--disallowedTools` : whitelist explicite des outils que Claude peut utiliser.
-- `--permission-mode acceptEdits` : Claude écrit les fichiers sans demander confirmation.
+### Les flags utiles en pipeline
 
-## GitHub Actions : refactor automatique
+| Flag | Rôle |
+|---|---|
+| `--bare` | Démarrage minimal : ignore hooks, skills, plugins, serveurs MCP, mémoire auto et `CLAUDE.md` du poste. Résultat reproductible d'une machine à l'autre. Exige `ANTHROPIC_API_KEY` (pas de connexion par abonnement). |
+| `--output-format text\|json\|stream-json` | `json` renvoie `result`, `session_id`, l'usage et `total_cost_usd`. `stream-json` émet un événement JSON par ligne. |
+| `--json-schema '<schéma>'` | Avec `--output-format json`, place une sortie conforme au schéma dans le champ `structured_output`. |
+| `--max-turns N` | Limite le nombre de tours agentiques ; la commande sort en erreur si la limite est atteinte. Aucune limite par défaut. |
+| `--max-budget-usd 5.00` | Plafond de dépense en dollars (mode print uniquement), sous-agents compris. |
+| `--allowedTools "..."` | Outils autorisés sans confirmation, en syntaxe de règle de permission. |
+| `--permission-mode` | Mode de base : `dontAsk` (refuse tout ce qui demanderait une confirmation), `acceptEdits`, `auto`, etc. |
+| `--permission-prompts none` | Pour les jobs sans humain : tout ce qui déclencherait une demande est refusé et Claude ne réessaie pas. |
+| `--append-system-prompt "..."` | Ajoute des consignes au prompt système par défaut. |
+| `--no-session-persistence` | Ne sauvegarde pas la session sur disque. |
+| `--continue` / `--resume <id>` | Enchaîne plusieurs appels dans la même conversation. |
 
-Voici un workflow qui lance Claude sur chaque PR pour proposer des améliorations de typage TypeScript.
+Points d'attention :
+
+- **Syntaxe des règles Bash** : `Bash(git diff *)` autorise toute commande qui commence par `git diff`. L'espace avant `*` compte : `Bash(git diff*)` accepterait aussi `git diff-index`.
+- **Mode de permission par défaut** : sans `--permission-mode`, la session prend le mode de départ configuré, qui peut être `auto`. En CI, indiquez toujours le mode voulu explicitement.
+- **Sans `--bare`**, un appel `-p` exécute les hooks de `.claude/settings.json` et connecte les serveurs de `.mcp.json` du dépôt, sans boîte de dialogue de confiance. Sur un dépôt dont vous ne maîtrisez pas le contenu (PR externe), utilisez `--bare`.
+- **Stdin** est plafonné à 10 Mo. Au-delà, écrivez le contenu dans un fichier et citez son chemin dans le prompt.
+
+### Sortie structurée pour vos scripts
+
+```bash
+claude --bare -p "Liste les fonctions exportées de src/auth.ts" \
+  --allowedTools "Read" \
+  --output-format json \
+  --json-schema '{"type":"object","properties":{"functions":{"type":"array","items":{"type":"string"}}},"required":["functions"]}' \
+  | jq '.structured_output.functions'
+```
+
+Le coût de la run est disponible dans `.total_cost_usd` : c'est une estimation côté client, utile pour alerter, pas pour facturer.
+
+## GitHub Actions : l'action officielle
+
+L'intégration GitHub passe par `anthropics/claude-code-action@v1`. Elle fonctionne selon deux modes, détectés automatiquement :
+
+- **mode interactif** (pas d'entrée `prompt`) : Claude répond quand quelqu'un écrit `@claude` dans une issue, une PR ou une revue ;
+- **mode automatisation** (entrée `prompt` fournie) : Claude s'exécute sur n'importe quel événement GitHub, y compris un `schedule`.
+
+### Installation
+
+Le plus rapide : lancez `claude` dans le dépôt puis `/install-github-app`. La commande installe l'application GitHub Claude, enregistre le secret (`ANTHROPIC_API_KEY` pour une clé API, `CLAUDE_CODE_OAUTH_TOKEN` pour un abonnement Pro, Max, Team ou Enterprise, généré avec `claude setup-token`) et prépare une PR avec les workflows. Il vous faut le CLI `gh` authentifié et des droits admin sur le dépôt. Elle ne fonctionne qu'avec github.com.
+
+### Répondre aux mentions `@claude`
 
 ```yaml
-name: Claude Refactor
+name: Claude Code
 on:
-  pull_request:
-    paths:
-      - "src/**/*.ts"
-
+  issue_comment:
+    types: [created]
+  pull_request_review_comment:
+    types: [created]
 jobs:
-  refactor:
+  claude:
+    if: contains(github.event.comment.body, '@claude')
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     permissions:
       contents: write
       pull-requests: write
+      issues: write
+      id-token: write
+      actions: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
-          fetch-depth: 0
-      - name: Install Claude Code
-        run: npm install -g @anthropic-ai/claude-code
-      - name: Run Claude
-        env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-        run: |
-          claude -p "Améliore le typage strict des fichiers modifiés dans cette PR. \
-            Utilise git diff origin/main pour identifier les fichiers." \
-            --allowedTools "Read,Edit,Bash(git diff:*)" \
-            --permission-mode acceptEdits \
-            --max-turns 12
-      - name: Commit
-        run: |
-          git config user.name "claude-bot"
-          git config user.email "bot@example.com"
-          git add -A && git diff --cached --quiet || git commit -m "chore: claude refactor"
-          git push
+          fetch-depth: 1
+      - uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          claude_args: "--max-turns 15"
 ```
 
-## GitLab CI : audit de sécurité nocturne
+`id-token: write` est nécessaire pour l'authentification via l'application GitHub ; `actions: read` permet à Claude de lire les résultats de CI de la PR. Seuls les utilisateurs ayant un accès en écriture au dépôt peuvent déclencher l'action (réglable avec `allowed_non_write_users`), et les bots sont refusés sauf s'ils figurent dans `allowed_bots`.
 
-Sur GitLab, le pattern est identique. On déclenche le job via `schedules` et on stocke le rapport en artefact.
+### Tâche planifiée avec un prompt
 
 ```yaml
+name: Rapport quotidien
+on:
+  schedule:
+    - cron: "0 7 * * 1-5"
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      issues: read
+      id-token: write
+    steps:
+      - uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: "Résume les commits d'hier et les issues ouvertes, en français."
+          claude_args: |
+            --model claude-sonnet-5-5
+            --max-turns 10
+            --allowedTools "mcp__github__list_commits,mcp__github__list_issues"
+```
+
+Avec un prompt en texte libre, Claude n'a ni shell ni accès à l'API GitHub tant que vous n'accordez pas les outils nécessaires dans `claude_args` (ou via l'entrée `settings`). Le prompt peut aussi être une skill : `/ma-skill` pour une skill de `.claude/skills/` (après `actions/checkout`), ou `/plugin:skill` pour une skill de plugin installée via `plugin_marketplaces` et `plugins`.
+
+### Entrées principales de l'action
+
+| Entrée | Usage |
+|---|---|
+| `prompt` | Instructions ou invocation de skill. Absente : mode interactif. |
+| `claude_args` | N'importe quel flag du CLI (`--model`, `--max-turns`, `--allowedTools`, `--mcp-config`, `--append-system-prompt`). Sans `--model`, le modèle par défaut de Claude Code est utilisé. |
+| `anthropic_api_key` / `claude_code_oauth_token` | Authentification par clé API ou par abonnement. |
+| `settings` | Réglages Claude Code en JSON ou chemin de fichier. |
+| `trigger_phrase` | Phrase de déclenchement, `@claude` par défaut. |
+| `use_bedrock` / `use_vertex` / `use_foundry` | Passer par Amazon Bedrock, Google Cloud ou Microsoft Foundry (authentification OIDC, sans clé statique). |
+
+Si vous migrez depuis `@beta` : remplacez `@beta` par `@v1`, supprimez `mode`, renommez `direct_prompt` en `prompt` et déplacez `max_turns` et `model` dans `claude_args`.
+
+Pour une simple revue automatique de chaque PR sans maintenir de workflow, regardez plutôt la fonctionnalité Code Review gérée par Anthropic.
+
+## GitLab CI : un job Claude
+
+L'intégration GitLab est en bêta et maintenue par GitLab. Le principe : un job qui installe Claude Code et l'appelle en `-p`. Ajoutez d'abord `ANTHROPIC_API_KEY` comme variable CI/CD masquée (**Settings > CI/CD > Variables**).
+
+```yaml
+stages:
+  - ai
+
 claude_audit:
-  image: node:22
-  variables:
-    ANTHROPIC_API_KEY: $ANTHROPIC_API_KEY
+  stage: ai
+  image: node:24-alpine3.21
+  timeout: 20m
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
   before_script:
-    - npm install -g @anthropic-ai/claude-code
+    - apk add --no-cache git curl bash
+    - curl -fsSL https://claude.ai/install.sh | bash
+    - export PATH="$HOME/.local/bin:$PATH"
   script:
-    - claude -p "Audit de sécurité du dossier api/. Liste les vulnérabilités OWASP Top 10 en JSON." --output-format json --allowedTools "Read,Grep,Glob" > audit.json
+    - >
+      claude --bare
+      -p "Audit de sécurité du dossier api/ : liste les vulnérabilités de l'OWASP Top 10 avec fichier, ligne et gravité."
+      --allowedTools "Read,Grep,Glob"
+      --permission-mode dontAsk
+      --max-turns 20
+      --max-budget-usd 3.00
+      --output-format json > audit.json
   artifacts:
     paths:
       - audit.json
     expire_in: 30 days
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "schedule"
 ```
 
-## Bonnes pratiques pour la prod
+L'installeur natif place `claude` dans `~/.local/bin`, d'où l'`export PATH`. Pour des déclenchements par mention `@claude` dans les MR, GitLab propose de passer le contexte au job via les variables `AI_FLOW_INPUT`, `AI_FLOW_CONTEXT` et `AI_FLOW_EVENT` (webhook « Comments » puis API de déclenchement de pipeline). Bedrock et Google Cloud sont pris en charge avec `CLAUDE_CODE_USE_BEDROCK=1` ou `CLAUDE_CODE_USE_VERTEX=1` et une authentification OIDC.
 
-- **Toujours fixer `--max-turns`**. Un agent libre en CI peut vite consommer 20 $ pour rien.
-- **Whitelist d'outils stricte**. En CI, jamais de `Bash(*)`. Listez les commandes exactes : `Bash(npm test:*)`, `Bash(git diff:*)`.
-- **Secret rotation**. Stockez `ANTHROPIC_API_KEY` dans le coffre de votre CI (GitHub Secrets, GitLab Variables masquées) et faites-le tourner trimestriellement.
-- **Sortie JSON pour les parseurs**. `--output-format stream-json` permet de suivre la progression en temps réel et de logger chaque étape.
-- **Sandbox réseau**. Sur GitHub Actions, utilisez `runs-on: ubuntu-latest` avec un firewall sortant pour éviter qu'un prompt malveillant exfiltre vos sources.
+## Garde-fous pour la production
+
+- **Bornez chaque run** : `--max-turns`, `--max-budget-usd` et un timeout au niveau du job (`timeout-minutes` sur GitHub, `timeout` sur GitLab).
+- **Listez les outils au plus juste** : en CI, pas de `Bash` nu. Préférez `Bash(npm test *)`, `Bash(git diff *)`. Combinez avec `--permission-mode dontAsk` pour refuser tout le reste.
+- **Utilisez `--bare`** dès que vous appelez le CLI directement, pour ne pas dépendre de la configuration du runner ni exécuter des hooks fournis par le dépôt.
+- **Secrets** : clé dans les secrets GitHub ou les variables masquées GitLab, jamais dans le dépôt. Pour une organisation, préférez une clé API de la Console à un jeton OAuth, lié à l'abonnement d'une personne. L'action GitHub accepte aussi la fédération d'identité (OIDC) pour éviter tout secret longue durée.
+- **Limitez la concurrence** (`concurrency` sur GitHub) pour éviter plusieurs runs coûteux en parallèle sur la même PR.
+- **Relisez les changements** : Claude passe par une PR ou une MR, les règles de protection de branche et les approbations s'appliquent.
+- **Commits de Claude et CI** : GitHub ne déclenche pas les workflows sur un commit poussé avec le `GITHUB_TOKEN` par défaut. Laissez l'action s'authentifier comme application GitHub si vous voulez que la CI tourne sur ses commits.
 
 ## Pour aller plus loin
 
-- La doc officielle des [headless flags](https://docs.claude.com/claude-code) liste tous les paramètres de `-p`.
-- L'action `anthropics/claude-code-action` (marketplace GitHub) encapsule le pattern ci-dessus et gère les commentaires de PR automatiquement.
-- Pour orchestrer plusieurs agents en parallèle (un par sous-dossier), couplez `-p` à `xargs -P` ou à `GNU parallel`.
-- Surveillez vos coûts via le header `anthropic-ratelimit-tokens-remaining` exposé par l'API.
+- [Mode headless](/wiki/cli/headless-mode)
+- [Pipes et automatisation](/wiki/cli/pipes-automation)
+- [Modes de permission](/wiki/cli/permissions-modes)
+- [Revue de code automatique](/wiki/workflows/code-review-auto)
+- [Claude Code sur AWS Bedrock](/wiki/enterprise/aws-bedrock)
+
+## Sources
+
+- [Run Claude Code programmatically (headless)](https://code.claude.com/docs/en/headless)
+- [Claude Code GitHub Actions](https://code.claude.com/docs/en/github-actions)
+- [Claude Code GitLab CI/CD](https://code.claude.com/docs/en/gitlab-ci-cd)
+- [CLI reference](https://code.claude.com/docs/en/cli-reference)
+- [anthropics/claude-code-action](https://github.com/anthropics/claude-code-action)

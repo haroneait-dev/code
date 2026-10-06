@@ -1,79 +1,129 @@
 ---
 title: "/help, /clear, /resume : naviguer une session"
-description: "Les trois commandes de base à connaître pour démarrer, nettoyer et reprendre une session Claude Code."
-updatedAt: "2026-05-19"
-readingMinutes: 5
+description: "Lister les commandes, repartir d'un contexte vide sans rien perdre et reprendre une conversation, avec le tableau des commandes intégrées les plus utiles en octobre 2026."
+updatedAt: "2026-10-03"
+readingMinutes: 6
 ---
 
-Avant même de songer aux commandes custom, trois slash commands intégrées suffisent à reprendre le contrôle d'une session Claude Code : `/help` pour explorer les capacités, `/clear` pour repartir d'un contexte propre, et `/resume` pour récupérer une conversation interrompue. Maîtriser ce trio évite 80% des frustrations des débuts : sessions qui partent en vrille, contexte saturé, ou perte d'un travail en cours après un crash de terminal.
+Trois commandes suffisent pour garder le contrôle d'une session Claude Code : `/help` pour voir ce qui est disponible, `/clear` pour repartir d'un contexte vide et `/resume` pour retrouver une conversation. Cet article les détaille, puis récapitule les commandes intégrées qui servent vraiment au quotidien.
 
-## /help — la porte d'entrée
+## Trouver une commande : `/help` et le menu `/`
 
-`/help` affiche la liste complète des commandes disponibles dans votre session, y compris vos commandes custom et celles fournies par des plugins. C'est aussi la commande la plus utile lorsqu'on découvre un nouveau projet : elle révèle tout ce que l'équipe a ajouté dans `.claude/commands/`.
+`/help` affiche l'aide et la liste des commandes disponibles dans votre session. En pratique, le réflexe le plus rapide est de taper `/` puis quelques lettres : le menu filtre au fur et à mesure.
 
-```bash
-> /help
-Available commands:
-  /clear          Clear conversation history
-  /resume         Resume a previous conversation
-  /cost           Show token usage and cost
-  /compact        Compact the conversation
-  /init           Initialize CLAUDE.md
-  /review         Review a pull request
-  ...
-```
+Quelques règles utiles du menu :
 
-Astuce méconnue : `/help <nom>` (selon les versions) ou simplement taper le début du nom et utiliser l'auto-complétion vous donne la description issue du frontmatter de chaque commande.
+- la correspondance ignore les séparateurs `-`, `_` et `:` (taper `/adddir` met `/add-dir` en surbrillance) ;
+- les alias fonctionnent : `/new` met `/clear` en surbrillance ;
+- après une faute de frappe, rien n'est surligné et `Entrée` envoie le texte tel quel, avec l'erreur « Unknown command » ;
+- certaines commandes n'apparaissent que si elles sont disponibles pour vous (plateforme, offre, fournisseur), et quelques-unes, comme `/heapdump`, restent cachées tant que vous n'avez pas tapé leur nom complet.
 
-## /clear — repartir de zéro
+Le menu liste aussi vos skills et commandes personnalisées (`.claude/skills/`, `.claude/commands/`), celles des plugins et les prompts exposés par vos serveurs MCP. Sur un projet que vous découvrez, c'est le moyen le plus simple de voir ce que l'équipe a préparé. La commande `/skills` donne une vue détaillée de ces skills.
 
-`/clear` efface l'historique de la conversation en cours et libère intégralement le contexte. C'est essentiel quand vous passez d'une tâche à une autre dans le même terminal : sans `/clear`, Claude conserve en mémoire les fichiers lus, les décisions prises et les erreurs rencontrées, ce qui pollue les réponses futures.
+Une commande n'est reconnue qu'en début de message. Si Claude est en train de répondre, elle est mise en file et s'exécute à la fin du tour, sauf quelques commandes immédiates comme `/status`, `/tasks` ou `/usage`.
 
-```bash
+## Repartir de zéro : `/clear`
+
+`/clear` démarre une nouvelle conversation avec un contexte vide. Les alias `/reset` et `/new` font la même chose.
+
+```text
 > /clear
-Conversation cleared. Context reset.
+> /clear refacto-auth     # nomme la conversation que vous quittez
 ```
 
-Règle empirique : un `/clear` entre chaque feature, chaque bug fix, chaque revue de PR. Si vous voyez Claude faire référence à un fichier qui n'a plus rien à voir avec votre demande actuelle, c'est le signal qu'un `/clear` était dû il y a 20 minutes.
+Ce qu'il faut savoir :
 
-Attention : `/clear` est irréversible dans la session courante. Si vous pensez avoir besoin de revenir en arrière, préférez ouvrir un nouveau terminal et laisser l'ancienne session intacte — vous pourrez toujours `/resume` plus tard.
+- **rien n'est perdu** : la conversation précédente reste enregistrée et se retrouve avec `/resume`. Dans le même processus, le menu de `/rewind` propose aussi une entrée pour revenir à la conversation effacée ;
+- **la mémoire du projet est conservée** : `CLAUDE.md` et la mémoire automatique sont rechargés, seule la conversation repart à vide ;
+- **le compteur de `/usage` repart à 0 $** (depuis la v2.1.211) ;
+- **`/clear` ne coûte rien**, contrairement à `/compact` qui envoie toute la conversation au modèle pour la résumer.
 
-## /resume — reprendre une conversation
+Règle simple : un `/clear` à chaque changement de sujet (nouvelle fonctionnalité, nouveau bug, nouvelle revue). Si Claude cite des fichiers sans rapport avec votre demande, le contexte est pollué. Pour continuer la même tâche avec moins de contexte, utilisez plutôt `/compact` (voir [/usage et /compact](/wiki/slash-commands/cost-compact)).
 
-`/resume` affiche une liste des conversations passées et vous laisse en choisir une pour la reprendre exactement là où elle s'était arrêtée. Pratique après un crash de terminal, un redémarrage machine, ou simplement pour rebrancher un travail entamé la veille.
+## Reprendre une conversation : `/resume`
+
+`/resume` ouvre le sélecteur de sessions. Vous pouvez aussi passer directement un identifiant ou un nom : `/resume refacto-auth`. L'alias est `/continue`.
+
+Raccourcis du sélecteur :
+
+| Touche | Action |
+| --- | --- |
+| `↑` / `↓` | Naviguer |
+| `Entrée` | Reprendre la session surlignée |
+| `Espace` | Aperçu du contenu |
+| `Ctrl+R` | Renommer la session |
+| `/` ou toute lettre | Rechercher (vous pouvez coller l'URL d'une PR) |
+| `Ctrl+B` | Filtrer sur la branche git courante |
+| `Ctrl+W` | Élargir à tous les worktrees du dépôt |
+| `Ctrl+A` | Élargir à tous les projets de la machine |
+| `Esc` | Quitter |
+
+Depuis le terminal, sans ouvrir de session :
 
 ```bash
-> /resume
-Select a conversation to resume:
-  1. [2026-05-18 14:32] Refactor auth module
-  2. [2026-05-18 09:15] Fix RLS policy on wiki_tips
-  3. [2026-05-17 18:04] Setup Supabase OAuth callback
+claude --continue            # reprend la conversation la plus récente du dossier
+claude --resume              # ouvre le sélecteur
+claude --resume refacto-auth # reprend une session nommée
+claude -n refacto-auth       # démarre une session déjà nommée
 ```
 
-Le contexte (fichiers lus, commandes exécutées, décisions) est restauré tel quel. C'est aussi la solution si vous voulez ouvrir deux fenêtres sur la même session sur un seul écran : lancez `claude` deux fois, faites `/resume` dans l'une et travaillez en parallèle.
+La reprise restaure l'historique complet (y compris les appels d'outils), le modèle utilisé et, depuis le terminal, le mode de permission dans la plupart des cas. Les sessions en arrière-plan apparaissent marquées `bg` : en reprendre une qui tourne encore vous y attache directement.
 
-## Le bon réflexe : combiner les trois
+Piège à éviter : reprendre la même session dans deux terminaux sans la dupliquer mélange les messages des deux dans un seul historique. Pour explorer une autre piste, utilisez `/branch` (vous basculez dans une copie) ou `/fork` (la copie part en arrière-plan).
 
-Une session productive ressemble souvent à ceci :
+Bon réflexe : nommez vos sessions avec `/rename` avant un `/clear`. Elles sont bien plus faciles à retrouver qu'un titre généré automatiquement.
 
-```bash
-$ claude
-> /resume          # je reprends la PR d'hier
-... travail ...
-> /clear           # je passe à une autre feature
-> /help            # je vérifie qu'une commande custom existe pour cette tâche
-```
+## Les commandes intégrées les plus utiles (octobre 2026)
 
-C'est cette boucle qui fait la différence entre un usage occasionnel et un workflow professionnel. Les développeurs qui ne `/clear` jamais finissent toujours par voir Claude halluciner sur des fichiers fantômes ; ceux qui ne `/resume` jamais perdent du temps à réexpliquer le contexte chaque matin.
+La liste complète dépasse la centaine d'entrées. Voici celles qui servent le plus, par moment de la journée (Claude Code 2.1.288).
+
+| Commande | À quoi elle sert |
+| --- | --- |
+| `/init` | Génère un `CLAUDE.md` de départ pour le projet |
+| `/memory` | Édite les fichiers `CLAUDE.md` et gère la mémoire automatique |
+| `/model [modèle]` | Change de modèle (Opus 5.5 par défaut, `sonnet`, `haiku`…) |
+| `/effort [niveau]` | Règle l'effort : `low` à `xhigh`, `max`, `auto` ; `ultracode` à part |
+| `/plan [tâche]` | Passe en mode plan avant un gros changement |
+| `/context` | Montre ce qui remplit la fenêtre de contexte |
+| `/compact [consignes]` | Résume la conversation pour libérer du contexte |
+| `/clear` | Nouvelle conversation, contexte vide |
+| `/usage` | Coût de la session, limites de l'offre, statistiques (`/cost` et `/stats` sont des alias) |
+| `/btw [question]` | Question annexe qui n'entre pas dans l'historique |
+| `/rewind` | Revient à un point de contrôle (code et conversation) |
+| `/resume`, `/rename` | Reprendre et nommer des sessions |
+| `/branch`, `/fork` | Dupliquer la conversation, au premier plan ou en arrière-plan |
+| `/tasks` | Liste le travail en arrière-plan (sous-agents, commandes) |
+| `/diff` | Affiche les changements de l'arbre de travail |
+| `/code-review` | Revue du diff (alias `/review`), `ultra` pour la revue cloud |
+| `/security-review` | Recherche de vulnérabilités dans les changements de la branche |
+| `/simplify` | Nettoyage du code modifié (pas de chasse aux bugs) |
+| `/permissions` | Règles allow, ask, deny |
+| `/config` | Réglages (`/config clé=valeur` pour aller vite) |
+| `/mcp` | État et authentification des serveurs MCP |
+| `/hooks`, `/skills`, `/plugin` | Inspecter hooks, skills et plugins |
+| `/doctor` | Bilan de l'installation et de la configuration (alias `/checkup`) |
+| `/batch`, `/loop`, `/goal`, `/schedule` | Changements en parallèle, répétition, objectif, routines cloud |
+| `/remote-control`, `/teleport` | Continuer une session depuis un autre appareil, ou rapatrier une session cloud |
+| `/export` | Exporter la conversation en texte |
+
+Certaines commandes sont des « skills fournis » (`/code-review`, `/batch`, `/loop`, `/doctor`…) : ce sont des prompts détaillés que Claude exécute avec ses outils, au même titre que les skills que vous écrivez.
 
 ## Erreurs fréquentes
 
-- **Confondre `/clear` et quitter Claude** : `/clear` vide le contexte mais reste dans la même session ; quitter (Ctrl+D) ferme tout et nécessitera un `/resume` pour retrouver l'historique.
-- **Spammer `/resume` sans filtre** : si la liste est trop longue, fermez les vieilles sessions ou notez l'identifiant qui vous intéresse.
-- **Ignorer `/help` sur un nouveau projet** : vous ratez les commandes que l'équipe a versionnées dans `.claude/commands/`.
+- **Croire que `/clear` efface définitivement** : la conversation reste disponible dans `/resume`.
+- **Ne jamais faire `/clear`** : le contexte grossit, chaque message coûte plus cher et les réponses se dispersent.
+- **Chercher une session sans nom** : utilisez `/rename` ou `claude -n`, puis `claude --resume <nom>`.
+- **Chercher `/vim` ou `/pr-comments`** : ces commandes ont été retirées. Le mode Vim se règle dans `/config`, et il suffit de demander à Claude de lire les commentaires d'une PR.
 
 ## Pour aller plus loin
 
-- Lisez la doc officielle : https://docs.claude.com/en/docs/claude-code/slash-commands
-- Combinez `/clear` avec `/cost` pour mesurer combien de tokens vous économisez en repartant à zéro
-- Configurez un hook `SessionStart` qui lance automatiquement un `/resume` si une session récente existe
+- [Reprendre une session en détail](/wiki/cli/sessions-reprise)
+- [Points de contrôle et /rewind](/wiki/cli/continue-checkpoints)
+- [/usage et /compact](/wiki/slash-commands/cost-compact)
+- [Créer une commande personnalisée](/wiki/slash-commands/creer-slash-command)
+
+## Sources
+
+- [Commands (référence complète)](https://code.claude.com/docs/en/commands)
+- [Manage sessions](https://code.claude.com/docs/en/sessions)
+- [Manage costs effectively](https://code.claude.com/docs/en/costs)

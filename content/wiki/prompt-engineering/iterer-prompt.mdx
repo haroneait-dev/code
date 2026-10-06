@@ -1,66 +1,116 @@
 ---
-title: "Itérer sur un prompt"
-description: "Méthodologie pour améliorer un prompt en production : eval sets, A/B, rollback et discipline d'ingénierie."
-updatedAt: "2026-05-19"
-readingMinutes: 6
+title: "Itérer sur un prompt : la méthode"
+description: "Améliorer un prompt pas à pas sans se fier à l'intuition : critères de réussite, jeu de tests, un changement à la fois, versionnage, et ce qu'il faut revérifier à chaque changement de modèle."
+updatedAt: "2026-10-03"
+readingMinutes: 7
 ---
 
-Un prompt n'est jamais "fini". Il évolue avec le modèle, les cas d'usage, les retours utilisateurs. Mais contrairement au code classique, un changement de prompt n'a pas de type checker ni de test unitaire évident : une formulation peut sembler meilleure sur trois exemples et dégrader la qualité sur cent autres. Itérer proprement demande donc une vraie discipline d'ingénierie.
+Un prompt n'est jamais fini : il évolue avec vos cas d'usage, vos utilisateurs et les modèles. Mais une formulation qui semble meilleure sur trois exemples peut dégrader cent autres cas. Cet article décrit une méthode simple pour itérer sans tourner en rond, aussi bien dans claude.ai que dans une application.
 
-## Partir d'une baseline mesurable
+## Avant de toucher au prompt
 
-Avant de toucher un prompt en production, il faut savoir **où on part**. Cela suppose :
+La documentation d'Anthropic pose trois prérequis avant tout travail de prompt :
 
-- Un **eval set** : 30 à 200 exemples représentatifs des cas réels (succès, échecs, edge cases).
-- Une **métrique** : exact match, score LLM-as-judge, taux de tool calls corrects, latence, coût.
-- Une **baseline chiffrée** : "le prompt v1 scorefait 78 % sur l'eval, à 1.2 s de latence médiane".
+1. des **critères de réussite** clairs ;
+2. un moyen de les **tester** ;
+3. un **premier jet** de prompt à améliorer.
 
-Sans baseline, toute itération est un pari. Avec, chaque changement devient falsifiable.
+Elle rappelle aussi que tous les problèmes ne se règlent pas par le prompt. Un souci de latence ou de coût se résout souvent mieux en changeant de modèle ou de niveau d'effort.
+
+## Définir ce qu'est une bonne réponse
+
+Un critère utile est précis et mesurable. « Des réponses de qualité » ne l'est pas. Ceci l'est :
+
+| Critère | Exemple mesurable |
+|---|---|
+| Exactitude | 95 % des tickets classés dans la bonne catégorie |
+| Format | 100 % des réponses passent la validation JSON |
+| Ton | Note moyenne d'au moins 4 sur 5 pour « ton professionnel », jugée par un autre modèle |
+| Longueur | Moins de 150 mots dans 90 % des cas |
+| Coût, latence | Moins de 3 secondes avant le premier token |
+
+La plupart des applications ont besoin de plusieurs critères à la fois.
 
 ## Le cycle d'itération
 
-Un cycle sain ressemble à ceci :
+1. **Observer** un échec : retour utilisateur, log, cas raté.
+2. **L'ajouter au jeu de tests**, pour ne plus jamais le perdre de vue.
+3. **Formuler une hypothèse** : « Claude invente des chiffres parce que le prompt ne l'autorise pas à dire qu'il ne sait pas. »
+4. **Changer une seule chose** dans le prompt.
+5. **Mesurer sur tout le jeu de tests**, pas seulement sur le cas qui a déclenché le changement.
+6. **Décider** : garder, annuler ou affiner.
 
-1. **Observer** un échec en production (logs, feedback utilisateur, ticket).
-2. **Reproduire** dans l'eval set en ajoutant le cas problématique.
-3. **Formuler une hypothèse** : "le modèle hallucine parce que la consigne d'output JSON est noyée dans le system prompt".
-4. **Modifier** le prompt sur une seule variable (un changement à la fois).
-5. **Mesurer** sur l'eval complet — pas juste le cas qui a déclenché la modif.
-6. **Décider** : merge, rollback, ou affiner.
+Le piège classique : modifier trois éléments d'un coup. Si le score bouge, vous ne savez pas lequel a compté.
 
-Le piège classique : changer trois choses en même temps "parce qu'elles vont ensemble". Si le score bouge, on ne sait pas laquelle a aidé.
+## Les modifications qui paient le plus souvent
 
-## A/B testing en production
+Dans l'ordre où les essayer :
 
-Pour les changements à fort impact, l'eval offline ne suffit pas. Il faut tester en conditions réelles :
+- **Ajouter du contexte** : pourquoi la tâche existe, pour qui, avec quel enjeu. Claude généralise à partir de l'explication.
+- **Préciser le résultat attendu** plutôt que d'ajouter des interdits.
+- **Ajouter ou diversifier des exemples** (voir [Few-shot prompting](/wiki/prompt-engineering/few-shot)).
+- **Séparer consignes et données** avec des [balises XML](/wiki/prompt-engineering/balises-xml).
+- **Ajuster l'effort** avant d'ajouter « réfléchissez bien » : sur les modèles récents, l'effort contrôle la réflexion plus sûrement que le prompt.
+- **Découper en plusieurs appels** quand vous devez inspecter une étape intermédiaire : brouillon, relecture selon des critères, version finale.
 
-- **Split utilisateurs** : 90 % sur v1, 10 % sur v2 pendant 48 h.
-- **Métriques produit** : taux de complétion de tâche, temps passé, retours négatifs, taux de retry.
-- **Significativité** : ne pas conclure sur 50 requêtes. Viser 500-1000 minimum par variante.
+## Itérer dans claude.ai
 
-Le `model` et la `system_prompt` étant versionnés, on peut router via un simple flag d'environnement ou un système de feature flags (LaunchDarkly, Statsig, ou table Postgres maison).
+Pas besoin d'outillage pour progresser sur un prompt personnel :
 
-## Versioning et rollback
+1. **Gardez un jeu de test minimal** : trois à cinq demandes types, dont une difficile, dans un document à part.
+2. **Modifiez votre message** plutôt que d'empiler les corrections dans la conversation : la nouvelle version part d'un contexte propre.
+3. **Demandez à Claude ce qui manquait** :
 
-Traiter les prompts comme du code :
+```text
+Votre réponse ne correspond pas à ce que je voulais : j'attendais un
+tableau comparatif court, vous avez écrit une dissertation. Quelles
+informations auraient dû figurer dans ma demande pour que vous
+produisiez directement le bon format ? Réécrivez ma demande initiale
+en les intégrant.
+```
 
-- **Fichier dédié** (`prompts/agent-v3.md`) versionné dans git, pas une string hardcodée.
-- **Commit message explicite** : "prompt v3.2 : ajout règle no-hallucination URLs, +4 % accuracy sur eval".
-- **Tag de version** envoyé en metadata à l'API pour pouvoir corréler logs et version.
-- **Rollback en un commit** : si v3 dégrade en prod, on revert et on redéploie en 5 minutes.
+4. **Stabilisez la bonne version** dans les instructions d'un projet (voir [Créer un projet](/wiki/claude-ai/projects-creation)), puis rejouez votre jeu de test dans une nouvelle conversation du projet.
 
-Stocker l'eval set à côté du prompt dans le repo permet de rejouer l'historique : un changement de modèle (Sonnet 4.6 → 4.7) peut être validé contre les eval sets de tous les prompts du projet en une commande.
+## Itérer sur un prompt d'application
 
-## Outils d'aide à l'itération
+### Traiter le prompt comme du code
 
-- **Anthropic Workbench** : interface web pour tester un prompt sur plusieurs inputs en parallèle.
-- **Prompt improver** : générateur d'amélioration assisté, utile pour casser un plateau.
-- **Logs structurés** : tous les appels API avec input/output/usage stockés dans une table queryable (BigQuery, Snowflake).
-- **LLM-as-judge** : utiliser Claude lui-même pour scorer les outputs sur des critères qualitatifs (cohérence, ton, exhaustivité).
+- Un **fichier dédié** versionné dans Git (`prompts/support-v3.md`), pas une chaîne cachée dans le code.
+- Un **message de commit** qui dit ce qui a changé et l'effet mesuré.
+- La **version du prompt** envoyée dans vos logs ou métadonnées, pour relier un comportement à une version.
+- Le **jeu de tests à côté du prompt**, pour pouvoir tout rejouer en une commande.
+
+### Tester en conditions réelles
+
+Pour un changement à fort impact, complétez les tests hors ligne par un essai sur une petite part du trafic (par exemple 10 %), avec des indicateurs produit : taux de réussite de la tâche, relances, retours négatifs. Attendez un volume suffisant avant de conclure.
+
+### Les outils
+
+- Le **playground de la Console Claude** permet d'essayer un prompt, de changer de modèle et de paramètres, et d'exporter le code. Il a remplacé le Workbench, retiré en 2026, et ne conserve pas votre travail sur les serveurs d'Anthropic : gardez vos prompts dans votre dépôt.
+- Le **notebook « metaprompt »** du Claude Cookbook génère un premier jet quand vous partez de zéro (voir [Meta-prompting](/wiki/prompt-engineering/meta-prompting)).
+- Les **évaluations automatisées** notent chaque version (voir [Tester un prompt](/wiki/prompt-engineering/tester-prompt)).
+
+## À chaque nouveau modèle, revérifiez
+
+Un prompt réglé pour un modèle n'est pas forcément optimal pour le suivant. Points relevés par Anthropic sur les modèles récents :
+
+- **Refaites un balayage d'effort.** Les niveaux ne correspondent pas à la même quantité de réflexion d'un modèle à l'autre : Opus 5.5 est à `medium` par défaut et égale ou dépasse Opus 5 en `high` dans les tests d'Anthropic.
+- **Retirez les consignes « anti-paresse »** du type « en cas de doute, utilisez l'outil » : les modèles récents risquent de sur-réagir.
+- **Retirez les demandes de raisonnement écrit dans la réponse** : elles peuvent déclencher un refus `reasoning_extraction` (voir [Faire réfléchir Claude](/wiki/prompt-engineering/chain-of-thought)).
+- **Retirez le prefill** : il renvoie une erreur 400 depuis la génération 4.6 (voir [Prefilling](/wiki/prompt-engineering/prefilling)).
+- **Revoyez les consignes de vérification** : Opus 5 vérifie déjà son travail, et les instructions héritées le poussent à sur-vérifier.
 
 ## Pour aller plus loin
 
-- Lire *Tester un prompt* pour la mécanique d'évaluation systématique
-- Lire *Anti-patterns prompt engineering* pour repérer les formulations qui freinent
-- Documentation : [Prompt engineering overview](https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/overview)
-- Outils : promptfoo, Langfuse, Helicone, Braintrust pour industrialiser l'évaluation
+- [Tester un prompt](/wiki/prompt-engineering/tester-prompt)
+- [Anti-patterns](/wiki/prompt-engineering/anti-patterns)
+- [Meta-prompting](/wiki/prompt-engineering/meta-prompting)
+- [Prompter les modèles Claude 5.5](/wiki/prompt-engineering/prompting-sonnet-5)
+
+## Sources
+
+- [Prompt engineering overview (Anthropic)](https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/overview)
+- [Define success criteria and build evaluations (Anthropic)](https://platform.claude.com/docs/en/test-and-evaluate/develop-tests)
+- [Prompting best practices : Chain complex prompts, Migration considerations (Anthropic)](https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/claude-prompting-best-practices)
+- [Prompting Claude Opus 5.5 : Calibrate effort (Anthropic)](https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-opus-5-5)
+- [How do I use the playground? (Centre d'aide Claude)](https://support.claude.com/en/articles/8606378-how-do-i-use-the-workbench)

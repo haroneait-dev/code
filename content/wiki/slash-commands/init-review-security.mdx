@@ -1,130 +1,122 @@
 ---
-title: "/init, /review, /security-review : bootstrap et audit"
-description: "Trois commandes natives pour démarrer un projet, relire une PR et auditer la sécurité du code."
-updatedAt: "2026-05-19"
+title: "/init, /code-review, /security-review : démarrer et auditer"
+description: "Générer un CLAUDE.md avec /init, relire un diff ou une PR avec /code-review (alias /review) et chercher des failles avec /security-review."
+updatedAt: "2026-10-03"
 readingMinutes: 6
 ---
 
-Trois commandes intégrées encapsulent des workflows qu'on lance des centaines de fois en équipe : `/init` pour découvrir un codebase et générer un `CLAUDE.md`, `/review` pour relire automatiquement une pull request, et `/security-review` pour auditer les changements pendants. Elles sont fournies par Anthropic, maintenues à jour, et constituent un excellent point de départ avant d'écrire ses propres commandes custom.
+Trois commandes intégrées couvrent le début et la fin d'une tâche : `/init` prépare le projet, `/code-review` cherche les bugs dans vos changements et `/security-review` cherche les vulnérabilités. Depuis la v2.1.223, `/review` n'est plus une commande à part : c'est un alias de `/code-review`.
 
-## /init — générer un CLAUDE.md
+## `/init` : un CLAUDE.md de départ
 
-`/init` analyse votre repo et crée (ou met à jour) le fichier `CLAUDE.md` à la racine, qui sert de mémoire persistante à Claude pour ce projet. La commande lit votre `package.json`, parcourt l'arborescence, détecte le framework, et propose un résumé de la stack, des conventions et des commandes principales.
+`/init` analyse le dépôt et écrit un `CLAUDE.md` à la racine : stack, commandes de build et de test, conventions repérées. Ce fichier est chargé au début de chaque session.
 
-```bash
+```text
 > /init
-Analyzing repository...
-- Detected: Next.js 16 App Router, TypeScript, Supabase
-- Found: package.json, tsconfig.json, .env.example
-- Scanning app/ for routes...
-Writing CLAUDE.md...
 ```
 
-Le `CLAUDE.md` généré inclut typiquement :
+Deux options utiles :
 
-```md
-# Project
+- `CLAUDE_CODE_NEW_INIT=1 claude` lance un parcours interactif qui aborde aussi les skills, les hooks et les fichiers de mémoire personnels ;
+- si `/init` trouve une configuration OpenAI Codex ou Gemini CLI, il propose de la reprendre avec `/import`.
 
-## Stack
-- Next.js 16, TypeScript, Tailwind
-- Supabase (auth + Postgres)
+Le fichier généré est un point de départ, pas un livrable. Relisez-le, supprimez ce que Claude peut déduire seul du code, et gardez les règles qui comptent. Pour l'affiner ensuite, utilisez `/memory`. Pour un audit des instructions devenues contradictoires ou obsolètes, `/doctor prompt-audit` (v2.1.283 et plus) passe en revue vos `CLAUDE.md` et vos skills.
 
-## Commands
-- npm run dev    # dev server
-- npm run build  # production build
-- npm test       # run tests
+Si le dépôt contient un `AGENTS.md` mais pas de `CLAUDE.md`, Claude Code lit `AGENTS.md`.
 
-## Conventions
-- Server components by default
-- API routes in app/api/
+## `/code-review` : trouver les bugs avant de pousser
+
+`/code-review` relit les commits de votre branche en avance sur l'amont, plus les changements non commités. Il cherche d'abord des erreurs de correction ; selon le modèle et l'effort, il signale aussi des nettoyages possibles.
+
+```text
+> /code-review                  # diff courant
+> /code-review high 1234        # PR n°1234, effort élevé
+> /code-review main...ma-branche
+> /code-review --fix            # applique les corrections ensuite
+> /code-review --comment 1234   # publie les remarques sur la PR
+> /code-review ultra            # revue multi-agents dans le cloud
 ```
 
-Lancez `/init` à chaque grosse refonte ou quand vous arrivez sur un projet existant : le fichier produit devient le contexte par défaut chargé à chaque session.
+Les points à connaître :
 
-## /review — relire une PR
+- **Effort** : `low` et `medium` ne remontent que les constats les plus sûrs (peu de faux positifs) ; `high` à `max` élargissent la couverture. Sans niveau, la commande réutilise le dernier niveau que vous avez tapé.
+- **Arrière-plan** : la revue tourne dans un sous-agent avec son propre contexte, vous continuez à travailler. Les résultats arrivent dans la conversation.
+- **`--max-findings n|all|default`** (v2.1.288) : change le nombre maximal de constats.
+- **`--fix` en arrière-plan** : ces modifications ne sont pas couvertes par les points de contrôle, `/rewind` ne les annule pas. Utilisez git.
+- **`ultra`** (alias `/ultrareview`) : revue approfondie dans un bac à sable cloud. Trois exécutions gratuites sur Pro et Max, puis des crédits d'usage.
 
-`/review` automatise la revue de code sur une pull request. Selon la version, vous pouvez la lancer sur la branche courante, sur un numéro de PR, ou sur un diff :
+La revue suit votre `CLAUDE.md`. Le fichier `REVIEW.md`, lui, ne sert qu'à la revue automatique des PR sur GitHub (Code Review, offres Team et Enterprise), pas à la commande locale.
 
-```bash
-> /review
-Reviewing current branch against main...
-- 4 files changed, +127 -43
-- Running checks: types, tests, conventions, security
-```
+`/simplify` est complémentaire : quatre agents cherchent les doublons, la complexité inutile, l'inefficacité et les problèmes de niveau d'abstraction, puis appliquent les corrections. Il ne cherche pas de bugs.
 
-Le rapport remonte les problèmes triés par sévérité : bugs probables, régressions de typage, manquements aux conventions du `CLAUDE.md`, tests manquants. C'est l'équivalent d'un reviewer humain rigoureux, sans l'attente.
+## `/security-review` : les vulnérabilités du diff
 
-Bonnes pratiques :
+`/security-review` analyse le diff entre votre branche et la branche par défaut de `origin` : injections, problèmes d'authentification, exposition de données, etc.
 
-- Lancez `/review` **avant** d'ouvrir la PR sur GitHub : vous corrigez les remarques bénignes vous-même
-- Pointez vers une PR spécifique : `/review 1234` pour relire celle d'un collègue
-- Combinez avec un hook `PreCommit` pour bloquer les commits qui échouent la revue
-
-## /security-review — auditer la sécurité
-
-`/security-review` est une variante focalisée sur les vulnérabilités. Elle examine les changements en attente sur la branche courante en cherchant les patterns connus : injection SQL, secrets en clair, XSS, autorisation manquante sur des routes API, configuration RLS incorrecte côté Supabase, etc.
-
-```bash
+```text
 > /security-review
-Auditing pending changes for security issues...
-
-[HIGH] app/api/wiki/[id]/route.ts:23
-  DELETE endpoint missing auth check.
-  Anyone can delete any wiki entry.
-
-[MED] lib/db.ts:14
-  SQL query uses string concatenation with user input.
-  Use parameterized queries instead.
-
-[LOW] .env.example
-  Contains placeholder that looks like a real key prefix.
 ```
 
-Sur un projet Next.js avec Supabase, `/security-review` attrape régulièrement :
+Il faut un remote `origin`. Si la commande échoue avec une erreur `ambiguous argument`, la référence par défaut du remote manque, la page d'erreurs de la documentation donne la correction.
 
-- Des routes API sans vérification du token Bearer
-- Des appels à `SUPABASE_SERVICE_ROLE_KEY` exposés côté client
-- Des composants `"use client"` qui importent des variables sans préfixe `NEXT_PUBLIC_`
-- Des RLS désactivées sur des tables sensibles
+Sur un projet Next.js et Supabase, demandez-vous en lisant le rapport :
 
-## Quand les enchaîner
+- chaque route API vérifie-t-elle le jeton de l'utilisateur ?
+- la clé `SUPABASE_SERVICE_ROLE_KEY` reste-t-elle côté serveur ?
+- les nouvelles tables ont-elles des politiques RLS ?
+- une variable sensible est-elle exposée via un préfixe `NEXT_PUBLIC_` ?
 
-Sur un projet neuf :
+Une revue automatique est une couche de défense parmi d'autres. Elle ne remplace ni les tests, ni une relecture humaine des parties critiques.
 
-```bash
-> /init                # crée CLAUDE.md
-> /review              # premier audit de qualité
-> /security-review     # premier audit sécurité
+## Enchaîner les trois
+
+Sur un projet que vous découvrez :
+
+```text
+> /init
+> /memory            # relire et corriger le CLAUDE.md
 ```
 
-Sur une feature branch avant de pousser :
+Avant d'ouvrir une PR :
 
-```bash
-> /review              # qualité générale
-> /security-review     # focus sécu
-> git push
+```text
+> /diff
+> /code-review
+> /security-review
 ```
 
-## Personnaliser ces commandes
+Pour automatiser la revue sur chaque PR, voir [Revue de code automatique](/wiki/workflows/code-review-auto).
 
-Les trois commandes sont scriptables : vous pouvez créer une version maison dans `.claude/commands/security-review.md` qui override l'officielle avec vos propres règles d'équipe (ex : interdire l'usage de `dangerouslySetInnerHTML`, vérifier la présence d'un header CSP).
+## Ajouter vos propres règles
+
+Les commandes personnalisées sont désormais des skills. Pour un audit maison, créez un skill avec un nom distinct, par exemple `.claude/skills/audit-secu/SKILL.md` :
 
 ```md
 ---
-description: "Audit sécurité spécifique à notre stack"
-allowed-tools: [Read, Grep, Bash]
+description: Audit sécurité propre à notre stack Next.js + Supabase
+disable-model-invocation: true
+allowed-tools: Read Grep Glob Bash(git diff *)
 ---
 
-Tu es un auditeur sécurité. Examine les changements pendants
-et vérifie en plus de la checklist standard :
+Examinez le diff courant (`git diff origin/main...HEAD`) et vérifiez, en plus des points habituels :
 
-- Aucun appel à `dangerouslySetInnerHTML`
-- Toutes les routes API vérifient le JWT Supabase
-- Aucune RLS désactivée
+- aucun `dangerouslySetInnerHTML` sans assainissement ;
+- chaque route sous `app/api/` vérifie le JWT Supabase ;
+- aucune table créée sans politique RLS.
+
+Classez les constats par gravité, avec fichier et ligne.
 ```
+
+Un nom distinct évite les ambiguïtés. Un skill de projet nommé `code-review` remplace bien `/code-review`, mais l'alias `/review` continue de lancer la version intégrée, ce qui déroute l'équipe. Notez aussi que `allowed-tools` pré-autorise ces outils pendant le tour : il ne restreint pas les autres (voir [le frontmatter](/wiki/slash-commands/markdown-frontmatter)).
 
 ## Pour aller plus loin
 
-- Documentation officielle : https://docs.claude.com/en/docs/claude-code/slash-commands
-- Couplez `/review` à un GitHub Action pour reviewer automatiquement chaque PR ouverte
-- Versionnez votre `/security-review` custom dans `.claude/commands/` pour le partager en équipe
+- [Bien écrire son CLAUDE.md](/wiki/demarrer/claude-md)
+- [Créer une commande personnalisée](/wiki/slash-commands/creer-slash-command)
+- [Revue de code automatique](/wiki/workflows/code-review-auto)
+
+## Sources
+
+- [Commands](https://code.claude.com/docs/en/commands)
+- [Code Review et /code-review](https://code.claude.com/docs/en/code-review)
+- [Skills](https://code.claude.com/docs/en/skills)

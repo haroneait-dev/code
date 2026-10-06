@@ -1,165 +1,102 @@
 ---
-title: "Output management"
-description: "Comment Claude Code gère et tronque les outputs longs — limites, pagination, stratégies."
-updatedAt: "2026-05-19"
+title: "Gérer les sorties longues"
+description: "Ce que Claude Code fait des sorties volumineuses (Bash, Read, Grep, Glob, MCP, WebFetch) : seuils exacts, fichiers de débordement, réglages et commandes à préférer."
+updatedAt: "2026-10-03"
 readingMinutes: 6
 ---
 
-Quand un outil retourne une sortie volumineuse — un build de 50 000 lignes, un dump SQL, un test runner verbeux — Claude Code ne peut pas tout absorber dans son contexte. Le harness applique alors des stratégies d'**output management** : troncature, pagination, redirection vers fichier, ou filtrage. Comprendre ces mécanismes vous évite des frustrations et vous aide à structurer vos commandes pour rester productif.
+Un build verbeux, une suite de tests complète ou un dump SQL peuvent produire bien plus de texte que ce qu'il est utile de mettre dans le contexte de Claude. Claude Code applique donc des limites par outil : au-delà, la sortie est écrite dans un fichier et Claude n'en reçoit qu'un aperçu. Connaître ces seuils vous aide à écrire des commandes qui donnent à Claude l'essentiel, sans saturer la fenêtre de contexte.
 
-## Pourquoi tronquer
+## Les limites par outil
 
-La fenêtre de contexte de Claude est large (200k tokens et plus) mais finie. Un seul `npm run build` peut produire 100k tokens d'output Webpack/Turbopack. Si tout était injecté, vous saturiez le contexte en une commande.
+| Outil | Limite | Au-delà |
+|-------|--------|---------|
+| Bash (succès) | Environ 30 000 caractères en ligne | Chemin d'un fichier de sortie + aperçu des 2 000 premiers caractères ; Claude lit ou cherche dans le fichier si besoin |
+| Bash (échec) | Environ 10 000 caractères | Extrait début + fin, sans chemin de fichier |
+| Bash (toute commande) | 5 Go de sortie | Commande arrêtée |
+| Read | Limite en tokens par lecture | Première page + avis `PARTIAL view` ; lecture de la suite avec `offset` et `limit` |
+| Grep | Pagination `head_limit` et `offset` | Claude affine ou pagine |
+| Glob | 100 fichiers | Indicateur de troncature ; Claude resserre le motif |
+| Outils MCP | Avertissement à 10 000 tokens, maximum 25 000 par défaut | Sortie enregistrée dans un fichier, Claude reçoit le chemin |
+| WebFetch | Page tronquée à une taille fixe | Le prompt d'extraction filtre de toute façon le contenu |
 
-Le harness :
+## Échec ou succès : pourquoi c'est important
 
-- **tronque** les outputs trop longs (souvent en gardant le début + la fin) ;
-- **signale** la troncature explicitement ;
-- vous laisse **réinspecter** la portion qui vous intéresse via Read/Bash.
+Pour Bash, Claude Code traite différemment un résultat valide et un échec. Un code de sortie 1 est considéré comme valide seulement pour `grep`, `rg`, `egrep`, `fgrep`, `find`, `diff`, `test`, `[`, `git diff` et `git grep`. Pour les autres commandes (y compris `jq -e` ou `cmp`), un code 1 est un échec : la sortie est plafonnée à environ 10 000 caractères, en extrait début + fin. Si une commande « qui échoue normalement » produit beaucoup de texte utile, redirigez-la vers un fichier.
 
-## Comportement par défaut
+## Réglages disponibles
 
-Pour l'outil `Bash` :
+| Réglage | Effet |
+|---------|-------|
+| `BASH_MAX_OUTPUT_LENGTH` | Taille de la fenêtre relue depuis le fichier de sortie (30 000 par défaut, 150 000 maximum). N'augmente pas le plafond en ligne d'un succès |
+| `bashOutputMaxChars` (settings, v2.1.261+) | Plafond en ligne d'un succès et fenêtre de relecture ensemble, jusqu'à 128 000 caractères. Remplace la variable précédente |
+| `CLAUDE_CODE_FILE_READ_MAX_OUTPUT_TOKENS` | Relève la limite de Read |
+| `MAX_MCP_OUTPUT_TOKENS` | Relève le plafond des sorties MCP |
 
-- les outputs sont **streamés** au fil de l'exécution ;
-- au-delà d'un certain seuil (varie selon version, typiquement quelques centaines de lignes), la sortie est tronquée ;
-- un message "[output truncated]" est inséré ;
-- l'output complet peut souvent être retrouvé via le mode background ou un fichier de log.
+Relever ces plafonds fait entrer plus de texte dans le contexte à chaque appel. C'est rarement la meilleure option : mieux vaut une commande qui sort moins.
 
-Pour les autres outils (Read, Grep, Glob) :
+## Stratégies efficaces
 
-- `Read` a un `limit` par défaut à 2000 lignes ;
-- `Grep` retourne par défaut ce qui rentre dans une réponse raisonnable — utilisez `head_limit` ;
-- `Glob` peut retourner des milliers de chemins, restez précis dans le pattern.
-
-## Stratégies pour gérer les outputs longs
-
-### 1. Rediriger vers un fichier
-
-```bash
-Bash(
-  command="npm run build > /tmp/build.log 2>&1",
-  description="Build with log to file",
-  timeout=300000
-)
-
-# Puis lire les parties intéressantes
-Bash(command="tail -100 /tmp/build.log", description="Tail of build log")
-```
-
-Vous gardez le log complet sur disque et n'injectez que ce qui vous intéresse.
-
-### 2. Filtrer à la source
+### Rediriger, puis filtrer
 
 ```bash
-Bash(
-  command="npm test 2>&1 | grep -E '(FAIL|Error|✗)'",
-  description="Test failures only"
-)
+npm run build > /tmp/build.log 2>&1; echo "exit=$?"
+grep -nE "error|Error|failed" /tmp/build.log | head -50
 ```
 
-Vous laissez `grep` faire le tri avant que l'output n'atteigne Claude.
+Le log complet reste sur disque. Claude lit ensuite la zone utile avec `Read` et `offset`.
 
-### 3. Compter, puis cibler
-
-```bash
-# 1. Combien d'erreurs ?
-Bash(command="npm run lint 2>&1 | grep -c 'error'", description="Count errors")
-
-# 2. Voir un sample
-Bash(command="npm run lint 2>&1 | grep 'error' | head -20", description="Sample errors")
-```
-
-### 4. Pagination explicite
-
-Pour un fichier de log énorme :
-
-```bash
-Read(file_path="/tmp/build.log", offset=5000, limit=200)
-```
-
-### 5. Background avec inspection différée
-
-```bash
-Bash(
-  command="npm run e2e",
-  run_in_background=true,
-  description="Run e2e tests"
-)
-# Vous serez notifié — pas besoin de polling
-```
-
-## Détection de troncature
-
-Quand un output a été tronqué, surveillez :
-
-- la mention `[truncated]`, `[output cut]`, ou similaire ;
-- un nombre de lignes suspicieux (ex. exactement 200 alors que vous attendiez beaucoup plus) ;
-- l'absence de la fin attendue (pas de "exit code", pas de "Tests passed").
-
-Si vous suspectez une troncature, ré-exécutez en redirigeant vers un fichier puis lisez par tranches.
-
-## Pièges courants
-
-**Demander un dump complet sans filtre.** `cat huge.log` via Bash → tronqué et inutile. Préférez un pipe `grep` ou un `tail`.
-
-**Tester avec des reporters verbeux.** `pytest -v -s` peut produire 10x plus d'output que `pytest --tb=short`. Choisissez le reporter en fonction du contexte.
-
-**Logs npm/yarn bavards.** Préfixez avec `npm run X --silent` ou `yarn X --silent` quand vous n'avez besoin que du résultat.
-
-**Output binaire.** Si vous `cat` un PDF ou une image, vous polluez le contexte avec du JSON/binaire illisible. Read gère ces formats correctement — utilisez Read.
-
-**Recursion `find /`.** Scanner toute la racine → des millions de chemins. Restez ciblé.
-
-## Cas spécifiques
-
-### Builds Next.js / Turbopack
-
-Les builds peuvent produire beaucoup de lignes. Astuce : capturez tout dans un fichier et n'examinez que les erreurs.
-
-```bash
-Bash(
-  command="npm run build > /tmp/build.log 2>&1; echo exit=$?",
-  description="Build with logging"
-)
-Bash(
-  command="grep -nE '(error|Error|fail)' /tmp/build.log | head -50",
-  description="Extract errors"
-)
-```
-
-### Test runners
-
-```bash
-# Jest / Vitest — reporter compact
-Bash(command="npm test -- --reporter=basic", description="Run tests, compact reporter")
-
-# Pytest
-Bash(command="pytest --tb=line --no-header -q", description="Run pytest compactly")
-```
-
-### Git diff énormes
-
-```bash
-# Plutôt qu'un diff complet
-Bash(command="git diff --stat", description="Diff stats only")
-
-# Ou par fichier
-Bash(command="git diff -- specific/file.ts", description="Diff specific file")
-```
-
-## Bonnes pratiques de conception de commande
+### Choisir des sorties compactes
 
 | Au lieu de | Préférez |
 |------------|----------|
-| `cat huge.log` | `tail -100 huge.log` ou `grep ... huge.log` |
-| `npm install` | `npm install --silent --no-audit --no-fund` |
+| `cat huge.log` | `tail -100 huge.log` ou `grep -n motif huge.log` |
+| `npm install` | `npm install --no-audit --no-fund --loglevel=error` |
+| `pytest -v` | `pytest -q --tb=short` |
 | `cargo build` | `cargo build --quiet` |
-| `pytest -v` | `pytest -q` |
-| Tout l'output Webpack | Build avec `> /tmp/log 2>&1` puis `grep` |
+| `git diff` sur 200 fichiers | `git diff --stat`, puis `git diff -- chemin/fichier` |
+| `git log` | `git log --oneline -20` |
 
-## Pour aller plus loin
+### Compter avant de lire
 
-- [Documentation Claude Code](https://docs.claude.com/en/docs/claude-code)
-- Voir aussi : `Bash` pour les flags des commandes, `Read` pour paginer les fichiers, `Grep` pour filtrer.
-- Astuce : créez un wrapper shell `qbuild()` qui fait `npm run build > /tmp/build.log 2>&1 | grep -E "error|warn"` — vous capturez le détail dans un fichier et n'envoyez que l'essentiel à Claude.
+```bash
+npm run lint 2>&1 | grep -c "error"
+npm run lint 2>&1 | grep "error" | head -20
+```
+
+### Longues commandes en arrière-plan
+
+Avec `run_in_background`, la sortie s'écrit dans un fichier que Claude relit avec `Read` au moment utile (l'ancien outil `TaskOutput` est déprécié au profit de cette lecture). Pour suivre une sortie au fil de l'eau et réagir à des lignes précises, l'outil `Monitor` envoie chaque nouvelle ligne comme un événement.
+
+### Déléguer l'exploration volumineuse
+
+Analyser 40 fichiers de logs ou tout un module : confiez-le à un sous-agent. Il absorbe les sorties dans son propre contexte et ne renvoie qu'un résumé.
+
+## Surveiller votre contexte
+
+- `/context` montre ce qui occupe la fenêtre de contexte.
+- `Ctrl+O` ouvre la transcription détaillée, avec les sorties complètes des outils.
+- `/compact` résume la conversation quand elle s'alourdit ; `/rewind` propose aussi « Summarize from here » pour compresser une phase de débogage verbeuse.
+
+## Pièges fréquents
+
+**Tests verbeux.** Un reporter détaillé multiplie la sortie. Utilisez le mode compact et ne relancez en détaillé que le test qui échoue.
+
+**Lire un binaire avec cat.** Images et PDF passent par `Read`, qui les gère nativement.
+
+**Croire qu'une sortie est complète.** Si la fin attendue manque (code de sortie, résumé des tests), la sortie a été coupée : redirigez vers un fichier et lisez par tranches.
+
+## Articles liés
+
+- [L'outil Bash](/wiki/outils/bash)
+- [L'outil Read](/wiki/outils/read)
+- [/clear, /resume et coûts](/wiki/cli/clear-resume-cost)
+- [/compact et coûts](/wiki/slash-commands/cost-compact)
+- [Contexte long](/wiki/prompt-engineering/contexte-long)
+
+## Sources
+
+- [Tools reference : Output limits](https://code.claude.com/docs/en/tools-reference#output-limits)
+- [Environment variables](https://code.claude.com/docs/en/env-vars)
+- [MCP : tool output limits](https://code.claude.com/docs/en/mcp)
+- [Checkpointing](https://code.claude.com/docs/en/checkpointing)

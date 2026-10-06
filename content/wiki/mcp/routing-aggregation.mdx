@@ -1,101 +1,155 @@
 ---
-title: "Routing et agrégation de serveurs MCP"
-description: "Utiliser un proxy MCP pour exposer plusieurs serveurs via un endpoint unique et simplifier la configuration client."
-updatedAt: "2026-05-19"
-readingMinutes: 6
+title: "Routage et agrégation de serveurs MCP : passerelles et gestion d'équipe"
+description: "Quand regrouper plusieurs serveurs MCP derrière une passerelle, comment le protocole 2026-07-28 facilite le routage, quelles règles d'authentification respecter, et comment Claude Code distribue des serveurs à toute une équipe sans passerelle."
+updatedAt: "2026-10-03"
+readingMinutes: 8
 ---
 
-À mesure que les serveurs MCP se multiplient — filesystem, git, github, postgres, memory, puppeteer, plus vos serveurs internes — la configuration client devient ingérable. Chaque utilisateur installe la même liste, met à jour à la main, debug ses propres pannes. La solution : un **proxy MCP** qui agrège plusieurs serveurs derrière un endpoint unique.
+Quand une équipe utilise dix serveurs MCP, chaque poste finit avec sa propre configuration, ses propres jetons et ses propres pannes. Une **passerelle MCP** (gateway) regroupe ces serveurs derrière une seule URL et centralise authentification, filtrage et journalisation. Avant d'en installer une, vérifiez que Claude Code ne règle pas déjà votre problème : c'est souvent le cas.
 
-## Le problème
+## Le problème à résoudre
 
-Le `claude_desktop_config.json` typique d'un développeur ressemble à ça :
+Trois symptômes distincts, qui n'appellent pas la même réponse :
+
+| Symptôme | Réponse la plus simple |
+|---|---|
+| Chaque développeur reconfigure les mêmes serveurs | `.mcp.json` commité, plugin, ou serveurs fournis par l'organisation |
+| Trop d'outils, le contexte sature | tool search de Claude Code (activé par défaut) |
+| Jetons d'API partagés sur tous les postes, pas d'audit | passerelle MCP avec authentification centralisée |
+
+## Ce que Claude Code fait déjà
+
+**Espaces de noms.** Chaque outil est préfixé par le nom de son serveur : `mcp__github__create_issue`, `mcp__linear__create_issue`. Deux serveurs peuvent exposer le même nom d'outil sans collision, et vos règles de permission ciblent un serveur précis.
+
+**Coût en contexte.** Avec le tool search, seuls les noms des outils sont chargés au démarrage ; les définitions arrivent à la demande. Ajouter des serveurs coûte peu. Agréger pour « économiser du contexte » n'est donc plus un bon argument.
+
+**Partage dans un projet.** Un `.mcp.json` à la racine du dépôt, avec des `${VAR}` à la place des secrets, donne à toute l'équipe les mêmes serveurs :
 
 ```json
 {
   "mcpServers": {
-    "filesystem": { ... },
-    "git": { ... },
-    "github": { ... },
-    "postgres": { ... },
-    "memory": { ... },
-    "linear": { ... },
-    "slack": { ... }
+    "sentry": { "type": "http", "url": "https://mcp.sentry.dev/mcp" },
+    "outils-internes": {
+      "type": "http",
+      "url": "https://mcp.interne.exemple.com/mcp",
+      "headers": { "Authorization": "Bearer ${INTERNAL_MCP_TOKEN}" }
+    }
   }
 }
 ```
 
-Sept processus locaux à maintenir, sept binaires à installer, sept jeux de credentials. Multipliez par 50 développeurs : enfer opérationnel.
+**Distribution par l'organisation.** Les administrateurs disposent de trois leviers dans les paramètres gérés :
 
-## L'idée du proxy MCP
+| Mécanisme | Effet |
+|---|---|
+| `managedMcpServers` (v2.1.259+) | fournit des serveurs distants à chaque utilisateur, en plus des siens. HTTPS obligatoire, aucune commande locale |
+| `managed-mcp.json` | contrôle exclusif : seuls les serveurs de ce fichier se chargent |
+| `allowedMcpServers` / `deniedMcpServers` | listes d'autorisation et d'interdiction par URL, commande ou nom |
 
-Un proxy MCP est un serveur qui :
-1. Se présente au client comme **un seul serveur MCP**
-2. Maintient en interne des **connexions vers plusieurs serveurs MCP en amont**
-3. **Agrège** leurs tools, resources et prompts dans un namespace unifié
-4. **Route** chaque appel vers le bon backend
+Exemple de liste d'autorisation :
 
-Côté client, on configure une seule entrée. Côté ops, on gère une configuration centralisée.
-
-## Schémas de namespace
-
-L'agrégation pose un problème : deux serveurs peuvent exposer un tool de même nom (`list_files` côté filesystem et côté github). Les proxys résolvent ça par :
-
-- **Préfixage** : `filesystem.list_files`, `github.list_files`
-- **Routing explicite** : un tool `route(server, tool, args)` unique
-- **Sélection contextuelle** : activer un sous-ensemble selon le projet
-
-Le préfixage est le plus courant et le plus prévisible pour le modèle.
-
-## Implémentations existantes
-
-Plusieurs projets open source matures :
-
-- **mcp-proxy** (sparfenyuk) : pont Stdio ↔ SSE, utile pour exposer un serveur local sur HTTP
-- **mcp-hub** / **mcp-router** : agrégateurs multi-serveurs avec UI de gestion
-- **Smithery** : registre + gateway hébergé qui agrège les serveurs publics
-- **Toolhive** : orchestrateur conteneurisé pour serveurs MCP en équipe
-
-Côté entreprise, certains éditeurs proposent des **gateways MCP managés** avec auth SSO, audit logs, rate limiting et politiques par utilisateur.
-
-## Architecture type pour une équipe
-
+```json
+{
+  "allowedMcpServers": [
+    { "serverUrl": "https://mcp.sentry.dev/*" },
+    { "serverUrl": "https://*.interne.exemple.com/*" }
+  ],
+  "deniedMcpServers": [
+    { "serverName": "serveur-non-approuve" }
+  ]
+}
 ```
-Claude clients (50 devs)
-        │
+
+Vous pouvez aussi empaqueter des serveurs dans un **plugin** diffusé par une marketplace interne, ou passer par les **connecteurs** gérés depuis la console d'administration claude.ai, qui apparaissent automatiquement dans Claude Code.
+
+## Quand une passerelle se justifie
+
+Une passerelle apporte une vraie valeur quand vous avez besoin de :
+
+- **ne jamais distribuer** les identifiants des API en aval (le jeton GitHub de l'équipe reste sur la passerelle) ;
+- **filtrer les outils par rôle** : un stagiaire ne voit pas `delete_database` ;
+- **journaliser** chaque appel pour l'audit et la conformité ;
+- **limiter le débit** et protéger des services fragiles ;
+- **exposer des serveurs stdio** (qui ne servent qu'un client) à plusieurs personnes, en les faisant tourner dans des conteneurs.
+
+Architecture type :
+
+```text
+Postes Claude Code / Claude Desktop
+        │  Streamable HTTP + OAuth (SSO de l'entreprise)
         ▼
-   MCP Gateway (HTTP/SSE, auth SSO)
+   Passerelle MCP  ── journal d'audit, filtrage par rôle
         │
-   ┌────┼─────┬─────────┬──────────┐
-   ▼    ▼     ▼         ▼          ▼
- GitHub Linear Postgres Filesystem Internal
-                                   tools
+   ┌────┼──────────┬──────────────┐
+   ▼    ▼          ▼              ▼
+GitHub  Linear   Postgres   Outils internes
+(jeton propre à la passerelle pour chaque service)
 ```
 
-Le gateway :
-- Authentifie chaque dev (token SSO)
-- Injecte les credentials backend (le dev ne voit jamais le token GitHub d'équipe)
-- Filtre les tools selon le rôle
-- Log toutes les invocations pour audit
+## Ce que la révision 2026-07-28 change pour le routage
 
-## Quand ne pas le faire
+La révision courante a été pensée en partie pour les passerelles :
 
-Le proxy ajoute une couche, donc :
+- **Sans état** : plus de `Mcp-Session-Id`, donc plus de sessions collantes. N'importe quelle instance de la passerelle peut traiter n'importe quelle requête.
+- **En-têtes de routage** : chaque POST porte `Mcp-Method` (par exemple `tools/call`) et `Mcp-Name` (le nom de l'outil, du prompt ou l'URI de la resource). Un répartiteur de charge ou un pare-feu applicatif peut router ou bloquer **sans lire le corps JSON**.
+- **Paramètres en en-tête** : un outil peut marquer un paramètre avec `x-mcp-header` dans son schéma (par exemple la région). Le client le recopie dans un en-tête `Mcp-Param-Region`, utilisable pour router vers le bon centre de données.
+- **Cohérence vérifiée** : un serveur qui lit le corps doit rejeter une requête dont les en-têtes ne correspondent pas au corps (`400`, erreur `-32020`). Cela empêche de tromper un intermédiaire avec un en-tête falsifié.
+- **Cache** : les listes portent `ttlMs` et `cacheScope` (`public` ou `private`). Un intermédiaire ne doit mettre en cache que les réponses `public`.
 
-- **Latence** supplémentaire (réseau + sérialisation)
-- **Point unique de défaillance** si pas redondé
-- **Complexité de debug** : une erreur peut venir du proxy ou du serveur en amont
-- **Surface d'attaque** : un proxy mal configuré expose tous les backends
+Pendant la transition, beaucoup de serveurs en amont restent sur une révision 2025, avec session. Une passerelle doit gérer les deux générations, ou n'agréger que des serveurs à jour.
 
-Pour un usage individuel ou une petite équipe (< 5 personnes), garder les serveurs locaux reste plus simple.
+## Règles d'authentification à respecter
 
-## Pattern hybride : proxy partiel
+C'est là que la plupart des passerelles maison se trompent :
 
-Une approche pragmatique : garder en local les serveurs qui ont besoin du contexte utilisateur (filesystem, git) et passer par un proxy pour les services partagés (GitHub d'équipe, base de données, outils internes). Le `mcp.json` reste raisonnable et les responsabilités sont claires.
+1. **Pas de relais de jeton.** La spécification interdit à un serveur MCP d'accepter ou de transmettre un jeton qui n'a pas été émis pour lui. La passerelle valide le jeton de l'utilisateur, puis utilise **ses propres** identifiants (ou un échange de jetons) pour chaque service en aval.
+2. **Audience vérifiée.** Le jeton présenté à la passerelle doit avoir été émis pour l'URL de la passerelle (paramètre `resource` d'OAuth, RFC 8707).
+3. **Métadonnées publiées.** La passerelle, comme tout serveur MCP protégé, publie ses métadonnées de ressource protégée (RFC 9728) pour que les clients trouvent le serveur d'autorisation.
+4. **SSO d'entreprise.** L'extension officielle Enterprise-Managed Authorization permet de piloter l'accès depuis le fournisseur d'identité de l'entreprise ; l'extension OAuth Client Credentials couvre les accès machine à machine.
+
+## Espaces de noms dans la passerelle
+
+Si la passerelle expose tous les outils sous un seul serveur, les collisions reviennent. Deux solutions :
+
+- **préfixer** : `github_create_issue`, `linear_create_issue` (restez dans les caractères autorisés : lettres, chiffres, `_`, `-`, `.`) ;
+- **exposer plusieurs URL** : `https://passerelle/github/mcp`, `https://passerelle/linear/mcp`. Chaque service reste un serveur distinct dans Claude Code, avec son propre préfixe `mcp__…`, et vos règles de permission restent lisibles.
+
+La seconde option est souvent la meilleure avec Claude Code.
+
+## Outils existants
+
+L'écosystème évolue vite ; évaluez par vous-même avant d'adopter. Parmi les projets open source connus :
+
+- **Docker MCP Gateway** : lance chaque serveur dans un conteneur isolé, derrière un point d'entrée unique ;
+- **ToolHive** (Stacklok) : exécution et gestion de serveurs MCP en conteneurs pour une équipe ;
+- **agentgateway** : proxy pour agents qui fédère plusieurs serveurs MCP avec espaces de noms ;
+- **mcp-proxy** : pont entre stdio et HTTP, pour exposer un serveur local sur le réseau.
+
+Les grands clouds et plusieurs éditeurs de sécurité proposent aussi des passerelles gérées. Vérifiez leur prise en charge de la révision 2026-07-28 et d'OAuth avant de choisir.
+
+## Les inconvénients
+
+- **Un point de défaillance unique** s'il n'est pas redondé.
+- **Une cible de choix** : la passerelle détient les identifiants de tous les services. Durcissez-la comme un coffre à secrets.
+- **Débogage plus difficile** : une erreur peut venir du client, de la passerelle ou du serveur en amont. Journalisez les en-têtes `Mcp-Method` et `Mcp-Name` à chaque étape.
+- **Latence** : un saut réseau de plus.
+
+Pour une personne seule ou une petite équipe, `.mcp.json` et les serveurs officiels distants suffisent largement. Une approche mixte fonctionne bien : les serveurs qui ont besoin de votre machine (fichiers, Git, navigateur) restent en stdio local, les services partagés passent par la passerelle.
 
 ## Pour aller plus loin
 
-- Étudier les implémentations open source citées sur GitHub
-- Lire la spec MCP sur la composition de serveurs (en cours d'évolution)
-- Évaluer Smithery ou un gateway hébergé pour un POC rapide
-- Concevoir une politique de naming des tools avant d'agréger pour éviter les collisions
+- [Installer un serveur MCP dans Claude Code](/wiki/mcp/installer-serveur-mcp)
+- [Transports MCP : stdio et Streamable HTTP](/wiki/mcp/transports-stdio-sse)
+- [Sécurité des serveurs MCP](/wiki/mcp/securite-mcp)
+- [Permissions des outils MCP](/wiki/slash-commands/mcp-permissions)
+- [Créer un plugin](/wiki/plugins/creer-plugin)
+
+## Sources
+
+- Streamable HTTP (en-têtes `Mcp-Method`, `Mcp-Name`, `x-mcp-header`) : https://modelcontextprotocol.io/specification/2026-07-28/basic/transports/streamable-http
+- Autorisation : https://modelcontextprotocol.io/specification/2026-07-28/basic/authorization
+- Changelog 2026-07-28 : https://modelcontextprotocol.io/specification/2026-07-28/changelog
+- Matrice des extensions officielles : https://modelcontextprotocol.io/extensions/client-matrix
+- MCP dans Claude Code : https://code.claude.com/docs/en/mcp
+- Gestion des serveurs MCP pour une organisation : https://code.claude.com/docs/en/managed-mcp
+- Docker MCP Gateway : https://www.docker.com/blog/docker-mcp-gateway-secure-infrastructure-for-agentic-ai/

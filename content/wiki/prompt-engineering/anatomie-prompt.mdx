@@ -1,86 +1,172 @@
 ---
-title: "Anatomie d'un prompt"
-description: "Décomposez un prompt efficace pour Claude en cinq composants : contexte, instructions, format, exemples, tâche."
-updatedAt: "2026-05-19"
-readingMinutes: 6
+title: "Anatomie d'un prompt efficace"
+description: "Les sept briques d'un bon prompt pour Claude (contexte, rôle, données, exemples, consignes, format, demande) avec un exemple complet dans claude.ai et via l'API."
+updatedAt: "2026-10-03"
+readingMinutes: 7
 ---
 
-Un prompt n'est pas une simple question lancée à Claude. C'est une structure pensée, presque architecturale, qui guide le modèle vers la réponse exacte que vous attendez. Comprendre les composants d'un prompt vous fait passer d'un usage approximatif à une utilisation professionnelle de Claude.
+Un prompt efficace n'est pas une formule magique : c'est un brief clair, comme celui que vous donneriez à un collègue brillant qui arrive dans l'équipe et ne connaît rien à votre dossier. Cet article décompose ce brief en briques simples, utilisables aussi bien dans [claude.ai](/wiki/claude-bases/bien-demander) que dans une application qui appelle l'API.
 
-## Le contexte : poser le décor
+## La règle d'or d'Anthropic
 
-Le contexte explique à Claude qui il est, pour qui il travaille, et dans quel environnement il opère. Sans contexte, le modèle improvise — avec contexte, il s'aligne. Un bon contexte précise le domaine métier, le niveau du destinataire, les contraintes implicites (ton, langue, vocabulaire).
+La documentation officielle propose un test simple : montrez votre prompt à un collègue qui n'a aucun contexte sur la tâche et demandez-lui de le suivre. S'il est perdu, Claude le sera aussi.
 
-```text
-Tu es un assistant juridique spécialisé en droit du travail français.
-Tu réponds à des DRH non-juristes. Tes réponses doivent être
-prudentes, sourcées, et toujours recommander une vérification par
-un avocat pour les cas complexes.
-```
+Les modèles actuels (Opus 5.5, Sonnet 5.5, Fable 5.1) suivent les consignes de façon plus littérale que leurs prédécesseurs. Ils ne devinent pas ce que vous n'avez pas écrit. Plus votre demande est précise, meilleur est le résultat.
 
-Notez que ce contexte fixe trois choses : le rôle, l'audience, et la posture (prudence + recommandation systématique). Claude n'aura pas à deviner.
+## Les sept briques
 
-## Les instructions : décrire le comportement
+| Brique | Question à laquelle elle répond | Obligatoire ? |
+|---|---|---|
+| Contexte et objectif | Pourquoi cette tâche, pour qui, avec quel enjeu ? | Oui |
+| Rôle | Quelle posture adopter ? | Utile |
+| Données | Sur quoi travailler (documents, chiffres, texte collé) ? | Selon la tâche |
+| Exemples | À quoi ressemble une bonne réponse ? | Très utile pour un format précis |
+| Consignes | Quelles règles respecter ? | Oui |
+| Format de sortie | Sous quelle forme livrer le résultat ? | Oui |
+| Demande | Que faire maintenant ? | Oui |
 
-Les instructions sont des règles persistantes qui s'appliquent à toutes les réponses. Elles diffèrent de la tâche : la tâche change, les instructions restent. Préférez des règles positives ("réponds en markdown") aux négations ("n'utilise pas de HTML"), Claude suit mieux les directives affirmatives.
+### 1. Le contexte et l'objectif
 
-Listez vos instructions plutôt que de les noyer dans un paragraphe :
+C'est la brique la plus souvent oubliée et la plus rentable. Expliquez **pourquoi** vous demandez quelque chose. Claude généralise à partir de l'explication et en déduit ce que vous n'avez pas précisé (ton, niveau de détail, vocabulaire).
 
-```text
-Règles de réponse :
-1. Réponds toujours en français.
-2. Cite le ou les articles du Code du travail concernés.
-3. Si la question dépasse ton domaine, dis-le clairement.
-4. Formate les listes avec des tirets, pas des numéros.
-```
-
-## Le format de sortie : cadrer la réponse
-
-Spécifier le format réduit drastiquement les itérations. JSON strict, markdown structuré, tableau, ou texte brut — choisissez et imposez. Pour les sorties machine, fournissez un schéma exact ; pour les sorties humaines, donnez un squelette de sections.
+La documentation donne cet exemple : au lieu de « N'utilisez jamais de points de suspension », écrivez « Votre réponse sera lue par un moteur de synthèse vocale, n'utilisez donc jamais de points de suspension : il ne sait pas les prononcer. »
 
 ```text
-Format de réponse attendu :
-
-## Résumé
-(2 phrases maximum)
-
-## Articles applicables
-- Article XXX-X : description
-
-## Recommandation
-(action concrète à entreprendre)
+Je suis responsable RH dans une PME de 40 salariés, sans juriste en interne.
+Je prépare une réunion avec la direction jeudi et j'ai besoin de comprendre
+les options possibles avant d'appeler notre avocat.
 ```
 
-## Les exemples : montrer plutôt que décrire
+### 2. Le rôle
 
-Un exemple vaut dix lignes d'instructions. Claude est particulièrement performant en imitation : montrez-lui un input et l'output idéal correspondant, et il alignera son style, sa structure et son niveau de détail. C'est le principe du few-shot prompting, à utiliser dès que la sortie doit suivre un patron précis.
-
-Encadrez vos exemples avec des balises XML pour que Claude distingue clairement l'exemple du reste du prompt :
-
-```xml
-<exemple>
-  <question>Un salarié peut-il refuser une mutation géographique ?</question>
-  <reponse>
-    ## Résumé
-    Cela dépend de la clause de mobilité du contrat...
-  </reponse>
-</exemple>
-```
-
-## La tâche : l'instruction du moment
-
-La tâche est ce que vous demandez ici et maintenant. Elle arrive en dernier, après tout le cadrage. Mettez-la en évidence — Claude accorde plus de poids à la fin du prompt, surtout pour les contextes longs. Une formulation directe et impérative fonctionne mieux qu'une question vague.
+Une phrase suffit à orienter le ton et l'angle d'analyse. Voir l'article [Role prompting](/wiki/prompt-engineering/role-prompting).
 
 ```text
-Question du DRH :
-"Mon salarié refuse de venir au bureau trois jours par semaine
-depuis qu'on a mis fin au full-remote. Que puis-je faire ?"
-
-Réponds en suivant le format défini ci-dessus.
+Vous êtes un conseiller en droit du travail français qui s'adresse à des
+non-juristes.
 ```
+
+### 3. Les données
+
+Documents, e-mails, tableaux, notes : tout ce sur quoi Claude doit travailler. Pour un contenu long (à partir de quelques pages), placez-le **en haut** du prompt et posez votre question à la fin. Entourez chaque document de balises pour éviter toute confusion entre vos consignes et le contenu (voir [Balises XML](/wiki/prompt-engineering/balises-xml)).
+
+### 4. Les exemples
+
+Un ou plusieurs exemples de bonne réponse sont le moyen le plus fiable d'obtenir un format, un ton ou une structure précis. La documentation recommande trois à cinq exemples variés. Voir [Few-shot prompting](/wiki/prompt-engineering/few-shot).
+
+### 5. Les consignes
+
+Listez les règles quand l'ordre ou l'exhaustivité comptent. Formulez-les **en positif** : dites ce que vous voulez plutôt que ce que vous ne voulez pas.
+
+```text
+Règles :
+1. Répondez en français, sans jargon juridique non expliqué.
+2. Citez les articles du Code du travail concernés.
+3. Si la réponse dépend d'un élément que vous n'avez pas, dites lequel.
+4. Signalez clairement les points qui demandent l'avis d'un avocat.
+```
+
+### 6. Le format de sortie
+
+Décrivez la forme attendue : un squelette de sections, un tableau, un JSON, une longueur. Le style de votre prompt influence aussi celui de la réponse : un prompt rédigé en prose simple obtient plus souvent une réponse en prose. Voir [Formater la sortie](/wiki/prompt-engineering/output-format).
+
+```text
+Format attendu :
+- Résumé en 2 phrases
+- Tableau des options (option, avantages, risques)
+- Recommandation en un paragraphe
+```
+
+### 7. La demande
+
+La tâche du moment, formulée avec un verbe d'action. Soyez explicite sur ce que vous voulez **obtenir** : « Pouvez-vous suggérer des modifications ? » donne des suggestions, « Modifiez ce texte pour… » donne un texte modifié.
+
+## Exemple complet dans claude.ai
+
+Voici un message prêt à coller dans une conversation. Il n'utilise aucune fonction technique, seulement les sept briques.
+
+```text
+Je suis responsable RH dans une PME de 40 salariés, sans juriste en interne.
+Je prépare une réunion avec la direction jeudi et je veux comprendre nos
+options avant d'appeler notre avocat.
+
+Situation : depuis la fin du télétravail complet, un salarié refuse de venir
+au bureau trois jours par semaine. Son contrat ne mentionne pas le télétravail.
+Un accord d'entreprise de 2023 prévoit deux jours de télétravail maximum.
+
+Agissez comme un conseiller en droit du travail qui s'adresse à des non-juristes.
+Citez les articles du Code du travail concernés et signalez ce qui demande
+l'avis d'un avocat.
+
+Présentez votre réponse ainsi : un résumé en deux phrases, un tableau des
+options (option, avantages, risques), puis une recommandation en un paragraphe.
+
+Quelles sont nos options ?
+```
+
+Si vous posez souvent ce type de question, placez le contexte, le rôle et les règles dans les **instructions d'un projet** : vous n'aurez plus à les répéter (voir [Personnaliser Claude](/wiki/claude-bases/personnaliser) et [Créer un projet](/wiki/claude-ai/projects-creation)).
+
+## Le même prompt via l'API
+
+Dans une application, les briques stables vont dans le `system`, la partie variable dans le message `user` (voir [System vs user](/wiki/prompt-engineering/system-vs-user)).
+
+```python
+import anthropic
+
+client = anthropic.Anthropic()
+
+SYSTEM = """Vous êtes un conseiller en droit du travail français qui répond
+à des responsables RH de PME, sans juriste en interne.
+
+Règles :
+1. Répondez en français, sans jargon non expliqué.
+2. Citez les articles du Code du travail concernés.
+3. Si la réponse dépend d'une information manquante, dites laquelle.
+4. Signalez ce qui demande l'avis d'un avocat.
+
+Format : résumé en 2 phrases, tableau des options (option, avantages,
+risques), recommandation en un paragraphe."""
+
+question = """<situation>
+Un salarié refuse de venir au bureau trois jours par semaine.
+Son contrat ne mentionne pas le télétravail. Un accord d'entreprise
+de 2023 prévoit deux jours de télétravail maximum.
+</situation>
+
+Quelles sont nos options ?"""
+
+message = client.messages.create(
+    model="claude-sonnet-5-5",
+    max_tokens=4000,
+    system=SYSTEM,
+    messages=[{"role": "user", "content": question}],
+)
+
+for block in message.content:
+    if block.type == "text":
+        print(block.text)
+```
+
+Lisez la réponse **par type de bloc** : sur les modèles récents, la réponse peut commencer par un bloc de réflexion (`thinking`) avant le texte.
+
+## Les erreurs les plus fréquentes
+
+- **Pas de contexte** : Claude produit une réponse générique, correcte mais inutile pour votre cas.
+- **Une liste d'interdits** au lieu d'une description du résultat voulu.
+- **Une portée implicite** : « mettez ce titre en gras » ne s'applique qu'au titre cité. Si vous voulez une règle générale, dites « tous les titres ».
+- **Tout en majuscules** (« CRITIQUE », « VOUS DEVEZ ») : sur les modèles récents, cela provoque souvent un excès de zèle. Un ton normal suffit.
+- **Demander d'écrire son raisonnement dans la réponse** : les modèles récents réfléchissent déjà en interne. Voir [Faire réfléchir Claude](/wiki/prompt-engineering/chain-of-thought).
 
 ## Pour aller plus loin
 
-- Lisez l'article sur les balises XML pour structurer chaque composant proprement.
-- Explorez le few-shot prompting pour exploiter la puissance des exemples.
-- Consultez l'article system vs user prompt pour savoir où placer chaque composant.
+- [Bien formuler ses demandes à Claude](/wiki/claude-bases/bien-demander) : la version grand public, avec des modèles à copier
+- [Balises XML](/wiki/prompt-engineering/balises-xml)
+- [Few-shot prompting](/wiki/prompt-engineering/few-shot)
+- [Anti-patterns](/wiki/prompt-engineering/anti-patterns)
+- [Prompter les modèles Claude 5.5](/wiki/prompt-engineering/prompting-sonnet-5)
+
+## Sources
+
+- [Prompting best practices (Anthropic)](https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/claude-prompting-best-practices)
+- [Prompt engineering overview (Anthropic)](https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/overview)
+- [Understanding Claude's personalization features (Centre d'aide Claude)](https://support.claude.com/en/articles/10185728-understanding-claude-s-personalization-features)

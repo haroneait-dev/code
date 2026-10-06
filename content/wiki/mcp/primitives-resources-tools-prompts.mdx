@@ -1,62 +1,162 @@
 ---
-title: "Resources, Tools, Prompts — les primitives MCP"
-description: "Comprendre les trois primitives fondamentales du protocole MCP et savoir quand utiliser chacune."
-updatedAt: "2026-05-19"
-readingMinutes: 6
+title: "Tools, resources, prompts : les primitives MCP"
+description: "Les trois primitives d'un serveur MCP, qui les contrôle (modèle, application, utilisateur), comment elles apparaissent dans Claude Code et comment choisir la bonne pour chaque besoin."
+updatedAt: "2026-10-03"
+readingMinutes: 8
 ---
 
-Le Model Context Protocol (MCP) repose sur trois primitives qui structurent la communication entre un serveur et un client LLM comme Claude : **Resources**, **Tools** et **Prompts**. Chacune répond à un besoin précis. Les confondre conduit à des serveurs MCP mal conçus, lourds à utiliser et peu fiables. Voici comment les distinguer.
+Un serveur MCP expose trois types de briques : **tools**, **resources** et **prompts**. Elles se distinguent surtout par **qui décide de les utiliser** : le modèle, l'application ou l'utilisateur. Choisir la bonne primitive rend votre serveur plus simple à utiliser et moins coûteux en contexte.
 
-## Resources : du contexte en lecture seule
+## Vue d'ensemble
 
-Les **Resources** exposent des données que le modèle peut lire pour s'informer. Elles sont identifiées par une URI (`file://`, `postgres://`, `github://issue/42`) et retournent du contenu textuel ou binaire. Pensez "GET" : pas d'effet de bord, pas de mutation.
+| Primitive | Contrôlée par | Rôle | Dans Claude Code |
+|---|---|---|---|
+| **Tool** | le modèle | une action ou un calcul que Claude décide d'appeler | outil `mcp__serveur__outil`, soumis aux permissions |
+| **Resource** | l'application (souvent sur demande de l'utilisateur) | une donnée identifiée par une URI, à lire et joindre au contexte | mention `@serveur:uri` dans le prompt |
+| **Prompt** | l'utilisateur | un modèle de messages paramétré | commande `/serveur:prompt` |
 
-Exemples typiques :
-- Le contenu d'un fichier local
-- Les lignes d'une table SQL
-- Le corps d'un ticket Jira
-- Un schéma de base de données
+Ces trois primitives sont toutes facultatives : beaucoup de serveurs n'exposent que des tools.
 
-Côté client, les Resources sont souvent **sélectionnées par l'utilisateur** (via un picker @-mention dans Claude Desktop), ou **listées dynamiquement** par le serveur. Le LLM ne les invoque pas lui-même — il les consomme.
+## Tools : ce que le modèle peut faire
 
-## Tools : des actions exécutables par le modèle
+Un tool est une fonction avec un nom, une description et un schéma d'entrée (JSON Schema). Le modèle lit la liste, choisit un outil et fournit les arguments. Un tool peut lire (rechercher des tickets) ou agir (créer une issue, déployer).
 
-Les **Tools** sont des fonctions que le LLM décide d'appeler. Elles ont un nom, un schéma JSON d'entrée, et produisent une sortie structurée. À la différence des Resources, elles peuvent avoir des effets de bord : envoyer un email, créer un fichier, lancer un build.
+Définition telle que le client la reçoit dans `tools/list` :
 
-C'est l'équivalent du *function calling* classique d'Anthropic, mais standardisé par MCP. Le modèle voit la liste des tools disponibles dans son contexte et les invoque quand sa logique l'exige.
+```json
+{
+  "name": "create_issue",
+  "title": "Créer une issue",
+  "description": "Crée une issue dans le dépôt indiqué. À utiliser quand l'utilisateur demande de signaler un bug ou une tâche.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "repo": { "type": "string", "description": "Dépôt au format owner/nom" },
+      "title": { "type": "string" },
+      "body": { "type": "string" }
+    },
+    "required": ["repo", "title"]
+  },
+  "annotations": { "readOnlyHint": false, "destructiveHint": false, "idempotentHint": false }
+}
+```
 
-Bonnes pratiques :
-- Un nom verbal explicite (`create_issue`, pas `issue`)
-- Un schéma JSON strict avec descriptions claires
-- Des messages d'erreur exploitables par le LLM
-- Idempotence quand c'est possible
+Points clés :
 
-## Prompts : des templates pilotés par l'utilisateur
+- **Résultat** : un tableau `content` (blocs `text`, `image`, `audio`, `resource_link`, ressource intégrée) et, si l'outil déclare un `outputSchema`, un `structuredContent` JSON. Dans ce cas, renvoyez aussi la version texte dans `content` pour les clients qui ne lisent que ce champ.
+- **Erreurs** : un échec métier (fichier absent, API indisponible) se renvoie comme résultat avec `isError: true`. Le modèle le lit et peut corriger son appel. Une erreur de protocole JSON-RPC, elle, ne lui parvient pas.
+- **Annotations** (`readOnlyHint`, `destructiveHint`, `idempotentHint`, `openWorldHint`) : des indications pour le client. Elles ne sont fiables que si le serveur l'est.
+- **Nommage** : 1 à 128 caractères, lettres ASCII, chiffres, `_`, `-` et `.`. Préférez un verbe explicite (`create_issue`, pas `issue`).
 
-Les **Prompts** sont des modèles de conversation paramétrés, déclenchés explicitement par l'utilisateur (souvent via une slash command ou un menu). Le serveur renvoie une séquence de messages prête à être injectée dans la conversation.
+## Resources : les données à lire
 
-Cas d'usage typiques :
-- `/review-pr` qui prépare un prompt avec le diff, le contexte du repo et les guidelines
-- `/summarize-meeting` qui formate un transcript
-- `/debug-error` qui assemble logs + stack trace + code source
+Une resource est un contenu identifié par une URI : `file:///projet/README.md`, `postgres://schema/users`, `github://issue/42`. Le serveur la décrit dans `resources/list` et la renvoie avec `resources/read`, en texte ou en binaire (base64).
 
-Les Prompts sont la primitive la moins utilisée mais la plus puissante pour cristalliser des **workflows répétitifs** dans une équipe.
+- **Templates** : pour une famille de resources, le serveur publie un modèle d'URI (RFC 6570) via `resources/templates/list`, par exemple `github://issue/{numero}`.
+- **Annotations** : `audience` (`user`, `assistant`), `priority` (0 à 1) et `lastModified` aident le client à trier.
+- **Changements** : un client peut s'abonner aux mises à jour d'une resource. Depuis la révision 2026-07-28, cela passe par `subscriptions/listen` (et non plus `resources/subscribe`).
+- **Cache** : les réponses portent `ttlMs` et `cacheScope`, qui disent au client combien de temps les garder.
 
-## Quand choisir quoi ?
+Dans Claude Code, tapez `@` : les resources des serveurs connectés apparaissent dans l'autocomplétion, à côté des fichiers. Une resource mentionnée est lue et jointe à votre message :
+
+```text
+Compare @postgres:schema://users avec @docs:file://database/user-model
+```
+
+Claude Code fournit aussi au modèle des outils pour lister et lire les resources lui-même. Les ressources d'interface MCP Apps (`ui://`) n'apparaissent pas dans ces listes : elles sont faites pour être affichées par un hôte graphique, pas lues par Claude.
+
+## Prompts : les commandes de l'utilisateur
+
+Un prompt est un modèle de conversation que l'utilisateur déclenche explicitement. Le serveur déclare ses arguments ; `prompts/get` renvoie une liste de messages prêts à injecter.
+
+Dans Claude Code, chaque prompt devient une commande. Les arguments se passent séparés par des espaces :
+
+```text
+/github:pr_review 456
+/mcp__jira__create_issue login-bug high
+```
+
+Cas d'usage : une revue de PR qui embarque les règles de l'équipe, un résumé d'incident, un gabarit de rapport. Les prompts restent la primitive la moins prise en charge par les clients : ne mettez pas dedans une fonction indispensable.
+
+## Un serveur qui expose les trois
+
+Avec le SDK Python officiel v2 (`MCPServer`, ex-FastMCP) :
+
+```python
+from mcp.server import MCPServer
+
+mcp = MCPServer("tickets")
+
+TICKETS = {"42": "Le formulaire de connexion plante sur Safari."}
+
+
+@mcp.tool()
+def search_tickets(query: str) -> str:
+    """Cherche des tickets dont le texte contient la requête."""
+    hits = [f"#{k} {v}" for k, v in TICKETS.items() if query.lower() in v.lower()]
+    return "\n".join(hits) or "Aucun ticket trouvé."
+
+
+@mcp.resource("tickets://{ticket_id}")
+def get_ticket(ticket_id: str) -> str:
+    """Texte complet d'un ticket."""
+    return TICKETS.get(ticket_id, "Ticket inconnu.")
+
+
+@mcp.prompt()
+def triage(ticket_id: str) -> str:
+    """Prépare le tri d'un ticket."""
+    return f"Lis le ticket {ticket_id}, estime sa gravité (1 à 4) et propose une équipe."
+
+
+if __name__ == "__main__":
+    mcp.run()
+```
+
+Branchement dans Claude Code :
+
+```bash
+claude mcp add tickets -- uv run --directory /chemin/absolu/projet server.py
+```
+
+Vous obtenez l'outil `mcp__tickets__search_tickets`, la mention `@tickets:tickets://42` et la commande `/tickets:triage 42`.
+
+## Comment choisir
 
 | Besoin | Primitive |
 |---|---|
-| Exposer un fichier, une table, un document | Resource |
-| Permettre au modèle d'agir (écrire, créer, déployer) | Tool |
-| Offrir une commande utilisateur réutilisable | Prompt |
+| Claude doit agir ou chercher de lui-même | Tool |
+| Donnée stable que l'utilisateur veut joindre au contexte | Resource |
+| Procédure répétée que l'utilisateur lance à la demande | Prompt |
+| Donnée que Claude doit trouver seul au fil de la tâche | Tool de recherche ou de lecture (éventuellement en plus d'une resource) |
 
-Une erreur fréquente : exposer une "liste de fichiers" comme un Tool `list_files` au lieu d'utiliser le mécanisme natif des Resources. Résultat : le modèle perd du temps à découvrir ce qu'il aurait dû voir d'emblée.
+Deux erreurs fréquentes :
 
-Autre piège : transformer un Prompt en Tool. Si l'utilisateur doit explicitement déclencher l'action, c'est un Prompt. Si c'est le modèle qui choisit, c'est un Tool.
+- **Tout mettre en resources** : dans la plupart des clients, le modèle n'explore pas les resources aussi naturellement qu'il appelle un outil. Si Claude doit découvrir l'information seul, exposez aussi un tool (`search_…`, `get_…`), quitte à renvoyer un `resource_link`.
+- **Transformer un prompt en tool** : si c'est l'utilisateur qui doit décider de lancer la procédure, c'est un prompt. Si c'est le modèle, c'est un tool.
+
+## Et côté client ?
+
+La spécification définit aussi des fonctions côté client, que le serveur peut solliciter :
+
+- **Élicitation** : le serveur demande une information à l'utilisateur (formulaire ou page web). C'est la fonction client recommandée en 2026.
+- **Sampling** (demander une complétion au modèle) et **Roots** (connaître les dossiers de travail) sont **dépréciés** depuis la révision 2026-07-28.
+
+Voir [MCP en 2026](/wiki/mcp/evolution-2026-apps-elicitation).
 
 ## Pour aller plus loin
 
-- Spécification officielle MCP : [modelcontextprotocol.io](https://modelcontextprotocol.io)
-- SDK TypeScript et Python disponibles sur GitHub
-- Inspecteur MCP (`@modelcontextprotocol/inspector`) pour tester un serveur sans Claude
-- Comparer avec le function calling natif Anthropic pour comprendre ce que MCP apporte en plus : la portabilité entre clients
+- [Architecture client/serveur de MCP](/wiki/mcp/architecture-client-serveur)
+- [Créer un serveur MCP en Python](/wiki/mcp/creer-serveur-py-setup)
+- [Créer un serveur MCP en TypeScript](/wiki/mcp/creer-serveur-ts-setup)
+- [Déboguer avec MCP Inspector](/wiki/mcp/debugging-inspector)
+- [Permissions des outils MCP](/wiki/slash-commands/mcp-permissions)
+
+## Sources
+
+- Spécification 2026-07-28 : https://modelcontextprotocol.io/specification/2026-07-28
+- Tools : https://modelcontextprotocol.io/specification/2026-07-28/server/tools
+- Resources : https://modelcontextprotocol.io/specification/2026-07-28/server/resources
+- Prompts : https://modelcontextprotocol.io/specification/2026-07-28/server/prompts
+- MCP dans Claude Code (resources, prompts) : https://code.claude.com/docs/en/mcp
+- SDK Python : https://github.com/modelcontextprotocol/python-sdk

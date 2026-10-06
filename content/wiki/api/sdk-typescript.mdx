@@ -1,163 +1,205 @@
 ---
-title: "SDK TypeScript"
-description: "Installer et utiliser @anthropic-ai/sdk en Node.js : client, messages.create et types."
-updatedAt: "2026-05-19"
-readingMinutes: 6
+title: "SDK TypeScript (@anthropic-ai/sdk)"
+description: "Installer @anthropic-ai/sdk, typer vos messages, régler l'effort, obtenir du JSON validé avec Zod, gérer les erreurs et l'intégrer dans une route Next.js."
+updatedAt: "2026-10-03"
+readingMinutes: 7
 ---
 
-Le SDK TypeScript officiel d'Anthropic, `@anthropic-ai/sdk`, est entièrement typé et fonctionne dans Node.js, Deno, Bun, Cloudflare Workers et même les navigateurs modernes (avec l'option appropriée). Voici comment l'utiliser au quotidien.
+Le SDK TypeScript officiel, `@anthropic-ai/sdk`, est entièrement typé et fonctionne côté serveur : Node.js 20+, Deno, Bun, Cloudflare Workers, Vercel Edge. Cette fiche couvre l'usage quotidien : client, requêtes, types, sorties structurées, erreurs et intégration Next.js.
 
 ## Installation
-
-Avec npm, pnpm ou yarn :
 
 ```bash
 npm install @anthropic-ai/sdk
 # ou
 pnpm add @anthropic-ai/sdk
-# ou
 bun add @anthropic-ai/sdk
 ```
 
-Aucune dépendance lourde, et les types TypeScript sont inclus directement dans le package — pas besoin d'installer un `@types/...` séparé.
+Les types sont inclus, aucun paquet `@types/...` à ajouter. TypeScript 5.0 minimum. Pour les sorties structurées avec Zod, ajoutez `zod`.
 
 ## Initialiser le client
 
-Comme en Python, la classe `Anthropic` lit automatiquement `process.env.ANTHROPIC_API_KEY`.
-
 ```ts
 import Anthropic from "@anthropic-ai/sdk";
 
-const client = new Anthropic();
+const client = new Anthropic(); // lit process.env.ANTHROPIC_API_KEY
 
-// Ou avec une clé explicite
-const client = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
+const tuned = new Anthropic({
+  timeout: 60_000, // en millisecondes (défaut : 10 minutes)
+  maxRetries: 4,   // défaut : 2
 });
 ```
 
-Dans un projet Next.js, créez le client uniquement côté serveur (route handler, server action, server component) — n'exposez jamais votre clé API au client.
+Dans le navigateur, le SDK refuse de s'exécuter par défaut (l'option `dangerouslyAllowBrowser` existe, mais exposerait votre clé). Gardez le client côté serveur : route handler, server action ou server component.
 
 ## Envoyer un message
 
-La méthode `client.messages.create()` retourne une `Promise<Message>` :
-
 ```ts
 import Anthropic from "@anthropic-ai/sdk";
 
 const client = new Anthropic();
 
 const message = await client.messages.create({
-  model: "claude-sonnet-5-5",
-  max_tokens: 1024,
-  messages: [
-    { role: "user", content: "Explique le principe SOLID en 3 phrases." },
-  ],
+  model: "claude-opus-5-5",
+  max_tokens: 16000,
+  system: "Vous êtes un expert TypeScript. Répondez en français.",
+  messages: [{ role: "user", content: "Expliquez les types conditionnels en 3 phrases." }],
 });
 
-// content est une union de blocs typés
-const firstBlock = message.content[0];
-if (firstBlock.type === "text") {
-  console.log(firstBlock.text);
+for (const block of message.content) {
+  if (block.type === "text") console.log(block.text);
 }
-
-console.log(`Tokens : ${message.usage.input_tokens} in / ${message.usage.output_tokens} out`);
+console.log(message.stop_reason, message.usage.input_tokens, message.usage.output_tokens);
+console.log(message._request_id);
 ```
 
-Le narrowing TypeScript sur `block.type === "text"` est important : un bloc peut aussi être de type `tool_use`, `thinking`, etc.
+Le narrowing sur `block.type` est obligatoire : un bloc peut être `text`, `thinking`, `tool_use`, etc. Sur Opus 5.5, la réflexion est toujours active, donc `content[0]` n'est pas forcément du texte.
 
-## Types essentiels
+## Types utiles
 
-Tous les types sont accessibles via l'import principal :
+Utilisez les types exportés plutôt que de redéfinir les vôtres :
 
 ```ts
-import type {
-  Message,
-  MessageParam,
-  ContentBlock,
-  TextBlock,
-  Usage,
-  Model,
-} from "@anthropic-ai/sdk/resources/messages";
+import Anthropic from "@anthropic-ai/sdk";
 
-const history: MessageParam[] = [
+const history: Anthropic.MessageParam[] = [
   { role: "user", content: "Salut" },
-  { role: "assistant", content: "Bonjour !" },
-  { role: "user", content: "Comment vas-tu ?" },
+  { role: "assistant", content: "Bonjour, que puis-je faire pour vous ?" },
+  { role: "user", content: "Explique le principe SOLID." },
 ];
+
+function firstText(msg: Anthropic.Message): string {
+  const block = msg.content.find((b): b is Anthropic.TextBlock => b.type === "text");
+  return block?.text ?? "";
+}
 ```
 
-Cela vous permet de typer proprement votre historique, vos handlers, et de bénéficier de l'autocomplétion sur tous les paramètres.
+`Anthropic.Tool`, `Anthropic.ToolUseBlock` et `Anthropic.ToolResultBlockParam` couvrent le tool use.
 
-## Options avancées
+## Options courantes
 
 ```ts
 const message = await client.messages.create({
-  model: "claude-sonnet-5-5",
-  max_tokens: 2048,
-  system: "Tu es un expert TypeScript. Réponds toujours en français.",
-  temperature: 0.5,
-  top_p: 0.95,
+  model: "claude-opus-5-5",
+  max_tokens: 16000,
+  output_config: { effort: "high" }, // low | medium | high | xhigh | max
+  thinking: { type: "adaptive", display: "summarized" },
   stop_sequences: ["</fin>"],
-  messages: [
-    { role: "user", content: "Comment fonctionnent les types conditionnels ?" },
+  metadata: { user_id: "usr_7f3a" },
+  system: [
+    {
+      type: "text",
+      text: "Documentation longue et stable...",
+      cache_control: { type: "ephemeral" }, // prompt caching
+    },
   ],
+  messages: [{ role: "user", content: "Comment fonctionnent les génériques ?" }],
 });
 ```
 
-Le paramètre `system` peut aussi être un tableau de blocs si vous souhaitez activer le **prompt caching** sur certaines portions :
+À retenir :
+
+- **Effort** : défaut `medium` sur Opus 5.5, `high` sur Sonnet 5.5. C'est le principal levier coût / qualité / latence.
+- **`temperature` et `top_p`** sont dépréciés : les modèles récents refusent les valeurs autres que le défaut.
+- **Préremplissage** (dernier message `assistant`) : erreur 400 sur les modèles récents.
+
+## JSON validé avec Zod
 
 ```ts
-system: [
-  {
-    type: "text",
-    text: "Documentation longue...",
-    cache_control: { type: "ephemeral" },
-  },
-],
+import Anthropic from "@anthropic-ai/sdk";
+import { z } from "zod";
+import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
+
+const Ticket = z.object({
+  categorie: z.enum(["facturation", "technique", "autre"]),
+  urgence: z.boolean(),
+  resume: z.string(),
+});
+
+const client = new Anthropic();
+const response = await client.messages.parse({
+  model: "claude-opus-5-5",
+  max_tokens: 4000,
+  messages: [{ role: "user", content: "Mon paiement a été débité deux fois, c'est urgent." }],
+  output_config: { format: zodOutputFormat(Ticket) },
+});
+
+console.log(response.parsed_output); // null si la validation a échoué
 ```
 
 ## Gestion des erreurs
 
-Le SDK exporte des classes d'erreurs spécifiques :
-
 ```ts
-import Anthropic, { APIError, RateLimitError } from "@anthropic-ai/sdk";
+import Anthropic from "@anthropic-ai/sdk";
 
 try {
-  const message = await client.messages.create({ /* ... */ });
+  await client.messages.create({
+    model: "claude-opus-5-5",
+    max_tokens: 4000,
+    messages: [{ role: "user", content: "Bonjour" }],
+  });
 } catch (err) {
-  if (err instanceof RateLimitError) {
-    console.warn("Trop de requêtes, on patiente.");
-  } else if (err instanceof APIError) {
-    console.error(`Erreur ${err.status}: ${err.message}`);
+  if (err instanceof Anthropic.BadRequestError) {
+    console.error("Requête invalide :", err.message); // ne pas relancer
+  } else if (err instanceof Anthropic.RateLimitError) {
+    console.warn("429 après retries :", err.headers?.get("retry-after"));
+  } else if (err instanceof Anthropic.APIError) {
+    console.error(`Erreur ${err.status} :`, err.message);
   } else {
     throw err;
   }
 }
 ```
 
-Le SDK gère également les retries automatiques sur les erreurs réseau et 5xx (configurable via l'option `maxRetries` du constructeur).
-
-## Exemple Next.js Route Handler
+Pour lire les en-têtes d'une réponse réussie (rate limits, workspace), utilisez `.withResponse()` :
 
 ```ts
-// app/api/chat/route.ts
+const { data, response } = await client.messages
+  .create({ model: "claude-opus-5-5", max_tokens: 1000, messages: [{ role: "user", content: "Bonjour" }] })
+  .withResponse();
+console.log(response.headers.get("anthropic-ratelimit-output-tokens-remaining"));
+```
+
+## Route Handler Next.js
+
+```ts
+// app/api/ask/route.ts
 import Anthropic from "@anthropic-ai/sdk";
 
 const client = new Anthropic();
 
 export async function POST(req: Request) {
-  const { prompt } = await req.json();
+  const { prompt } = (await req.json()) as { prompt: string };
+
   const message = await client.messages.create({
     model: "claude-sonnet-5-5",
-    max_tokens: 1024,
+    max_tokens: 4000,
     messages: [{ role: "user", content: prompt }],
   });
-  return Response.json({ text: (message.content[0] as { text: string }).text });
+
+  const text = message.content
+    .filter((b): b is Anthropic.TextBlock => b.type === "text")
+    .map((b) => b.text)
+    .join("");
+
+  return Response.json({ text, stopReason: message.stop_reason });
 }
 ```
 
+Pour un affichage progressif, passez au [streaming](/wiki/api/streaming).
+
 ## Pour aller plus loin
 
-Le SDK supporte également le **streaming** via `client.messages.stream()` (avec une API d'événements très ergonomique), les **tool calls** typés, la **vision**, le **batch API** pour traiter des milliers de messages en différé à moitié prix, et le **prompt caching**. Voir le [repo GitHub anthropic-sdk-typescript](https://github.com/anthropics/anthropic-sdk-typescript) pour la référence complète.
+- [Premier appel API](/wiki/api/premier-appel-api)
+- [Streaming](/wiki/api/streaming)
+- [Tool use et tool runner](/wiki/api/tool-use)
+- [API Batch](/wiki/api/batch-api)
+- [Prompt caching](/wiki/api/prompt-caching-implementation)
+
+## Sources
+
+- Dépôt anthropic-sdk-typescript : https://github.com/anthropics/anthropic-sdk-typescript
+- Client SDKs : https://platform.claude.com/docs/en/cli-sdks-libraries/overview
+- Structured outputs : https://platform.claude.com/docs/en/build-with-claude/structured-outputs
+- Errors : https://platform.claude.com/docs/en/api/errors

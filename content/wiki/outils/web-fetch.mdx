@@ -1,127 +1,107 @@
 ---
 title: "L'outil WebFetch"
-description: "Récupérer le contenu d'une URL depuis Claude Code — rendu JS, cache, contournement anti-bots."
-updatedAt: "2026-05-19"
-readingMinutes: 6
+description: "Comment Claude Code lit une page web avec WebFetch : extraction par prompt, cache, redirections, domaines préapprouvés, règles de permission et limites."
+updatedAt: "2026-10-03"
+readingMinutes: 5
 ---
 
-`WebFetch` permet à Claude Code de récupérer une URL et d'en extraire le contenu pertinent en utilisant un modèle léger pour le résumer ou le requêter via un prompt. C'est l'outil de prédilection pour lire une page de documentation, un article de blog, une issue GitHub ou un changelog sans quitter votre session.
+`WebFetch` récupère une URL, convertit la page en Markdown, puis lui applique un **prompt d'extraction** dans un appel de modèle séparé. Claude reçoit la réponse à ce prompt, pas la page brute. C'est l'outil pour lire une documentation, un changelog ou une issue publique sans quitter la session.
 
-## À quoi sert WebFetch
+## Le point clé : WebFetch est « avec pertes »
 
-- Lire une page de documentation officielle (Next.js, React, Anthropic) ;
-- Extraire des informations d'une issue ou d'un PR GitHub ;
-- Vérifier un changelog ou une note de version ;
-- Récupérer un fichier brut (`raw.githubusercontent.com`) ;
-- Suivre un lien donné par l'utilisateur pour en extraire les points clés.
+Le prompt d'extraction décide de ce qui parvient à Claude. Si le résultat dit « la page ne mentionne pas X », cela peut simplement vouloir dire que le prompt ne posait pas la question. Deux parades :
 
-WebFetch n'est **pas** un crawler. Une URL = un appel. Pour de la recherche large, utilisez `WebSearch`.
+- relancer avec un prompt plus précis ;
+- récupérer la page brute avec `curl` via Bash quand chaque détail compte.
 
 ## Paramètres
 
-| Paramètre | Type | Obligatoire | Description |
-|-----------|------|-------------|-------------|
-| `url` | string | oui | URL complète (https préféré) |
-| `prompt` | string | oui | Question / instruction pour extraire le contenu |
+| Paramètre | Rôle |
+|-----------|------|
+| `url` | URL complète |
+| `prompt` | Ce qu'il faut extraire de la page |
 
-Le `prompt` est crucial : il dit au modèle quoi chercher dans la page. Évite de retourner toute la page (souvent inutile et coûteux).
+Exemple d'appel :
 
-## Exemples concrets
-
-### Lire une page de doc et en extraire l'essentiel
-
-```ts
-WebFetch(
-  url="https://docs.claude.com/en/docs/claude-code",
-  prompt="Liste les outils disponibles et leur description courte."
-)
+```json
+{
+  "url": "https://code.claude.com/docs/en/hooks",
+  "prompt": "Liste tous les événements de hooks avec une phrase de description pour chacun."
+}
 ```
 
-### Récupérer le changelog d'une lib
+Un bon prompt est précis : « Liste les paramètres de la fonction X avec leur type » plutôt que « Résume la page ».
 
-```ts
-WebFetch(
-  url="https://github.com/vercel/next.js/releases/tag/v16.0.0",
-  prompt="Quelles sont les breaking changes et les nouvelles features ?"
-)
+## Comportements à connaître
+
+| Comportement | Détail |
+|--------------|--------|
+| `localhost` et noms sans point | Refusés avant toute requête ; Claude utilise `curl` pour les serveurs locaux |
+| HTTP | Converti automatiquement en HTTPS |
+| Grandes pages | Tronquées à une taille fixe avant l'extraction |
+| Cache | 15 minutes par défaut ; réglable avec `CLAUDE_CODE_WEBFETCH_CACHE_TTL_MS` |
+| Délai | Échec après 5 minutes de téléchargement ; réglable avec `CLAUDE_CODE_WEBFETCH_DEADLINE_MS` (`0` pour supprimer) |
+| Redirection vers un autre domaine | Non suivie : Claude reçoit l'URL cible et refait un appel |
+| En-têtes | `User-Agent` commençant par `Claude-User`, `Accept` qui préfère le Markdown |
+
+WebFetch travaille sur la réponse renvoyée par le serveur. Une application qui construit son contenu en JavaScript dans le navigateur peut donc arriver presque vide : cherchez une version statique (documentation en Markdown, fichier `llms.txt`, version « raw » d'un fichier GitHub).
+
+## Permissions
+
+En mode Manuel et en `acceptEdits`, WebFetch demande avant chaque requête, sauf pour :
+
+- les domaines déjà autorisés ou refusés par vos règles ;
+- un ensemble intégré de domaines de documentation préapprouvés.
+
+L'invite propose trois choix : « Yes » (cette requête seulement), « Yes, and don't ask again for `<domaine>` » (enregistre une règle dans `.claude/settings.local.json`) et « No ». Les modes `auto` et `bypassPermissions` ne demandent pas, sauf règle `ask` explicite.
+
+Pour autoriser un domaine à l'avance :
+
+```json
+{
+  "permissions": {
+    "allow": ["WebFetch(domain:nextjs.org)", "WebFetch(domain:*.supabase.com)"],
+    "deny": ["WebFetch(domain:pastebin.com)"]
+  }
+}
 ```
 
-### Lire un raw markdown
+- `*.exemple.com` couvre tous les sous-domaines mais pas `exemple.com` lui-même ;
+- une règle explicite l'emporte sur la liste préapprouvée, ce qui permet de bloquer un domaine de documentation ;
+- les commandes sandboxées n'héritent pas de la liste préapprouvée de WebFetch, et inversement l'allowlist réseau du sandbox ne supprime pas les demandes de WebFetch.
 
-```ts
-WebFetch(
-  url="https://raw.githubusercontent.com/user/repo/main/CHANGELOG.md",
-  prompt="Quels changements ont eu lieu dans la version 2.0 ?"
-)
-```
+## Désactiver ou diagnostiquer
 
-## Cache et HTTPS
+- `CLAUDE_CODE_DISABLE_WEB_FETCH=1` coupe WebFetch (WebSearch reste disponible).
+- Sur un compte Team ou Enterprise, WebFetch dépend aussi de la politique de l'organisation. Si l'outil manque, lancez `/status` et regardez la ligne `Organization policy`.
 
-- **Cache** : WebFetch met en cache les réponses pendant ~15 minutes (selon l'implémentation [à vérifier]) pour éviter les appels redondants.
-- **HTTPS upgrade** : si vous passez une URL `http://`, elle peut être automatiquement promue en `https://` quand le serveur le supporte.
-- **Redirections** : si l'URL redirige vers un autre **host**, Claude vous le signale plutôt que de suivre aveuglément — vous décidez de refaire l'appel sur la nouvelle URL.
+## WebFetch ou autre chose ?
 
-## Limites
+| Besoin | Outil |
+|--------|-------|
+| Lire une page publique dont vous avez l'URL | WebFetch |
+| Trouver des pages sur un sujet | WebSearch, puis WebFetch |
+| Page privée, API authentifiée | `curl` ou `gh api` via Bash, ou un serveur MCP |
+| Interagir avec un site (clics, formulaires) | Claude in Chrome ou un serveur MCP de navigateur |
+| Page complète sans filtrage | `curl` via Bash |
 
-**Pas de rendu JavaScript.** WebFetch récupère le HTML brut. Les SPA (React, Vue) qui hydratent côté client peuvent retourner une page quasi vide. Pour ces cas, recherchez la doc équivalente côté serveur (`/api/`, fichiers MDX), ou utilisez `WebSearch` pour viser une page statique.
+## Pièges fréquents
 
-**Sites anti-bots.** Cloudflare, Akamai et autres WAF peuvent bloquer ou challenger les requêtes automatisées. Symptôme : page "Just a moment..." ou 403. Workaround :
+**Prompt vague.** Résumé plat et détails perdus. Formulez une question.
 
-- chercher une version archivée (`web.archive.org/web/*/<url>`) ;
-- viser une URL `raw.githubusercontent.com` plutôt que `github.com` ;
-- utiliser `WebSearch` qui passe par une infrastructure différente.
+**Croire à une absence.** Une réponse « non mentionné » mérite une vérification avec un autre prompt.
 
-**Authentification.** WebFetch ne gère pas l'authentification (cookies, OAuth). Pour des ressources privées, utilisez `Bash` avec `curl` + token.
+**Contenu de page = données, pas instructions.** Une page peut contenir du texte conçu pour manipuler un agent. Restez vigilant si Claude propose soudain une action sans rapport avec votre demande.
 
-**Taille de page.** Très longues pages → tronquées. Posez un prompt précis pour aider le modèle à cibler.
+## Articles liés
 
-## Pièges courants
+- [L'outil WebSearch](/wiki/outils/web-search)
+- [L'outil Bash](/wiki/outils/bash)
+- [Prompt injection](/wiki/workflows/prompt-injection)
+- [Claude in Chrome](/wiki/claude-agents/claude-chrome)
 
-**Prompt trop vague.** "Résume cette page" → réponse plate. Préférez : "Liste les paramètres acceptés par la fonction X avec leur type et description."
+## Sources
 
-**URL avec espaces.** Encodez-les en `%20` ou utilisez des URLs propres.
-
-**Confondre WebFetch et WebSearch.** WebFetch = URL connue. WebSearch = je cherche, je ne sais pas où c'est.
-
-**Oublier le préfixe `https://`.** Sans schéma, l'appel échoue. Toujours commencer par `https://`.
-
-## Combinaisons typiques
-
-### Documentation → implémentation
-
-```bash
-# 1. Lire la doc
-WebFetch(url="https://docs.anthropic.com/...", prompt="Comment faire un streaming ?")
-
-# 2. Implémenter
-Edit(file_path="/.../api/chat/route.ts", old_string="...", new_string="...")
-```
-
-### Issue GitHub → diagnostic
-
-```bash
-# 1. Récupérer l'issue
-WebFetch(
-  url="https://github.com/vercel/next.js/issues/12345",
-  prompt="Quel est le bug, le workaround, et la version corrigée ?"
-)
-
-# 2. Vérifier votre code
-Grep(pattern="...", path="...")
-```
-
-## Bonnes pratiques
-
-**Une URL par appel.** WebFetch n'a pas de mode batch. Pour plusieurs URLs, faites plusieurs appels en parallèle (multiple tool calls dans un message).
-
-**Réutilisez le cache.** Si vous re-demandez la même URL dans la même session, c'est gratuit pendant ~15 min.
-
-**Préférez les sources canoniques.** `docs.claude.com` plutôt qu'un blog non officiel. `developer.mozilla.org` plutôt que w3schools.
-
-**Vérifiez la date.** Les pages web évoluent. Si vous lisez de la doc, vérifiez qu'elle correspond à votre version de lib.
-
-## Pour aller plus loin
-
-- [Documentation Claude Code](https://docs.claude.com/en/docs/claude-code)
-- Voir aussi : `WebSearch` pour découvrir, `Bash(curl ...)` pour les requêtes authentifiées.
-- Astuce : pour fact-checker pendant une rédaction de doc, faites plusieurs WebFetch en parallèle sur les pages canoniques — bien plus rapide que séquentiel.
+- [Tools reference : WebFetch tool behavior](https://code.claude.com/docs/en/tools-reference#webfetch-tool-behavior)
+- [Configure permissions : WebFetch](https://code.claude.com/docs/en/permissions#webfetch)
+- [Environment variables](https://code.claude.com/docs/en/env-vars)

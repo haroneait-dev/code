@@ -1,67 +1,162 @@
 ---
 title: "Hooks pour l'observabilité"
-description: "Envoyer les traces de hooks vers OpenTelemetry, Langfuse ou Phoenix pour monitorer vos agents."
-updatedAt: "2026-05-19"
-readingMinutes: 6
+description: "Activer la télémétrie OpenTelemetry native de Claude Code (métriques, événements, traces et événements de hooks), puis compléter avec des hooks pour les données métier, corrélées par prompt_id et tool_use_id."
+updatedAt: "2026-10-03"
+readingMinutes: 8
 ---
 
-Dès qu'un agent Claude Code tourne en continu — en CI, dans un cron, ou pour plusieurs développeurs — il devient indispensable de mesurer ce qu'il fait : combien d'outils par session, quels fichiers édités, combien de tokens consommés, quels prompts utilisateurs déclenchent quelles actions. Les hooks sont le point d'instrumentation idéal car ils s'exécutent à chaque event clé du cycle de vie.
+Dès qu'un agent Claude Code tourne pour une équipe, en CI ou sur la durée, il faut mesurer ce qu'il fait : coûts, tokens, outils utilisés, durées, blocages. Claude Code exporte nativement ces données en OpenTelemetry (OTel). Les hooks ne remplacent pas cette télémétrie : ils la complètent avec vos propres données (ticket, résultat de tests, règle métier déclenchée).
 
-## Modèle mental : un span par event
+## Commencer par la télémétrie native
 
-L'idée centrale est d'associer chaque event Claude Code (`UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `Stop`) à un span OpenTelemetry. La session devient le trace parent, chaque outil un span enfant. On obtient alors un graphe complet de l'exécution, comparable à celui d'une requête HTTP distribuée.
-
-| Event Claude        | Span OTel suggéré           | Attributs utiles                       |
-|---------------------|-----------------------------|----------------------------------------|
-| `SessionStart`      | trace root                  | `session.id`, `user.email`, `git.sha`  |
-| `UserPromptSubmit`  | span `user.prompt`          | `prompt.length`, `cwd`                 |
-| `PreToolUse`        | début span `tool.<name>`    | `tool.name`, `tool.input`              |
-| `PostToolUse`       | fin span `tool.<name>`      | `tool.exit_code`, `tool.duration_ms`   |
-| `Stop`              | clôture du trace            | `tokens.input`, `tokens.output`        |
-
-## Hook d'export minimal
-
-Pour ne pas alourdir chaque session, le hook écrit un événement JSON ligne par ligne dans un fichier ; un démon (otelcol, vector, fluent-bit) le lit et l'envoie au collecteur.
+Tout se règle par variables d'environnement, dans votre shell ou dans le bloc `env` des settings (gérés de préférence, pour une flotte) :
 
 ```bash
-#!/usr/bin/env bash
-# ~/.claude/hooks/otel-emit.sh
-input=$(cat)
-event=$(echo "$input" | jq -c \
-  --arg ts "$(date -u +%FT%T.%3NZ)" \
-  --arg host "$(hostname)" \
-  '. + {ts: $ts, host: $host}')
-echo "$event" >> /var/log/claude/events.jsonl
-exit 0
+export CLAUDE_CODE_ENABLE_TELEMETRY=1
+export OTEL_METRICS_EXPORTER=otlp          # otlp, prometheus, console, none
+export OTEL_LOGS_EXPORTER=otlp             # otlp, console, none
+export OTEL_EXPORTER_OTLP_PROTOCOL=grpc    # obligatoire : pas de valeur par défaut
+export OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317
+export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer votre-token"
+claude
 ```
 
-Configurez-le sur tous les events que vous souhaitez tracer :
+Pour vérifier : la métrique `claude_code.session.count` doit apparaître au démarrage, et l'événement `claude_code.user_prompt` après un premier prompt. Si rien n'arrive, lancez `claude --debug-file /tmp/claude.log` et cherchez les lignes `[3P telemetry]`.
+
+### Ce que vous obtenez
+
+| Signal | Exemples |
+|---|---|
+| Métriques | `claude_code.cost.usage` (USD), `claude_code.token.usage`, `claude_code.lines_of_code.count`, `claude_code.commit.count`, `claude_code.pull_request.count`, `claude_code.active_time.total` |
+| Événements (logs) | `user_prompt`, `api_request`, `api_error`, `tool_result`, `tool_decision`, `compaction`, `subagent_completed` |
+| Événements de hooks | `hook_registered`, `hook_execution_start`, `hook_execution_complete` |
+| Traces (bêta) | span racine `claude_code.interaction`, enfants `claude_code.llm_request` et `claude_code.tool` |
+
+Chaque événement porte `prompt.id`, qui relie tout ce qu'a produit un même prompt, et des attributs standard (`session.id`, `user.account_uuid`, `organization.id`, `user.email` si disponible…).
+
+### Observer vos hooks sans écrire de code
+
+Les événements dédiés aux hooks répondent déjà à la plupart des questions :
+
+- `claude_code.hook_registered` : un événement par hook configuré au démarrage, avec `hook_event`, `hook_type` (`command`, `http`, `mcp_tool`, `prompt`, `agent`) et `hook_source` (`userSettings`, `projectSettings`, `policySettings`, `pluginHook`…). Idéal pour inventorier les hooks d'une flotte.
+- `claude_code.hook_execution_complete` : par passage, `hook_name` (par exemple `PreToolUse:Write`), `num_hooks`, `num_success`, `num_blocking`, `num_non_blocking_error`, `num_cancelled` et `total_duration_ms`.
+
+Avec ces deux événements, vous suivez la latence de vos hooks, leur taux d'erreur et le nombre d'actions bloquées par une politique, sans toucher aux scripts.
+
+### Les traces
+
+Le traçage est en bêta et désactivé par défaut :
+
+```bash
+export CLAUDE_CODE_ENHANCED_TELEMETRY_BETA=1
+export OTEL_TRACES_EXPORTER=otlp
+```
+
+Chaque prompt ouvre un span `claude_code.interaction` ; les requêtes au modèle et les outils en sont les enfants, et les spans des sous-agents s'imbriquent sous l'outil `Agent`. Un span `claude_code.hook` existe aussi, mais seulement avec le traçage « détaillé » (`ENABLE_BETA_TRACING_DETAILED=1` et `BETA_TRACING_ENDPOINT`), qui change la destination des données : lisez la documentation avant de l'activer.
+
+Quand le traçage est actif, les commandes lancées par les outils `Bash` et `PowerShell` reçoivent une variable `TRACEPARENT` : un script instrumenté peut rattacher ses propres spans à la trace de l'outil.
+
+### Confidentialité
+
+Par défaut, Claude Code n'exporte ni le texte des prompts, ni les réponses, ni les arguments des outils : seulement des longueurs et des métadonnées. Chaque contenu s'active explicitement :
+
+| Variable | Ajoute |
+|---|---|
+| `OTEL_LOG_USER_PROMPTS=1` | Texte des prompts |
+| `OTEL_LOG_ASSISTANT_RESPONSES=1` | Texte des réponses |
+| `OTEL_LOG_TOOL_DETAILS=1` | Commandes Bash, arguments d'outils, noms de skills et de serveurs MCP |
+| `OTEL_LOG_TOOL_CONTENT=1` | Contenu des sorties d'outils dans les spans (traçage requis) |
+
+Ces données partent uniquement vers votre collecteur, jamais vers Anthropic. Activez-les en connaissance de cause : une commande Bash peut contenir un secret.
+
+## Compléter avec des hooks
+
+Les hooks servent quand vous voulez une donnée que la télémétrie ne connaît pas : le ticket associé, le résultat d'un `npm test`, la règle de sécurité qui a bloqué, le nom du client. La clé est de **corréler** vos enregistrements avec les événements natifs :
+
+| Champ du hook | Attribut OTel correspondant |
+|---|---|
+| `prompt_id` | `prompt.id` sur tous les événements |
+| `tool_use_id` | `tool_use_id` sur `tool_result` et `tool_decision` |
+| `session_id` | `session.id` |
+
+### Écrire dans un tampon local
+
+N'appelez pas votre backend directement depuis un hook bloquant : la latence réseau s'ajouterait à chaque outil. Écrivez une ligne JSON dans un fichier, et laissez un agent de collecte (OpenTelemetry Collector avec le récepteur `filelog`, Vector, Fluent Bit) l'expédier.
+
+```bash
+#!/bin/bash
+# .claude/hooks/emit.sh : un enregistrement par événement
+mkdir -p "$HOME/.claude/telemetry"
+jq -c --arg ts "$(date -u +%FT%TZ)" --arg host "$(hostname)" '{
+  ts: $ts, host: $host,
+  event: .hook_event_name, session_id, prompt_id, tool_use_id,
+  tool: .tool_name, agent: .agent_type,
+  duration_ms, error,
+  bash: (if .tool_name == "Bash" then (.tool_input.command | .[0:200]) else null end)
+} | with_entries(select(.value != null))' >> "$HOME/.claude/telemetry/hooks.jsonl"
+exit 0
+```
 
 ```json
 {
   "hooks": {
-    "PreToolUse":  [{ "hooks": [{ "type": "command", "command": "/usr/local/bin/otel-emit.sh" }] }],
-    "PostToolUse": [{ "hooks": [{ "type": "command", "command": "/usr/local/bin/otel-emit.sh" }] }],
-    "Stop":        [{ "hooks": [{ "type": "command", "command": "/usr/local/bin/otel-emit.sh" }] }]
+    "PostToolUse":        [{ "matcher": "*", "hooks": [{ "type": "command", "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/emit.sh", "args": [], "async": true }] }],
+    "PostToolUseFailure": [{ "matcher": "*", "hooks": [{ "type": "command", "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/emit.sh", "args": [], "async": true }] }],
+    "Stop":               [{ "hooks": [{ "type": "command", "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/emit.sh", "args": [], "async": true }] }]
   }
 }
 ```
 
-## Intégration Langfuse
+`"async": true` sort l'écriture du chemin critique. Le script tronque la commande Bash à 200 caractères : appliquez la même discipline de rédaction que pour la télémétrie native, et filtrez les secrets avant export.
 
-Langfuse est particulièrement adapté aux agents LLM : il sait représenter prompts, completions et outils dans une vue « trace ». Un petit script Node ou Python lit le `jsonl` et appelle l'API Langfuse, en regroupant les events par `session_id`. Le `transcript_path` fourni dans le payload permet en plus de remonter le prompt complet et les messages assistant pour les attacher au span.
+### Un hook HTTP vers votre propre service
 
-## Intégration Phoenix (Arize)
+Si vous avez déjà un service d'ingestion, un hook `http` envoie le JSON de l'événement en POST, sans script :
 
-Phoenix offre une UI locale (open source) très pratique en développement. Le SDK Python `arize-phoenix-otel` accepte directement des spans OTel standards : il suffit de pointer le collecteur OpenTelemetry vers `http://localhost:6006/v1/traces`. Vous bénéficiez alors des vues « LLM tracing » sans aucun couplage propriétaire.
+```json
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "http",
+            "url": "https://ingest.exemple.internal/claude-hooks",
+            "timeout": 5,
+            "headers": { "Authorization": "Bearer $INGEST_TOKEN" },
+            "allowedEnvVars": ["INGEST_TOKEN"]
+          }
+        ]
+      }
+    ]
+  }
+}
+```
 
-## Bonnes pratiques
+Le service doit répondre vite par un 2xx (corps vide). Une erreur réseau n'interrompt pas Claude, mais un hook `http` est synchrone : un service lent ralentit chaque outil. Côté entreprise, `allowedHttpHookUrls` limite les URL autorisées.
 
-- **Asynchrone** : ne jamais appeler l'API d'observabilité directement depuis le hook. Écrire dans un buffer local et exporter via un agent dédié évite de ralentir Claude Code.
-- **Redaction** : avant export, supprimez les secrets potentiels (`.env`, tokens) avec `jq` ou un script de redaction.
-- **Cardinalité** : n'attribuez pas le contenu complet des prompts en label OTel — préférez un hash et stockez le contenu dans le span body.
-- **Sampling** : pour les sessions très longues, échantillonnez les `PreToolUse` afin de limiter le volume.
+## Langfuse, Phoenix et autres outils LLM
 
-## Pour aller plus loin
+Les plateformes d'observabilité orientées LLM, comme Langfuse ou Arize Phoenix, acceptent des traces OpenTelemetry. La voie la plus simple consiste à envoyer les traces natives de Claude Code vers un OpenTelemetry Collector, puis à le configurer pour exporter vers ces outils en OTLP. Vérifiez dans leur documentation l'URL d'ingestion OTLP et l'authentification attendues. Gardez les hooks pour les attributs métier que vous voulez joindre aux mêmes `session.id` et `prompt.id`.
 
-Une fois l'export en place, construisez quelques dashboards de base : durée moyenne par outil, taux d'exit code non nuls, top 10 des commandes Bash exécutées. Ces métriques révèlent rapidement les frictions (outils lents, prompts qui boucle, fichiers édités trop souvent) et donnent une vraie boucle d'amélioration continue à vos workflows d'agents.
+## Tableaux de bord utiles
+
+- Coût et tokens par utilisateur, équipe (`OTEL_RESOURCE_ATTRIBUTES=team.id=...`) ou dépôt.
+- Durée p95 de chaque hook (`hook_execution_complete.total_duration_ms`) et nombre de blocages (`num_blocking`).
+- Taux d'échec par outil (`tool_result` avec `success: "false"`).
+- Top des commandes Bash (avec `OTEL_LOG_TOOL_DETAILS=1`).
+- Erreurs d'API par type, à croiser avec un hook `StopFailure`.
+
+## Articles liés
+
+- [Hooks et performance](/wiki/hooks/performance)
+- [Réagir aux erreurs : StopFailure et PostToolUseFailure](/wiki/hooks/erreurs-stopfailure)
+- [Exemples pratiques](/wiki/hooks/exemples-pratiques)
+- [Audit trail](/wiki/workflows/audit-trail)
+- [Les variables d'environnement](/wiki/cli/variables-env)
+
+## Sources
+
+- [Monitoring (OpenTelemetry)](https://code.claude.com/docs/en/monitoring-usage)
+- [Hooks reference : Common input fields, HTTP hook fields](https://code.claude.com/docs/en/hooks)

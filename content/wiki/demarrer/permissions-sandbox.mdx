@@ -1,86 +1,154 @@
 ---
 title: "Permissions et sandbox"
-description: "Comprendre le modèle de permissions de Claude Code et les modes sandbox qui isolent l'exécution des commandes."
-updatedAt: "2026-05-19"
-readingMinutes: 7
+description: "Les six modes de permission, les règles allow, ask et deny, et le sandbox Bash qui limite au niveau du système les fichiers et domaines accessibles."
+updatedAt: "2026-10-03"
+readingMinutes: 8
 ---
 
-Claude Code peut lire vos fichiers, écrire du code et exécuter des commandes shell — autant de capacités dangereuses si elles ne sont pas encadrées. Le **modèle de permissions** et le **sandbox** sont les deux mécanismes qui décident, à chaque action, si Claude peut y procéder seul, doit demander confirmation ou se voit refuser l'accès.
+Claude Code peut lire vos fichiers, les modifier et lancer des commandes shell. Deux mécanismes complémentaires encadrent ces capacités : les **permissions** décident si une action peut avoir lieu (seule, après confirmation, ou jamais), et le **sandbox** impose au niveau du système d'exploitation les fichiers et domaines réseau que les commandes shell peuvent atteindre.
 
-## Le modèle de permissions
+## Les modes de permission
 
-À chaque appel d'outil sensible (Write, Edit, Bash, etc.), Claude Code consulte ses règles de permissions. Trois modes existent :
+| Mode | Ce qui passe sans demander | Pour quoi faire |
+|---|---|---|
+| `default` (affiché « Manual ») | Les lectures uniquement | Tout valider vous-même, travail sensible |
+| `acceptEdits` | Lectures, modifications de fichiers et commandes de fichiers courantes (`mkdir`, `touch`, `mv`, `cp`) | Itérer sur du code que vous relisez |
+| `plan` | Lectures (Claude explore et propose un plan sans modifier vos sources) | Analyser avant de modifier |
+| `auto` | Tout, avec un classifieur qui vérifie chaque action en arrière-plan | Tâches longues, moins d'interruptions |
+| `dontAsk` | Lectures et outils pré-autorisés ; tout le reste est refusé | CI et scripts verrouillés |
+| `bypassPermissions` | Tout | Conteneurs et VM isolés uniquement |
 
-| Mode | Comportement |
-|------|--------------|
-| `default` | Demande confirmation pour les actions à risque (écriture, shell) |
-| `acceptEdits` | Accepte automatiquement Edit/Write/NotebookEdit |
-| `bypassPermissions` | Aucune confirmation (équivalent `--dangerously-skip-permissions`) |
-| `plan` | Mode planification — Claude propose un plan, n'exécute rien |
+**`auto` est le mode de départ** des sessions interactives dans le terminal et dans VS Code : d'abord pour les offres Pro, Max et Team (août 2026), puis pour tous les comptes depuis la v2.1.283. Le classifieur bloque par défaut les actions risquées : `curl | bash`, envoi de données sensibles vers l'extérieur, déploiements en production, `git push --force`, `git reset --hard`, suppression massive, `terraform destroy`, affichage d'un secret dans la conversation, etc.
 
-Vous changez de mode à tout moment via `/permissions` ou au démarrage avec un flag :
+### Changer de mode
 
-```bash
-claude --permission-mode acceptEdits
+- **Pendant la session** : `Shift+Tab` fait défiler les modes (depuis `auto` : `default`, puis `acceptEdits`, puis `plan`, puis retour à `auto`). Le mode actif s'affiche sous la zone de saisie.
+- **Au démarrage** : `claude --permission-mode plan` (fonctionne aussi avec `-p`).
+- **Par défaut** : la clé `permissions.defaultMode` dans vos réglages.
+
+```json
+{
+  "permissions": {
+    "defaultMode": "acceptEdits"
+  }
+}
 ```
 
-> ⚠️ `bypassPermissions` désactive **toutes** les confirmations. À réserver aux environnements jetables (sandbox CI, conteneur Docker).
+`dontAsk` n'apparaît jamais dans le cycle `Shift+Tab` : il se choisit avec `--permission-mode dontAsk`. `bypassPermissions` n'y apparaît que si vous avez lancé Claude Code avec `--dangerously-skip-permissions` (ou équivalent).
 
-## Allowlist et denylist
+> `bypassPermissions` désactive presque toutes les vérifications, y compris l'écriture dans `.git` et `.claude`. Réservez-le à un conteneur ou une VM jetable, sans accès à vos identifiants. Pour bloquer ce mode dans une organisation : `"disableBypassPermissionsMode": "disable"` dans les réglages gérés.
 
-Au-delà du mode global, vous définissez des règles fines dans `.claude/settings.json` :
+## Les règles allow, ask et deny
+
+Par-dessus le mode, vous ajoutez des règles fines dans `.claude/settings.json` (partagé), `.claude/settings.local.json` (personnel) ou `~/.claude/settings.json` (tous vos projets) :
 
 ```json
 {
   "permissions": {
     "allow": [
-      "Bash(npm test:*)",
-      "Bash(git status:*)",
-      "Edit"
+      "Bash(npm test *)",
+      "Bash(git status)",
+      "Bash(git diff *)"
+    ],
+    "ask": [
+      "Bash(git push *)"
     ],
     "deny": [
-      "Bash(rm -rf:*)",
-      "Bash(sudo:*)",
-      "Write(/etc/**)"
+      "Bash(sudo *)",
+      "Read(./.env)",
+      "Read(./.env.*)",
+      "Edit(//etc/**)"
     ]
   }
 }
 ```
 
-Les règles utilisent un **matcher** (`Bash`, `Edit`, `Read`, etc.) suivi d'un pattern optionnel. Les règles `deny` ont priorité sur les `allow`.
+Ce qu'il faut savoir :
 
-## Le sandbox
+- **Ordre d'évaluation : deny, puis ask, puis allow.** La première règle qui correspond décide. Une règle `allow` plus précise ne peut pas annuler un `deny`.
+- **Les `deny` s'appliquent dans tous les modes**, même `bypassPermissions`.
+- **Syntaxe Bash** : `*` est un joker. `Bash(npm test *)` couvre `npm test` avec ou sans arguments. L'ancienne écriture `Bash(npm test:*)` reste équivalente.
+- **Chemins** : `Edit(/src/**)` est relatif au projet, `Read(~/Documents/*.pdf)` au dossier personnel, et `Edit(//etc/**)` est un chemin absolu (deux barres obliques).
+- **Write n'a pas de règles de chemin** : utilisez `Edit(...)`, qui couvre tous les outils de modification. Une règle `Read(...)` en `deny` bloque aussi l'écriture au même endroit.
+- **Limite** : les règles `Read` et `Edit` s'appliquent aux outils de Claude et aux commandes shell reconnues (`cat`, `sed`, redirections), mais pas à un script Python ou Node qui ouvre des fichiers lui-même. Pour une vraie barrière, activez le sandbox.
 
-Le **sandbox** isole l'exécution des commandes Bash. Il existe deux niveaux :
+Pour consulter et modifier les règles sans éditer de JSON, tapez `/permissions`. Le panneau indique de quel fichier vient chaque règle. Quand vous répondez « Yes, and don't ask again » à une demande, la règle est enregistrée dans `.claude/settings.local.json`.
 
-- **Read-only sandbox** : Claude peut explorer (lire, lister, grep) mais aucune écriture ni commande modifiante.
-- **No-network sandbox** : Claude peut écrire et exécuter mais pas accéder au réseau (utile pour exécuter du code non-fiable).
+## Le sandbox Bash
 
-Sur macOS, le sandbox utilise `sandbox-exec`. Sur Linux, `bubblewrap` ou `nsjail`. Sur Windows, le support est plus limité [à vérifier].
+Le sandbox est une barrière appliquée par le système d'exploitation autour des commandes shell que Claude lance (Bash, PowerShell, Monitor) et de leurs processus enfants. Il est **désactivé par défaut**.
 
-```bash
-claude --sandbox read-only
+| Accès | Par défaut dans le sandbox |
+|---|---|
+| Écriture | Dossier de travail, dossier temporaire, dossiers ajoutés (`--add-dir`) ; les fichiers de configuration de Claude Code (`.claude/`, `.mcp.json`, `.git/hooks`, `.bashrc`…) restent protégés |
+| Lecture | La majeure partie de la machine, y compris `~/.ssh` (à restreindre avec `denyRead`) |
+| Réseau | Aucune sortie directe : tout passe par un proxy qui vérifie chaque domaine |
+
+### Plateformes
+
+- **macOS** : utilise Seatbelt, intégré au système. Rien à installer.
+- **Linux et WSL2** : nécessite `bubblewrap` et `socat` (`sudo apt-get install bubblewrap socat`). Sur Ubuntu 24.04 et plus, un profil AppArmor peut être nécessaire.
+- **Windows natif** : pas de sandbox. Utilisez WSL2.
+
+### Activer le sandbox
+
+Dans une session :
+
+```text
+/sandbox
 ```
 
-## Permissions par projet vs globales
+Le panneau propose deux modes : **auto-allow** (les commandes sandboxées passent sans demande, puisque le système les contient) ou **regular permissions** (les demandes habituelles restent). Le choix est enregistré dans `.claude/settings.local.json`. Pour tous vos projets, mettez la configuration dans `~/.claude/settings.json` :
 
-La configuration est cumulative :
+```json
+{
+  "sandbox": {
+    "enabled": true,
+    "allowUnsandboxedCommands": false,
+    "filesystem": {
+      "allowWrite": ["~/.kube", "/tmp/build"],
+      "denyRead": ["~/.aws/credentials"]
+    },
+    "network": {
+      "allowedDomains": ["registry.npmjs.org", "github.com"]
+    },
+    "excludedCommands": ["docker compose *"]
+  }
+}
+```
 
-1. `~/.claude/settings.json` — vos préférences globales
-2. `<repo>/.claude/settings.json` — règles partagées de l'équipe (commitées dans Git)
-3. `<repo>/.claude/settings.local.json` — surrides locaux (gitignored)
+- `allowUnsandboxedCommands: false` active le **mode strict** : Claude ne peut plus relancer une commande hors du sandbox après un échec.
+- `excludedCommands` sort certaines commandes du sandbox (elles repassent alors par les permissions classiques). Gardez des motifs étroits.
+- `failIfUnavailable: true` empêche Claude Code de démarrer si le sandbox ne peut pas s'activer (sinon il exécute sans sandbox).
 
-Cette hiérarchie permet à l'équipe d'imposer des `deny` partagés (ex. `Bash(rm -rf:*)`) tout en laissant chaque dev relâcher certaines règles localement.
+### Vérifier qu'il fonctionne
 
-## Bonnes pratiques
+Demandez à Claude (et non via `!`, qui s'exécute hors sandbox) de lancer `touch ~/sandbox-probe`. La commande doit échouer avec `Operation not permitted` (macOS) ou `Read-only file system` (Linux). Si Claude propose de la relancer hors sandbox, refusez.
 
-- En dev local : `default` + quelques `allow` pour les commandes fréquentes (`npm test`, `git status`).
-- En CI/CD : `bypassPermissions` dans un conteneur jetable, avec des `deny` stricts.
-- Sur un projet critique : ne jamais autoriser `Bash(rm:*)`, `Bash(sudo:*)`, ni l'écriture en dehors du dossier projet.
-- Audit régulier de `.claude/settings.local.json` (qu'on oublie facilement).
+### Ce que le sandbox ne couvre pas
+
+Les outils Read, Edit, WebFetch, les hooks, les serveurs MCP locaux et la commande de status line s'exécutent hors sandbox : ils obéissent aux règles de permission. Pour tout isoler, lancez Claude Code lui-même dans un conteneur ou une VM.
+
+## Recommandations par contexte
+
+| Contexte | Configuration conseillée |
+|---|---|
+| Développement local courant | Mode `auto` ou `acceptEdits`, quelques `allow`, `deny` sur les secrets |
+| Projet sensible | Mode `default`, sandbox activé en mode strict, `denyRead` sur `~/.ssh` et `~/.aws` |
+| CI / scripts | `--permission-mode dontAsk` avec des `allow` précis, dans un conteneur |
+| Conteneur jetable sans secrets | `bypassPermissions` possible |
+
+Pensez à relire régulièrement `.claude/settings.local.json` : les « don't ask again » s'y accumulent vite.
 
 ## Pour aller plus loin
 
-- Article : [Modes de permissions](/wiki/cli/permissions-modes)
-- Article : [Hooks de sécurité](/wiki/hooks/securite-rce)
-- Doc officielle : [Claude Code permissions](https://docs.claude.com/en/docs/claude-code/permissions)
+- [Les modes de permission en détail](/wiki/cli/permissions-modes)
+- [Configurer un projet](/wiki/demarrer/configurer-projet)
+- [Hooks et sécurité](/wiki/hooks/securite-rce)
+- [Données sensibles](/wiki/workflows/donnees-sensibles)
+
+## Sources
+
+- [Configure permissions](https://code.claude.com/docs/en/permissions)
+- [Choose a permission mode](https://code.claude.com/docs/en/permission-modes)
+- [Configure the sandboxed Bash tool](https://code.claude.com/docs/en/sandboxing)

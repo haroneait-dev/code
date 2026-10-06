@@ -1,85 +1,131 @@
 ---
-title: "Obsidian + Claude : le guide complet"
-description: "Connecter ton vault Obsidian à Claude — approche directe (fichiers) et approche MCP, cas d'usage concrets et sécurité."
-updatedAt: "2026-06-05"
-readingMinutes: 9
+title: "Obsidian et Claude : le guide complet"
+description: "Les trois façons de faire travailler Claude sur un vault Obsidian (fichiers directs avec Claude Code, CLI officielle et skills, serveur MCP), avec exemples, choix et précautions."
+updatedAt: "2026-10-03"
+readingMinutes: 7
 ---
 
-Obsidian est un éditeur de notes basé sur des fichiers Markdown stockés en local (un « vault » est simplement un dossier de fichiers `.md` sur ton disque). Cette particularité en fait un terrain idéal pour Claude : un coffre Obsidian n'est rien d'autre qu'une arborescence de fichiers texte que Claude sait lire, écrire, relier et restructurer.
+Un vault Obsidian n'est qu'un dossier de fichiers Markdown sur votre disque. Claude sait lire, écrire, relier et réorganiser ces fichiers. Ce guide présente les trois manières de connecter Claude à votre vault, quand choisir laquelle, et les précautions à prendre.
 
-Il existe **deux grandes manières** de faire travailler Claude sur un vault Obsidian, et il est important de bien les distinguer :
+## Les trois approches en bref
 
-1. **L'approche directe (fichiers)** — On pointe Claude Code sur le dossier du vault. Comme ce ne sont que des fichiers Markdown, Claude les manipule directement, sans aucune installation supplémentaire. C'est l'approche la plus simple et la plus puissante pour de gros remaniements.
-2. **L'approche MCP (Model Context Protocol)** — On installe un serveur MCP qui expose le vault à Claude via l'API REST locale d'Obsidian. Cela permet à Claude Desktop, Claude Code et certaines intégrations de lire/écrire dans le vault « à chaud », pendant qu'Obsidian est ouvert, avec accès au contexte (note active, recherche, backlinks).
+| Approche | Ce qu'il faut | Points forts | Limites |
+|---|---|---|---|
+| **Fichiers directs** avec Claude Code | Claude Code, rien d'autre | Simple, puissant pour les gros chantiers | Ne voit pas l'état d'Obsidian (note active, index) |
+| **CLI officielle + skills** | Obsidian 1.12.4 ou plus, CLI activée, skills `kepano/obsidian-skills` | Recherche et notes quotidiennes via Obsidian, syntaxe Obsidian maîtrisée | Obsidian doit être ouvert |
+| **Serveur MCP** | Plugin Local REST API (MCP intégré) ou autre serveur | Accès « à chaud » depuis Claude Code et Claude Desktop | Configuration, clé d'API, certificat |
 
-> Ce guide couvre la philosophie et l'approche directe. Pour la configuration détaillée des serveurs MCP, voir [Serveurs MCP Obsidian : installation & config](/wiki/obsidian/serveurs-mcp).
+Le détail de la configuration MCP est dans [Serveurs MCP Obsidian](/wiki/obsidian/serveurs-mcp).
 
-## Pourquoi connecter Obsidian à Claude ?
+## Ce que Claude peut faire sur un vault
 
-Le vrai déblocage, c'est de sortir l'IA de la fenêtre de chat. Au lieu de copier-coller des notes dans une conversation, Claude « connaît » directement ton vault et peut :
+- **Restructurer** : renommer, déplacer, fusionner des notes, harmoniser titres et frontmatter YAML.
+- **Créer des notes liées** avec des liens `[[...]]` corrects.
+- **Construire des notes index** (MOC, *Maps of Content*) qui organisent un dossier ou un thème.
+- **Chercher et synthétiser** : retrouver toutes les notes sur un sujet et en faire un résumé.
+- **Repérer les notes orphelines** et proposer des liens.
+- **Rédiger** à partir de vos notes, qui servent de matière première et de mémoire externe.
 
-- **Restructurer un coffre** : renommer, déplacer, fusionner des notes, harmoniser les titres et le frontmatter YAML.
-- **Créer des notes de zéro** ou des notes liées entre elles, avec les backlinks `[[...]]` corrects.
-- **Construire des tableaux de bord** (notes index, MOC — Maps of Content) qui agrègent et organisent le reste du vault.
-- **Faire de la recherche plein texte floue** sur l'ensemble des notes et en extraire le contexte.
-- **Découvrir les backlinks** et les connexions entre idées que tu n'avais pas repérées.
-- **Aider à la rédaction longue** : des utilisateurs rapportent écrire ~2 000 mots en ~90 minutes en s'appuyant sur Claude Desktop branché à leur vault, parce que les notes servent de matière première et de mémoire externe.
+## Approche 1 : les fichiers directs avec Claude Code
 
-L'idée force : ton vault devient à la fois la **source de contexte** et la **destination** du travail de Claude.
-
-## L'approche directe avec Claude Code (la plus simple)
-
-Comme un vault = un dossier de `.md`, tu n'as **rien à installer de spécial**. Il suffit d'ouvrir Claude Code dans le dossier du vault.
+Aucune installation spécifique : ouvrez Claude Code dans le dossier du vault.
 
 ```bash
-# Aller dans le dossier de ton vault Obsidian
 cd ~/Documents/MonVault
-
-# Lancer Claude Code
 claude
 ```
 
-À partir de là, tu peux demander des choses comme :
+Exemples de demandes :
 
-- « Liste toutes les notes sans tag et propose-moi des tags cohérents. »
-- « Crée une MOC `Index - Productivité.md` qui relie toutes les notes du dossier `productivite/`. »
-- « Repère les notes orphelines (sans aucun backlink) et propose des liens pertinents. »
-- « Uniformise le frontmatter YAML de toutes les notes : champs `title`, `date`, `tags`. »
-- « Convertis mes listes à puces en notes atomiques liées entre elles. »
+- « Liste les notes sans tag et propose des tags cohérents avec ceux qui existent déjà. »
+- « Crée `Index - Productivité.md` qui relie toutes les notes du dossier `productivite/`, regroupées par thème. »
+- « Repère les notes orphelines (aucun lien entrant) et propose trois liens pertinents pour chacune. »
+- « Uniformise le frontmatter de toutes les notes : champs `title`, `date`, `tags`. Montre-moi d'abord le plan. »
 
-**Avantages** : zéro configuration, accès complet aux fichiers, idéal pour les opérations massives et le refactoring de vault.
+### Donnez à Claude les règles de votre vault
 
-**Limite** : Claude travaille sur les fichiers « à froid ». Il ne voit pas l'état d'Obsidian en temps réel (note active, sélection) à moins de passer par MCP.
+Créez un fichier `CLAUDE.md` à la racine du vault. Claude Code le lit à chaque session.
 
-> **Conseil** : travaille toujours sur un vault **versionné avec Git**, ou fais une sauvegarde avant un gros remaniement. Tu pourras revenir en arrière en cas de besoin.
+```markdown
+# Règles du vault
 
-## Directe ou MCP : laquelle choisir ?
+- Notes en français, titres en minuscules sauf noms propres.
+- Frontmatter obligatoire : title, date (AAAA-MM-JJ), tags (liste).
+- Liens internes au format [[Nom de la note]], jamais de liens Markdown vers des notes.
+- Ne jamais modifier le dossier `templates/` ni `.obsidian/`.
+- Notes quotidiennes dans `journal/AAAA-MM-JJ.md`.
+```
 
-| Objectif | Approche conseillée | Exemple de prompt |
+Pour un remaniement important, démarrez en mode plan (`Shift+Tab` jusqu'à « plan », ou `claude --permission-mode plan`) : Claude propose ses changements avant d'y toucher.
+
+**Limite** : Claude voit les fichiers, pas l'application. Il ignore la note ouverte, les résultats de recherche d'Obsidian ou les propriétés calculées. Un renommage fait hors d'Obsidian ne met pas à jour automatiquement les liens : demandez explicitement à Claude de corriger les `[[liens]]` concernés.
+
+## Approche 2 : la CLI officielle d'Obsidian et les skills
+
+Depuis la version **1.12.4 (27 février 2026)**, Obsidian propose une interface en ligne de commande. Activez-la dans **Paramètres → Général**, option « Command line interface » (libellé selon la langue de l'interface), puis suivez les instructions d'enregistrement. L'application doit être ouverte pour que la CLI fonctionne.
+
+Quelques commandes :
+
+```bash
+obsidian search query="réunion client" limit=10
+obsidian read file="Projet Alpha"
+obsidian create name="Nouvelle idée" content="# Nouvelle idée" silent
+obsidian append file="Projet Alpha" content="- Relancer le fournisseur"
+obsidian daily:append content="- [ ] Préparer la démo"
+```
+
+Le créateur d'Obsidian, Steph Ango (kepano), publie un ensemble de **skills** officielles qui apprennent à Claude Code à utiliser cette CLI et les formats d'Obsidian : `obsidian-markdown` (liens, callouts), `obsidian-bases`, `json-canvas`, `obsidian-cli`, entre autres. Installation dans Claude Code :
+
+```text
+/plugin marketplace add kepano/obsidian-skills
+```
+
+Vous pouvez aussi copier le contenu du dépôt dans le dossier `.claude/` à la racine du vault. Ensuite, Claude choisit seul la bonne skill, ou vous l'appelez par son nom.
+
+## Approche 3 : un serveur MCP
+
+Un serveur MCP expose le vault « vivant » à Claude : note active, recherche d'Obsidian, commandes. C'est la voie à suivre pour **Claude Desktop**, qui n'a pas d'accès direct à vos fichiers, et utile dans Claude Code quand vous voulez interagir avec l'application ouverte.
+
+La solution la plus simple aujourd'hui : le plugin communautaire **Local REST API**, qui intègre désormais son propre serveur MCP. Dans Claude Code :
+
+```bash
+claude mcp add --transport http obsidian https://127.0.0.1:27124/mcp/ \
+  --header "Authorization: Bearer <votre-cle-api>"
+```
+
+Le pas-à-pas complet (certificat, Claude Desktop, alternatives, dépannage) est dans [Serveurs MCP Obsidian](/wiki/obsidian/serveurs-mcp).
+
+## Laquelle choisir ?
+
+| Objectif | Approche conseillée | Exemple de demande |
 |---|---|---|
-| Refactor massif du vault | Claude Code (direct) | « Renomme toutes les notes au format `YYYY-MM-DD - titre` et corrige les backlinks. » |
-| Générer des notes liées pendant que tu écris | MCP (Claude Desktop) | « Crée une note atomique pour chaque concept cité dans la note active et relie-les. » |
-| Construire un dashboard / MOC | Claude Code ou MCP | « Génère `MOC - Apprentissage.md` qui regroupe les notes du dossier `learning/` par thème. » |
-| Recherche transversale | MCP | « Trouve toutes les notes parlant de X et résume les points communs. » |
-| Rédaction longue assistée | MCP (Claude Desktop) | « Aide-moi à rédiger cet article à partir de mes notes `[[brouillon]]` et `[[sources]]`. » |
-| Nettoyage du frontmatter | Claude Code | « Uniformise les champs YAML et corrige les tags incohérents. » |
+| Remaniement massif du vault | Fichiers directs | « Renomme les notes au format `AAAA-MM-JJ - titre` et corrige tous les liens. » |
+| Nettoyage du frontmatter | Fichiers directs | « Uniformise les champs YAML et corrige les tags incohérents. » |
+| Journal et tâches du jour | CLI + skills | « Ajoute à ma note du jour les trois tâches issues de cette réunion. » |
+| Travail sur la note ouverte | MCP | « Crée une note pour chaque concept cité dans la note active et relie-les. » |
+| Depuis Claude Desktop | MCP | « Trouve mes notes sur X et résume leurs points communs. » |
 
-En résumé : **approche directe pour les gros chantiers**, **MCP pour travailler en continu pendant qu'Obsidian est ouvert**.
+En résumé : **fichiers directs pour les gros chantiers**, **CLI et skills pour le quotidien**, **MCP pour Claude Desktop et le travail sur l'application ouverte**.
 
-## Bonnes pratiques & sécurité
+## Bonnes pratiques et sécurité
 
-- **Tout reste local** : avec le plugin Local REST API, l'accès au vault se fait en local sur ta machine. Ne partage jamais ta clé d'API et ne l'expose pas sur Internet.
-- **Versionne avec Git** : un vault sous Git te permet d'annuler n'importe quelle modification de Claude. C'est le meilleur filet de sécurité.
-- **Commence petit** : teste les serveurs MCP sur un vault de test avant de les lancer sur ton coffre principal.
-- **Sois explicite** : démarre tes sessions par « utilise Obsidian / le vault » pour que Claude appelle bien les outils MCP.
-- **Un port par vault** : si tu utilises plusieurs vaults avec un plugin MCP, attribue un port unique à chacun pour éviter les conflits.
+- **Versionnez le vault avec Git** (ou faites une sauvegarde) avant tout remaniement. C'est votre meilleur filet de sécurité.
+- **Testez sur une copie** avant de lancer une opération de masse sur votre vault principal.
+- **Gardez la clé d'API secrète.** Le serveur de Local REST API écoute en local (`127.0.0.1`) : ne l'exposez pas sur votre réseau ni sur Internet.
+- **Excluez ce qui est sensible.** Rangez les notes privées dans un dossier que vous interdisez à Claude (règle dans `CLAUDE.md`, et règle `deny` dans les permissions de Claude Code si nécessaire).
+- **Soyez explicite** : « utilise le vault Obsidian » ou « utilise les outils MCP obsidian » aide Claude à choisir les bons outils.
 
-## Aller plus loin
+## Pour aller plus loin
 
-- [Serveurs MCP Obsidian : installation & config](/wiki/obsidian/serveurs-mcp) — le pas-à-pas pour brancher Obsidian à chaud.
-- [Introduction au MCP](/wiki/mcp/introduction-mcp) — comprendre le protocole sous-jacent.
-- [Sources & ressources externes](/wiki/actualites/sources-ressources) — tous les liens GitHub et forums Obsidian.
+- [Serveurs MCP Obsidian : installation et configuration](/wiki/obsidian/serveurs-mcp)
+- [Le fichier CLAUDE.md](/wiki/demarrer/claude-md)
+- [Introduction au MCP](/wiki/mcp/introduction-mcp)
+- [Sources et ressources externes](/wiki/actualites/sources-ressources)
 
----
+## Sources
 
-*Cet article fait partie du wiki Claude Mastery. Non affilié à Anthropic. Claude™ est une marque d'Anthropic, PBC.*
+- [kepano/obsidian-skills (GitHub)](https://github.com/kepano/obsidian-skills)
+- [Obsidian 1.12.4 : notes de version (CLI)](https://obsidian.md/changelog/2026-02-27-desktop-v1.12.4/)
+- [Obsidian Local REST API (GitHub)](https://github.com/coddingtonbear/obsidian-local-rest-api)
+- [Connecter Claude Code à des outils via MCP (documentation Claude Code)](https://code.claude.com/docs/en/mcp)
+- [Mémoire et CLAUDE.md (documentation Claude Code)](https://code.claude.com/docs/en/memory)

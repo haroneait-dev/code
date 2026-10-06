@@ -238,8 +238,8 @@ export const ARTICLE_STUBS: ArticleStub[] = [
   { category: "demarrer", slug: "ide-vscode-cursor-windsurf", title: "Configurer les IDE (VS Code, Cursor, Windsurf, Zed)", description: "Extensions officielles et tierces dans les éditeurs modernes." },
   { category: "demarrer", slug: "troubleshooting-installation", title: "Résolution des conflits d'installation", description: "Erreurs Node.js/NPM, conflits Python, pare-feu, permissions." },
   { category: "demarrer", slug: "config-globale", title: "Le fichier de config globale", description: "Anatomie de la config user en dehors de CLAUDE.md." },
-  { category: "demarrer", slug: "anthropic-quickstarts", title: "Anthropic Quickstarts", description: "Architectures de référence officielles (AWS, GCP, Vercel templates)." },
-  { category: "demarrer", slug: "meta-prompt-tool", title: "Le Meta-Prompt Tool d'Anthropic", description: "Outil officiel pour générer des prompts parfaits." },
+  { category: "demarrer", slug: "anthropic-quickstarts", title: "Claude Quickstarts : les templates officiels", description: "Le dépôt claude-quickstarts d'Anthropic : ses projets (support client, analyse de données, computer use, Managed Agents) et comment en démarrer un." },
+  { category: "demarrer", slug: "meta-prompt-tool", title: "Générer un prompt avec Claude (meta-prompt)", description: "Faire rédiger un premier jet de prompt structuré par Claude, puis le tester et l'affiner." },
 
   // ═══ MODÈLES CLAUDE ══════════════════════════════════════════════
   { category: "modeles", slug: "opus-sonnet-5-5", title: "Claude Opus 5.5 et Sonnet 5.5", description: "La génération 5.5 (septembre 2026) : prix, contexte 1M, ce qui change dans Claude Code et en API." },
@@ -309,13 +309,13 @@ export const ARTICLE_STUBS: ArticleStub[] = [
   { category: "slash-commands", slug: "creer-slash-command", title: "Créer une slash command custom", description: "Structure, frontmatter, déploiement." },
   { category: "slash-commands", slug: "arguments-namespacing", title: "Arguments et namespacing", description: "Passer des arguments, organiser ses commandes en namespaces." },
   { category: "slash-commands", slug: "mcp-permissions", title: "/mcp et /permissions", description: "Gérer MCP et les permissions à la volée." },
-  { category: "slash-commands", slug: "slash-dans-hooks", title: "Slash commands dans les hooks", description: "Déclencher des commandes depuis un hook." },
-  { category: "slash-commands", slug: "markdown-frontmatter", title: "Markdown frontmatter dans les commandes", description: "Les champs supportés et leur effet." },
-  { category: "slash-commands", slug: "bash-injection-securisee", title: "Bash injection sécurisée", description: "Comment Claude protège contre l'injection dans les commandes." },
-  { category: "slash-commands", slug: "skills-vs-slash", title: "Skills vs slash commands", description: "Quand utiliser un skill plutôt qu'une commande." },
-  { category: "slash-commands", slug: "arguments-complexes", title: "Slash commands avec arguments complexes", description: "Parser regex, chemins, flags personnalisés." },
-  { category: "slash-commands", slug: "config-modifications-chaud", title: "/config et modifications à chaud", description: "Modifier les variables internes du CLI en pleine session." },
-  { category: "slash-commands", slug: "partage-equipe", title: "Partage et centralisation en équipe", description: "Versionner les slash commands dans un repo d'entreprise." },
+  { category: "slash-commands", slug: "slash-dans-hooks", title: "Hooks et commandes personnalisées", description: "Filtrer ou enrichir une commande /nom, attacher des hooks à un skill, ou lancer un skill depuis un hook sans boucle infinie." },
+  { category: "slash-commands", slug: "markdown-frontmatter", title: "Le frontmatter des commandes personnalisées", description: "Les champs (description, argument-hint, allowed-tools, model, effort, context…), leur effet réel et les erreurs qui les rendent inopérants." },
+  { category: "slash-commands", slug: "bash-injection-securisee", title: "Écrire des commandes personnalisées sûres", description: "Ce qui s'exécute vraiment dans un shell quand une commande /nom reçoit des arguments, et les protections qui limitent les dégâts." },
+  { category: "slash-commands", slug: "skills-vs-slash", title: "Skills et slash commands : ce qui a changé", description: "Les commandes personnalisées sont désormais des skills : déclenchement manuel ou automatique, CLAUDE.md ou hook." },
+  { category: "slash-commands", slug: "arguments-complexes", title: "Commandes avec arguments complexes", description: "Flags, chemins multiples, regex et JSON : ce que Claude Code découpe pour vous et ce que Claude doit analyser." },
+  { category: "slash-commands", slug: "config-modifications-chaud", title: "/config et réglages en cours de session", description: "Menu /config, forme /config clé=valeur, rechargement à chaud des settings.json et clés qui exigent une nouvelle session." },
+  { category: "slash-commands", slug: "partage-equipe", title: "Partager les commandes en équipe", description: "Skills commités, marketplace de plugins privée, skills gérés par l'organisation, conventions et revue." },
 
   // ═══ HOOKS ═══════════════════════════════════════════════════════
   { category: "hooks", slug: "introduction-hooks", title: "Qu'est-ce qu'un hook ?", description: "Concept, cas d'usage, philosophie." },
@@ -350,17 +350,17 @@ export const ARTICLE_STUBS: ArticleStub[] = [
   { category: "skills", slug: "doc-generation", title: "Génération auto de doc de skills", description: "Générer SKILL.md à partir de commentaires TSDoc/JSDoc." },
 
   // ═══ SUBAGENTS ═══════════════════════════════════════════════════
-  { category: "subagents", slug: "pourquoi-subagents", title: "Pourquoi des subagents ?", description: "Cas d'usage, bénéfices, anti-patterns." },
-  { category: "subagents", slug: "types-fournis", title: "Types fournis (Explore, Plan, code-reviewer)", description: "Inventaire des subagents disponibles par défaut." },
-  { category: "subagents", slug: "creer-subagent-custom", title: "Créer des subagents personnalisés", description: "Fichier Markdown + YAML (name, description, tools, model), agents intégrés, résolution du modèle et coût." },
-  { category: "subagents", slug: "frontmatter-agent", title: "Frontmatter agent", description: "Champs name, description, tools, model, etc." },
-  { category: "subagents", slug: "quand-deleguer", title: "Quand déléguer à un subagent ?", description: "Heuristiques pour décider." },
-  { category: "subagents", slug: "parallelisation", title: "Parallélisation", description: "Lancer plusieurs subagents en parallèle." },
-  { category: "subagents", slug: "cout-token-budgeting", title: "Coût et token budgeting", description: "Combien coûte un subagent, comment budgeter." },
-  { category: "subagents", slug: "erreurs-courantes", title: "Erreurs courantes", description: "Les pièges les plus fréquents." },
-  { category: "subagents", slug: "sous-traitance-recursive", title: "Sous-traitance récursive : agents créés par agents", description: "Limites, boucles infinies, arbres de dépendances." },
-  { category: "subagents", slug: "code-reviewer-isolation", title: "Le subagent code-reviewer en isolation", description: "Audit d'une PR avant validation humaine." },
-  { category: "subagents", slug: "state-sharing", title: "Partage d'état entre agents", description: "Transmettre résultats et fichiers temporaires." },
+  { category: "subagents", slug: "pourquoi-subagents", title: "Pourquoi utiliser des subagents ?", description: "Contexte préservé, outils restreints, modèle moins cher et travail en arrière-plan, avec leurs limites." },
+  { category: "subagents", slug: "types-fournis", title: "Les subagents intégrés (Explore, Plan, general-purpose)", description: "Rôle, modèle et outils de chaque subagent intégré, forks compris, et comment les désactiver." },
+  { category: "subagents", slug: "creer-subagent-custom", title: "Créer un subagent personnalisé", description: "Fichier .claude/agents, priorités, exemple complet, description, outils, modèle et invocation." },
+  { category: "subagents", slug: "frontmatter-agent", title: "Frontmatter des subagents : référence des champs", description: "Tous les champs YAML officiels (tools, model, permissionMode, skills, memory, isolation…) et leurs pièges." },
+  { category: "subagents", slug: "quand-deleguer", title: "Quand déléguer à un subagent ?", description: "Grille de décision : conversation, subagent, fork, /btw, workflow ou équipe d'agents." },
+  { category: "subagents", slug: "parallelisation", title: "Paralléliser les subagents", description: "Arrière-plan par défaut, limite de 20 simultanés, worktrees, /batch et workflows." },
+  { category: "subagents", slug: "cout-token-budgeting", title: "Coût et budget de tokens des subagents", description: "D'où viennent les tokens, comment les mesurer et les réduire." },
+  { category: "subagents", slug: "erreurs-courantes", title: "Erreurs courantes avec les subagents", description: "Brief vague, champ mal orthographié, agent ignoré, limite de concurrence et autres pièges." },
+  { category: "subagents", slug: "sous-traitance-recursive", title: "Sous-traitance récursive : des subagents qui lancent des subagents", description: "Limite de profondeur (3 niveaux par défaut), réglage, boucles et suivi par hooks." },
+  { category: "subagents", slug: "code-reviewer-isolation", title: "Un subagent code-reviewer isolé", description: "Créer un relecteur en lecture seule qui audite un diff sans connaître l'implémentation." },
+  { category: "subagents", slug: "state-sharing", title: "Partage d'état entre agents", description: "Rapport final, JSON, fichiers, SendMessage, hooks et mémoire pour faire circuler les résultats." },
 
   // ═══ MCP ═════════════════════════════════════════════════════════
   { category: "mcp", slug: "introduction-mcp", title: "Qu'est-ce que MCP ?", description: "Le Model Context Protocol expliqué." },
@@ -378,7 +378,7 @@ export const ARTICLE_STUBS: ArticleStub[] = [
   { category: "mcp", slug: "json-rpc-mapping", title: "JSON-RPC 2.0 sous le capot", description: "Spécifications réseau du protocole MCP." },
   { category: "mcp", slug: "primitives-resources-tools-prompts", title: "Resources, Tools, Prompts — les primitives MCP", description: "Différences et quand utiliser l'une plutôt que l'autre." },
   { category: "mcp", slug: "transports-stdio-sse", title: "Transports MCP : Stdio vs SSE", description: "Choisir le bon mode selon local vs distant." },
-  { category: "mcp", slug: "serveur-memory", title: "Le serveur MCP Memory (Knowledge Graph)", description: "Construire un graphe de connaissances persistant pour Claude." },
+  { category: "mcp", slug: "serveur-memory", title: "Le serveur MCP Memory", description: "Une mémoire persistante en entités, relations et observations stockées en JSONL." },
   { category: "mcp", slug: "routing-aggregation", title: "Routing et agrégation de serveurs MCP", description: "Proxys MCP pour exposer plusieurs serveurs via un point d'entrée." },
   { category: "mcp", slug: "evolution-2026-apps-elicitation", title: "MCP en 2026 : Apps, élicitation, sampling & Streamable HTTP", description: "Don à l'Agentic AI Foundation, MCP Apps (UI interactives), élicitation, sampling et transport sans état." },
 
@@ -415,8 +415,8 @@ export const ARTICLE_STUBS: ArticleStub[] = [
   { category: "api", slug: "rate-limit-headers", title: "Gestion fine du Rate Limiting", description: "Parser anthropic-ratelimit-* pour adapter dynamiquement." },
   { category: "api", slug: "metadata-user-id", title: "Métadonnées (metadata.user_id)", description: "Tracking et isolation des requêtes par utilisateur final." },
   { category: "api", slug: "ttft-tuning", title: "Time-To-First-Token (TTFT) tuning", description: "Optimiser pour que Claude commence à répondre vite." },
-  { category: "api", slug: "token-budgeting", title: "Token budgeting et dépassement de contexte", description: "Sliding window, résumé dynamique pour agents long-running." },
-  { category: "api", slug: "evals-automatisees", title: "Évaluations (Evals) automatisées", description: "promptfoo, framework Anthropic — valider sans régression." },
+  { category: "api", slug: "token-budgeting", title: "Token budgeting et dépassement de contexte", description: "Compter les tokens avant l'envoi, borner les résultats d'outils et compacter l'historique d'un agent long." },
+  { category: "api", slug: "evals-automatisees", title: "Évaluations automatisées de vos prompts", description: "Un jeu de tests, trois façons de noter (code, LLM juge, humain) et un blocage en CI quand la qualité baisse." },
 
   // ═══ WORKFLOWS & SÉCURITÉ ════════════════════════════════════════
   { category: "workflows", slug: "code-review-auto", title: "Code review automatisé", description: "Workflow pour auditer chaque PR avec Claude." },
@@ -429,7 +429,7 @@ export const ARTICLE_STUBS: ArticleStub[] = [
   { category: "workflows", slug: "prompt-injection", title: "Prompt injection", description: "Comprendre et se protéger des attaques par injection." },
   { category: "workflows", slug: "donnees-sensibles", title: "Données sensibles", description: "Travailler avec des données confidentielles." },
   { category: "workflows", slug: "audit-trail", title: "Audit trail", description: "Tracer toutes les actions de Claude pour compliance." },
-  { category: "workflows", slug: "migration-db", title: "Migration de bases de données automatisée", description: "Schéma SQL → migration Prisma/Liquibase + rollback." },
+  { category: "workflows", slug: "migration-db", title: "Migrations de base de données avec Claude Code", description: "Migrations Prisma ou Liquibase sûres, avec rollback, test sur une base jetable et hook qui bloque la production." },
   { category: "workflows", slug: "doc-vivante", title: "Documentation technique vivante", description: "Boucle code → MkDocs/Mermaid à chaque commit." },
   { category: "workflows", slug: "faux-positifs-audit", title: "Faux positifs en audit de sécurité", description: "Calibrer /security-review pour éviter le bruit." },
 
@@ -495,7 +495,7 @@ export const ARTICLE_STUBS: ArticleStub[] = [
   { category: "actualites", slug: "claude-science", title: "Claude Science — l'atelier IA pour chercheurs", description: "60+ compétences en génomique/chémoinformatique, intégration BioNeMo de NVIDIA et calcul distribué via Modal." },
   { category: "actualites", slug: "backdoor-chine-distillation", title: "Le « backdoor » chinois : traçage & distillation", description: "L'alerte NVDB de juillet 2026, la réalité du mécanisme anti-distillation, et le conflit Anthropic / Alibaba." },
   { category: "actualites", slug: "auto-amelioration-recursive", title: "L'auto-amélioration récursive de Claude", description: "Claude écrit 80 % du code d'Anthropic, et l'expérience d'optimisation passée de 3× à 52× en moins d'un an." },
-  { category: "actualites", slug: "sources-ressources", title: "Sources & ressources externes", description: "Liens officiels Anthropic, MCP, Obsidian, changelogs — la base de données externe du wiki." },
+  { category: "actualites", slug: "sources-ressources", title: "Sources et ressources fiables sur Claude", description: "Les liens officiels à consulter en priorité (API, Claude Code, aide, MCP), puis les ressources communautaires utiles." },
 ];
 
 // ─── Helpers ─────────────────────────────────────────────────────────

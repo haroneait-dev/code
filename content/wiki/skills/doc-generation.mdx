@@ -1,128 +1,127 @@
 ---
-title: "Génération auto de doc de skills"
-description: "Générer automatiquement le SKILL.md d'un Skill Claude Code à partir des commentaires TSDoc/JSDoc, avec outils de scaffolding et CI."
-updatedAt: "2026-05-19"
-readingMinutes: 6
+title: "Générer et maintenir la documentation de vos skills"
+description: "Automatiser ce qui peut l'être autour d'un skill : brouillon avec skill-creator, fichiers de référence générés depuis le code, catalogue des skills et contrôles en CI."
+updatedAt: "2026-10-03"
+readingMinutes: 5
 ---
 
-Maintenir à la main la documentation de dizaines de Skills devient vite ingérable : description désynchronisée du code, exemples obsolètes, frontmatter cassé. La solution : générer le `SKILL.md` automatiquement depuis les commentaires TSDoc/JSDoc du code source, comme on le fait pour Typedoc ou Storybook. Ce guide montre comment mettre en place un pipeline simple, du scaffolding initial à la régénération en CI.
+Un `SKILL.md` n'est pas une documentation d'API : c'est un jeu d'instructions pour Claude. Le générer entièrement depuis des commentaires de code produit en général un skill verbeux et peu utile. En revanche, plusieurs parties se prêtent bien à l'automatisation : le premier brouillon, les fichiers de référence, le catalogue de vos skills et les contrôles avant fusion. Cette page montre quoi automatiser, et quoi garder à la main.
 
-## Pourquoi générer plutôt qu'écrire
+## Ce qui doit rester écrit à la main
 
-Trois douleurs récurrentes que la génération résout :
+- **La `description`** : c'est elle qui déclenche le skill. Elle doit dire ce que fait le skill et quand l'utiliser, avec les mots de vos utilisateurs. Aucun outil ne connaît ce contexte mieux que vous.
+- **La procédure** dans le corps de `SKILL.md` : quelques étapes impératives, sous 500 lignes, avec les consignes essentielles en haut (elles survivent mieux à la compaction).
 
-- **Drift** : un Skill évolue (ajout d'arguments, nouvelle option), mais le `SKILL.md` reste figé. Les utilisateurs lisent une doc fausse.
-- **Verbosité** : décrire en prose ce qui est déjà décrit en types TypeScript est doublon. Le compilateur connaît déjà les arguments.
-- **Cohérence** : 30 Skills écrits par 10 devs = 10 styles différents. Un générateur applique un template unique.
+## Le premier brouillon : demandez à Claude
 
-Le frontmatter, lui, reste souvent semi-manuel : seul un humain peut écrire un `description` pertinent pour l'activation auto.
+La méthode recommandée par Anthropic est de développer un skill **avec** Claude : une instance vous aide à rédiger, une autre (session neuve) l'utilise sur de vraies tâches. Le plugin `skill-creator` outille cette démarche :
 
-## Scaffolding initial : `claude skill init`
+```text
+/plugin install skill-creator@claude-plugins-official
+```
 
-Pour démarrer un Skill, le CLI fournit (ou peut être étendu pour fournir) un générateur qui crée la structure minimale.
+Demandez ensuite par exemple : « Crée un skill qui génère nos migrations Supabase à partir de ce que nous venons de faire. » Il propose la structure, le frontmatter et des cas de test, puis peut affiner la description en mesurant le taux de déclenchement.
+
+Pour un projet entier, `/run-skill-generator` écrit un skill `.claude/skills/run-<nom>/` qui enregistre comment lancer votre application, et `/verify` consigne sa propre recette dans `.claude/skills/verify/SKILL.md`. Ce sont deux exemples de skills générés par Claude Code lui-même.
+
+## Générer les fichiers de référence depuis le code
+
+C'est là que la génération depuis TSDoc ou JSDoc a du sens. Si votre skill pilote une bibliothèque interne, produisez sa référence d'API avec un outil classique, puis placez-la dans un fichier que le skill lit **seulement si besoin** (niveau 3 de la divulgation progressive).
 
 ```bash
-npx claude-skill-init my-skill --lang ts
+npx typedoc --plugin typedoc-plugin-markdown \
+  --out .claude/skills/client-interne/reference \
+  src/client/index.ts
 ```
 
-Génère :
+Dans `SKILL.md`, ne recopiez pas la référence, pointez vers elle :
 
-```
-my-skill/
-  SKILL.md          # Frontmatter pré-rempli, sections vides
-  src/
-    index.ts        # Entry point avec TSDoc déjà annoté
-  scripts/
-    run.sh          # Wrapper Bash
-  .skillrc.json     # Config du générateur (template, sections)
+```markdown
+## Référence
+
+Pour la signature exacte d'une fonction du client, lisez le fichier
+correspondant dans [reference/](reference/). Ne lisez que ce dont vous avez besoin.
 ```
 
-Le `SKILL.md` initial contient :
+Quelques règles issues des bonnes pratiques officielles :
 
-```md
----
-title: "<TODO>"
-description: "<TODO — write WHEN to use and WHEN NOT to>"
----
+- un seul niveau de renvoi depuis `SKILL.md` ;
+- une table des matières en tête des fichiers de référence longs ;
+- pas d'information datée (« avant août 2026… ») sans la ranger dans une section « Anciennes méthodes ».
 
-<!-- AUTO-GENERATED — do not edit below this line -->
+## Générer un catalogue de vos skills
+
+Avec des dizaines de skills, un README listant chacun avec sa description évite les doublons. Un petit script suffit :
+
+```js
+// scripts/catalogue-skills.mjs
+import { readdir, readFile, writeFile } from "node:fs/promises";
+import { parse } from "yaml";
+
+const dir = ".claude/skills";
+const lignes = ["| Skill | Description | Invocation |", "|---|---|---|"];
+
+for (const nom of (await readdir(dir)).sort()) {
+  let texte;
+  try {
+    texte = await readFile(`${dir}/${nom}/SKILL.md`, "utf8");
+  } catch {
+    continue;
+  }
+  const match = texte.match(/^---\n([\s\S]*?)\n---/);
+  const fm = match ? parse(match[1]) ?? {} : {};
+  const invocation = fm["disable-model-invocation"] ? "manuelle" : "auto + manuelle";
+  lignes.push(`| \`/${fm.name ?? nom}\` | ${fm.description ?? "(aucune)"} | ${invocation} |`);
+}
+
+await writeFile(`${dir}/README.md`, lignes.join("\n") + "\n");
 ```
 
-Tout ce qui suit le marqueur est régénéré à chaque build.
+Le `README.md` à la racine de `.claude/skills/` n'est pas un skill (pas de `SKILL.md`) : Claude Code l'ignore.
 
-## Extraire la doc depuis TSDoc/JSDoc
+## Contrôler en CI
 
-Le générateur lit les types et les commentaires TSDoc du code. Exemple d'entrée :
-
-```ts
-/**
- * Envoie un message Slack sur le canal configuré.
- * @param message - Texte à envoyer (markdown Slack supporté)
- * @param channel - ID du canal, défaut: env SLACK_CHANNEL_ID
- * @example
- *   notify("Deploy terminé", "C01234")
- */
-export async function notify(message: string, channel?: string) { ... }
-```
-
-Le générateur produit dans le `SKILL.md` :
-
-```md
-## API
-
-### `notify(message, channel?)`
-
-Envoie un message Slack sur le canal configuré.
-
-**Paramètres**
-- `message` (string) — Texte à envoyer (markdown Slack supporté)
-- `channel` (string, optionnel) — ID du canal, défaut: env `SLACK_CHANNEL_ID`
-
-**Exemple**
-
-​```ts
-notify("Deploy terminé", "C01234")
-​```
-```
-
-Outils disponibles pour cette extraction : **TypeDoc** (le plus mûr, plugin markdown), **api-extractor** de Microsoft, **tsdoc-markdown**, ou un parseur custom basé sur le compiler TypeScript.
-
-## Régénération en CI
-
-L'idéal est de bloquer les PR qui modifient un Skill sans régénérer la doc. Workflow GitHub Actions minimal :
+Combinez la validation officielle et vos propres règles :
 
 ```yaml
-- run: npm run skills:gen
-- run: git diff --exit-code SKILL.md || (echo "Doc obsolète, run npm run skills:gen" && exit 1)
+# .github/workflows/skills.yml (extrait)
+- run: npm install -g @anthropic-ai/claude-code
+- run: claude plugin validate .claude/skills
+- run: node scripts/catalogue-skills.mjs && git diff --exit-code .claude/skills/README.md
+- run: node scripts/verifier-skills.mjs
 ```
 
-Couplé à un hook `pre-commit` (via Husky ou lefthook) qui régénère automatiquement, le drift devient impossible.
+`claude plugin validate` signale les frontmatters qui ne se parsent pas. Votre script `verifier-skills.mjs` peut ajouter des règles maison :
 
-## Templates et sections personnalisées
+- `description` présente et sous 1 024 caractères (limite de claude.ai et de l'API) ;
+- `name` en minuscules, chiffres et tirets, 64 caractères maximum ;
+- `SKILL.md` sous 500 lignes ;
+- uniquement des champs officiels (Claude Code ignore en silence une clé mal orthographiée, comme `allowed_tools` au lieu de `allowed-tools`) ;
+- pour un skill destiné à claude.ai : uniquement `name`, `description`, `license`, `compatibility`, `metadata`, `allowed-tools`.
 
-Un bon générateur permet de définir des **slots** dans le template :
+Pour un skill distribué en plugin, ajoutez `claude plugin validate --strict` et une suite `claude plugin eval` (voir [Tester un skill](/wiki/skills/tester-skill)).
 
-- `{{frontmatter}}` — toujours manuel
-- `{{description-long}}` — manuel, prose
-- `{{api}}` — auto depuis TSDoc
-- `{{examples}}` — auto depuis tests (`*.test.ts`) ou `@example`
-- `{{cleanup}}` — manuel
+## README humain contre SKILL.md
 
-Stocker le template dans `.skillrc.json` permet à toute l'équipe de partager le même format sans copier-coller.
+| | README.md | SKILL.md |
+|---|---|---|
+| Lecteur | Développeurs qui découvrent le skill | Claude |
+| Contenu | Installation, prérequis, exemples, changelog | Description de déclenchement, procédure impérative |
+| Ton | Explicatif | Consignes courtes et vérifiables |
 
-## Validation du frontmatter
-
-Au-delà de la génération, ajouter une étape de **validation** :
-
-- Le `description` fait-il au moins 40 caractères ?
-- Inclut-il un "use when" et un "skip when" ?
-- Le `name` est-il en kebab-case ?
-
-Un script Zod (ou Valibot) qui parse le frontmatter et fail si invalide évite 90% des Skills cassés en production.
+Ne fusionnez pas les deux : chaque ligne de `SKILL.md` coûte des tokens à chaque invocation.
 
 ## Pour aller plus loin
 
-- TypeDoc avec plugin markdown : `typedoc-plugin-markdown`
-- Voir **Cycle de vie d'un Skill** pour comprendre l'impact du `description` sur l'activation
-- Inspiration : le système de docs de tRPC, généré depuis les types
-- Outils complémentaires : `syncpack` pour aligner les versions de dépendances entre Skills, `changesets` pour versionner chaque Skill indépendamment
+- [Structure d'un skill](/wiki/skills/structure-skill)
+- [Frontmatter de SKILL.md](/wiki/skills/skill-md-frontmatter)
+- [Publier un skill](/wiki/skills/publier-skill)
+- [Exécution en CI/CD](/wiki/cli/cicd-execution)
+
+## Sources
+
+- Skills, skill-creator, dépannage : https://code.claude.com/docs/en/skills
+- Bonnes pratiques de rédaction : https://platform.claude.com/docs/en/agents-and-tools/agent-skills/best-practices
+- Contraintes de `name` et `description` : https://docs.claude.com/en/docs/agents-and-tools/agent-skills/overview
+- Validation des plugins : https://code.claude.com/docs/en/plugins/publish
+- TypeDoc et typedoc-plugin-markdown : https://typedoc.org

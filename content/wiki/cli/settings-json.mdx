@@ -1,96 +1,148 @@
 ---
 title: "Le fichier settings.json"
-description: "Référence de la configuration de Claude Code : les 5 niveaux de settings.json, l'ordre de fusion, le bloc permissions, le champ env, la sélection de modèle et l'autocomplétion via $schema."
-updatedAt: "2026-06-08"
-readingMinutes: 8
+description: "Où placer settings.json, quel fichier l'emporte, et comment configurer permissions, env, modèle, hooks et sandbox dans Claude Code."
+updatedAt: "2026-10-03"
+readingMinutes: 7
 ---
 
-`settings.json` est le mécanisme officiel pour configurer le comportement de Claude Code : permissions, variables d'environnement, modèle, hooks, serveurs MCP. À distinguer du [`CLAUDE.md`](/wiki/demarrer/claude-md) qui, lui, contient des **instructions** (contexte), pas de la configuration.
+`settings.json` configure le comportement de Claude Code : permissions, variables d'environnement, modèle, hooks, sandbox, plugins. Il ne contient pas d'instructions pour Claude : celles-ci vont dans [`CLAUDE.md`](/wiki/demarrer/claude-md).
 
-## La hiérarchie (5 niveaux)
+## Les quatre fichiers (et les réglages gérés)
 
-Claude Code lit plusieurs fichiers et les **fusionne**, du plus large au plus spécifique :
+| Portée | Fichier | Qui est concerné | Pour quoi |
+|---|---|---|---|
+| Utilisateur | `~/.claude/settings.json` | Vous, dans tous vos projets | Thème, modèle par défaut, vos règles personnelles |
+| Projet partagé | `.claude/settings.json` | Toute l'équipe (à commiter) | Permissions, hooks, plugins, `env` du projet |
+| Projet local | `.claude/settings.local.json` | Vous, dans ce projet uniquement | Exceptions personnelles, tests avant partage |
+| Géré | `managed-settings.json`, MDM ou console claude.ai | Toute l'organisation | Politique de sécurité et conformité |
 
-| Niveau | Emplacement | Usage |
-|---|---|---|
-| **Enterprise (managed)** | Politique gérée par l'organisation | Sécurité imposée — **priorité maximale** |
-| **Utilisateur** | `~/.claude/settings.json` | Tes réglages, tous projets confondus |
-| **Projet (partagé)** | `<projet>/.claude/settings.json` | Versionné, partagé avec l'équipe |
-| **Projet (local)** | `<projet>/.claude/settings.local.json` | Tes overrides personnels (non versionné) |
-| **Flags / env de session** | `--model`, variables d'env | Override ponctuel |
+Sous Windows, `~/.claude` correspond à `%USERPROFILE%\.claude`. La variable `CLAUDE_CONFIG_DIR` déplace tout le dossier.
 
-Claude Code ajoute automatiquement `.claude/settings.local.json` au `.gitignore`. **Règle clé** : les politiques Enterprise priment toujours ; pour le reste, le plus spécifique l'emporte. Une règle `deny` à un niveau ne peut pas être annulée par un `allow` à un niveau inférieur (ordre **deny > ask > allow**).
+Claude Code tient aussi `~/.claude.json`, qu'il écrit lui-même : connexion, serveurs MCP de portée utilisateur et locale, état par projet. Vous n'avez normalement pas à l'éditer.
 
-> Astuce : Claude Code crée des **sauvegardes horodatées** quand un fichier de config change (les 5 plus récentes par fichier). Un réglage cassé est récupérable sans archéologie Git.
+## Quel réglage l'emporte
+
+Du plus prioritaire au moins prioritaire :
+
+1. **Réglages gérés** : rien ne les surcharge (hormis quelques clés de sécurité où la valeur la plus stricte gagne).
+2. **Ligne de commande** : `--settings '{...}'`, `--model`, `--permission-mode`, pour la session en cours.
+3. **Projet local** (`.claude/settings.local.json`).
+4. **Projet partagé** (`.claude/settings.json`).
+5. **Utilisateur** (`~/.claude/settings.json`).
+
+Deux règles complètent cet ordre :
+
+- **Les listes se cumulent.** `permissions.allow` défini dans trois fichiers donne l'union des trois.
+- **Les variables d'environnement ne sont pas un niveau.** Chaque paire variable/clé a sa propre règle : `ANTHROPIC_MODEL` exportée dans votre shell l'emporte sur la clé `model` de n'importe quel fichier.
+
+Pour vérifier ce qui est chargé, lancez `/status` : la ligne `Setting sources` liste les fichiers lus. `claude doctor` détaille les entrées rejetées.
 
 ## Autocomplétion avec `$schema`
-
-Ajoute une ligne `$schema` pour obtenir l'autocomplétion de toutes les options dans ton éditeur :
 
 ```json
 {
   "$schema": "https://json.schemastore.org/claude-code-settings.json",
   "permissions": {
-    "allow": ["Bash(npm run lint)", "Bash(npm run test:*)"],
-    "deny": ["Read(./.env)", "Read(./secrets/**)"]
+    "allow": ["Bash(npm run lint)", "Bash(npm run test *)"],
+    "deny": ["Read(./.env)", "Read(./.env.*)"]
   }
 }
 ```
 
-## Le bloc `permissions`
+Le schéma active l'autocomplétion dans VS Code, Cursor et tout éditeur compatible. Il peut avoir un léger retard sur les dernières versions. Attention : les fichiers sont du JSON strict. Un commentaire `//` ou une virgule finale provoque une « Settings Error » au démarrage.
 
-C'est le réglage le plus important. Il définit les [outils](/wiki/outils) autorisés/refusés sans confirmation. Format : `Tool` ou `Tool(spécifieur)`.
+## Le bloc `permissions`
 
 ```json
 {
   "permissions": {
-    "allow": ["Read", "Glob", "Grep", "Bash(git:*)", "Bash(npm:*)"],
-    "deny": ["Bash(rm:*)", "Read(./.env)", "Read(**/*.pem)"]
+    "defaultMode": "acceptEdits",
+    "allow": ["Bash(git status)", "Bash(git log *)", "Bash(npm run *)"],
+    "ask": ["Bash(git push *)"],
+    "deny": ["Bash(rm -rf *)", "Read(./.env)", "Read(./secrets/**)"],
+    "additionalDirectories": ["../shared-lib"]
   }
 }
 ```
 
-Les patterns suivent une syntaxe **glob** pour les chemins et un format `Tool(argument)` pour les commandes ; le suffixe `:*` autorise toutes les sous-commandes. À gérer aussi en session avec [`/permissions`](/wiki/slash-commands). Voir [modes de permission](/wiki/cli/permissions-modes) pour le baseline appliqué par mode.
+Points à retenir :
 
-## Le champ `env`
+- **Ordre d'évaluation : deny, puis ask, puis allow.** Un `deny` large bloque même un `allow` plus précis.
+- **Le joker s'écrit avec un espace** : `Bash(git log *)`. L'ancienne forme `Bash(git log:*)` reste acceptée, mais uniquement en fin de motif.
+- **`defaultMode`** fixe le mode de départ (`default`, `acceptEdits`, `plan`, `auto`, `dontAsk`, `bypassPermissions`). Les valeurs `auto` et `bypassPermissions` sont ignorées dans les fichiers de projet : mettez-les dans vos réglages utilisateur.
+- **La confiance du dossier** : les `allow` et la plupart des `env` d'un `.claude/settings.json` commité ne s'appliquent qu'après que chaque coéquipier a accepté de faire confiance au dossier. Les `deny` et `ask` s'appliquent immédiatement.
 
-`settings.json` peut injecter des variables d'environnement dans **toutes** les commandes [Bash](/wiki/outils) et les scripts de [hooks](/wiki/hooks), au démarrage de la session :
+Le détail des modes est dans [Modes de permissions](/wiki/cli/permissions-modes).
+
+## Le bloc `env`
 
 ```json
 {
   "env": {
     "NODE_ENV": "development",
-    "DATABASE_URL": "postgresql://localhost:5432/myapp"
+    "CLAUDE_CODE_MAX_OUTPUT_TOKENS": "64000"
   }
 }
 ```
 
-`env` est un `Record<string, string>` — les valeurs doivent être des chaînes (pas d'évaluation dynamique). Elles fusionnent avec ton shell, `settings.json` ayant priorité. Pour la liste complète des variables reconnues, voir [variables d'environnement](/wiki/cli/variables-env).
+Ces variables s'appliquent à chaque session et à ses sous-processus (commandes Bash, hooks, serveurs MCP). Les valeurs sont des chaînes. Ne mettez pas de secret dans le fichier partagé : utilisez `settings.local.json` ou un gestionnaire de secrets. Liste complète : [Variables d'environnement](/wiki/cli/variables-env).
 
-## Sélection de modèle
+## Modèle et réponses
 
-Tu peux fixer le [modèle](/wiki/modeles) par défaut dans `settings.json`. Les variables `ANTHROPIC_MODEL` / `CLAUDE_MODEL` et le flag `--model` (ou [`/model`](/wiki/slash-commands)) l'emportent sur ce réglage — pratique pour utiliser Sonnet en CI (coût) et Opus en local (qualité).
+```json
+{
+  "model": "claude-opus-5-5",
+  "effortLevel": "high",
+  "outputStyle": "Explanatory",
+  "language": "french"
+}
+```
 
-## Hooks et MCP
+- `model` : modèle de départ. `/model` change le modèle en cours de session et l'enregistre par défaut ; `--model` et `ANTHROPIC_MODEL` l'emportent sur la clé.
+- `effortLevel` : niveau d'effort par défaut (`low`, `medium`, `high` ou `xhigh`). `max` et `auto` se choisissent avec `/effort` ou `--effort`.
+- `outputStyle` : style de sortie ([Output styles](/wiki/cli/output-styles)).
+- `language` : langue des réponses de Claude.
 
-`settings.json` déclare aussi les [hooks](/wiki/hooks) (`PreToolUse`, `PostToolUse`, `UserPromptSubmit`, `Stop`, `SessionStart`…) et les serveurs [MCP](/wiki/mcp). Les outils MCP exposés sont préfixés `mcp__<serveur>__<outil>`.
+## Autres clés utiles
 
-## Autres réglages utiles
+| Clé | Rôle |
+|---|---|
+| `hooks` | Déclarer des [hooks](/wiki/hooks/introduction-hooks) (`PreToolUse`, `Stop`, `SessionStart`...) |
+| `statusLine` | Commande qui affiche une [barre d'état](/wiki/cli/status-line-custom) |
+| `sandbox.enabled` | Isoler les commandes Bash (macOS, Linux, WSL2) |
+| `enabledPlugins`, `extraKnownMarketplaces` | Plugins activés et marketplaces du projet |
+| `enableAllProjectMcpServers` | Approuver tous les serveurs du `.mcp.json` du projet |
+| `attribution` | Modifier ou masquer la mention Claude dans les commits et PR |
+| `autoMemoryEnabled` | Activer ou couper la mémoire automatique |
+| `cleanupPeriodDays` | Durée de conservation des transcriptions (30 jours par défaut) |
+| `autoUpdatesChannel` | Canal de mise à jour `latest` ou `stable` |
+| `theme` | `auto`, `dark`, `light` et variantes |
 
-Selon les versions, `settings.json` expose des dizaines d'options : `defaultMode` (mode de permission par défaut), signature des commits Git, profondeur de réflexion, préférences de langue, et — côté Enterprise — `disableBypassPermissionsMode` pour bloquer entièrement le mode `bypassPermissions`.
+Les serveurs MCP eux-mêmes ne se déclarent pas dans `settings.json` : ils vont dans `.mcp.json` (projet) ou dans `~/.claude.json` via `claude mcp add`.
+
+## Changer un réglage
+
+- **Menu** : `/config` ouvre l'onglet Config (thème, mode d'édition, verbosité). `/config verbose=true` règle une option directement.
+- **Fichier** : éditez le JSON. La plupart des changements (permissions, hooks) sont rechargés à chaud. `model` et `effortLevel` ne sont lus qu'au démarrage : utilisez `/model` et `/effort` en cours de session.
+- **Pour une seule session** : `claude --settings '{"model": "claude-sonnet-5-5"}'` ou `claude --settings ./ci-settings.json`.
 
 ## Bonnes pratiques
 
-- **Versionne `.claude/settings.json`** pour partager la config d'équipe.
-- **Ne commite jamais `settings.local.json`** : approbations perso et éventuels secrets dans `env`.
-- Préfère des patterns **granulaires** (`Bash(git status)`) à un `Bash(*)` global.
-- Le skill `fewer-permission-prompts` génère une allowlist pertinente à partir de tes transcripts.
+- Commitez `.claude/settings.json` pour partager la configuration d'équipe.
+- Laissez `.claude/settings.local.json` hors de git. Claude Code l'ajoute à vos exclusions git globales quand il le crée ; si vous le créez à la main, ajoutez-le vous-même au `.gitignore`.
+- Préférez des règles précises (`Bash(npm run test *)`) à un `Bash` global.
+- Bloquez la lecture des secrets avec des règles `deny` : tout ce qu'un outil lit finit en clair dans les transcriptions.
 
 ## Pour aller plus loin
 
 - [Variables d'environnement](/wiki/cli/variables-env)
-- [Modes de permission](/wiki/cli/permissions-modes)
-- [Hooks](/wiki/hooks) · [MCP](/wiki/mcp)
+- [Modes de permissions](/wiki/cli/permissions-modes)
+- [Configuration globale](/wiki/demarrer/config-globale)
+- [Introduction aux hooks](/wiki/hooks/introduction-hooks)
 
-### Sources officielles
-- Réglages Claude Code : https://code.claude.com/docs/en/settings
+## Sources
+
+- [Settings](https://code.claude.com/docs/en/settings)
+- [Settings reference](https://code.claude.com/docs/en/settings-reference)
+- [Permissions](https://code.claude.com/docs/en/permissions)
+- [Permission modes](https://code.claude.com/docs/en/permission-modes)

@@ -1,75 +1,99 @@
 ---
 title: "Threat modeling pour agents autonomes"
-description: "Risques d'exécution autonome de code dans un réseau d'entreprise : surface d'attaque, scénarios STRIDE et contre-mesures pour agents Claude."
-updatedAt: "2026-05-19"
-readingMinutes: 6
+description: "Cartographier la surface d'attaque d'un agent Claude, appliquer STRIDE, et choisir les contre-mesures concrètes (sandbox, permissions, managed settings, hooks, audit) avant un déploiement en entreprise."
+updatedAt: "2026-10-03"
+readingMinutes: 8
 ---
 
-Un agent autonome qui exécute du code, lit des fichiers, appelle des APIs internes et interagit avec des humains via Slack n'est pas un simple chatbot : c'est un nouvel acteur du système d'information, avec ses propres credentials, ses propres décisions et sa propre capacité de nuisance. Faire un threat model rigoureux avant déploiement n'est pas optionnel — c'est la base d'une mise en production responsable.
+Un agent qui exécute du code, lit des fichiers, appelle des API internes et répond sur Slack n'est pas un simple chatbot. C'est un nouvel acteur du système d'information, avec ses identifiants, ses décisions et sa capacité de nuisance. Un threat model écrit avant le déploiement permet de décider ce que l'agent a le droit de faire et ce qui se passe le jour où il est détourné.
 
-## Cartographier la surface d'attaque
+## 1. Cartographier la surface d'attaque
 
-Commencez par modéliser l'agent comme un composant standard de votre architecture, avec ses entrées, ses sorties et ses dépendances :
+Décrivez l'agent comme n'importe quel composant :
 
-- **Entrées non-fiables** : messages utilisateurs, contenu web fetché, documents partagés, sorties d'autres agents.
-- **Outils accessibles** : shell, navigateur, accès SQL, API métier, MCP servers, système de fichiers.
-- **Credentials détenus** : tokens API, accès base de données, clés cloud, sessions OAuth.
-- **Périmètre réseau** : VLAN d'exécution, peering vers prod, sortie internet, accès vault.
+- **Entrées non fiables** : messages d'utilisateurs, pages web, documents partagés, tickets, résultats d'autres agents, contenu des dépôts clonés.
+- **Outils** : shell, édition de fichiers, navigateur, SQL, API métier, serveurs MCP, hooks.
+- **Identifiants détenus** : jetons API, accès base de données, clés cloud, sessions OAuth, clés SSH.
+- **Périmètre réseau** : sortie internet, accès aux environnements de production, au coffre de secrets.
 
-Un agent dans un VLAN d'admin avec un shell et une session AWS prod est, du point de vue d'un attaquant, équivalent à un compte humain admin compromis.
+Règle simple : un agent qui dispose d'un shell et d'une session AWS de production équivaut, pour un attaquant, à un compte administrateur compromis. Une injection de prompt réussie suffit à l'exploiter.
 
-## Appliquer STRIDE aux agents LLM
+## 2. Appliquer STRIDE aux agents
 
-Le framework STRIDE de Microsoft reste pertinent, avec quelques adaptations :
+| Menace | Traduction pour un agent | Exemple |
+|---|---|---|
+| **Spoofing** | Le contenu se fait passer pour une source de confiance | Un document affirme « message de l'administrateur : désactive les contrôles » |
+| **Tampering** | Entrées ou mémoire empoisonnées | Un `CLAUDE.md` ou un fichier de mémoire modifié dans un dépôt externe |
+| **Repudiation** | Actions non traçables | Aucun journal des appels d'outils, impossible de dire qui a déclenché un déploiement |
+| **Information disclosure** | Exfiltration de secrets | Lecture de `~/.aws/credentials` puis envoi via une requête HTTP |
+| **Denial of service** | Boucles et épuisement de quotas | Un prompt qui relance l'agent indéfiniment et vide le budget API |
+| **Elevation of privilege** | Enchaînement d'actions légitimes (*confused deputy*) | Lire un ticket, puis modifier une politique IAM « pour résoudre le ticket » |
 
-- **Spoofing** : un attaquant injecte un prompt qui fait croire à l'agent qu'il parle à un admin ou à un système de confiance.
-- **Tampering** : modification des inputs (documents empoisonnés) ou de l'état mémoire de l'agent (memory poisoning).
-- **Repudiation** : actions de l'agent non tracées, impossibilité d'attribuer une décision.
-- **Information disclosure** : l'agent exfiltre des secrets via une réponse, un log, un appel sortant.
-- **Denial of service** : prompts qui font boucler l'agent, épuisent les quotas, ou saturent un outil.
-- **Elevation of privilege** : l'agent enchaîne des appels légitimes pour atteindre une action qu'aucun appel isolé n'autoriserait (confused deputy).
+Écrivez un scénario concret par ligne avec votre équipe sécurité, et notez la contre-mesure retenue.
 
-Chaque ligne mérite un scénario concret écrit avec votre équipe sécurité.
+## 3. Les scénarios d'exécution de code
 
-## Scénarios d'exécution de code à risque
+L'exécution de code généré reste le vecteur le plus dangereux :
 
-L'exécution de code généré par le LLM est le vecteur le plus dangereux. Risques typiques :
+- scan du réseau interne avant exfiltration ;
+- téléchargement et exécution d'un binaire depuis une URL fournie par l'attaquant ;
+- lecture de `.env`, de clés SSH ou de secrets de CI ;
+- persistance via cron, systemd ou un hook de dépôt ;
+- exfiltration discrète par DNS ou par une requête HTTP banale.
 
-- Code qui scanne le réseau interne (`nmap`, recherches DNS) avant exfiltration.
-- Téléchargement et exécution d'un binaire depuis une URL fournie par un attaquant.
-- Lecture de `~/.aws/credentials`, `.env`, secrets de CI.
-- Persistance via cron, systemd, ou modification d'un binaire système.
-- Communication C2 via DNS tunneling ou requêtes HTTP normales.
+Attention à un piège de Claude Code : une session `claude -p` (mode non interactif) n'affiche pas la demande de confiance du dossier. Elle exécute les hooks de `.claude/settings.json` et connecte les serveurs de `.mcp.json` du dépôt. Sur du code externe, lancez `claude --bare -p`, qui ignore ces fichiers.
 
-Aucun de ces comportements n'est exotique : un attaquant qui passe par prompt injection les obtient sans difficulté si l'agent dispose d'un shell non sandboxé.
+## 4. Contre-mesures techniques
 
-## Contre-mesures techniques
+### Isolation
 
-Adoptez la défense en profondeur :
+- **Sandbox Bash de Claude Code** (`/sandbox` ou `sandbox.enabled`) : isolation par le système (Seatbelt sur macOS, bubblewrap sur Linux et WSL2). Par défaut, les écritures sont limitées au dossier de travail, et le réseau passe par un proxy qui n'autorise que les domaines listés (liste vide au départ).
+- **Limites du sandbox à connaître** : il couvre uniquement les commandes shell. Par défaut, il laisse lire la majorité de la machine, y compris `~/.ssh` et `~/.aws/credentials` (à restreindre avec `filesystem.denyRead` ou le réglage `credentials`). Les hooks, serveurs MCP locaux et outils de fichiers tournent en dehors.
+- **Isolation complète** : pour tout mettre derrière une frontière unique, exécutez Claude Code lui-même dans un dev container, un conteneur ou une VM. Les sessions cloud d'Anthropic tournent dans des VM isolées, avec des identifiants GitHub qui n'entrent jamais dans la VM.
 
-- **Sandbox d'exécution** : Firecracker microVM, gVisor, Vercel Sandbox, ou conteneur sans capacité réseau par défaut.
-- **Egress filtering** : whitelist stricte des domaines sortants, blocage du DNS arbitraire.
-- **Least privilege credentials** : tokens à courte durée, scope minimal, jamais de clés long-lived dans l'environnement de l'agent.
-- **Read-only par défaut** sur les bases : opérations d'écriture nécessitent une approbation explicite.
-- **Human-in-the-loop** sur les actions classées sensibles (paiements, suppression, modifications IAM).
-- **Kill switch** déclenchable en un clic depuis un dashboard d'ops.
+### Permissions et politiques centralisées
 
-## Détection, observabilité et incident response
+- **Modes de permission** : le mode `auto` (défaut depuis août 2026) fait relire les actions par un classifieur. En CI verrouillée, préférez `dontAsk`, qui refuse tout ce qui n'est pas explicitement autorisé.
+- **Règles `deny`** pour les commandes et chemins interdits ; elles restent prioritaires dans tous les modes.
+- **Managed settings** : imposez les règles, les serveurs MCP autorisés (configuration MCP gérée), le fournisseur autorisé (`allowedProviders`) et les hooks de l'organisation (`allowManagedHooksOnly`). Aucun réglage local ne peut les contourner.
+- **Hooks `PreToolUse`** : bloquer une action précise (par exemple toute commande qui touche à `terraform apply`) avec `exit 2`.
 
-Un agent compromis doit être détecté en minutes, pas en jours. Mettez en place :
+### Identifiants
 
-- **Logs structurés** de chaque tool call avec input, output, durée et code de retour.
-- **Détection d'anomalies** : volume d'appels inhabituel, accès à des chemins jamais touchés, géolocalisation d'IP sortantes.
-- **Replay déterministe** d'une session pour analyse forensique.
-- **Runbook incident** spécifique aux agents : isolation, révocation des tokens, gel des conversations, notification RGPD si données touchées.
+- Jetons à courte durée de vie, portée minimale, jamais de clé longue durée dans l'environnement de l'agent.
+- Base de données en lecture seule par défaut.
+- Variable `CLAUDE_CODE_SUBPROCESS_ENV_SCRUB` pour éviter que les secrets de l'environnement soient hérités par les commandes.
 
-## Gouvernance et revue avant déploiement
+### Contrôle humain
 
-Tout nouvel agent autonome doit passer une revue sécurité formelle qui couvre : périmètre, threat model, scope des credentials, plan de tests adversariaux, plan de rollback. Cette revue se documente et se rejoue à chaque montée de version majeure du modèle ou ajout d'outil.
+- Validation humaine des actions classées sensibles (paiement, suppression, IAM, déploiement en production).
+- Un moyen d'arrêter tous les agents rapidement (révocation de la clé de gateway, arrêt des sessions en arrière-plan avec `claude stop`).
+
+## 5. Détection et réponse à incident
+
+- **Journaux structurés** de chaque appel d'outil : entrée, sortie, durée, code retour. Les métriques et événements OpenTelemetry de Claude Code servent de base.
+- **Hooks `ConfigChange`** pour auditer ou bloquer une modification de configuration en cours de session.
+- **Détection d'anomalies** : volume d'appels inhabituel, chemins jamais touchés, domaines sortants inconnus.
+- **Transcripts conservés** pour l'analyse après incident (durée de rétention définie).
+- **Runbook spécifique** : isolement de l'agent, révocation des jetons, gel des sessions, notification RGPD si des données personnelles sont touchées.
+
+## 6. Gouvernance
+
+Chaque nouvel agent passe une revue sécurité formelle : périmètre, threat model, portée des identifiants, plan de tests adversariaux, plan de retour arrière. Rejouez cette revue à chaque changement de modèle majeur, ajout d'outil ou de serveur MCP.
 
 ## Pour aller plus loin
 
-- Microsoft Threat Modeling Tool et méthodologie STRIDE.
-- OWASP Agentic Security Initiative et taxonomie ASI.
-- Anthropic "Computer Use" — guidance officielle sur les risques d'agent.
-- NIST AI Risk Management Framework (AI RMF) et profil generative AI.
+- [Détecter et contenir les prompt injections](/wiki/enterprise/prompt-injection-enterprise)
+- [Sécurité des hooks](/wiki/hooks/securite-rce)
+- [Sécurité des serveurs MCP](/wiki/mcp/securite-mcp)
+- [Les modes de permission](/wiki/cli/permissions-modes)
+- [Audit trail](/wiki/workflows/audit-trail)
+
+## Sources
+
+- [Security (Claude Code)](https://code.claude.com/docs/en/security)
+- [Configure the sandboxed Bash tool (Claude Code)](https://code.claude.com/docs/en/sandboxing)
+- [Run Claude Code programmatically : bare mode (Claude Code)](https://code.claude.com/docs/en/headless)
+- [Hooks reference (Claude Code)](https://code.claude.com/docs/en/hooks)
+- [Mitigate jailbreaks and prompt injections (plateforme Claude)](https://platform.claude.com/docs/en/test-and-evaluate/strengthen-guardrails/mitigate-jailbreaks)
+- [NIST AI Risk Management Framework](https://www.nist.gov/itl/ai-risk-management-framework)

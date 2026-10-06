@@ -1,64 +1,110 @@
 ---
-title: "Fenêtre de contexte : 200K, 1M et compaction"
-description: "Exploiter une fenêtre de 200K ou 1M tokens : ce qu'elle représente, structure du prompt, lost in the middle, chunking et auto-compaction dans Claude Code."
+title: "Fenêtre de contexte : 1M, 200K et compaction"
+description: "Quelle fenêtre de contexte pour quel modèle Claude (1 million ou 200 000 tokens), ce qu'elle contient vraiment, comment structurer un long prompt, et comment Claude Code et l'API gèrent la compaction."
 updatedAt: "2026-10-03"
-readingMinutes: 6
+readingMinutes: 7
 ---
 
-En octobre 2026, deux tailles de fenêtre coexistent :
+La fenêtre de contexte est la quantité de texte que Claude peut prendre en compte en une seule requête : prompt système, historique, documents, définitions d'outils **et** la réponse en cours de génération. En octobre 2026, la plupart des modèles actuels disposent de **1 million de tokens**. Avoir la place ne garantit pas que le modèle s'en serve bien : voici comment en tirer parti.
 
-- **1 million de tokens** pour Opus 5.5, Sonnet 5.5, Fable 5.1 (et Sonnet 5, Opus 4.7 et suivants) ;
-- **200 000 tokens** pour Haiku 4.5 et les modèles plus anciens (Opus 4.6 et Sonnet 4.6 ont une variante `[1m]`).
+## Quelle fenêtre pour quel modèle
 
-Dans Claude Code, Claude **compacte** automatiquement la conversation à l'approche de la limite. Réglez le seuil avec `/autocompact 500k` (par modèle) ou `"autoCompactWindow"` dans les réglages ; `CLAUDE_CODE_DISABLE_1M_CONTEXT=1` ramène tous les modèles à 200K.
+| Fenêtre | Modèles |
+|---|---|
+| **1 million de tokens** | Opus 5.5, Sonnet 5.5, Fable 5.1, Mythos 5.1, ainsi que Opus 5, Sonnet 5, Fable 5, Opus 4.8, Opus 4.7, Opus 4.6 et Sonnet 4.6 |
+| **200 000 tokens** | Haiku 4.5, Sonnet 4.5 et les modèles plus anciens |
 
-Avoir la place ne garantit pas que le modèle s'en serve bien. Voici les bonnes pratiques pour tirer parti d'un contexte long sans tomber dans les pièges classiques.
+Sur l'API Anthropic, 1M est la valeur par défaut pour ces modèles : pas d'en-tête bêta, et **pas de supplément tarifaire** au-delà de 200 000 tokens. Une requête peut générer jusqu'à 128 000 tokens de sortie (`max_tokens`).
 
-## Ce que 200K tokens représente vraiment
+Sur Bedrock et Google Cloud, certains modèles demandent une variante `[1m]` pour atteindre 1M (voir [Claude sur les clouds](/wiki/enterprise/clouds)).
 
-Un token correspond grosso modo à 4 caractères ou ~0,75 mot en anglais (un peu plus en français à cause des accents et de la morphologie). 200K tokens, c'est donc :
+## Ce que représente un contexte long
 
-- **~150 000 mots** de texte courant
-- **~500 pages** de roman
-- **~20 000 lignes** de code TypeScript
-- **~50 PDF** d'une dizaine de pages
+En anglais, un token vaut environ 4 caractères ou 0,75 mot ; le français en consomme un peu plus. Attention : depuis Claude 4.7, un nouveau tokeniseur produit **environ 30 % de tokens en plus** pour le même texte. Les ordres de grandeur ci-dessous sont donc indicatifs :
 
-Concrètement, vous pouvez injecter une base de connaissances complète, le code source d'un module entier, ou plusieurs heures de transcription audio. Le coût grimpe vite cependant : 200K tokens d'entrée coûtent environ 0,40 $ sur Sonnet 5.5, et un appel à 1M environ 2 $. D'où l'intérêt du [prompt caching](/wiki/api/prompt-caching-implementation).
+| Taille | Ordre de grandeur |
+|---|---|
+| 200 000 tokens | un gros roman, ou un module de code de taille moyenne |
+| 1 million de tokens | plusieurs livres, ou une bonne partie d'un dépôt de code |
 
-## Le phénomène lost in the middle
+Le coût monte vite. Sur Sonnet 5.5 (2 $ par million en entrée), 200 000 tokens d'entrée coûtent environ **0,40 $** et un appel à 1M environ **2 $**, à chaque requête. D'où l'intérêt du [prompt caching](/wiki/api/prompt-caching-implementation), qui fait payer la relecture d'un contexte stable 10 fois moins cher (et encore moins sur Opus 5.5 et Fable 5.1).
 
-C'est le piège n°1 des contextes longs. Les LLM, Claude inclus, accordent plus d'attention au début et à la fin du contexte qu'au milieu. Une information cruciale placée au token 100 000 sur 200 000 risque d'être ignorée ou mal pondérée.
+## Le piège du « lost in the middle »
 
-Claude 4.x est nettement plus résistant à ce phénomène que les générations précédentes (les benchmarks "needle in a haystack" montrent une précision >95% jusqu'à 180K tokens), mais ce n'est pas magique. Les éléments les plus importants doivent rester aux extrémités du prompt — typiquement : instructions au début, question à la fin.
+Les modèles de langage, Claude compris, exploitent moins bien une information noyée au milieu d'un très long contexte qu'une information placée au début ou à la fin. Les modèles récents résistent mieux à ce phénomène, mais il ne disparaît pas. Détails et tests : [Lost in the middle](/wiki/prompt-engineering/lost-in-the-middle).
 
-## Structure de prompt recommandée
+## Structurer un long prompt
 
-Pour un long contexte, structurez votre prompt en 5 blocs explicites, dans cet ordre :
+La documentation d'Anthropic recommande, au-delà d'environ 20 000 tokens :
 
-1. **System prompt** : rôle, ton, contraintes générales
-2. **Instructions** : tâche précise à accomplir
-3. **Documents / contexte** : encadrés par des balises XML (`<document>`, `<code>`, `<transcript>`)
-4. **Exemples few-shot** (si applicable)
-5. **Question finale** : la requête utilisateur, répétée si nécessaire
+1. **Les documents en haut**, avant les instructions et la question. Selon Anthropic, placer la question à la fin améliore la qualité des réponses jusqu'à 30 % sur des entrées complexes à plusieurs documents.
+2. **Des balises XML** pour chaque document, avec sa source :
 
-Les balises XML aident énormément Claude à délimiter les zones. Donnez aussi un identifiant à chaque document (`<document id="rapport-2025">`) pour que le modèle puisse citer ses sources.
+```xml
+<documents>
+  <document index="1">
+    <source>rapport-annuel-2025.pdf</source>
+    <document_content>
+      {{RAPPORT}}
+    </document_content>
+  </document>
+  <document index="2">
+    <source>analyse-concurrence-t2.xlsx</source>
+    <document_content>
+      {{ANALYSE}}
+    </document_content>
+  </document>
+</documents>
 
-## Stratégies de chunking et de compression
+Analysez le rapport annuel et l'analyse concurrentielle.
+Identifiez nos avantages et proposez trois priorités pour le troisième trimestre.
+```
 
-Plutôt que de tout envoyer, demandez-vous toujours : qu'est-ce qui est strictement nécessaire ? Trois approches utiles :
+3. **Des citations d'abord** : demandez à Claude d'extraire les passages pertinents entre balises `<quotes>` avant de répondre. Il se concentre ainsi sur l'essentiel.
 
-- **Retrieval (RAG)** : utilisez un index vectoriel pour ne charger que les passages pertinents. Combiné à Claude, c'est souvent plus précis ET moins cher qu'un context dump complet.
-- **Résumé hiérarchique** : compressez d'abord chaque document en résumé structuré, puis travaillez sur les résumés.
-- **Pagination dynamique** : pour les conversations longues, gardez les N derniers tours en entier et résumez le reste.
+Voir aussi [les balises XML](/wiki/prompt-engineering/balises-xml) et [le contexte long](/wiki/prompt-engineering/contexte-long).
 
-Claude 4.x dispose aussi d'un mécanisme de **prompt caching** : si vous renvoyez le même contexte sur plusieurs appels (par exemple 100K tokens de doc + une question variable), activez le cache et payez ces tokens 10× moins cher après le premier appel.
+## Envoyer moins, mais mieux
 
-## Test : le rappel en bout de contexte
+Avant de tout injecter, demandez-vous ce qui est strictement nécessaire :
 
-Avant de mettre un workflow long-contexte en production, testez-le. Insérez délibérément 3-4 "needles" (faits uniques, faciles à vérifier) à différentes profondeurs du prompt — 25%, 50%, 75%, 95% — et posez des questions ciblées. Si Claude rate la needle à 50%, votre structure est mauvaise : remontez l'info vers les extrémités ou switchez vers du RAG.
+- **Recherche ciblée (RAG)** : un index ne renvoie que les passages utiles. Souvent plus précis et moins cher qu'un contexte rempli à ras bord.
+- **Résumé hiérarchique** : résumez d'abord chaque document, puis travaillez sur les résumés.
+- **Historique glissant** : gardez les derniers échanges en entier et résumez le reste.
+
+## Quand la limite est atteinte
+
+**Côté API :**
+
+- si l'entrée seule dépasse la fenêtre, l'API renvoie une erreur 400 (« prompt is too long ») ;
+- sur les modèles 4.5 et plus récents, si l'entrée plus `max_tokens` dépasse la fenêtre, la requête est acceptée ; si la génération atteint la limite, elle s'arrête avec `stop_reason: "model_context_window_exceeded"` ;
+- la **compaction côté serveur** (en bêta pour les modèles 4.6 et plus récents) résume automatiquement le début de la conversation pour continuer au-delà de la limite. Le *context editing* permet aussi d'effacer d'anciens résultats d'outils ou blocs de réflexion.
+
+Les tokens de réflexion comptent dans la fenêtre et sont facturés comme de la sortie. Sur les modèles récents, les blocs de réflexion des tours précédents sont conservés et occupent de la place dans les requêtes suivantes.
+
+**Dans Claude Code :**
+
+- la conversation est **compactée automatiquement** à l'approche de la limite : vers 967 000 tokens par défaut sur les modèles à 1M ;
+- `/autocompact 500k` avance ce seuil pour le modèle courant ; le réglage `autoCompactWindow` ou la variable `CLAUDE_CODE_AUTO_COMPACT_WINDOW` font de même ;
+- `/compact` lance une compaction manuelle, `/context` montre ce qui remplit la fenêtre ;
+- `CLAUDE_CODE_DISABLE_1M_CONTEXT=1` ramène tous les modèles à 200 000 tokens (utile si une passerelle interne impose cette limite) ;
+- `DISABLE_AUTO_COMPACT=1` coupe la compaction automatique.
+
+Pour garder un contexte propre au quotidien, voir [CLAUDE.md et mémoire](/wiki/demarrer/claude-md).
+
+## Tester avant la production
+
+Avant de lancer un workflow à long contexte, insérez trois ou quatre faits uniques et faciles à vérifier à différentes profondeurs du prompt (25 %, 50 %, 75 %, 95 %), puis posez des questions ciblées. Si Claude rate le fait placé au milieu, revoyez la structure ou passez à une recherche ciblée.
 
 ## Pour aller plus loin
 
-- Documentation officielle : [docs.anthropic.com/en/docs/build-with-claude/prompt-caching](https://docs.anthropic.com/en/docs/build-with-claude/prompt-caching)
-- Article wiki [Pricing et tokens](/wiki/modeles/pricing-tokens) pour calculer le coût d'un contexte long
-- Étude originale Liu et al. (2024) sur le "Lost in the Middle"
+- [Tarification et optimisation des coûts](/wiki/modeles/pricing-tokens)
+- [Budget de tokens côté API](/wiki/api/token-budgeting)
+- [Le prompt caching](/wiki/api/prompt-caching-implementation)
+
+## Sources
+
+- Fenêtres de contexte : https://platform.claude.com/docs/en/build-with-claude/context-windows
+- Conseils pour les longs contextes : https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/claude-prompting-best-practices
+- Tarifs (long contexte, cache) : https://platform.claude.com/docs/en/about-claude/pricing
+- Compaction dans Claude Code : https://code.claude.com/docs/en/model-config

@@ -1,90 +1,173 @@
 ---
 title: "JSON-RPC 2.0 sous le capot de MCP"
-description: "Spécifications réseau de MCP : requêtes, réponses, notifications, lifecycle et messages clés."
-updatedAt: "2026-05-19"
-readingMinutes: 6
+description: "Les messages MCP au niveau du fil : requêtes, résultats typés, métadonnées _meta, découverte, allers-retours multiples, abonnements et codes d'erreur de la révision 2026-07-28."
+updatedAt: "2026-10-03"
+readingMinutes: 9
 ---
 
-MCP n'invente pas une couche réseau : il s'appuie entièrement sur **JSON-RPC 2.0**, un standard simple et éprouvé. Comprendre ce mapping aide à déboguer, à écrire des clients custom, et à saisir pourquoi certaines limites du protocole existent.
+MCP n'invente pas de format réseau : tous ses messages sont du **JSON-RPC 2.0**. Savoir lire ces messages vous aide à déboguer un serveur, à comprendre une erreur de connexion ou à écrire un client. Depuis la révision **2026-07-28**, la chorégraphie a beaucoup changé : plus de poignée de main `initialize`, plus de session, et chaque requête se suffit à elle-même.
 
-## Rappel JSON-RPC 2.0
+## Les trois types de messages
 
-JSON-RPC définit trois types de messages :
+| Type | Forme | Réponse attendue |
+|---|---|---|
+| Requête | `{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{...}}` | Oui |
+| Réponse | `{"jsonrpc":"2.0","id":1,"result":{...}}` ou `{"jsonrpc":"2.0","id":1,"error":{...}}` | Non |
+| Notification | `{"jsonrpc":"2.0","method":"notifications/progress","params":{...}}` (sans `id`) | Non |
 
-- **Request** : `{"jsonrpc":"2.0","id":1,"method":"foo","params":{...}}` — attend une réponse.
-- **Response** : `{"jsonrpc":"2.0","id":1,"result":{...}}` ou `{"jsonrpc":"2.0","id":1,"error":{"code":-32601,"message":"Method not found"}}`.
-- **Notification** : comme une requête mais **sans `id`** — pas de réponse attendue.
+Deux règles propres à MCP : l'`id` d'une requête ne peut pas être `null`, et il ne doit pas réutiliser l'`id` d'une requête encore en attente.
 
-L'`id` corrèle requête et réponse. Les codes d'erreur suivent les conventions JSON-RPC (-32700 parse error, -32601 method not found, etc.) plus quelques codes MCP custom.
+Autre règle importante depuis 2026-07-28 : **seul le client envoie des requêtes**. Le serveur répond et émet des notifications, mais n'initie plus de requête JSON-RPC. Ce qui passait autrefois par une requête serveur (demander une saisie à l'utilisateur, par exemple) passe désormais par un résultat spécial, décrit plus bas.
 
-## Le lifecycle d'une session MCP
+## Chaque requête porte son contexte dans `_meta`
 
-Une connexion MCP suit toujours la même chorégraphie :
+Le protocole est désormais **sans état**. Un serveur ne doit rien déduire des requêtes précédentes, même sur la même connexion. Chaque requête du client transporte donc ses métadonnées dans `params._meta` :
 
-1. **`initialize`** (client → serveur) : version du protocole, capacités client.
-2. **Réponse `initialize`** (serveur → client) : capacités serveur, infos d'identification.
-3. **`notifications/initialized`** (client → serveur, notification) : signal que le client est prêt.
-4. Échanges normaux : `tools/list`, `tools/call`, `resources/read`, etc.
-5. **Shutdown** : fermeture du transport (stdio close ou HTTP disconnect).
+| Clé | Obligatoire | Rôle |
+|---|---|---|
+| `io.modelcontextprotocol/protocolVersion` | Oui | Révision du protocole, ex. `"2026-07-28"` |
+| `io.modelcontextprotocol/clientCapabilities` | Oui | Capacités du client utiles à cette requête |
+| `io.modelcontextprotocol/clientInfo` | Non (recommandé) | Nom et version du client |
+| `io.modelcontextprotocol/logLevel` | Non | Niveau de log souhaité pour cette requête |
+| `progressToken` | Non | Demande des notifications de progression |
+| `traceparent`, `tracestate`, `baggage` | Non | Propagation de trace OpenTelemetry |
 
-Si vous voyez dans une trace une requête `tools/call` avant la fin de l'initialisation, c'est un bug client garanti.
+Une requête sans champ obligatoire est rejetée avec `-32602` (paramètres invalides). Si le serveur a besoin d'une capacité que le client n'a pas déclarée, il répond `-32021`. Côté serveur, chaque résultat peut porter `io.modelcontextprotocol/serverInfo` dans son propre `_meta`.
 
-## Les méthodes clés
+## Les résultats sont typés : `resultType`
 
-Côté client → serveur, on retrouve principalement :
+Tout résultat contient désormais un champ `resultType` :
 
-- `tools/list` → liste des outils avec leur JSON Schema d'entrée.
-- `tools/call` → invoque un outil avec `name` et `arguments`.
-- `resources/list`, `resources/read` → ressources lisibles (fichiers, données).
-- `resources/templates/list` → templates d'URI paramétrables.
-- `prompts/list`, `prompts/get` → prompts pré-fabriqués exposés par le serveur.
-- `completion/complete` → autocomplétion d'arguments.
+- `"complete"` : la requête est terminée, le résultat contient la réponse finale.
+- `"input_required"` : le serveur a besoin d'une information supplémentaire avant de conclure.
 
-Côté serveur → client (plus rare) :
+Un client qui parle à un serveur plus ancien traite l'absence de `resultType` comme `"complete"`.
 
-- `sampling/createMessage` → le serveur demande au client de faire un appel LLM (puissant, peu implémenté).
-- `roots/list` → le serveur demande les "racines" (dossiers de travail) au client.
+## Découverte : `server/discover`
 
-## Les notifications
+Le serveur doit implémenter `server/discover`, qui renvoie en une fois les versions supportées, les capacités, l'identité et les éventuelles `instructions` destinées au modèle. Le client n'est pas obligé de l'appeler : il peut envoyer directement `tools/list` et gérer une éventuelle erreur de version. En stdio, ce premier appel sert surtout à détecter un serveur ancien (voir plus bas).
 
-Les notifications sont fire-and-forget. Les principales :
-
-- `notifications/initialized` (client → serveur).
-- `notifications/tools/list_changed`, `notifications/resources/list_changed`, `notifications/prompts/list_changed` (serveur → client) : indiquent au client de rafraîchir sa liste.
-- `notifications/resources/updated` : une ressource précise a changé.
-- `notifications/progress` : avancement d'une opération longue (encore peu utilisé en pratique).
-- `notifications/cancelled` : annulation d'une requête en cours par son `id`.
-
-## Les transports
-
-MCP définit deux transports officiels qui véhiculent ces messages JSON-RPC :
-
-- **stdio** : un message JSON par ligne sur stdin/stdout. Idéal pour les serveurs locaux lancés par le client. Stderr reste libre pour les logs.
-- **Streamable HTTP** (anciennement HTTP+SSE) : POST pour envoyer les requêtes, SSE pour recevoir notifications et réponses asynchrones. Idéal pour les serveurs distants, avec OAuth en option.
-
-Sur stdio, le framing est trivial (newline-delimited JSON). Sur HTTP, il y a un peu plus de cérémonie : sessions, IDs de session via header `Mcp-Session-Id`, et reprise possible après déconnexion.
-
-## Exemple d'échange minimal
+## Exemple d'échange complet
 
 ```json
-// → initialize
-{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"my-client","version":"1.0"}}}
+// → découverte (facultative)
+{"jsonrpc":"2.0","id":1,"method":"server/discover","params":{"_meta":{
+  "io.modelcontextprotocol/protocolVersion":"2026-07-28",
+  "io.modelcontextprotocol/clientInfo":{"name":"mon-client","version":"1.0.0"},
+  "io.modelcontextprotocol/clientCapabilities":{}}}}
 
-// ← reponse
-{"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"2025-06-18","capabilities":{"tools":{}},"serverInfo":{"name":"my-server","version":"0.1"}}}
+// ← identité, capacités, durée de cache
+{"jsonrpc":"2.0","id":1,"result":{"resultType":"complete",
+  "supportedVersions":["2026-07-28"],
+  "capabilities":{"tools":{}},
+  "_meta":{"io.modelcontextprotocol/serverInfo":{"name":"calc","version":"0.1.0"}},
+  "ttlMs":3600000,"cacheScope":"public"}}
 
-// → initialized (notification)
-{"jsonrpc":"2.0","method":"notifications/initialized"}
+// → appel d'un tool (même _meta à chaque requête)
+{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{
+  "name":"add","arguments":{"a":2,"b":3},
+  "_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28",
+           "io.modelcontextprotocol/clientCapabilities":{}}}}
 
-// → tools/call
-{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"add","arguments":{"a":2,"b":3}}}
-
-// ← resultat
-{"jsonrpc":"2.0","id":2,"result":{"content":[{"type":"text","text":"5"}]}}
+// ← résultat
+{"jsonrpc":"2.0","id":2,"result":{"resultType":"complete",
+  "content":[{"type":"text","text":"5"}],"isError":false}}
 ```
+
+Les commentaires `//` sont là pour la lecture : ils ne sont pas valides en JSON.
+
+## Les méthodes principales
+
+| Méthode | Rôle |
+|---|---|
+| `server/discover` | Versions, capacités, identité du serveur |
+| `tools/list`, `tools/call` | Lister et appeler les tools |
+| `resources/list`, `resources/templates/list`, `resources/read` | Lister et lire les resources |
+| `prompts/list`, `prompts/get` | Lister et récupérer les prompts |
+| `completion/complete` | Autocomplétion des arguments de prompts et de templates |
+| `subscriptions/listen` | Ouvrir un flux de notifications de changement |
+
+Les listes sont paginées par curseur (`nextCursor`). Les résultats de `server/discover`, des méthodes `*/list` et de `resources/read` portent des indications de cache : `ttlMs` (durée de fraîcheur en millisecondes) et `cacheScope` (`"public"` ou `"private"`).
+
+## Allers-retours multiples : `input_required`
+
+Quand un tool a besoin d'une confirmation ou d'une saisie de l'utilisateur, le serveur ne lui envoie plus de requête. Il répond avec un résultat `input_required` qui contient les demandes, et éventuellement un `requestState` opaque :
+
+```json
+{"jsonrpc":"2.0","id":2,"result":{"resultType":"input_required",
+  "inputRequests":{"confirmation":{"method":"elicitation/create","params":{
+    "mode":"form","message":"Supprimer 3 fichiers ?",
+    "requestedSchema":{"type":"object","properties":{"ok":{"type":"boolean"}},"required":["ok"]}}}},
+  "requestState":"eyJ…"}}
+```
+
+Le client interroge l'utilisateur, puis **rejoue la requête d'origine** avec un nouvel `id`, les réponses dans `inputResponses` et le `requestState` recopié à l'identique :
+
+```json
+{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{
+  "name":"nettoyer","arguments":{"dossier":"tmp"},
+  "inputResponses":{"confirmation":{"action":"accept","content":{"ok":true}}},
+  "requestState":"eyJ…",
+  "_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28",
+           "io.modelcontextprotocol/clientCapabilities":{"elicitation":{"form":{}}}}}}
+```
+
+Ce mécanisme ne s'applique qu'à `tools/call`, `prompts/get` et `resources/read`. Les demandes possibles sont `elicitation/create`, `sampling/createMessage` et `roots/list` (ces deux dernières sont dépréciées). Le serveur doit traiter `requestState` comme une donnée contrôlée par un attaquant : signature ou chiffrement authentifié, durée de vie courte, liaison à l'utilisateur et à la requête.
+
+## Notifications et abonnements
+
+Les notifications restent sans réponse. Les principales :
+
+- `notifications/progress` : avancement d'une requête qui portait un `progressToken`.
+- `notifications/cancelled` : en stdio, le client annule une requête en cours. En HTTP, l'annulation consiste simplement à fermer le flux de réponse.
+- `notifications/tools/list_changed`, `notifications/prompts/list_changed`, `notifications/resources/list_changed`, `notifications/resources/updated` : changements côté serveur.
+
+Ces notifications de changement ne sont plus envoyées spontanément. Le client ouvre un flux avec `subscriptions/listen` en précisant ce qu'il veut recevoir (`toolsListChanged`, `resourceSubscriptions`…). Le serveur confirme avec `notifications/subscriptions/acknowledged`, puis chaque notification porte `io.modelcontextprotocol/subscriptionId` dans son `_meta`. Cette méthode remplace `resources/subscribe` et le flux HTTP GET des révisions précédentes.
+
+## Codes d'erreur
+
+| Code | Signification |
+|---|---|
+| `-32700` | JSON illisible |
+| `-32600` | Requête invalide |
+| `-32601` | Méthode inconnue (HTTP 404 en Streamable HTTP) |
+| `-32602` | Paramètres invalides, y compris tool ou resource introuvable, `_meta` incomplet, `requestState` invalide |
+| `-32603` | Erreur interne |
+| `-32020` | En-tête HTTP incohérent avec le corps (`HeaderMismatch`) |
+| `-32021` | Capacité client manquante |
+| `-32022` | Version de protocole non supportée (la réponse liste les versions acceptées) |
+
+Ne confondez pas erreur de protocole et erreur de tool. Un tool qui échoue normalement (fichier absent, API indisponible) renvoie un **résultat** avec `isError: true`, que le modèle lit et peut corriger. Une erreur JSON-RPC, elle, n'est pas montrée au modèle.
+
+## Compatibilité avec les révisions 2025
+
+Les révisions 2024-11-05 à 2025-11-25 fonctionnaient autrement :
+
+1. `initialize` (client vers serveur) avec version et capacités ;
+2. réponse avec les capacités du serveur ;
+3. notification `notifications/initialized` ;
+4. échanges sur une session (en HTTP, en-tête `Mcp-Session-Id`) ;
+5. le serveur pouvait envoyer ses propres requêtes (`sampling/createMessage`, `roots/list`, `elicitation/create`, `ping`).
+
+Un client moderne qui veut parler aux deux générations en stdio envoie d'abord `server/discover`. S'il reçoit un résultat, le serveur est moderne. S'il reçoit `-32022`, il choisit une version de la liste proposée. Toute autre erreur, ou l'absence de réponse, indique un serveur ancien : il se rabat alors sur `initialize`. Les SDK officiels v2 gèrent cette détection pour vous, et servent aussi les clients anciens depuis le même code serveur.
+
+## Observer les messages
+
+- **Inspector MCP** : `npx @modelcontextprotocol/inspector <commande>` affiche chaque message échangé.
+- **stdio** : chaque ligne de stdout est un message JSON. Un wrapper qui duplique stdin et stdout vers des fichiers (avec `tee`), puis `jq`, suffit pour analyser une session.
+- **HTTP** : les en-têtes `MCP-Protocol-Version`, `Mcp-Method` et `Mcp-Name` recopient les champs du corps, ce qui permet de filtrer les logs d'un proxy sans analyser le JSON.
 
 ## Pour aller plus loin
 
-- La spec complète vit dans `modelcontextprotocol/specification` (TypeScript + Markdown).
-- Pour écrire un client custom, le SDK officiel encapsule tout ce framing — mais lire les schémas une fois aide à comprendre les erreurs.
-- Wireshark / `tee` sur stdio + `jq` est une combo redoutable pour analyser une session en direct.
+- [Transports MCP : stdio et Streamable HTTP](/wiki/mcp/transports-stdio-sse)
+- [Les primitives : resources, tools et prompts](/wiki/mcp/primitives-resources-tools-prompts)
+- [MCP en 2026 : elicitation, MCP Apps et protocole sans état](/wiki/mcp/evolution-2026-apps-elicitation)
+- [Déboguer avec l'Inspector](/wiki/mcp/debugging-inspector)
+
+## Sources
+
+- [Spécification MCP 2026-07-28 : protocole de base](https://modelcontextprotocol.io/specification/2026-07-28/basic)
+- [Journal des changements 2026-07-28](https://modelcontextprotocol.io/specification/2026-07-28/changelog)
+- [Requêtes à allers-retours multiples (MRTR)](https://modelcontextprotocol.io/specification/2026-07-28/basic/patterns/mrtr)
+- [Abonnements](https://modelcontextprotocol.io/specification/2026-07-28/basic/patterns/subscriptions)
+- [Dépôt de la spécification (schéma TypeScript)](https://github.com/modelcontextprotocol/modelcontextprotocol)

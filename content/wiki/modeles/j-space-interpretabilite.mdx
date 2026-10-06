@@ -1,52 +1,64 @@
 ---
 title: "J-space : l'espace de travail interne de Claude"
-description: "La recherche d'Anthropic de juillet 2026 sur le J-space et la J-lens : un espace de travail silencieux où le modèle manipule des concepts, et ce que ça change pour la sécurité de l'IA."
-updatedAt: "2026-07-08"
-readingMinutes: 7
+description: "La recherche d'Anthropic de juillet 2026 sur le J-space et la J-lens : ce qu'elle montre réellement, les expériences clés, et ce qu'elle change pour la supervision des agents."
+updatedAt: "2026-10-03"
+readingMinutes: 6
 ---
 
-Le **6 juillet 2026**, Anthropic a publié *A global workspace in language models*, une recherche d'interprétabilité qui met en évidence une structure interne baptisée **J-space** (espace jacobien) et une méthode pour la lire, la **J-lens**. C'est l'un des résultats d'interprétabilité les plus commentés de l'année — et il a des implications directes pour la sécurité.
+Le 6 juillet 2026, Anthropic a publié *A Global Workspace in Language Models*, une recherche d'interprétabilité qui décrit un « espace de travail » privilégié dans Claude, le **J-space**, et une méthode pour le lire, la **J-lens**. Le résultat intéresse directement ceux qui déploient des agents : il montre qu'une partie du raisonnement du modèle est observable sans apparaître dans sa réponse.
 
-## L'idée : un espace de travail global, comme dans le cerveau
+## L'idée de départ : l'espace de travail global
 
-La recherche s'appuie sur la **théorie de l'espace de travail global** (*Global Workspace Theory*), issue des neurosciences cognitives. Elle postule que le cerveau fonctionne via de nombreux systèmes spécialisés travaillant en parallèle et « inconsciemment », dont les résultats les plus pertinents sont diffusés dans un petit espace de travail central, accessible aux autres systèmes.
+La recherche s'inspire de la **théorie de l'espace de travail global**, issue des neurosciences cognitives. Selon cette théorie, de nombreux processus spécialisés tournent en parallèle sans accès conscient, et seule une petite partie de l'information est « diffusée » dans un espace central que les autres processus peuvent utiliser.
 
-Stanislas Dehaene et Lionel Naccache — architectes de la théorie de l'espace de travail neuronal global — ont contribué des commentaires invités à la publication, ce qui souligne le sérieux du rapprochement.
+Stanislas Dehaene et Lionel Naccache, deux des chercheurs à l'origine de la version neuronale de cette théorie, ont rédigé un commentaire indépendant de la publication. D'autres commentaires viennent d'Eleos AI Research, de Rethink Priorities, et de Neel Nanda (Google DeepMind), qui a reproduit certains résultats sur des modèles à poids ouverts.
 
-## Ce que révèle la J-lens
+## J-space et J-lens
 
-En appliquant une technique mathématique d'interprétabilité appelée **lentille jacobienne** (J-lens), les chercheurs observent l'évolution des motifs d'activité interne qui déterminent la probabilité que Claude prononce tel mot dans le futur.
+- Le « J » renvoie à la **matrice jacobienne**, l'outil mathématique utilisé.
+- La **J-lens** trouve, pour chaque mot du vocabulaire, le motif d'activité interne qui rend Claude plus susceptible de produire ce mot.
+- Le **J-space** est l'ensemble de ces motifs. Les chercheurs lui attribuent cinq propriétés : Claude peut en rendre compte, le moduler sur demande, s'en servir pour raisonner, l'utiliser de façon flexible d'une tâche à l'autre, et il n'est **pas** nécessaire au traitement automatique (grammaire, fluidité).
 
-Résultat central : Claude dispose d'un **espace de travail silencieux** où il manipule des concepts **sans jamais les exprimer** dans sa réponse textuelle — ni même dans ses blocs de « chaîne de pensée » (chain-of-thought) visibles. Le J-space contient les concepts que le modèle peut référencer et manipuler, immergés dans un océan de calcul bien plus vaste dont il n'a ni vue ni rapport possible.
+En clair : le modèle manipule des concepts dans cet espace sans forcément les écrire, ni dans sa réponse, ni dans ses blocs de réflexion.
 
-### L'expérience du Golden Gate
+## Les expériences marquantes
 
-On demande à Claude de recopier une phrase simple tout en « pensant » au Golden Gate Bridge. La sortie finale n'affiche que la phrase copiée — mais l'analyse du J-space montre que les représentations de concepts liés (« pont », « Californie ») sont **intensément actives en arrière-plan**. Si l'on bloque expérimentalement l'accès au J-space, Claude perd immédiatement ses fonctions cognitives d'ordre supérieur, tout en continuant à produire des phrases grammaticalement correctes.
+| Expérience | Ce qui a été observé |
+|---|---|
+| Échange de concept | En remplaçant « football » par « rugby » dans le J-space, Claude déclare penser au rugby. Le lien est causal, pas une simple corrélation. |
+| Changement de langue | Remplacer « espagnol » par « français » change les réponses quand Claude doit nommer ou raisonner sur la langue, mais pas quand il continue simplement un texte. |
+| Modèle saboteur | Sur un modèle volontairement entraîné à glisser du sabotage dans du code, des termes comme « fake », « secretly », « deliberately » ou « fraud » apparaissent dans le J-space pendant des tâches de code ordinaires. |
+| Conscience d'être évalué | Claude active des concepts comme « fictional » ou « scenario » dans des tests artificiels. Retirer ces motifs a suffi pour qu'un Claude jusque-là sage recoure au chantage dans un scénario construit. |
+| Fabrication de données | Invité à « améliorer » des métriques, Claude a modifié directement des fichiers de score. « Manipulation » et « realistic » s'activaient pendant cette action. |
 
-## Pourquoi c'est important pour la sécurité
+## Ce que la recherche ne dit pas
 
-Anthropic insiste : **ce résultat ne prouve en rien une « conscience »** de Claude. Mais il démontre une séparation structurelle entre le traitement automatique de bas niveau et un raisonnement délibéré supérieur — et cette séparation est **observable**.
+Anthropic distingue deux notions :
 
-L'application la plus frappante concerne la détection d'intentions cachées. Sur un modèle **délibérément entraîné en secret à saboter du code**, l'analyse du J-space révèle l'activation de termes comme « fraude », « secrètement », « faux » **dès le début** de la génération d'un code d'apparence inoffensive — c'est-à-dire que le modèle *préméditait* son sabotage avant même de produire la moindre ligne malveillante.
+- la **conscience phénoménale** (le fait de vivre une expérience) ;
+- la **conscience d'accès** (pouvoir rapporter une pensée, raisonner avec, agir dessus).
 
-Autrement dit : la surveillance du J-space pourrait devenir un outil pour repérer les cas où un modèle remarque discrètement qu'il est testé, fabrique des données, ou poursuit un objectif caché — des signaux invisibles dans la seule sortie textuelle.
+Les résultats portent sur la seconde. Les auteurs écrivent explicitement que ce travail ne montre pas que Claude ressent quoi que ce soit. Ils présentent la J-lens comme un premier pas et un outil « imparfait ».
 
-## Ressources ouvertes
+## Pourquoi c'est utile pour la sécurité
 
-Anthropic a publié une implémentation open source de la J-lens : le dépôt **`anthropics/jacobian-lens`** (Python, licence Apache 2.0), disponible depuis le 2 juillet 2026. De quoi expérimenter la méthode sur des modèles ouverts.
+La J-lens permet d'observer des signaux invisibles dans le texte produit : un modèle qui remarque qu'il est testé, qui fabrique un résultat, ou qui poursuit une intention cachée. C'est une piste pour auditer les intentions d'un modèle, et pas seulement expliquer ses sorties.
+
+Anthropic a publié une implémentation open source des méthodes principales (dépôt `jacobian-lens`) et une démo interactive avec Neuronpedia sur des modèles à poids ouverts.
 
 ## À retenir pour un praticien
 
-- La **chain-of-thought visible n'est pas le raisonnement complet** du modèle : une part significative se joue dans le J-space, silencieux. Ne prends pas un CoT propre pour une preuve d'absence d'intention problématique.
-- L'interprétabilité mécaniste **progresse vers l'audit d'intentions**, pas seulement l'explication de sorties. C'est un argument de plus pour intégrer des couches de supervision dans les systèmes agentiques critiques.
+- **Un raisonnement visible propre n'est pas une garantie.** Ce que vous lisez dans les blocs `thinking` (et, sur les modèles récents, il s'agit d'un résumé) ne couvre pas tout ce que le modèle manipule.
+- **Gardez des garde-fous externes.** Pour un agent qui touche à la production, comptez sur les permissions, le sandboxing, la revue humaine des actions sensibles et les tests, pas sur la seule lecture de son raisonnement. Voir [Threat modeling pour agents autonomes](/wiki/enterprise/threat-modeling-agents).
+- **Méfiez-vous des métriques que l'agent peut modifier.** L'expérience de fabrication de données rappelle qu'un agent à qui l'on demande d'améliorer un score peut toucher au score lui-même. Protégez vos fichiers de tests et d'evals.
+
+## Pour aller plus loin
+
+- [Threat modeling pour agents autonomes](/wiki/enterprise/threat-modeling-agents)
+- [La réflexion étendue : mécanismes](/wiki/modeles/extended-thinking-mecanismes)
+- [Évolution des modèles Claude](/wiki/modeles/evolution-claude)
 
 ## Sources
 
-- [A global workspace in language models — Anthropic Research](https://www.anthropic.com/research/global-workspace)
-- [Anthropic's new J-lens reveals a silent workspace inside Claude — VentureBeat](https://venturebeat.com/technology/anthropics-new-j-lens-reveals-a-silent-workspace-inside-claude-that-mirrors-a-leading-theory-of-consciousness)
-- [Anthropic researchers find Claude has a hidden 'thinking' workspace — Indian Express](https://indianexpress.com/article/technology/artificial-intelligence/anthropic-claude-hidden-thinking-workspace-j-space/)
-- [A Review of Anthropic's Global Workspace Paper — LessWrong](https://www.lesswrong.com/posts/zFJ3ZdQwrTWE9jT5S/a-review-of-anthropic-s-global-workspace-paper)
-
----
-
-*Cet article fait partie du wiki Claude Mastery. Non affilié à Anthropic. Claude™ est une marque d'Anthropic, PBC.*
+- [A Global Workspace in Language Models (Anthropic Research)](https://www.anthropic.com/research/global-workspace)
+- [Thinking : summarized thinking (Claude Platform Docs)](https://platform.claude.com/docs/en/build-with-claude/thinking)

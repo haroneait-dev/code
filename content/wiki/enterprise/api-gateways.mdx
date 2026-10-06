@@ -1,69 +1,128 @@
 ---
-title: "Gestion des clés API et API Gateways"
-description: "Proxys Kong, Cloudflare Workers, LiteLLM : rotation des clés, cache de réponses et rate-limiting pour industrialiser l'usage de Claude."
-updatedAt: "2026-05-19"
-readingMinutes: 6
+title: "Gestion des clés API et gateways LLM"
+description: "Centraliser les clés, les budgets et l'audit devant Claude : Claude apps gateway, LiteLLM, Kong ou Cloudflare, configuration de Claude Code et règles de compatibilité à respecter."
+updatedAt: "2026-10-03"
+readingMinutes: 8
 ---
 
-Dans une organisation qui dépasse quelques utilisateurs, exposer la clé API Anthropic à chaque service est une pratique à risque : pas de rotation centralisée, pas d'observabilité, pas de contrôle de coût. L'introduction d'une API Gateway entre vos applications et l'API Anthropic règle ces problèmes et ouvre la porte à des optimisations majeures (cache, fallback, multi-tenant).
+Distribuer la clé API Anthropic à chaque développeur et à chaque service, c'est perdre le contrôle : pas de révocation fine, pas de budget par équipe, pas de journal central. Une gateway LLM se place entre vos clients (applications, Claude Code) et le fournisseur. Elle détient la clé de l'organisation et délivre à chacun ses propres identifiants. Cet article couvre le choix d'une gateway, la configuration de Claude Code et les erreurs de compatibilité les plus fréquentes.
 
-## Pourquoi une Gateway devant Anthropic
+## Ce qu'apporte une gateway
 
-Une Gateway dédiée aux LLM apporte cinq bénéfices clairs :
+- **Secrets centralisés** : la clé du fournisseur reste côté serveur ; chaque développeur reçoit un identifiant révocable.
+- **Attribution des coûts** par développeur, équipe ou projet, quel que soit le fournisseur.
+- **Budgets et limites de débit** définis à un seul endroit.
+- **Journal d'audit** de chaque requête.
+- **Changement de fournisseur** (API Claude, Bedrock, Google Cloud, Foundry) sans toucher aux postes, si la gateway expose un endpoint au format Anthropic unique.
 
-- **Centralisation des secrets** : une seule clé Anthropic, lue côté gateway, jamais distribuée.
-- **Quota et rate-limit par équipe** ou par projet, indépendamment des limites Anthropic.
-- **Observabilité unifiée** : logs, traces, métriques (tokens in/out, coût par appel) au même endroit.
-- **Cache sémantique** des réponses pour les requêtes répétitives.
-- **Multi-provider routing** : basculer vers Bedrock ou Vertex AI en cas d'incident.
+Contrepartie : la gateway devient une infrastructure à maintenir. Chaque version de Claude Code peut ajouter des en-têtes ou des champs ; une gateway qui ne les transmet pas casse les fonctionnalités correspondantes.
 
-## LiteLLM : le proxy LLM-native
+## Choisir sa gateway
 
-LiteLLM s'est imposé comme la référence open source pour ce cas d'usage. Il expose un endpoint unique compatible OpenAI, route vers Anthropic en interne et gère nativement les `cache_control` blocks de Claude. Il offre :
+| Option | Points forts | À surveiller |
+|---|---|---|
+| **Claude apps gateway** (intégrée au binaire `claude`) | Connexion SSO via votre fournisseur d'identité, réglages gérés par groupe, métriques OTLP, compatibilité maintenue à chaque version | Pas de jeton de service : une CI doit se connecter directement au fournisseur |
+| **LiteLLM** (open source) | Clés virtuelles, budgets, multi-fournisseurs, auto-hébergé | Transmission des en-têtes `anthropic-*` à vérifier à chaque mise à jour |
+| **Kong, Apigee, Tyk** | Réutilise votre API management existant (OAuth, mTLS, observabilité) | Moins de fonctions spécifiques aux LLM |
+| **Cloudflare AI Gateway, Vercel AI Gateway** | Service managé, analytics et cache intégrés | Données qui transitent par un tiers supplémentaire |
 
-- Une UI de gestion des "virtual keys" : vous distribuez à chaque équipe une clé LiteLLM, révocable instantanément.
-- Des budgets mensuels par clé avec alertes.
-- Un cache Redis avec fingerprint sémantique optionnel.
-- Le fallback automatique entre providers (Anthropic API → Bedrock → Vertex).
-- Des hooks de logging vers Langfuse, Helicone, Datadog.
+Anthropic ne cautionne ni n'audite les gateways tierces et ne prend pas en charge le routage de Claude Code vers des modèles non Claude.
 
-Déploiement typique : un container LiteLLM derrière un load balancer interne, avec PostgreSQL pour les clés et Redis pour le cache.
+La Claude apps gateway se lance avec `claude gateway --config gateway.yaml`. Elle peut router vers Bedrock, Claude Platform on AWS, Google Cloud, Foundry ou l'API Claude. Les développeurs s'y connectent avec `/login`.
 
-## Kong et l'approche API Management classique
+## Connecter Claude Code à une gateway
 
-Si votre organisation utilise déjà Kong (ou Apigee, Tyk), les plugins AI Gateway de Kong permettent de réutiliser l'infra existante. Kong AI Proxy supporte Anthropic nativement, applique vos politiques d'authentification (OAuth, mTLS, JWT) et s'intègre à votre stack observability. Avantage : pas de nouveau composant à exploiter. Inconvénient : moins de features LLM-spécifiques que LiteLLM (cache sémantique limité, pas de gestion fine des cache_control).
+Deux variables suffisent : l'adresse et l'identifiant.
 
-## Cloudflare Workers et l'edge proxying
+```bash
+export ANTHROPIC_BASE_URL=https://llm-gateway.example.com
+export ANTHROPIC_AUTH_TOKEN=sk-gateway-xxxx   # envoyé en Authorization: Bearer
+```
 
-Pour les applications grand public ou multi-régions, un Worker Cloudflare en frontal réduit la latence et masque la clé Anthropic. Vous bénéficiez :
+Quelle variable choisir pour l'identifiant :
 
-- Du KV/Durable Objects pour le cache.
-- Des AI Gateway Cloudflare (analytics + cache + retry intégrés).
-- D'une isolation par token utilisateur via Workers Auth.
+| Variable | En-tête envoyé | Quand l'utiliser |
+|---|---|---|
+| `ANTHROPIC_AUTH_TOKEN` | `Authorization: Bearer` | La gateway parle de « bearer token » |
+| `ANTHROPIC_API_KEY` | `x-api-key` | La gateway parle de « clé API » |
+| `apiKeyHelper` (réglage) | Les deux | L'identifiant tourne ou vient d'un coffre |
 
-C'est l'approche la plus économique pour des SaaS avec trafic mondial, et la latence ajoutée reste sous 30 ms grâce au réseau edge.
+Pour une configuration durable (y compris pour les agents en arrière-plan), placez ces valeurs dans le bloc `env` de `~/.claude/settings.json`, jamais dans le `.claude/settings.json` versionné du projet.
 
-## Rotation des clés et gestion des secrets
+Vérifiez ensuite avec `/status` : la ligne `Anthropic base URL` doit afficher la gateway, et la ligne `Auth token` ou `API key` doit nommer la variable choisie. Un test sans Claude Code :
 
-Quelle que soit la gateway, appliquez ces règles :
+```bash
+curl -sS -w '\n%{http_code}\n' -X POST "$ANTHROPIC_BASE_URL/v1/messages" \
+  -H "Authorization: Bearer $ANTHROPIC_AUTH_TOKEN" \
+  -H "anthropic-version: 2023-06-01" \
+  -H "content-type: application/json" \
+  -d '{"model": "claude-sonnet-5-5", "max_tokens": 1, "messages": [{"role": "user", "content": "."}]}'
+```
 
-- **Stockage** dans un vault (HashiCorp Vault, AWS Secrets Manager, Doppler) — jamais en variable d'environnement statique ni dans Git.
-- **Rotation programmée** trimestrielle, ou immédiate après tout départ d'un ingénieur ayant eu accès.
-- **Clés distinctes** par environnement (dev, staging, prod) et par criticité (clé "interactive" vs clé "batch").
-- **Monitoring d'anomalies** : pic soudain de tokens, géolocalisation inhabituelle, ratio cache miss anormal.
+Attention à la facturation : avec un identifiant de gateway actif, l'abonnement claude.ai du développeur n'est plus utilisé. Tout est facturé au tarif API sur le compte derrière la gateway. À l'inverse, définir seulement `ANTHROPIC_BASE_URL` sans identifiant laisse l'abonnement claude.ai actif.
 
-## Cache stratégique : prompt caching natif + cache sémantique
+## Rotation des identifiants avec `apiKeyHelper`
 
-Distinguez deux caches complémentaires :
+Le réglage `apiKeyHelper` exécute une commande qui affiche l'identifiant courant. Claude Code met le résultat en cache 5 minutes par défaut (modifiable avec `CLAUDE_CODE_API_KEY_HELPER_TTL_MS`).
 
-- Le **prompt caching natif Anthropic** (`cache_control`) qui réduit le coût des préfixes longs côté Anthropic.
-- Le **cache applicatif** côté gateway qui évite l'appel quand la même question revient.
+```bash
+#!/bin/bash
+# ~/bin/get-gateway-key.sh : n'afficher QUE la clé, sans bannière ni log
+vault kv get -field=api_key secret/llm-gateway/claude-code
+```
 
-Le second est particulièrement rentable pour les FAQ, les classifications et les requêtes batch idempotentes. Attention à l'invalidation : versionnez la clé de cache avec le hash du system prompt et de la version du modèle.
+```json
+{
+  "apiKeyHelper": "~/bin/get-gateway-key.sh"
+}
+```
+
+## Déploiement à l'échelle de l'organisation
+
+1. Déployez la gateway avec la clé du fournisseur.
+2. Émettez un identifiant par développeur : le départ d'un collaborateur se traite en révoquant une seule clé.
+3. Distribuez l'URL et l'identifiant via les **managed settings** et votre outil de gestion des secrets.
+4. Verrouillez la destination avec `allowedProviders: ["customEndpoint"]` et l'`ANTHROPIC_BASE_URL` dans le bloc `env` des managed settings (Claude Code v2.1.285 ou plus) : une session pointée ailleurs, y compris directement vers Anthropic, est refusée.
+5. Sur un réseau qui n'autorise que la gateway, ajoutez `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1` pour couper les vérifications de version et la télémétrie.
+
+## Ce que votre gateway doit respecter
+
+Les causes de panne les plus courantes, d'après le guide de compatibilité officiel :
+
+- **Transmettre tels quels** les en-têtes `anthropic-version` et `anthropic-beta`, sans liste blanche de valeurs : de nouvelles valeurs arrivent avec chaque version.
+- **Streamer sans mettre en tampon** : Claude Code lit le flux au fil de l'eau et abandonne après 5 minutes sans octet. Relayez aussi les événements `ping`.
+- **Ne pas réécrire le corps** : conserver les marqueurs `cache_control` (sinon plus de prompt caching) et le tableau `system` tel quel.
+- **Renvoyer les corps d'erreur sans les modifier** et un `retry-after` en secondes.
+- **Servir `/v1/messages`** ; `/v1/messages/count_tokens` est optionnel (sans lui, le décompte de contexte devient une estimation).
+- **WAF** : les prompts contiennent du code et des balises qui déclenchent les règles anti-XSS. Exemptez le chemin `/v1/messages` de l'inspection du corps (règle `CrossSiteScripting_Body` sur AWS WAF).
+
+Pour l'attribution des coûts, Claude Code envoie l'en-tête `x-claude-code-session-id` (et `x-claude-code-agent-id` pour les sous-agents) : pratique pour regrouper les requêtes d'une session sans lire les corps.
+
+En cas d'erreurs 400 sur des champs inconnus (`context_management`, `Extra inputs are not permitted`), les développeurs peuvent poser `CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS=1` en attendant que la gateway soit corrigée.
+
+## Caches : natif et applicatif
+
+- Le **prompt caching** d'Anthropic (`cache_control`) réduit le coût des préfixes longs. La gateway doit simplement le laisser passer.
+- Un **cache de réponses** côté gateway évite l'appel quand la même requête revient. Il est rentable pour des classifications ou des FAQ, rarement pour un agent de code dont chaque requête est unique. Versionnez la clé de cache avec le hash du prompt système et l'ID du modèle.
+
+## Hygiène des clés
+
+- Coffre-fort (HashiCorp Vault, AWS Secrets Manager, etc.), jamais de clé dans Git.
+- Clés distinctes par environnement (dev, préprod, prod) et par usage (interactif, batch).
+- Rotation planifiée, et immédiate après un départ ou une fuite suspectée.
+- Alertes sur les anomalies : pic de tokens, horaires inhabituels, chute du taux de cache.
 
 ## Pour aller plus loin
 
-- Documentation LiteLLM Proxy et "Virtual Keys".
-- Kong AI Gateway plugins (ai-proxy, ai-prompt-guard).
-- Cloudflare AI Gateway et Workers AI.
-- Anthropic prompt caching, guide officiel.
+- [Résilience multi-cloud](/wiki/enterprise/resilience-multi-cloud)
+- [Claude Code et Vercel : plugin, AI SDK et AI Gateway](/wiki/enterprise/vercel-plugin-ai-sdk)
+- [Secrets et .env](/wiki/workflows/secrets-env)
+- [Implémenter le prompt caching (API)](/wiki/api/prompt-caching-implementation)
+- [Les variables d'environnement](/wiki/cli/variables-env)
+
+## Sources
+
+- [Run Claude Code through a gateway (Claude Code)](https://code.claude.com/docs/en/gateways)
+- [Other LLM gateways (Claude Code)](https://code.claude.com/docs/en/llm-gateway)
+- [Connect Claude Code to an LLM gateway (Claude Code)](https://code.claude.com/docs/en/llm-gateway-connect)
+- [Gateway compatibility guide (Claude Code)](https://code.claude.com/docs/en/llm-gateway-protocol)

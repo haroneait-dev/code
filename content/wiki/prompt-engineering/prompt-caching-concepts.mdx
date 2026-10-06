@@ -1,63 +1,130 @@
 ---
-title: "Prompt Caching : concepts et stratégies"
-description: "Comprendre le prompt caching d'Anthropic et structurer ses prompts pour maximiser le cache hit rate."
-updatedAt: "2026-05-19"
-readingMinutes: 6
+title: "Prompt caching : concepts et stratégies"
+description: "Comprendre le cache de prompt de l'API Claude (cache automatique ou points de cache, durée de 5 minutes ou 1 heure, tarifs, tailles minimales, ce qui l'invalide) et organiser vos prompts pour en profiter."
+updatedAt: "2026-10-03"
+readingMinutes: 7
 ---
 
-Le **prompt caching** est l'une des optimisations les plus rentables qu'on puisse mettre en place sur l'API Anthropic. En réutilisant intelligemment des portions de contexte d'une requête à l'autre, on peut réduire la latence jusqu'à 80 % et le coût des tokens d'entrée jusqu'à 90 %. Encore faut-il structurer son prompt correctement : le cache ne fonctionne que si la partie en tête de prompt est strictement identique entre deux appels.
+Le *prompt caching* permet à l'API de réutiliser le début d'un prompt déjà traité au lieu de le relire à chaque requête. Résultat : des requêtes plus rapides et des tokens d'entrée facturés une fraction de leur prix. Il ne marche que si le début du prompt est **strictement identique** d'une requête à l'autre : tout l'enjeu est d'organiser vos prompts pour cela.
 
-## Comment fonctionne le cache
+## Le principe
 
-Anthropic cache les préfixes de prompts marqués avec `cache_control: { type: "ephemeral" }`. Quand un nouveau message arrive, l'API compare le préfixe à ses caches actifs (TTL par défaut de 5 minutes, extensible à 1 heure). Si tout le contenu jusqu'au marqueur de cache est identique au token près, on obtient un **cache hit** : les tokens cachés sont facturés à 10 % du prix normal et ne nécessitent pas de re-tokenisation.
+Le cache fonctionne par **préfixe**. L'API vérifie si le prompt, jusqu'à un point de cache, a déjà été traité récemment :
 
-Quatre blocs peuvent être cachés : `system`, `tools`, `messages`, et les blocs `content` individuels. Le minimum requis est de **1024 tokens** pour Sonnet/Opus et 2048 pour Haiku — en dessous, le marqueur est ignoré silencieusement.
+- si oui (*cache hit*), elle relit la version en cache ;
+- sinon, elle traite le prompt complet et met le préfixe en cache dès que la réponse commence.
 
-## La règle d'or : statique en premier
+L'ordre de lecture est toujours le même : **`tools`, puis `system`, puis `messages`**. Une modification à un niveau invalide ce niveau et tous les suivants.
 
-C'est le principe le plus important du prompt caching : **tout ce qui ne change pas doit être placé au début, tout ce qui varie à la fin**. L'ordre canonique est :
+## Deux façons de l'activer
 
-1. **Tools** (définitions de fonctions, schémas JSON)
-2. **System prompt** (instructions, persona, règles métier)
-3. **Documents de contexte** (RAG, fichiers de référence, exemples few-shot)
-4. **Historique de conversation** (messages précédents)
-5. **Message utilisateur courant** (la seule partie vraiment dynamique)
+| Mode | Comment | Pour quoi |
+|---|---|---|
+| **Automatique** | Un champ `cache_control` au niveau racine de la requête | Conversations multi-tours : le point de cache avance seul à mesure que la conversation grandit. Point de départ recommandé |
+| **Points de cache explicites** | `cache_control` sur des blocs précis, **4 maximum** par requête | Contrôle fin, quand des parties changent à des rythmes différents |
 
-Inverser cet ordre — par exemple injecter la date du jour ou un user ID en tête de system prompt — invalide tout le cache à chaque requête.
+Le cache automatique utilise l'un des quatre emplacements disponibles. L'implémentation détaillée est dans [Implémenter le prompt caching](/wiki/api/prompt-caching-implementation).
 
-## Stratégies de placement des marqueurs
+## Durée et tarifs
 
-L'API autorise jusqu'à **4 marqueurs `cache_control`** par requête, ce qui permet de créer plusieurs points de cache imbriqués. Une stratégie classique pour un agent conversationnel :
+Le cache dure **5 minutes** par défaut, renouvelées à chaque lecture. Une durée d'**1 heure** est disponible avec `"ttl": "1h"`.
 
-- Marqueur 1 : fin des `tools`
-- Marqueur 2 : fin du `system` + documents stables
-- Marqueur 3 : fin de l'historique conversationnel (réécrit à chaque tour pour étendre le cache)
-- Marqueur 4 : réservé pour un contexte temporaire
+| Opération | Prix par rapport au tarif d'entrée normal |
+|---|---|
+| Écriture, cache de 5 minutes | 1,25 fois |
+| Écriture, cache d'1 heure | 2 fois |
+| Lecture (hit) | 0,1 fois (0,05 fois sur Opus 5.5, 0,025 fois sur Fable 5.1 et Mythos 5.1) |
 
-Le 3ᵉ marqueur permet d'étendre progressivement le cache au fil de la conversation : chaque tour ajoute les derniers messages au préfixe cachable, ce qui fait grossir le cache hit avec le temps.
+Exemples par million de tokens :
 
-## Éviter les invalidations silencieuses
+| Modèle | Entrée normale | Écriture 5 min | Lecture en cache |
+|---|---|---|---|
+| Opus 5.5 | 4 $ | 5 $ | 0,20 $ |
+| Sonnet 5.5 | 2 $ | 2,50 $ | 0,20 $ |
+| Haiku 4.5 | 1 $ | 1,25 $ | 0,10 $ |
 
-Quelques pièges classiques qui cassent le cache sans erreur visible :
+Le cache de 5 minutes est rentable dès la première relecture, celui d'1 heure dès la deuxième. Ces réductions se cumulent avec celle de l'API Batch.
 
-- **Timestamps dans le system prompt** : `"Tu es un assistant. Date : 2026-05-18T14:32:01Z"` invalide tout. Mettre la date en fin de prompt utilisateur à la place.
-- **IDs dynamiques** : user_id, session_id, request_id doivent vivre dans le `user` message, pas dans le `system`.
-- **Outils réordonnés** : si vous générez vos `tools` depuis un objet JS, l'ordre des clés peut varier. Utiliser un tri stable.
-- **Whitespace** : une espace en trop, un `\n` Windows vs Unix, et le hash change.
+## Taille minimale
 
-## Mesurer son cache hit rate
+En dessous d'une certaine taille, le préfixe n'est **pas** mis en cache, sans message d'erreur :
 
-L'API renvoie dans `usage` les champs `cache_creation_input_tokens` et `cache_read_input_tokens`. Le ratio à viser :
+| Minimum | Modèles |
+|---|---|
+| 512 tokens | Fable 5.1, Mythos 5.1, Opus 5.5, Opus 5, Sonnet 5.5, Fable 5, Mythos 5 |
+| 1 024 tokens | Sonnet 5, Opus 4.8, Sonnet 4.6, Sonnet 4.5 |
+| 4 096 tokens | Haiku 4.5, Opus 4.6, Opus 4.5 |
 
+Vérifiez dans la réponse : si `cache_creation_input_tokens` et `cache_read_input_tokens` valent tous deux 0, rien n'a été mis en cache.
+
+## La règle d'or : le stable d'abord, le variable à la fin
+
+Rangez votre requête du plus stable au plus changeant :
+
+1. **Outils** (définitions, schémas) ;
+2. **Prompt système** (rôle, règles) ;
+3. **Documents de référence et exemples** ;
+4. **Historique de conversation** ;
+5. **Message du moment**.
+
+Placez le point de cache **à la fin de la partie identique** d'une requête à l'autre, pas sur le bloc qui change.
+
+## Ce qui casse le cache sans prévenir
+
+| Changement | Effet |
+|---|---|
+| Définitions d'outils modifiées ou réordonnées | Tout le cache est invalidé |
+| Activation ou désactivation de la recherche web ou des citations | Invalide `system` et `messages` |
+| Changement de `tool_choice`, ajout ou retrait d'images | Invalide `messages` |
+| Changement de l'effort ou des paramètres de réflexion | Invalide au moins `messages` |
+| Blocs de réflexion retirés de l'historique (Fable 5.1, Opus 5.5, Sonnet 5.5) | Invalide `messages` |
+
+Et les pièges classiques côté code :
+
+- une **date ou une heure** en tête du prompt système ;
+- un **identifiant** d'utilisateur ou de session dans le `system` ;
+- des outils générés depuis un objet dont **l'ordre des clés** varie ;
+- un historique **réécrit** entre deux requêtes (résumé en place, rappel inséré puis supprimé).
+
+Pour changer l'effort d'un seul tour sans perdre le cache, la documentation recommande le **changement d'effort par message** (bêta) plutôt que la modification du paramètre global. Et pour les rappels ponctuels, ajoutez-les à la suite de l'historique au lieu de les insérer puis de les retirer.
+
+## Mesurer le taux de cache
+
+Chaque réponse détaille l'usage :
+
+```json
+"usage": {
+  "cache_read_input_tokens": 100000,
+  "cache_creation_input_tokens": 0,
+  "input_tokens": 50,
+  "output_tokens": 503
+}
 ```
-hit_rate = cache_read / (cache_read + cache_creation + input_tokens)
+
+Attention : `input_tokens` ne compte que les tokens **après** le dernier point de cache. Le total d'entrée est la somme des trois premiers champs. Un indicateur simple :
+
+```text
+taux de cache = cache_read / (cache_read + cache_creation + input_tokens)
 ```
 
-Un agent bien optimisé tourne entre 70 et 95 % de hit rate après chauffage. En dessous de 50 %, il y a presque toujours un timestamp ou un ID qui pollue le préfixe.
+S'il reste bas sur des requêtes qui devraient se ressembler, cherchez un élément variable au début du prompt.
+
+## À savoir
+
+- Les tokens en cache **comptent toujours** dans la fenêtre de contexte : le cache change le prix, pas la place occupée.
+- Les blocs de réflexion ne peuvent pas être marqués avec `cache_control`, mais ils sont mis en cache avec le reste de l'historique.
+- Dans **claude.ai**, pas de réglage à faire : le contenu d'un projet est mis en cache, ce qui permet de l'interroger plusieurs fois en consommant moins de vos limites d'usage (voir [Bien nourrir un projet](/wiki/claude-ai/projects-knowledge-base)).
 
 ## Pour aller plus loin
 
-- Documentation officielle : [Prompt caching](https://docs.anthropic.com/en/docs/build-with-claude/prompt-caching)
-- TTL étendu 1 heure : utile pour les agents long-running et les batchs documentaires
-- Combiner avec le **batch API** pour 50 % de réduction supplémentaire sur les workloads asynchrones
-- Lire aussi : *Itérer sur un prompt* et *Tester un prompt* pour mesurer l'impact d'un changement avant de casser un cache rentable
+- [Implémenter le prompt caching (API)](/wiki/api/prompt-caching-implementation)
+- [Travailler avec un contexte long](/wiki/prompt-engineering/contexte-long)
+- [API Batch](/wiki/api/batch-api)
+- [Tarifs et tokens](/wiki/modeles/pricing-tokens)
+
+## Sources
+
+- [Prompt caching (Anthropic)](https://platform.claude.com/docs/en/build-with-claude/prompt-caching)
+- [Pricing : Prompt caching (Anthropic)](https://platform.claude.com/docs/en/about-claude/pricing)
+- [Prompting Claude Sonnet 5.5 : Calibrate effort (Anthropic)](https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-sonnet-5-5)
+- [Usage limit best practices (Centre d'aide Claude)](https://support.claude.com/en/articles/9797557-usage-limit-best-practices)
