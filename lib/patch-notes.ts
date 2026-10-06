@@ -22,6 +22,18 @@ export const PATCH_NOTES: PatchNote[] = [
   {
     date: "2026-10-06",
     kind: "site",
+    version: "Site 2.6",
+    title: "Page Prompts entièrement refaite",
+    items: [
+      "79 prompts en 11 catégories, dont 4 nouvelles : SEO, marketing et publicité, vente et prospection, données et finance.",
+      "Chaque prompt applique une vraie technique de métier (intention de recherche, cocon sémantique, données structurées, AIDA, méthode STAR…) expliquée dans « Pourquoi ça marche ».",
+      "La méthode de chaque catégorie, un niveau par prompt, une recherche et un filtre par niveau.",
+    ],
+    href: "/prompts",
+  },
+  {
+    date: "2026-10-06",
+    kind: "site",
     version: "Site 2.5",
     title: "Comparatifs, une page par application, badges et défi de la semaine",
     items: [
