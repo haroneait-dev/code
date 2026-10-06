@@ -3,6 +3,7 @@ import { ArrowUpRight } from "lucide-react";
 import { SiteHeader } from "@/components/site/SiteHeader";
 import { SiteFooter } from "@/components/site/SiteFooter";
 import { THEMES, KIND_LABEL, type AppKind } from "@/lib/applications";
+import { PATHS } from "@/lib/app-paths";
 
 export const metadata = {
   title: "Applications à brancher sur Claude, par thème",
@@ -121,11 +122,40 @@ export default function ApplicationsPage() {
                 </div>
               </div>
 
+              {PATHS[t.id] && (
+                <div className="mb-12">
+                  <h3 className="font-headline-lg text-[24px] md:text-[28px] font-bold mb-2">De débutant à expert</h3>
+                  <p className="text-[15.5px] text-on-surface-variant mb-6 max-w-2xl">
+                    Quatre niveaux, dans l'ordre. Passez au suivant quand vous avez réussi le projet du niveau.
+                  </p>
+                  <ol className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                    {PATHS[t.id].map((lv, i) => (
+                      <li key={lv.level} className="rounded-lg border border-outline-variant bg-surface-container-lowest p-6">
+                        <div className="flex items-baseline gap-3 mb-2">
+                          <span className="font-display-xl text-[28px] leading-none font-extrabold text-primary-fixed-dim tabular-nums">{i + 1}</span>
+                          <span className="font-headline-lg text-[20px] font-bold text-on-surface">{lv.level}</span>
+                        </div>
+                        <p className="text-[15.5px] text-on-surface font-semibold leading-relaxed mb-3">{lv.goal}</p>
+                        <ul className="flex flex-col gap-2 mb-4 list-disc pl-5 text-[15px] text-on-surface-variant leading-relaxed">
+                          {lv.steps.map((s) => (
+                            <li key={s}>{s}</li>
+                          ))}
+                        </ul>
+                        <p className="rounded-md bg-[#fbe3a8]/50 border border-[#f2b23e]/40 px-3.5 py-2.5 text-[14.5px] text-on-surface leading-relaxed">
+                          <strong>Projet de validation :</strong> {lv.project}
+                        </p>
+                      </li>
+                    ))}
+                  </ol>
+                </div>
+              )}
+
+              <h3 className="font-headline-lg text-[24px] md:text-[28px] font-bold mb-6">Les applications</h3>
               <ul className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
                 {t.apps.map((a) => (
                   <li key={a.name} className="flex flex-col rounded-lg border-[1.5px] border-on-surface bg-surface-container-lowest p-6 shadow-[4px_4px_0_#fbe3a8]">
                     <div className="flex items-start justify-between gap-3 mb-3">
-                      <h3 className="font-headline-lg text-[22px] font-bold text-on-surface">{a.name}</h3>
+                      <h4 className="font-headline-lg text-[22px] font-bold text-on-surface">{a.name}</h4>
                       <span className={`shrink-0 rounded px-2 py-0.5 text-[12.5px] font-semibold ${KIND_STYLE[a.kind]}`}>
                         {KIND_LABEL[a.kind]}
                       </span>
