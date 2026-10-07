@@ -33,6 +33,7 @@ import {
 import { loadArticle } from "@/lib/wiki-loader";
 import { ARTICLE_QUIZZES } from "@/lib/article-quizzes";
 import { ArticleQuiz } from "@/components/wiki/ArticleQuiz";
+import { ReadingProgress } from "@/components/site/ReadingProgress";
 
 const CAT_ICONS = {
   terminal: Terminal,
@@ -145,6 +146,7 @@ export default async function ArticlePage({
   return (
     <div className="min-h-screen flex flex-col">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }} />
+      <ReadingProgress />
       <SiteHeader active={cat?.section === "claude" ? "claude" : cat?.section === "code" ? "code" : "wiki"} showSearch />
 
       <div className="flex-grow w-full max-w-[1440px] mx-auto px-margin-mobile md:px-10 xl:px-margin-desktop flex gap-10 xl:gap-12 py-8 relative">

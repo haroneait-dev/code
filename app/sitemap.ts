@@ -20,6 +20,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { url: `${siteUrl}/test`, lastModified: now, priority: 0.9 },
     { url: `${siteUrl}/prompts`, lastModified: now, priority: 0.85 },
     { url: `${siteUrl}/patch-notes`, lastModified: now, priority: 0.8 },
+    { url: `${siteUrl}/evolution`, lastModified: now, priority: 0.8 },
   ];
 
   const appPages: MetadataRoute.Sitemap = allApps().map((a) => ({

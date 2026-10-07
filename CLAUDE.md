@@ -61,6 +61,8 @@ app/
   test/                     # Test de niveau (10 questions) + pages de résultat partagé
   patch-notes/              # Patch notes du site et nouveautés Claude
   recherche/                # Recherche
+  evolution/                # L'évolution de Claude en graphiques animés (données : lib/evolution.ts)
+  template.tsx              # Transition d'entrée de page (CSS)
   (comparatifs : catégorie du wiki, content/wiki/comparatifs/)
   opengraph-image.tsx       # Images de partage (modèle dans lib/og.tsx)
 components/
@@ -74,6 +76,9 @@ lib/
   quiz.ts  share.ts               # Test de niveau, liens de partage
   article-quizzes.ts              # Mini-quiz de fin d'article
   prompts.ts  patch-notes.ts  nav.ts  og.tsx
+remotion/                   # Compositions Remotion : ClaudeCodeDemo (lue dans le site via @remotion/player), TikTokAstuces (vidéo)
+public/media/               # Vidéos du logo 3D (rendu Blender), versions claire et sombre
+public/fonts/               # Polices locales pour le rendu vidéo Remotion
 proxy.ts                    # Désactive les anciennes pages/API à compte (308 / 410)
 next.config.mjs             # Redirections des articles retirés
 ```
@@ -94,6 +99,11 @@ next.config.mjs             # Redirections des articles retirés
 ### Couleurs et mode sombre
 - Toutes les couleurs passent par des variables `--c-<nom>` (canaux RGB) définies dans `app/globals.css` pour `:root` et `.dark`.
 - Dans les classes arbitraires, utiliser `rgb(var(--c-mark))`, jamais un hexadécimal en dur (sinon le mode sombre casse).
+
+### Animations et vidéos
+- Rendre une vidéo Remotion : `npx remotion render remotion/index.ts <Composition> sortie.mp4 --browser-executable=<chemin headless_shell>`.
+- Le logo 3D est un rendu Blender (Cycles) assemblé en MP4 avec ffmpeg sur le fond clair et sur le fond sombre.
+- Toute animation doit respecter « réduire les animations » et ne pas retarder l'affichage du contenu principal (vérifier avec Lighthouse).
 
 ## Variables d'environnement
 ```
