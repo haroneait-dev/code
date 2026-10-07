@@ -4,6 +4,8 @@ import "./globals.css";
 import { Analytics } from "@vercel/analytics/next";
 import { CommandPalette } from "@/components/site/CommandPalette";
 import { ClickRipple } from "@/components/site/ClickRipple";
+import { PageCurtain } from "@/components/site/PageCurtain";
+import { ScrollFX } from "@/components/site/ScrollFX";
 
 const display = Bricolage_Grotesque({
   subsets: ["latin"],
@@ -101,6 +103,8 @@ export default function RootLayout({
         {children}
         <CommandPalette />
         <ClickRipple />
+        <PageCurtain />
+        <ScrollFX />
         <Analytics />
       </body>
     </html>

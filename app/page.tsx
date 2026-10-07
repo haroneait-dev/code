@@ -6,6 +6,7 @@ import { ParcoursBanner } from "@/components/site/ParcoursBanner";
 import { DefiSemaine } from "@/components/site/DefiSemaine";
 import { Hero3D } from "@/components/site/Hero3D";
 import { TerminalDemo } from "@/components/site/TerminalDemo";
+import { ScrollStory } from "@/components/site/ScrollStory";
 import { curriculum, totalLessons } from "@/lib/curriculum";
 import { articleCount, articleCountBySection } from "@/lib/wiki-manifest";
 
@@ -181,6 +182,8 @@ export default function LandingPage() {
             <TerminalDemo />
           </div>
         </section>
+
+        <ScrollStory />
 
         {/* Ce qui a changé */}
         <section className="w-full px-margin-mobile md:px-margin-desktop py-16 md:py-20 bg-surface-container-low border-y border-outline-variant">

@@ -104,6 +104,8 @@ next.config.mjs             # Redirections des articles retirés
 ### Animations et vidéos
 - Rendre une vidéo Remotion : `npx remotion render remotion/index.ts <Composition> sortie.mp4 --browser-executable=<chemin headless_shell>`.
 - Le logo 3D est un rendu Blender (Cycles) assemblé en MP4 avec ffmpeg sur le fond clair et sur le fond sombre.
+- Effets globaux dans layout.tsx : PageCurtain (rideau entre les pages ; `data-no-curtain` sur un lien pour l'éviter), ScrollFX (surligneur et apparitions au défilement), ClickRipple.
+- Section « scroll stop » de l'accueil : ScrollStory, planche de 48 images Blender (public/media/scroll-3d.webp, 8 × 6).
 - Toute animation doit respecter « réduire les animations » et ne pas retarder l'affichage du contenu principal (vérifier avec Lighthouse).
 
 ## Variables d'environnement
