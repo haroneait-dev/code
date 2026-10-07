@@ -62,6 +62,7 @@ app/
   patch-notes/              # Patch notes du site et nouveautés Claude
   recherche/                # Recherche
   evolution/                # L'évolution de Claude en graphiques animés (données : lib/evolution.ts)
+  choisir-modele/           # Comparateur de modèles (données : lib/models.ts)
   template.tsx              # Transition d'entrée de page (CSS)
   (comparatifs : catégorie du wiki, content/wiki/comparatifs/)
   opengraph-image.tsx       # Images de partage (modèle dans lib/og.tsx)
@@ -76,8 +77,8 @@ lib/
   quiz.ts  share.ts               # Test de niveau, liens de partage
   article-quizzes.ts              # Mini-quiz de fin d'article
   prompts.ts  patch-notes.ts  nav.ts  og.tsx
-remotion/                   # Compositions Remotion : ClaudeCodeDemo (lue dans le site via @remotion/player), TikTokAstuces (vidéo)
-public/media/               # Vidéos du logo 3D (rendu Blender), versions claire et sombre
+remotion/                   # Compositions Remotion : ClaudeCodeDemo (lue dans le site), TikTokAstuces, TikTok-<id> (vidéos listées dans remotion/videos.ts)
+public/media/               # Logo 3D en vidéo et objets 3D des sections (sections/*.webp), rendus Blender
 public/fonts/               # Polices locales pour le rendu vidéo Remotion
 proxy.ts                    # Désactive les anciennes pages/API à compte (308 / 410)
 next.config.mjs             # Redirections des articles retirés

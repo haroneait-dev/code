@@ -22,6 +22,19 @@ export const PATCH_NOTES: PatchNote[] = [
   {
     date: "2026-10-07",
     kind: "site",
+    version: "Site 3.1",
+    title: "Terminal d'essai, comparateur de modèles et tampon de niveau",
+    items: [
+      "Sur l'accueil, un terminal où vous tapez une demande et voyez comment Claude Code la traite.",
+      "Nouveau comparateur : décrivez votre usage, il conseille un modèle Claude et estime son coût par mois.",
+      "Le résultat du test de niveau s'imprime avec un tampon.",
+      "Un objet 3D pour chaque grande partie : Claude, Claude Code, Applications et Prompts.",
+    ],
+    href: "/choisir-modele",
+  },
+  {
+    date: "2026-10-07",
+    kind: "site",
     version: "Site 3.0",
     title: "Un site plus vivant : 3D, animations et l'évolution de Claude en chiffres",
     items: [

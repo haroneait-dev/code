@@ -116,6 +116,11 @@ export function SiteFooter() {
                 </Link>
               </li>
               <li>
+                <Link href="/choisir-modele" className="hover:text-primary transition-colors">
+                  Quel modèle choisir ?
+                </Link>
+              </li>
+              <li>
                 <Link href="/patch-notes" className="hover:text-primary transition-colors">
                   Patch notes
                 </Link>
