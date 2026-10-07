@@ -363,3 +363,41 @@
 @keyframes cm-float { 0%, 100% { transform: translateY(0) rotate(0deg); } 50% { transform: translateY(-8px) rotate(-1.5deg); } }
 .cm-float { animation: cm-float 5s ease-in-out infinite; }
 @media (prefers-reduced-motion: reduce) { .cm-line-in, .cm-float { animation: none; } }
+
+/* Rideau de transition entre les pages (PageCurtain) */
+.cm-curtain { position: fixed; inset: 0; z-index: 200; pointer-events: none; }
+.cm-curtain-a, .cm-curtain-b { position: absolute; inset: 0; transform: translateY(100%); }
+.cm-curtain-a { background: #f2b23e; }
+.cm-curtain-b { background: #2f5d46; display: flex; align-items: center; justify-content: center; }
+.cm-curtain-logo {
+  width: 84px; height: 84px; border-radius: 18px; background: #fbf6ee; color: #2f5d46;
+  display: flex; align-items: center; justify-content: center;
+  font: 800 34px/1 ui-monospace, "JetBrains Mono", monospace; transform: rotate(-6deg) scale(0.6); opacity: 0;
+}
+.cm-curtain-cover .cm-curtain-a { animation: cm-cur-in 0.42s cubic-bezier(0.7, 0, 0.2, 1) forwards; }
+.cm-curtain-cover .cm-curtain-b { animation: cm-cur-in 0.42s cubic-bezier(0.7, 0, 0.2, 1) 0.07s forwards; }
+.cm-curtain-cover .cm-curtain-logo, .cm-curtain-hold .cm-curtain-logo { animation: cm-logo-pop 0.4s cubic-bezier(0.3, 1.6, 0.5, 1) 0.3s forwards; }
+.cm-curtain-hold .cm-curtain-a, .cm-curtain-hold .cm-curtain-b { transform: none; }
+.cm-curtain-hold .cm-curtain-logo { animation: cm-logo-pop 0.3s forwards, cm-logo-wait 0.9s ease-in-out 0.3s infinite; }
+.cm-curtain-reveal .cm-curtain-b { transform: none; animation: cm-cur-out 0.55s cubic-bezier(0.7, 0, 0.2, 1) forwards; }
+.cm-curtain-reveal .cm-curtain-a { transform: none; animation: cm-cur-out 0.55s cubic-bezier(0.7, 0, 0.2, 1) 0.08s forwards; }
+.cm-curtain-reveal .cm-curtain-logo { opacity: 1; transform: rotate(-6deg); }
+@keyframes cm-cur-in { from { transform: translateY(100%); } to { transform: none; } }
+@keyframes cm-cur-out { from { transform: none; } to { transform: translateY(-100%); } }
+@keyframes cm-logo-pop { to { opacity: 1; transform: rotate(-6deg) scale(1); } }
+@keyframes cm-logo-wait { 50% { transform: rotate(6deg) scale(1.06); } }
+
+/* Motion design au défilement (ScrollFX) */
+.cm-mark { background-size: 0% 100%; background-repeat: no-repeat; transition: background-size 0.75s cubic-bezier(0.65, 0, 0.25, 1); }
+.cm-mark.cm-in { background-size: 100% 100%; }
+.cm-reveal { opacity: 0; transform: translateY(28px) rotate(-0.6deg); }
+.cm-reveal.cm-in {
+  opacity: 1; transform: none;
+  transition: opacity 0.6s ease, transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+  transition-delay: calc(var(--cm-i, 0) * 70ms);
+}
+@media (prefers-reduced-motion: reduce) {
+  .cm-curtain { display: none; }
+  .cm-mark { background-size: 100% 100%; }
+  .cm-reveal { opacity: 1; transform: none; }
+}

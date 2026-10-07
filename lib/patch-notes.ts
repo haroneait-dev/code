@@ -22,6 +22,18 @@ export const PATCH_NOTES: PatchNote[] = [
   {
     date: "2026-10-07",
     kind: "site",
+    version: "Site 3.2",
+    title: "Effets de transition et animations au défilement",
+    items: [
+      "Changement de page : un rideau souci et vert traverse l'écran avec le logo.",
+      "Sur l'accueil, une section qui reste fixée pendant le défilement : le logo 3D tourne et les 4 étapes de Claude Code s'enchaînent.",
+      "Partout : le surligneur se trace comme un coup de feutre, titres et cartes apparaissent en cascade.",
+    ],
+    href: "/",
+  },
+  {
+    date: "2026-10-07",
+    kind: "site",
     version: "Site 3.1",
     title: "Terminal d'essai, comparateur de modèles et tampon de niveau",
     items: [
