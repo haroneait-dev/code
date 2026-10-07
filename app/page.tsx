@@ -5,6 +5,7 @@ import { SiteFooter } from "@/components/site/SiteFooter";
 import { ParcoursBanner } from "@/components/site/ParcoursBanner";
 import { DefiSemaine } from "@/components/site/DefiSemaine";
 import { Hero3D } from "@/components/site/Hero3D";
+import { TerminalDemo } from "@/components/site/TerminalDemo";
 import { curriculum, totalLessons } from "@/lib/curriculum";
 import { articleCount, articleCountBySection } from "@/lib/wiki-manifest";
 
@@ -158,6 +159,26 @@ export default function LandingPage() {
                 <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" strokeWidth={2} />
               </span>
             </Link>
+          </div>
+        </section>
+
+        {/* Essayer Claude Code */}
+        <section className="w-full px-margin-mobile md:px-margin-desktop pb-16 md:pb-24">
+          <div className="max-w-container-max mx-auto grid grid-cols-1 lg:grid-cols-[1fr_minmax(0,620px)] gap-8 lg:gap-12 items-center">
+            <div>
+              <p className="tag-note mb-5">À essayer</p>
+              <h2 className="font-headline-lg text-[30px] md:text-[40px] leading-[1.08] font-extrabold text-on-surface mb-4">
+                Parlez à Claude Code comme à un collègue
+              </h2>
+              <p className="text-[17px] text-on-surface-variant leading-relaxed mb-6 max-w-xl">
+                Tapez une demande dans le terminal : vous voyez comment l'agent lit le projet,
+                modifie le code, lance les tests et corrige ce qui casse. Une démo, rien n'est envoyé.
+              </p>
+              <Link href="/learn" className="btn-secondary h-12 px-6 rounded-md inline-flex items-center gap-2 font-semibold text-[15px]">
+                Commencer la formation <ArrowRight className="w-4 h-4" strokeWidth={2} />
+              </Link>
+            </div>
+            <TerminalDemo />
           </div>
         </section>
 

@@ -4,6 +4,7 @@ import { SiteHeader } from "@/components/site/SiteHeader";
 import { SiteFooter } from "@/components/site/SiteFooter";
 import { LearningPath, SectionToc } from "@/components/site/SectionToc";
 import { articleCountBySection } from "@/lib/wiki-manifest";
+import { Section3D } from "@/components/site/Section3D";
 
 export const metadata = {
   title: "Claude : le guide complet en français",
@@ -64,7 +65,10 @@ export default function ClaudeHubPage() {
       <main className="flex-grow">
         <section className="w-full px-margin-mobile md:px-margin-desktop pt-14 pb-14 md:pt-20">
           <div className="max-w-container-max mx-auto max-w-3xl md:max-w-container-max">
-            <p className="tag-note mb-7">Partie Claude · {count} articles · revue le 3 octobre 2026</p>
+            <div className="flex items-start justify-between gap-4">
+              <p className="tag-note mb-7">Partie Claude · {count} articles · revue le 3 octobre 2026</p>
+              <Section3D name="claude" className="w-24 sm:w-32 md:w-44 -mt-6 -mr-2 -mb-8 md:-mb-14" />
+            </div>
             <h1 className="font-display-xl font-extrabold tracking-tight text-on-surface text-[40px] leading-[1.05] md:text-[64px] md:leading-[1] mb-6 max-w-3xl">
               <span className="text-mark">Claude</span>, l'assistant, expliqué de A à Z.
             </h1>

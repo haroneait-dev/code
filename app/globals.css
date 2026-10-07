@@ -356,3 +356,10 @@
 @media (prefers-reduced-motion: reduce) {
   .cm-page-enter { animation: none; }
 }
+
+/* Terminal d'essai et objets 3D des sections */
+@keyframes cm-line-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+.cm-line-in { animation: cm-line-in 0.25s ease-out; }
+@keyframes cm-float { 0%, 100% { transform: translateY(0) rotate(0deg); } 50% { transform: translateY(-8px) rotate(-1.5deg); } }
+.cm-float { animation: cm-float 5s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .cm-line-in, .cm-float { animation: none; } }

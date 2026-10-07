@@ -1,142 +1,187 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
-type Step =
-  | { kind: "prompt"; text: string }
-  | { kind: "claude"; lines: string[] }
-  | { kind: "tool"; name: string; arg: string }
-  | { kind: "pause"; ms: number };
+// Terminal d'essai sur l'accueil : le visiteur tape une demande (ou clique
+// sur une suggestion) et voit, ligne par ligne, ce que Claude Code ferait.
+// Réponses écrites à la main, rien n'est envoyé.
 
-const SCRIPT: Step[] = [
-  { kind: "prompt", text: "Refactor app/api/users/route.ts pour utiliser zod" },
-  { kind: "pause", ms: 400 },
-  { kind: "tool", name: "Read", arg: "app/api/users/route.ts" },
-  { kind: "tool", name: "Edit", arg: "+ import { z } from 'zod'" },
-  { kind: "tool", name: "Bash", arg: "npx tsc --noEmit" },
-  { kind: "claude", lines: ["✓ Schema zod ajouté", "✓ Validation au runtime", "✓ Types inférés"] },
-  { kind: "pause", ms: 1200 },
+type Line = { text: string; tone?: "muted" | "ok" | "add" | "del" | "tool" };
+
+const SCRIPTS: { match: RegExp; label: string; lines: Line[] }[] = [
+  {
+    match: /^\/init/i,
+    label: "/init",
+    lines: [
+      { text: "● Lecture du projet (package.json, src/, tests/)", tone: "tool" },
+      { text: "  Next.js 16, TypeScript, 42 composants, Vitest", tone: "muted" },
+      { text: "● Écriture de CLAUDE.md", tone: "tool" },
+      { text: "+ ## Commandes : npm run dev, npm test, npm run lint", tone: "add" },
+      { text: "+ ## Conventions : composants dans components/, pas de any", tone: "add" },
+      { text: "✓ CLAUDE.md créé. Je le relirai au début de chaque session.", tone: "ok" },
+    ],
+  },
+  {
+    match: /explique|comprend|c.est quoi ce projet/i,
+    label: "explique ce projet",
+    lines: [
+      { text: "● Lecture de 18 fichiers", tone: "tool" },
+      { text: "C'est une boutique en ligne en Next.js :", tone: undefined },
+      { text: "  · app/ : les pages (catalogue, panier, paiement)", tone: "muted" },
+      { text: "  · lib/stripe.ts : le paiement, appelé depuis app/api/checkout", tone: "muted" },
+      { text: "  · Point d'attention : aucun test sur le calcul de la TVA.", tone: "muted" },
+      { text: "Voulez-vous que j'ajoute ces tests ?", tone: "ok" },
+    ],
+  },
+  {
+    match: /test/i,
+    label: "ajoute des tests pour la TVA",
+    lines: [
+      { text: "● Lecture de lib/prix.ts", tone: "tool" },
+      { text: "● Création de lib/prix.test.ts (6 cas)", tone: "tool" },
+      { text: "+ it(\"applique 20 % sur un prix HT\", …)", tone: "add" },
+      { text: "+ it(\"arrondit au centime supérieur\", …)", tone: "add" },
+      { text: "● npm test", tone: "tool" },
+      { text: "✗ 1 échec : 19,99 € HT donne 23,98 € au lieu de 23,99 €", tone: "del" },
+      { text: "● Correction de l'arrondi dans lib/prix.ts", tone: "tool" },
+      { text: "✓ 6 tests réussis", tone: "ok" },
+    ],
+  },
+  {
+    match: /review|relis|relecture|bug/i,
+    label: "/review",
+    lines: [
+      { text: "● Lecture du diff (4 fichiers, +120 −35)", tone: "tool" },
+      { text: "1. app/api/checkout : le montant vient du navigateur.", tone: "del" },
+      { text: "   Recalculez-le côté serveur, sinon on peut payer 1 €.", tone: "muted" },
+      { text: "2. components/Panier.tsx : clé de liste manquante.", tone: undefined },
+      { text: "3. Rien d'autre de bloquant.", tone: "muted" },
+      { text: "✓ Relecture terminée : 1 problème important, 1 mineur", tone: "ok" },
+    ],
+  },
+  {
+    match: /sombre|dark/i,
+    label: "ajoute un mode sombre",
+    lines: [
+      { text: "● Lecture de tailwind.config.ts et app/globals.css", tone: "tool" },
+      { text: "+ darkMode: \"class\"", tone: "add" },
+      { text: "+ .dark { --fond: 27 22 18; --texte: 242 233 220; }", tone: "add" },
+      { text: "● Création de components/ThemeToggle.tsx", tone: "tool" },
+      { text: "● npm run build", tone: "tool" },
+      { text: "✓ Mode sombre ajouté, le choix est gardé dans le navigateur", tone: "ok" },
+    ],
+  },
 ];
 
+const FALLBACK: Line[] = [
+  { text: "● Lecture des fichiers concernés", tone: "tool" },
+  { text: "Voici mon plan :", tone: undefined },
+  { text: "  1. repérer le code à modifier", tone: "muted" },
+  { text: "  2. faire le changement par petites étapes", tone: "muted" },
+  { text: "  3. lancer les tests et vous montrer le résultat", tone: "muted" },
+  { text: "Je commence ? (ici, c'est une démo : essayez une suggestion)", tone: "ok" },
+];
+
+const TONE: Record<string, string> = {
+  muted: "text-[#b8a993]",
+  ok: "text-[#9fd3b4]",
+  add: "text-[#9fd3b4]",
+  del: "text-[#f0a58f]",
+  tool: "text-[#f2b23e]",
+};
+
 export function TerminalDemo() {
-  const [shown, setShown] = useState<Step[]>([]);
-  const [typing, setTyping] = useState("");
+  const [input, setInput] = useState("");
+  const [history, setHistory] = useState<{ prompt: string; lines: Line[]; shown: number }[]>([]);
+  const busy = history.length > 0 && history[history.length - 1].shown < history[history.length - 1].lines.length;
+  const box = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    let cancelled = false;
-    let idx = 0;
-    const run = async () => {
-      while (!cancelled) {
-        const step = SCRIPT[idx % SCRIPT.length];
-        if (step.kind === "prompt") {
-          for (let i = 0; i <= step.text.length; i++) {
-            if (cancelled) return;
-            setTyping(step.text.slice(0, i));
-            await wait(28);
-          }
-          await wait(300);
-          setShown((s) => [...s, step]);
-          setTyping("");
-        } else if (step.kind === "pause") {
-          await wait(step.ms);
-        } else {
-          setShown((s) => [...s, step]);
-          await wait(step.kind === "claude" ? 900 : 420);
-        }
-        idx++;
-        if (idx >= SCRIPT.length) {
-          await wait(2200);
-          if (!cancelled) {
-            setShown([]);
-            idx = 0;
-          }
-        }
-      }
-    };
-    run();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+    if (!busy) return;
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const t = setTimeout(
+      () =>
+        setHistory((h) => {
+          const last = h[h.length - 1];
+          return [...h.slice(0, -1), { ...last, shown: reduce ? last.lines.length : last.shown + 1 }];
+        }),
+      reduce ? 0 : 380
+    );
+    return () => clearTimeout(t);
+  }, [history, busy]);
+
+  useEffect(() => {
+    box.current?.scrollTo({ top: box.current.scrollHeight });
+  }, [history]);
+
+  function run(text: string) {
+    const prompt = text.trim();
+    if (!prompt || busy) return;
+    const script = SCRIPTS.find((s) => s.match.test(prompt));
+    setHistory((h) => [...h.slice(-2), { prompt, lines: script?.lines ?? FALLBACK, shown: 0 }]);
+    setInput("");
+  }
 
   return (
-    <div className="relative w-full max-w-xl mx-auto">
-      <div className="rounded-2xl bg-[#1a1c1c] border border-outline-variant overflow-hidden shadow-2xl">
-        <div className="flex items-center gap-2 px-4 py-3 bg-[#241a0e]/60 border-b border-white/5">
-          <span className="w-3 h-3 rounded-full bg-[#ff5f57]" />
-          <span className="w-3 h-3 rounded-full bg-[#febc2e]" />
-          <span className="w-3 h-3 rounded-full bg-[#28c840]" />
-          <span className="ml-3 text-xs font-mono text-white/40">
-            ~/projet — claude
-          </span>
-        </div>
-        <div className="p-5 font-mono text-[13px] leading-relaxed text-white/85 min-h-[280px]">
-          <div className="text-emerald-400/80">$ claude</div>
-          <div className="text-white/50 mb-3">
-            Connecté — claude-sonnet-4-6 · 200K tokens
-          </div>
-          {shown.map((step, i) => (
-            <Line key={i} step={step} />
-          ))}
-          {typing !== "" && (
-            <div>
-              <span className="text-amber-300/90">{">"} </span>
-              <span>{typing}</span>
-              <Caret />
-            </div>
-          )}
-          {typing === "" &&
-            (shown.length === 0 ||
-              shown[shown.length - 1].kind !== "prompt") && (
-              <div>
-                <span className="text-amber-300/90">{">"} </span>
-                <Caret />
-              </div>
-            )}
-        </div>
+    <div className="rounded-lg border-[1.5px] border-on-surface bg-[#2b2119] text-[#f6efe3] shadow-[6px_6px_0_rgb(var(--c-green-soft))] overflow-hidden">
+      <div className="flex items-center gap-2 px-4 py-2.5 border-b border-white/10">
+        <span className="w-2.5 h-2.5 rounded-full bg-[#f0a58f]" />
+        <span className="w-2.5 h-2.5 rounded-full bg-[#f2b23e]" />
+        <span className="w-2.5 h-2.5 rounded-full bg-[#9fd3b4]" />
+        <span className="ml-2 font-mono text-[12px] text-[#b8a993]">~/ma-boutique · claude</span>
       </div>
-      <div className="absolute -z-10 inset-0 blur-3xl opacity-50 bg-[radial-gradient(circle_at_30%_20%,#e0c29e,transparent_60%),radial-gradient(circle_at_70%_80%,#a37b5a,transparent_55%)]" />
-    </div>
-  );
-}
-
-function Line({ step }: { step: Step }) {
-  if (step.kind === "prompt") {
-    return (
-      <div className="mb-2">
-        <span className="text-amber-300/90">{">"} </span>
-        <span>{step.text}</span>
-      </div>
-    );
-  }
-  if (step.kind === "tool") {
-    return (
-      <div className="mb-1 text-white/60">
-        <span className="text-cyan-300/80">↳ {step.name}</span>{" "}
-        <span className="text-white/45">({step.arg})</span>
-      </div>
-    );
-  }
-  if (step.kind === "claude") {
-    return (
-      <div className="mb-2 mt-1">
-        {step.lines.map((l, i) => (
-          <div key={i} className="text-emerald-300/90">
-            {l}
+      <div ref={box} className="h-[300px] overflow-y-auto px-4 py-3 font-mono text-[13px] md:text-[14px] leading-[1.7]" aria-live="polite">
+        {history.length === 0 && (
+          <p className="text-[#b8a993]">
+            Tapez une demande comme vous le feriez à Claude Code, ou choisissez une suggestion ci-dessous.
+          </p>
+        )}
+        {history.map((h, i) => (
+          <div key={i} className="mb-3">
+            <p className="break-words">
+              <span className="text-[#f2b23e]">&gt;</span> {h.prompt}
+            </p>
+            {h.lines.slice(0, h.shown).map((l, j) => (
+              <p key={j} className={`break-words cm-line-in ${l.tone ? TONE[l.tone] : ""}`}>
+                {l.text}
+              </p>
+            ))}
+            {i === history.length - 1 && busy && <span className="inline-block w-2 h-4 bg-[#f6efe3] align-middle animate-pulse" />}
           </div>
         ))}
       </div>
-    );
-  }
-  return null;
-}
-
-function Caret() {
-  return (
-    <span className="inline-block w-2 h-[1.05em] align-[-2px] ml-[1px] bg-white/80 animate-caret" />
+      <form
+        className="flex items-center gap-2 border-t border-white/10 px-4 py-3"
+        onSubmit={(e) => {
+          e.preventDefault();
+          run(input);
+        }}
+      >
+        <span className="font-mono text-[#f2b23e]">&gt;</span>
+        <input
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          placeholder="ajoute des tests pour la TVA"
+          aria-label="Votre demande à Claude Code"
+          className="flex-1 min-w-0 bg-transparent font-mono text-[16px] md:text-[14px] text-[#f6efe3] placeholder:text-[#7d6f5e] outline-none"
+        />
+        <button type="submit" disabled={busy} className="font-mono text-[12px] px-3 py-1.5 rounded bg-[#2f5d46] text-[#fbf6ee] disabled:opacity-50" data-ripple>
+          Entrée
+        </button>
+      </form>
+      <div className="flex flex-wrap gap-2 px-4 pb-4">
+        {SCRIPTS.map((s) => (
+          <button
+            key={s.label}
+            type="button"
+            disabled={busy}
+            onClick={() => run(s.label)}
+            className="font-mono text-[12px] px-2.5 py-1 rounded border border-white/20 text-[#e9dfcf] hover:border-[#f2b23e] hover:text-[#f2b23e] transition-colors disabled:opacity-50"
+          >
+            {s.label}
+          </button>
+        ))}
+      </div>
+    </div>
   );
-}
-
-function wait(ms: number) {
-  return new Promise<void>((res) => setTimeout(res, ms));
 }

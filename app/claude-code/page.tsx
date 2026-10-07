@@ -6,6 +6,7 @@ import { LearningPath, SectionToc } from "@/components/site/SectionToc";
 import { articleCountBySection } from "@/lib/wiki-manifest";
 import { curriculum, totalLessons } from "@/lib/curriculum";
 import { ClaudeCodePlayer } from "@/components/site/ClaudeCodePlayer";
+import { Section3D } from "@/components/site/Section3D";
 
 export const metadata = {
   title: "Claude Code : formation et wiki en français",
@@ -67,7 +68,10 @@ export default function ClaudeCodeHubPage() {
         <section className="w-full px-margin-mobile md:px-margin-desktop pt-14 pb-14 md:pt-20">
           <div className="max-w-container-max mx-auto grid grid-cols-1 lg:grid-cols-[1fr_minmax(0,520px)] gap-10 lg:gap-12 items-center">
             <div>
-            <p className="tag-note mb-7">Partie Claude Code · {count} articles · Claude Code 2.1.288</p>
+            <div className="flex items-start justify-between gap-4">
+              <p className="tag-note mb-7">Partie Claude Code · {count} articles · Claude Code 2.1.288</p>
+              <Section3D name="claude-code" className="w-24 sm:w-32 md:w-44 -mt-6 -mr-2 -mb-8 md:-mb-14" />
+            </div>
             <h1 className="font-display-xl font-extrabold tracking-tight text-on-surface text-[40px] leading-[1.05] md:text-[64px] md:leading-[1] mb-6 max-w-3xl">
               <span className="text-mark">Claude Code</span>, l'agent qui code avec vous.
             </h1>

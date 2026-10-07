@@ -6,6 +6,7 @@ import { THEMES, KIND_LABEL, appSlug, type AppKind } from "@/lib/applications";
 import { PATHS } from "@/lib/app-paths";
 import { ParcoursBanner } from "@/components/site/ParcoursBanner";
 import { LevelBadge, StepCheck, ThemeProgress } from "@/components/site/Progress";
+import { Section3D } from "@/components/site/Section3D";
 
 export const metadata = {
   title: "Applications à brancher sur Claude, par thème",
@@ -30,7 +31,10 @@ export default function ApplicationsPage() {
       <main className="flex-grow">
         <section className="w-full px-margin-mobile md:px-margin-desktop pt-14 pb-10 md:pt-20">
           <div className="max-w-container-max mx-auto">
-            <p className="tag-note mb-7">{THEMES.length} thèmes · {total} applications</p>
+            <div className="flex items-start justify-between gap-4">
+              <p className="tag-note mb-7">{THEMES.length} thèmes · {total} applications</p>
+              <Section3D name="applications" className="w-24 sm:w-32 md:w-44 -mt-6 -mr-2 -mb-8 md:-mb-14" />
+            </div>
             <h1 className="font-display-xl font-extrabold tracking-tight text-on-surface text-[40px] leading-[1.05] md:text-[64px] md:leading-[1] mb-6 max-w-3xl">
               Les <span className="text-mark">applications</span> à brancher sur Claude.
             </h1>

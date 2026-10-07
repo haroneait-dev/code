@@ -17,6 +17,7 @@ import {
 import { THEMES } from "@/lib/applications";
 import { PATHS } from "@/lib/app-paths";
 import { ShareResult } from "@/components/quiz/ShareResult";
+import { ResultStamp } from "@/components/quiz/ResultStamp";
 import { track } from "@vercel/analytics";
 
 type Stage = "intro" | "questions" | "result";
@@ -195,12 +196,15 @@ export function Quiz() {
       <BlurFade>
         <p className="tag-note mb-6">Votre résultat</p>
       </BlurFade>
+      <div className="flex items-start justify-between gap-4">
       <h1 className="font-display-xl font-extrabold tracking-tight text-on-surface text-[38px] leading-[1.05] md:text-[56px] md:leading-[1] mb-5">
         <WordReveal text={"Votre niveau\u00a0:"} />{" "}
         <BlurFade delay={0.3} className="inline-block">
           <span className="text-mark">{r.level}</span>
         </BlurFade>
       </h1>
+      <ResultStamp level={r.level} className="-mt-2" />
+      </div>
       <BlurFade delay={0.35}>
         <div className="max-w-md mb-3">
           <Meter value={r.score / MAX_SCORE} />

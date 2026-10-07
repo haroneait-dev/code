@@ -3,6 +3,7 @@ import { SiteHeader } from "@/components/site/SiteHeader";
 import { SiteFooter } from "@/components/site/SiteFooter";
 import { PromptsExplorer } from "@/components/site/PromptsExplorer";
 import { PROMPT_GROUPS } from "@/lib/prompts";
+import { Section3D } from "@/components/site/Section3D";
 
 export const metadata = {
   title: "Prompts prêts à copier pour Claude : SEO, e-commerce, marketing, vente…",
@@ -19,7 +20,10 @@ export default function PromptsPage() {
       <main className="flex-grow">
         <section className="w-full px-margin-mobile md:px-margin-desktop pt-14 pb-10 md:pt-20">
           <div className="max-w-container-max mx-auto">
-            <p className="tag-note mb-7">{total} prompts · {PROMPT_GROUPS.length} catégories</p>
+            <div className="flex items-start justify-between gap-4">
+              <p className="tag-note mb-7">{total} prompts · {PROMPT_GROUPS.length} catégories</p>
+              <Section3D name="prompts" className="w-24 sm:w-32 md:w-44 -mt-6 -mr-2 -mb-8 md:-mb-14" />
+            </div>
             <h1 className="font-display-xl font-extrabold tracking-tight text-on-surface text-[40px] leading-[1.05] md:text-[64px] md:leading-[1] mb-6 max-w-3xl">
               Des prompts <span className="text-mark">prêts à copier</span>.
             </h1>
