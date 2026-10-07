@@ -20,6 +20,19 @@ export const KIND_INFO: Record<NoteKind, { label: string; className: string }> =
 
 export const PATCH_NOTES: PatchNote[] = [
   {
+    date: "2026-10-07",
+    kind: "site",
+    version: "Site 3.0",
+    title: "Un site plus vivant : 3D, animations et l'évolution de Claude en chiffres",
+    items: [
+      "Un logo 3D animé sur l'accueil, rendu avec Blender, en version claire et sombre.",
+      "Une animation « Claude Code en action » dans la partie Claude Code : la demande, la lecture du code, les modifications, les tests qui passent.",
+      "Nouvelle page « L'évolution de Claude » : prix, contexte et rythme des sorties en graphiques animés, frise des grandes étapes et fil des nouveautés en direct.",
+      "Transitions douces entre les pages, onde au clic sur les boutons, barre de lecture dans les articles.",
+    ],
+    href: "/evolution",
+  },
+  {
     date: "2026-10-06",
     kind: "site",
     version: "Site 2.7",
