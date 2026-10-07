@@ -4,6 +4,7 @@ import { SiteHeader } from "@/components/site/SiteHeader";
 import { SiteFooter } from "@/components/site/SiteFooter";
 import { ParcoursBanner } from "@/components/site/ParcoursBanner";
 import { DefiSemaine } from "@/components/site/DefiSemaine";
+import { Hero3D } from "@/components/site/Hero3D";
 import { curriculum, totalLessons } from "@/lib/curriculum";
 import { articleCount, articleCountBySection } from "@/lib/wiki-manifest";
 
@@ -66,8 +67,12 @@ export default function LandingPage() {
       <main className="flex-grow">
         {/* Ouverture */}
         <section className="w-full px-margin-mobile md:px-margin-desktop pt-14 pb-12 md:pt-20 md:pb-16">
-          <div className="max-w-container-max mx-auto">
-            <p className="tag-note mb-7">Revu le {LAST_REVIEW}</p>
+          <div className="max-w-container-max mx-auto lg:grid lg:grid-cols-[1fr_400px] lg:gap-8 lg:items-center">
+            <div>
+            <div className="flex items-start justify-between gap-4">
+              <p className="tag-note mb-7">Revu le {LAST_REVIEW}</p>
+              <Hero3D className="w-28 sm:w-36 -mt-8 -mr-2 -mb-6 shrink-0 lg:hidden" />
+            </div>
             <h1 className="font-display-xl font-extrabold tracking-tight text-on-surface text-[42px] leading-[1.04] md:text-[72px] md:leading-[0.98] mb-6 max-w-4xl">
               Apprendre <span className="text-mark">Claude</span> et{" "}
               <span className="text-mark">Claude Code</span>, en français.
@@ -80,6 +85,8 @@ export default function LandingPage() {
             <div className="mt-8 max-w-3xl">
               <ParcoursBanner />
             </div>
+            </div>
+            <Hero3D className="hidden lg:block w-full" />
           </div>
         </section>
 
@@ -172,6 +179,13 @@ export default function LandingPage() {
                   className="inline-flex items-center gap-1.5 font-semibold text-primary hover:underline underline-offset-4"
                 >
                   Toutes les patch notes
+                  <ArrowUpRight className="w-4 h-4" strokeWidth={2} />
+                </Link>
+                <Link
+                  href="/evolution"
+                  className="inline-flex items-center gap-1.5 font-semibold text-primary hover:underline underline-offset-4"
+                >
+                  L'évolution de Claude en chiffres
                   <ArrowUpRight className="w-4 h-4" strokeWidth={2} />
                 </Link>
                 <Link

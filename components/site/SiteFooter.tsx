@@ -110,6 +110,16 @@ export function SiteFooter() {
                   Fiches
                 </Link>
               </li>
+              <li>
+                <Link href="/evolution" className="hover:text-primary transition-colors">
+                  L'évolution de Claude
+                </Link>
+              </li>
+              <li>
+                <Link href="/patch-notes" className="hover:text-primary transition-colors">
+                  Patch notes
+                </Link>
+              </li>
             </ul>
           </div>
 

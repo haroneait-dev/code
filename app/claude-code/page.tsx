@@ -5,6 +5,7 @@ import { SiteFooter } from "@/components/site/SiteFooter";
 import { LearningPath, SectionToc } from "@/components/site/SectionToc";
 import { articleCountBySection } from "@/lib/wiki-manifest";
 import { curriculum, totalLessons } from "@/lib/curriculum";
+import { ClaudeCodePlayer } from "@/components/site/ClaudeCodePlayer";
 
 export const metadata = {
   title: "Claude Code : formation et wiki en français",
@@ -64,7 +65,8 @@ export default function ClaudeCodeHubPage() {
 
       <main className="flex-grow">
         <section className="w-full px-margin-mobile md:px-margin-desktop pt-14 pb-14 md:pt-20">
-          <div className="max-w-container-max mx-auto">
+          <div className="max-w-container-max mx-auto grid grid-cols-1 lg:grid-cols-[1fr_minmax(0,520px)] gap-10 lg:gap-12 items-center">
+            <div>
             <p className="tag-note mb-7">Partie Claude Code · {count} articles · Claude Code 2.1.288</p>
             <h1 className="font-display-xl font-extrabold tracking-tight text-on-surface text-[40px] leading-[1.05] md:text-[64px] md:leading-[1] mb-6 max-w-3xl">
               <span className="text-mark">Claude Code</span>, l'agent qui code avec vous.
@@ -90,6 +92,8 @@ export default function ClaudeCodeHubPage() {
                 Les nouveautés 2026
               </Link>
             </div>
+            </div>
+            <ClaudeCodePlayer />
           </div>
         </section>
 
