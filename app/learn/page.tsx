@@ -19,16 +19,16 @@ export default function LearnIndexPage() {
 
       <main className="flex-grow w-full max-w-container-max mx-auto px-margin-mobile md:px-margin-desktop py-16">
         {/* Hero */}
-        <section className="mb-16 max-w-3xl">
+        <section className="py-section mb-16 max-w-3xl">
           <div className="mb-6">
             <span className="tag-note">
               Formation Claude Code
             </span>
           </div>
-          <h1 className="font-display-xl text-display-xl md:text-[64px] md:leading-[1] font-extrabold tracking-tight mb-6 text-on-surface">
+          <h1 className="text-h1 font-display-xl -xl font-extrabold tracking-tight mb-6 text-on-surface">
             De zéro à <span className="text-mark">expert</span> Claude Code.
           </h1>
-          <p className="font-body-rt text-body-rt md:text-[19px] text-on-surface-variant leading-relaxed mb-8">
+          <p className="font-body-rt text-body-rt md:text-body text-on-surface-variant leading-relaxed mb-8">
             Une formation structurée en {totalModules} modules et{" "}
             {totalLessons} leçons pratiques. Du premier prompt à l'orchestration
             d'agents, tout est couvert.
@@ -51,7 +51,7 @@ export default function LearnIndexPage() {
 
         {/* Modules */}
         <section>
-          <h2 className="font-headline-lg text-headline-lg text-on-surface mb-8">
+          <h2 className="text-h2 font-headline-lg  text-on-surface mb-8">
             Programme complet
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -65,17 +65,17 @@ export default function LearnIndexPage() {
                       ? `/learn/${mod.id}/${firstLesson.id}`
                       : `/learn`
                   }
-                  className="bg-surface-container-lowest border border-outline-variant rounded-xl p-6 soft-lift flex flex-col group"
+                  className="bg-surface-container-lowest border border-outline-variant rounded-lg p-6 soft-lift flex flex-col group"
                 >
                   <div className="flex items-center justify-between mb-4">
-                    <div className="text-xs font-code-md text-on-surface-variant">
+                    <div className="text-small font-code-md text-on-surface-variant">
                       Module {String(idx + 1).padStart(2, "0")}
                     </div>
-                    <span className="text-2xl" aria-hidden>
+                    <span className="text-h3" aria-hidden>
                       {mod.emoji}
                     </span>
                   </div>
-                  <h3 className="font-body-rt text-body-rt font-semibold mb-3 text-on-surface group-hover:text-primary transition-colors">
+                  <h3 className="text-h3 font-body-rt text-body-rt font-semibold mb-3 text-on-surface group-hover:text-primary transition-colors">
                     {mod.title}
                   </h3>
                   <ul className="space-y-1.5 mb-6 flex-grow">
@@ -84,7 +84,7 @@ export default function LearnIndexPage() {
                         key={l.id}
                         className="text-body-sm text-on-surface-variant flex items-center gap-2"
                       >
-                        <span className="w-1 h-1 rounded-full bg-on-surface-variant" />
+                        <span className="w-1 h-1 rounded bg-on-surface-variant" />
                         <span className="truncate">{l.title}</span>
                       </li>
                     ))}
@@ -96,7 +96,7 @@ export default function LearnIndexPage() {
                     )}
                   </ul>
                   <div className="flex items-center justify-between pt-3 border-t border-outline-variant">
-                    <span className="text-[12px] font-code-md text-primary bg-primary-fixed/30 px-2 py-1 rounded">
+                    <span className="text-small font-code-md text-primary bg-primary-fixed/30 px-2 py-1 rounded">
                       {mod.lessons.length} leçon
                       {mod.lessons.length > 1 ? "s" : ""}
                     </span>

@@ -18,7 +18,7 @@ export function CopyButton({ text, label = "Copier", event }: { text: string; la
     <button
       type="button"
       onClick={copy}
-      className={`h-9 px-3.5 rounded-md inline-flex items-center gap-1.5 text-[14px] font-semibold transition-colors ${
+      className={`h-9 px-3.5 rounded inline-flex items-center gap-1.5 text-small font-semibold transition-colors ${
         copied ? "bg-primary text-on-primary" : "btn-secondary"
       }`}
     >

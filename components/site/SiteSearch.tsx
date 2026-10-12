@@ -127,7 +127,7 @@ export function SiteSearch({ initialQuery = "" }: { initialQuery?: string }) {
           role="combobox"
           autoComplete="off"
         />
-        <span className="text-xs text-on-surface-variant border border-outline-variant rounded px-1 ml-2 font-code-md shrink-0">
+        <span className="text-small text-on-surface-variant border border-outline-variant rounded px-1 ml-2 font-code-md shrink-0">
           ⌘K
         </span>
       </form>
@@ -135,7 +135,7 @@ export function SiteSearch({ initialQuery = "" }: { initialQuery?: string }) {
       {showDropdown && (
         <div
           role="listbox"
-          className="absolute right-0 mt-2 w-[26rem] max-w-[80vw] bg-surface-container-lowest border border-outline-variant rounded-xl shadow-2xl shadow-black/40 overflow-hidden z-50"
+          className="absolute right-0 mt-2 w-[26rem] max-w-[80vw] bg-surface-container-lowest border border-outline-variant rounded-lg shadow-black/40 overflow-hidden z-50"
         >
           {results.length === 0 ? (
             <p className="px-4 py-3 text-body-sm text-on-surface-variant">
@@ -164,7 +164,7 @@ export function SiteSearch({ initialQuery = "" }: { initialQuery?: string }) {
                         <span className="block text-body-sm font-medium text-on-surface truncate">
                           {r.title}
                         </span>
-                        <span className="block text-[12px] text-on-surface-variant truncate">
+                        <span className="block text-small text-on-surface-variant truncate">
                           {r.type === "lesson" ? "Formation" : "Wiki"} · {r.context}
                         </span>
                       </span>

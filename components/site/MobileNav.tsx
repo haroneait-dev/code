@@ -30,7 +30,7 @@ export function MobileNav({ active = null }: { active?: NavKey }) {
         aria-label="Ouvrir le menu"
         aria-expanded={open}
         aria-controls="mobile-nav-drawer"
-        className="xl:hidden inline-flex items-center justify-center w-10 h-10 rounded-full hover:bg-surface-container transition-colors text-on-surface"
+        className="xl:hidden inline-flex items-center justify-center w-11 h-11 rounded hover:bg-surface-container transition-colors text-on-surface"
       >
         <Menu className="w-5 h-5" strokeWidth={1.75} />
       </button>
@@ -47,22 +47,22 @@ export function MobileNav({ active = null }: { active?: NavKey }) {
             className="absolute inset-0 bg-on-surface/40 animate-fade-in"
             onClick={() => setOpen(false)}
           />
-          <div className="absolute right-0 top-0 h-full w-[82%] max-w-sm bg-surface border-l border-outline-variant shadow-2xl flex flex-col animate-slide-in-right">
+          <div className="absolute right-0 top-0 h-full w-[82%] max-w-sm bg-surface border-l border-outline-variant flex flex-col animate-slide-in-right">
             <div className="flex items-center justify-between h-16 px-5 border-b border-outline-variant">
-              <span className="font-headline-lg text-[21px] font-bold text-on-surface tracking-tight">
+              <span className="font-headline-lg text-h3 font-bold text-on-surface tracking-tight">
                 Claude Mastery
               </span>
               <button
                 type="button"
                 onClick={() => setOpen(false)}
                 aria-label="Fermer le menu"
-                className="inline-flex items-center justify-center w-10 h-10 rounded-full hover:bg-surface-container transition-colors text-on-surface"
+                className="inline-flex items-center justify-center w-11 h-11 rounded hover:bg-surface-container transition-colors text-on-surface"
               >
                 <X className="w-5 h-5" strokeWidth={1.75} />
               </button>
             </div>
 
-            <nav className="flex-1 px-3 py-4 flex flex-col gap-1">
+            <nav className="overflow-y-auto flex-1 px-3 py-4 flex flex-col gap-1">
               {LINKS.map((l) => {
                 const isActive = active === l.key;
                 return (
@@ -72,8 +72,8 @@ export function MobileNav({ active = null }: { active?: NavKey }) {
                     onClick={() => setOpen(false)}
                     className={
                       isActive
-                        ? "flex items-center px-4 py-3 rounded-md bg-primary-fixed text-on-surface font-semibold text-body-rt"
-                        : "flex items-center px-4 py-3 rounded-md text-on-surface hover:bg-surface-container transition-colors text-body-rt"
+                        ? "flex items-center px-4 py-3 rounded bg-primary-fixed text-on-surface font-semibold text-body-rt"
+                        : "flex items-center px-4 py-3 rounded text-on-surface hover:bg-surface-container transition-colors text-body-rt"
                     }
                   >
                     {l.label}
@@ -86,7 +86,7 @@ export function MobileNav({ active = null }: { active?: NavKey }) {
               <Link
                 href="/test"
                 onClick={() => setOpen(false)}
-                className="btn-primary h-12 rounded-md inline-flex items-center justify-center font-semibold text-[15px]"
+                className="btn-primary inline-flex items-center justify-center"
               >
                 Test de niveau (2 min)
               </Link>

@@ -152,7 +152,7 @@ export default async function ArticlePage({
       <div className="flex-grow w-full max-w-[1440px] mx-auto px-margin-mobile md:px-10 xl:px-margin-desktop flex gap-10 xl:gap-12 py-8 relative">
         {/* Left sidebar — categories + articles in current cat */}
         <aside className="hidden lg:block w-60 xl:w-64 flex-shrink-0 sticky top-[96px] h-[calc(100vh-120px)] overflow-y-auto pr-2">
-          <h3 className="font-body-sm text-on-surface-variant uppercase tracking-wider mb-4 font-semibold text-xs">
+          <h3 className="text-h3 font-body-sm text-on-surface-variant uppercase tracking-wider mb-4 font-semibold text-small">
             <Link href={section?.href ?? "/wiki"} className="hover:text-primary transition-colors">
               {section ? `Partie ${section.name}` : "Catégories"}
             </Link>
@@ -182,7 +182,7 @@ export default async function ArticlePage({
           </ul>
 
           <div className="pt-6 border-t border-outline-variant">
-            <h3 className="font-body-sm text-on-surface-variant uppercase tracking-wider mb-3 font-semibold text-xs">
+            <h3 className="text-h3 font-body-sm text-on-surface-variant uppercase tracking-wider mb-3 font-semibold text-small">
               Dans {cat.name}
             </h3>
             <ul className="space-y-0.5">
@@ -219,24 +219,24 @@ export default async function ArticlePage({
           </nav>
 
           <article>
-            <h1 className="font-display-xl text-[34px] md:text-[48px] font-extrabold tracking-tight mb-5 text-on-surface leading-[1.1]">
+            <h1 className="text-h1 font-display-xl font-extrabold tracking-tight mb-5 text-on-surface">
               {article.title}
             </h1>
-            <p className="text-on-surface-variant text-[18px] md:text-[20px] mb-7 leading-[1.6]">
+            <p className="text-on-surface-variant text-body md:text-body mb-7 leading-[1.6]">
               {article.description}
             </p>
             <div className="flex items-center gap-4 text-body-sm text-on-surface-variant pb-8 border-b border-outline-variant mb-12">
               <span>Mis à jour le {formatDateFr(article.updatedAt)}</span>
-              <span className="w-1 h-1 bg-outline-variant rounded-full" />
+              <span className="w-1 h-1 bg-outline-variant rounded" />
               <span>{article.readingMinutes} min de lecture</span>
             </div>
 
             {headings.length > 2 && (
-              <details className="2xl:hidden mb-12 rounded-md border border-outline-variant bg-surface-container-low px-5 py-4">
-                <summary className="cursor-pointer font-semibold text-on-surface text-[15px]">
+              <details className="2xl:hidden mb-12 rounded border border-outline-variant bg-surface-container-low px-5 py-4">
+                <summary className="cursor-pointer font-semibold text-on-surface text-small">
                   Sur cette page ({headings.length} parties)
                 </summary>
-                <ol className="mt-4 grid gap-2 list-decimal pl-5 text-[15px] text-on-surface-variant">
+                <ol className="mt-4 grid gap-2 list-decimal pl-5 text-small text-on-surface-variant">
                   {headings.map((h) => (
                     <li key={h.id}>
                       <a href={`#${h.id}`} className="hover:text-primary transition-colors">
@@ -253,13 +253,13 @@ export default async function ArticlePage({
                 href={article.tiktok}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="mb-10 flex items-center justify-between gap-4 rounded-lg border-[1.5px] border-on-surface bg-surface-container-lowest px-5 py-4 shadow-[4px_4px_0_rgb(var(--c-mark))] hover:bg-[rgb(var(--c-mark)/0.35)] transition-colors"
+                className="mb-10 flex items-center justify-between gap-4 rounded-lg border-[1.5px] border-on-surface bg-surface-container-lowest px-5 py-4 hover:bg-[rgb(var(--c-mark)/0.35)] transition-colors"
               >
                 <span>
-                  <span className="block font-semibold text-[16.5px] text-on-surface">Ce sujet en vidéo</span>
-                  <span className="block text-[14.5px] text-on-surface-variant">Une minute pour l'essentiel, sur TikTok</span>
+                  <span className="block font-semibold text-body text-on-surface">Ce sujet en vidéo</span>
+                  <span className="block text-small text-on-surface-variant">Une minute pour l'essentiel, sur TikTok</span>
                 </span>
-                <span className="btn-primary h-10 px-4 rounded-md inline-flex items-center font-semibold text-[14.5px] shrink-0">Voir la vidéo</span>
+                <span className="btn-primary inline-flex items-center shrink-0">Voir la vidéo</span>
               </a>
             )}
             <ArticleBody body={article.body} />
@@ -272,9 +272,9 @@ export default async function ArticlePage({
               {prev ? (
                 <Link
                   href={`/wiki/${cat.id}/${prev.slug}`}
-                  className="group p-4 border border-outline-variant rounded-xl hover:bg-surface-container-lowest transition-colors"
+                  className="group p-4 border border-outline-variant rounded-lg hover:bg-surface-container-lowest transition-colors"
                 >
-                  <div className="inline-flex items-center gap-2 text-xs text-on-surface-variant mb-1">
+                  <div className="inline-flex items-center gap-2 text-small text-on-surface-variant mb-1">
                     <ArrowLeft className="w-3 h-3" strokeWidth={1.75} />
                     Précédent
                   </div>
@@ -288,9 +288,9 @@ export default async function ArticlePage({
               {next && (
                 <Link
                   href={`/wiki/${cat.id}/${next.slug}`}
-                  className="group p-4 border border-outline-variant rounded-xl hover:bg-surface-container-lowest transition-colors text-right sm:col-start-2"
+                  className="group p-4 border border-outline-variant rounded-lg hover:bg-surface-container-lowest transition-colors text-right sm:col-start-2"
                 >
-                  <div className="inline-flex items-center gap-2 text-xs text-on-surface-variant mb-1 justify-end w-full">
+                  <div className="inline-flex items-center gap-2 text-small text-on-surface-variant mb-1 justify-end w-full">
                     Suivant
                     <ArrowRight className="w-3 h-3" strokeWidth={1.75} />
                   </div>
@@ -305,7 +305,7 @@ export default async function ArticlePage({
 
         {/* Right sidebar — TOC */}
         <aside className="hidden 2xl:block w-60 flex-shrink-0 sticky top-[96px] h-[calc(100vh-120px)] pl-6 border-l border-outline-variant overflow-y-auto">
-          <h3 className="font-body-sm text-on-surface-variant uppercase tracking-wider mb-4 font-semibold text-xs">
+          <h3 className="text-h3 font-body-sm text-on-surface-variant uppercase tracking-wider mb-4 font-semibold text-small">
             Sur cette page
           </h3>
           <ul className="space-y-3">

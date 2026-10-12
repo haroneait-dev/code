@@ -40,18 +40,18 @@ export function ParcoursBanner({ themeId }: { themeId?: string }) {
 
   if (!result) {
     return (
-      <BlurFade className="relative rounded-lg border-[1.5px] border-on-surface bg-surface-container-lowest p-5 md:p-6 shadow-[5px_5px_0_rgb(var(--c-mark))] flex flex-col md:flex-row md:items-center gap-4 md:gap-8">
+      <BlurFade className="relative rounded-lg border-[1.5px] border-on-surface bg-surface-container-lowest p-5 md:p-6 flex flex-col md:flex-row md:items-center gap-4 md:gap-8">
         <div className="flex-1 pr-8">
-          <p className="font-semibold text-[18px] text-on-surface mb-1">Nouveau ici ? Faites le test de niveau.</p>
-          <p className="text-[15.5px] text-on-surface-variant leading-relaxed">
+          <p className="font-semibold text-body text-on-surface mb-1">Nouveau ici ? Faites le test de niveau.</p>
+          <p className="text-small text-on-surface-variant leading-relaxed">
             10 questions, 2 minutes : vous saurez par quoi commencer et quel parcours suivre.
           </p>
         </div>
-        <Link href="/test" className="btn-primary h-11 px-5 rounded-md inline-flex items-center justify-center gap-2 font-semibold text-[15px] shrink-0 group">
+        <Link href="/test" className="btn-primary inline-flex items-center justify-center gap-2 shrink-0 group">
           Faire le test
           <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" strokeWidth={2} />
         </Link>
-        <button type="button" onClick={hide} aria-label="Masquer" className="absolute top-3 right-3 p-1.5 rounded-full text-on-surface-variant hover:bg-surface-container">
+        <button type="button" onClick={hide} aria-label="Masquer" className="absolute top-3 right-3 p-1.5 rounded text-on-surface-variant hover:bg-surface-container">
           <X className="w-4 h-4" strokeWidth={2} />
         </button>
       </BlurFade>
@@ -63,24 +63,24 @@ export function ParcoursBanner({ themeId }: { themeId?: string }) {
   return (
     <BlurFade className="relative rounded-lg border-[1.5px] border-primary bg-[rgb(var(--c-green-soft)/0.40)] p-5 md:p-6 flex flex-col md:flex-row md:items-center gap-4 md:gap-8">
       <div className="flex-1 pr-8 min-w-0">
-        <p className="font-mono text-[12.5px] uppercase tracking-wider text-on-surface-variant mb-1">
+        <p className="font-mono text-small uppercase tracking-wider text-on-surface-variant mb-1">
           Votre parcours · {theme?.name} · {result.level}
         </p>
         {plan && (
-          <p className="text-[16px] text-on-surface leading-relaxed">
+          <p className="text-body text-on-surface leading-relaxed">
             <strong>Prochaine étape :</strong> {plan.steps[0]}
           </p>
         )}
       </div>
       <div className="flex gap-2 shrink-0">
-        <Link href={`/applications#${result.theme}`} className="btn-primary h-11 px-5 rounded-md inline-flex items-center justify-center font-semibold text-[15px]">
+        <Link href={`/applications#${result.theme}`} className="btn-primary inline-flex items-center justify-center">
           Continuer
         </Link>
-        <Link href="/test" className="btn-secondary h-11 px-4 rounded-md inline-flex items-center justify-center font-semibold text-[14.5px]">
+        <Link href="/test" className="btn-secondary inline-flex items-center justify-center">
           Mon plan
         </Link>
       </div>
-      <button type="button" onClick={hide} aria-label="Masquer" className="absolute top-3 right-3 p-1.5 rounded-full text-on-surface-variant hover:bg-surface-container">
+      <button type="button" onClick={hide} aria-label="Masquer" className="absolute top-3 right-3 p-1.5 rounded text-on-surface-variant hover:bg-surface-container">
         <X className="w-4 h-4" strokeWidth={2} />
       </button>
     </BlurFade>

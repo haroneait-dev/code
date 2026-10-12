@@ -40,7 +40,7 @@ export function SearchPageInput({ initialQuery = "" }: { initialQuery?: string }
     <form
       onSubmit={handleSubmit}
       role="search"
-      className="flex items-center gap-3 bg-surface-container-lowest border border-outline-variant rounded-xl px-4 py-3 focus-within:border-primary transition-colors"
+      className="flex items-center gap-3 bg-surface-container-lowest border border-outline-variant rounded-lg px-4 py-3 focus-within:border-primary transition-colors"
     >
       <Search
         className="w-5 h-5 text-on-surface-variant shrink-0"

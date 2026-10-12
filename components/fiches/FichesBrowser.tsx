@@ -59,7 +59,7 @@ export function FichesBrowser() {
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Rechercher une fiche (titre, concept, tag)…"
           aria-label="Rechercher une fiche"
-          className="w-full bg-surface-container-lowest border border-outline-variant rounded-full pl-11 pr-4 py-3 text-body-sm text-on-surface placeholder:text-on-surface-variant focus:outline-none focus:border-primary transition-colors"
+          className="w-full bg-surface-container-lowest border border-outline-variant rounded pl-11 pr-4 py-3 text-body-sm text-on-surface placeholder:text-on-surface-variant focus:outline-none focus:border-primary transition-colors"
         />
       </div>
 
@@ -82,7 +82,7 @@ export function FichesBrowser() {
 
       {/* Filtres difficulté */}
       <div className="flex flex-wrap items-center gap-2 mb-8">
-        <span className="text-[12px] uppercase tracking-wider text-on-surface-variant mr-1">
+        <span className="text-small uppercase tracking-wider text-on-surface-variant mr-1">
           Niveau
         </span>
         {FICHE_DIFFICULTIES.map((d) => (
@@ -117,7 +117,7 @@ export function FichesBrowser() {
 
       {/* Liste */}
       {filtered.length === 0 ? (
-        <div className="border border-dashed border-outline-variant rounded-xl p-12 text-center text-on-surface-variant">
+        <div className="border border-dashed border-outline-variant rounded-lg p-12 text-center text-on-surface-variant">
           Aucune fiche ne correspond. Essaie d'élargir tes filtres.
         </div>
       ) : (
@@ -152,8 +152,8 @@ function FilterChip({
       aria-pressed={active}
       className={
         active
-          ? "px-3.5 py-1.5 rounded-full text-body-sm font-medium bg-primary text-on-primary transition-colors"
-          : "px-3.5 py-1.5 rounded-full text-body-sm bg-surface-container-lowest border border-outline-variant text-on-surface-variant hover:text-on-surface hover:border-primary/50 transition-colors"
+          ? "px-3.5 py-1.5 rounded text-body-sm font-medium bg-primary text-on-primary transition-colors"
+          : "px-3.5 py-1.5 rounded text-body-sm bg-surface-container-lowest border border-outline-variant text-on-surface-variant hover:text-on-surface hover:border-primary/50 transition-colors"
       }
     >
       {label}
@@ -171,7 +171,7 @@ function FicheCard({
   onToggle: () => void;
 }) {
   return (
-    <div className="bg-surface-container-lowest border border-outline-variant rounded-xl overflow-hidden transition-colors">
+    <div className="bg-surface-container-lowest border border-outline-variant rounded-lg overflow-hidden transition-colors">
       <button
         type="button"
         onClick={onToggle}
@@ -180,16 +180,16 @@ function FicheCard({
       >
         <div className="flex-grow min-w-0">
           <div className="flex flex-wrap items-center gap-2 mb-2">
-            <span className="text-[11px] font-code-md text-primary bg-primary-fixed/30 px-2 py-0.5 rounded">
+            <span className="text-small font-code-md text-primary bg-primary-fixed/30 px-2 py-0.5 rounded">
               {fiche.category}
             </span>
             <span
-              className={`text-[11px] font-medium px-2 py-0.5 rounded ${DIFFICULTY_STYLE[fiche.difficulty]}`}
+              className={`text-small font-medium px-2 py-0.5 rounded ${DIFFICULTY_STYLE[fiche.difficulty]}`}
             >
               {fiche.difficulty}
             </span>
           </div>
-          <h3 className="font-body-rt text-body-rt font-semibold text-on-surface mb-1.5">
+          <h3 className="text-h3 font-body-rt text-body-rt font-semibold text-on-surface mb-1.5">
             {fiche.title}
           </h3>
           <p className="text-body-sm text-on-surface-variant leading-relaxed">
@@ -197,7 +197,7 @@ function FicheCard({
           </p>
         </div>
         <ChevronDown
-          className={`w-5 h-5 flex-shrink-0 mt-1 text-on-surface-variant transition-transform ${open ? "rotate-180" : ""}`}
+          className={`w-5 h-5 flex-shrink-0 mt-1 text-on-surface-variant transition-transform ${open ? "" : ""}`}
           strokeWidth={1.75}
         />
       </button>
@@ -215,7 +215,7 @@ function FicheCard({
             ))}
 
             {fiche.codeSnippet && (
-              <pre className="bg-surface-container border border-outline-variant rounded-lg p-4 overflow-x-auto text-[13px] font-code-md text-on-surface leading-relaxed">
+              <pre className="bg-surface-container border border-outline-variant rounded-lg p-4 overflow-x-auto text-small font-code-md text-on-surface leading-relaxed">
                 <code>{fiche.codeSnippet}</code>
               </pre>
             )}
@@ -224,7 +224,7 @@ function FicheCard({
               {fiche.tags.map((t) => (
                 <span
                   key={t}
-                  className="text-[11px] font-code-md text-on-surface-variant bg-surface-container px-2 py-0.5 rounded"
+                  className="text-small font-code-md text-on-surface-variant bg-surface-container px-2 py-0.5 rounded"
                 >
                   #{t}
                 </span>

@@ -79,9 +79,9 @@ export function StepProgress({ current, total }: { current: number; total: numbe
   return (
     <div aria-label="Progression" className="flex gap-1.5" role="progressbar" aria-valuemin={0} aria-valuemax={total} aria-valuenow={current}>
       {Array.from({ length: total }, (_, i) => (
-        <div key={i} className="h-2 flex-1 rounded-full bg-surface-container-high overflow-hidden">
+        <div key={i} className="h-2 flex-1 rounded bg-surface-container-high overflow-hidden">
           <motion.div
-            className="h-full rounded-full bg-primary"
+            className="h-full rounded bg-primary"
             initial={false}
             animate={{ width: i < current ? "100%" : "0%" }}
             transition={{ duration: reduce ? 0 : 0.2, ease: [0.22, 1, 0.36, 1] }}
@@ -97,9 +97,9 @@ export function Meter({ value, className }: { value: number; className?: string 
   const reduce = useReducedMotion();
   const percentage = Math.round(Math.min(1, Math.max(0, value)) * 100);
   return (
-    <div role="progressbar" aria-label="Progression" aria-valuemin={0} aria-valuemax={100} aria-valuenow={percentage} className={`h-3 rounded-full bg-surface-container-high overflow-hidden ${className ?? ""}`}>
+    <div role="progressbar" aria-label="Progression" aria-valuemin={0} aria-valuemax={100} aria-valuenow={percentage} className={`h-3 rounded bg-surface-container-high overflow-hidden ${className ?? ""}`}>
       <motion.div
-        className="h-full rounded-full bg-primary"
+        className="h-full rounded bg-primary"
         initial={false}
         animate={{ width: `${percentage}%` }}
         transition={{ duration: reduce ? 0 : 0.2, ease: [0.22, 1, 0.36, 1] }}

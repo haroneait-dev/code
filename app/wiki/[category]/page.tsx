@@ -38,10 +38,10 @@ export default async function CategoryPage({
           <span className="text-on-surface">{cat.name}</span>
         </nav>
 
-        <h1 className="font-display-xl text-[40px] md:text-[56px] font-extrabold tracking-tight mb-4 text-on-surface">
+        <h1 className="text-h1 font-display-xl font-extrabold tracking-tight mb-4 text-on-surface">
           {cat.name}
         </h1>
-        <p className="font-body-rt text-body-rt md:text-[19px] text-on-surface-variant mb-12 max-w-2xl">
+        <p className="font-body-rt text-body-rt md:text-body text-on-surface-variant mb-12 max-w-2xl">
           {cat.description}
         </p>
 

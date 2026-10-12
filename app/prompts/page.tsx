@@ -18,16 +18,16 @@ export default function PromptsPage() {
     <div className="min-h-screen flex flex-col bg-surface">
       <SiteHeader active="prompts" />
       <main className="flex-grow">
-        <section className="w-full px-margin-mobile md:px-margin-desktop pt-14 pb-10 md:pt-20">
+        <section className="py-section w-full px-margin-mobile md:px-margin-desktop  pb-10 ">
           <div className="max-w-container-max mx-auto">
             <div className="flex items-start justify-between gap-4">
               <p className="tag-note mb-7">{total} prompts · {PROMPT_GROUPS.length} catégories</p>
               <Section3D name="prompts" className="w-24 sm:w-32 md:w-44 -mt-6 -mr-2 -mb-8 md:-mb-14" />
             </div>
-            <h1 className="font-display-xl font-extrabold tracking-tight text-on-surface text-[40px] leading-[1.05] md:text-[64px] md:leading-[1] mb-6 max-w-3xl">
+            <h1 className="text-h1 font-display-xl font-extrabold tracking-tight text-on-surface mb-6 max-w-3xl">
               Des prompts <span className="text-mark">prêts à copier</span>.
             </h1>
-            <p className="text-[18px] md:text-[20px] text-on-surface-variant leading-relaxed max-w-2xl">
+            <p className="text-body md:text-body text-on-surface-variant leading-relaxed max-w-2xl">
               Chaque prompt applique une vraie technique de métier, expliquée en
               dessous. Copiez, remplacez ce qui est entre crochets, envoyez. Pour la
               méthode générale, lisez{" "}

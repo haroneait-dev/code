@@ -25,7 +25,7 @@ export default async function SearchPage({ searchParams }: Props) {
       <SiteHeader showSearch />
 
       <main className="flex-grow w-full max-w-3xl mx-auto px-margin-mobile md:px-margin-desktop py-12">
-        <h1 className="font-display-xl text-display-xl font-extrabold tracking-tight mb-6 text-on-surface">
+        <h1 className="text-h1 font-display-xl -xl font-extrabold tracking-tight mb-6 text-on-surface">
           Recherche
         </h1>
 
@@ -73,24 +73,24 @@ export default async function SearchPage({ searchParams }: Props) {
                 <li key={r.href}>
                   <Link
                     href={r.href}
-                    className="group flex items-start gap-4 bg-surface-container-lowest border border-outline-variant rounded-xl p-4 soft-lift"
+                    className="group flex items-start gap-4 bg-surface-container-lowest border border-outline-variant rounded-lg p-4 soft-lift"
                   >
                     <div className="mt-0.5 shrink-0 text-on-surface-variant">
                       <Icon className="w-5 h-5" strokeWidth={1.75} />
                     </div>
                     <div className="min-w-0 flex-grow">
                       <div className="flex items-center gap-2 mb-1">
-                        <span className="text-[11px] font-bold uppercase tracking-wider text-primary">
+                        <span className="text-small font-bold uppercase tracking-wider text-primary">
                           {badge}
                         </span>
                         <span className="text-on-surface-variant" aria-hidden>
                           ·
                         </span>
-                        <span className="text-[12px] text-on-surface-variant truncate">
+                        <span className="text-small text-on-surface-variant truncate">
                           {r.context}
                         </span>
                       </div>
-                      <h2 className="font-body-rt text-body-rt font-semibold text-on-surface group-hover:text-primary transition-colors">
+                      <h2 className="text-h2 font-body-rt text-body-rt font-semibold text-on-surface group-hover:text-primary transition-colors">
                         {r.title}
                       </h2>
                       <p className="text-body-sm text-on-surface-variant line-clamp-2 mt-0.5">

@@ -22,12 +22,12 @@ export default function WikiIndexPage() {
       <SiteHeader active="wiki" showSearch />
 
       <main className="flex-grow w-full max-w-container-max mx-auto px-margin-mobile md:px-margin-desktop py-14 md:py-20">
-        <section className="mb-14 max-w-3xl">
+        <section className="py-section mb-14 max-w-3xl">
           <p className="tag-note mb-7">Wiki · {articleCount()} articles</p>
-          <h1 className="font-display-xl font-extrabold tracking-tight text-on-surface text-[40px] leading-[1.05] md:text-[64px] md:leading-[1] mb-6">
+          <h1 className="text-h1 font-display-xl font-extrabold tracking-tight text-on-surface mb-6">
             Tout le savoir, <span className="text-mark">rangé</span>.
           </h1>
-          <p className="text-[18px] md:text-[19px] text-on-surface-variant leading-relaxed">
+          <p className="text-body md:text-body text-on-surface-variant leading-relaxed">
             Deux grandes parties : Claude, l'assistant que tout le monde peut
             utiliser, et Claude Code, l'agent des développeurs. Plus les sujets
             communs aux deux.
@@ -41,13 +41,13 @@ export default function WikiIndexPage() {
               href={`#${s.id}`}
               className="group bg-surface-container-lowest border border-outline-variant rounded-lg p-6 soft-lift flex flex-col"
             >
-              <span className="font-headline-lg text-[22px] font-bold text-on-surface mb-2">
+              <span className="font-headline-lg text-h3 font-bold text-on-surface mb-2">
                 {s.name}
               </span>
-              <span className="text-[15px] text-on-surface-variant leading-relaxed flex-grow mb-4">
+              <span className="text-small text-on-surface-variant leading-relaxed flex-grow mb-4">
                 {s.description}
               </span>
-              <span className="font-mono text-[13px] text-on-surface-variant tabular-nums">
+              <span className="font-mono text-small text-on-surface-variant tabular-nums">
                 {articleCountBySection(s.id)} articles
               </span>
             </a>
@@ -55,9 +55,9 @@ export default function WikiIndexPage() {
         </nav>
 
         {SECTIONS.map((s) => (
-          <section key={s.id} id={s.id} className="mb-20 scroll-mt-24">
+          <section key={s.id} id={s.id} className="py-section mb-20 scroll-mt-24">
             <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 mb-10">
-              <h2 className="font-headline-lg text-[32px] md:text-[40px] leading-[1.1] font-bold tracking-tight">
+              <h2 className="text-h2 font-headline-lg   leading-[1.1] font-bold tracking-tight">
                 {s.name}
               </h2>
               {s.href !== "/wiki" && (

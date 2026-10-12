@@ -17,28 +17,28 @@ export function ArticleBody({ body }: { body: string }) {
           h2: (props) => (
             <h2
               {...props}
-              className="font-headline-lg text-[26px] md:text-[29px] leading-[1.2] font-bold mt-16 mb-6 pb-3 border-b border-outline-variant text-on-surface scroll-mt-24"
+              className="text-h2 font-headline-lg   leading-[1.2] font-bold mt-16 mb-6 pb-3 border-b border-outline-variant text-on-surface scroll-mt-24"
             />
           ),
           h3: (props) => (
             <h3
               {...props}
-              className="font-headline-lg text-[21px] md:text-[22px] leading-[1.3] font-semibold mt-11 mb-4 text-on-surface scroll-mt-24"
+              className="text-h3 font-headline-lg   leading-[1.3] font-semibold mt-11 mb-4 text-on-surface scroll-mt-24"
             />
           ),
           p: (props) => (
             <p
               {...props}
-              className="font-body-rt text-[17px] md:text-[18px] text-on-surface leading-[1.8] mb-6"
+              className="font-body-rt text-body md:text-body text-on-surface leading-[1.7] mb-6"
             />
           ),
           ul: (props) => (
-            <ul {...props} className="list-disc pl-6 mb-7 space-y-3 text-[17px] md:text-[18px] text-on-surface marker:text-outline" />
+            <ul {...props} className="list-disc pl-6 mb-7 space-y-3 text-body md:text-body text-on-surface marker:text-outline" />
           ),
           ol: (props) => (
-            <ol {...props} className="list-decimal pl-6 mb-7 space-y-3 text-[17px] md:text-[18px] text-on-surface marker:text-on-surface-variant" />
+            <ol {...props} className="list-decimal pl-6 mb-7 space-y-3 text-body md:text-body text-on-surface marker:text-on-surface-variant" />
           ),
-          li: (props) => <li {...props} className="leading-[1.75] pl-1" />,
+          li: (props) => <li {...props} className="leading-[1.7] pl-1" />,
           a: (props) => (
             <a
               {...props}
@@ -63,7 +63,7 @@ export function ArticleBody({ body }: { body: string }) {
             return (
               <code
                 {...props}
-                className="font-code-md text-[0.9em] text-primary bg-primary-fixed/30 px-1.5 py-0.5 rounded"
+                className="font-code-md text-small text-primary bg-primary-fixed/30 px-1.5 py-0.5 rounded"
               >
                 {children}
               </code>
@@ -83,13 +83,13 @@ export function ArticleBody({ body }: { body: string }) {
           ),
           table: (props) => (
             <div className="overflow-x-auto my-8 border border-outline-variant rounded-lg">
-              <table {...props} className="w-full text-[15px] leading-[1.6]" />
+              <table {...props} className="w-full text-small leading-[1.6]" />
             </div>
           ),
           th: (props) => (
             <th
               {...props}
-              className="text-left align-bottom px-4 py-3 border-b border-outline-variant bg-surface-container-low text-on-surface font-semibold text-[14px]"
+              className="text-left align-bottom px-4 py-3 border-b border-outline-variant bg-surface-container-low text-on-surface font-semibold text-small"
             />
           ),
           td: (props) => (
@@ -119,13 +119,13 @@ function CodeBlockCopy({ code, lang }: { code: string; lang: string }) {
   return (
     <div className="bg-surface-container-lowest border border-outline-variant rounded-lg overflow-hidden my-7">
       <div className="flex justify-between items-center px-4 py-2 border-b border-outline-variant">
-        <span className="text-xs font-code-md text-on-surface-variant uppercase tracking-wider">
+        <span className="text-small font-code-md text-on-surface-variant uppercase tracking-wider">
           {lang}
         </span>
         <button
           type="button"
           onClick={copy}
-          className="text-on-surface-variant hover:text-on-surface transition-colors inline-flex items-center gap-1.5 text-xs"
+          className="text-on-surface-variant hover:text-on-surface transition-colors inline-flex items-center gap-1.5 text-small"
           aria-label="Copier"
         >
           {copied ? (
@@ -141,7 +141,7 @@ function CodeBlockCopy({ code, lang }: { code: string; lang: string }) {
           )}
         </button>
       </div>
-      <pre className="font-code-md text-[14px] leading-[1.7] text-on-surface overflow-x-auto px-5 py-4 m-0">
+      <pre className="font-code-md text-small leading-[1.7] text-on-surface overflow-x-auto px-5 py-4 m-0">
         <code className={`language-${lang}`}>{code}</code>
       </pre>
     </div>

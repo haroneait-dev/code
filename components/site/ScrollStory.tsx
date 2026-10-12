@@ -62,12 +62,12 @@ export function ScrollStory() {
 
   if (flat) {
     return (
-      <section className="w-full px-margin-mobile md:px-margin-desktop py-16">
+      <section className="py-section w-full px-margin-mobile md:px-margin-desktop ">
         <div className="max-w-container-max mx-auto grid gap-6 md:grid-cols-4">
           {STEPS.map((s) => (
             <div key={s.k}>
-              <p className="font-mono text-[13px] text-on-surface-variant mb-2">{s.k}</p>
-              <h3 className="font-headline-lg text-[24px] font-extrabold mb-2">{s.title}</h3>
+              <p className="font-mono text-small text-on-surface-variant mb-2">{s.k}</p>
+              <h3 className="text-h3 font-headline-lg  font-extrabold mb-2">{s.title}</h3>
               <p className="text-on-surface-variant">{s.text}</p>
             </div>
           ))}
@@ -82,21 +82,14 @@ export function ScrollStory() {
   const step = Math.min(STEPS.length - 1, Math.floor(p * STEPS.length));
 
   return (
-    <section ref={ref} className="relative h-[320vh] bg-primary text-on-primary" aria-label="Comment travaille Claude Code">
+    <section ref={ref} className="py-section relative h-[240vh] bg-surface-container-low text-on-surface" aria-label="Comment travaille Claude Code">
       <div className="sticky top-0 h-[100svh] overflow-hidden flex flex-col lg:flex-row items-center justify-center gap-4 lg:gap-16 px-margin-mobile md:px-margin-desktop">
-        {/* Grand numéro en fond */}
-        <span
-          aria-hidden
-          className="absolute -right-6 bottom-0 font-display-xl font-extrabold leading-none text-[42vw] lg:text-[28vw] opacity-[0.07] select-none"
-          style={{ transform: `translateY(${(0.5 - p) * 18}%)` }}
-        >
-          {STEPS[step].k}
-        </span>
+
 
         <div
           aria-hidden
-          className="relative w-[62vw] max-w-[300px] lg:max-w-[440px] aspect-square shrink-0 rounded-full overflow-hidden bg-[#fbf6ee] shadow-[10px_10px_0_#f2b23e]"
-          style={{ transform: `scale(${0.88 + p * 0.16}) rotate(${(p - 0.5) * 8}deg)` }}
+          className="relative w-[62vw] max-w-[300px] lg:max-w-[440px] aspect-square shrink-0 rounded overflow-hidden bg-surface-container-lowest"
+          style={{ transform: `scale(${0.95 + p * 0.05})` }}
         >
           <div
             className="absolute inset-0"
@@ -109,27 +102,27 @@ export function ScrollStory() {
         </div>
 
         <div className="relative w-full max-w-md">
-          <p className="font-mono text-[13px] uppercase tracking-wider opacity-80 mb-3">Comment travaille Claude Code</p>
+          <p className="font-mono text-small uppercase tracking-wider opacity-80 mb-3">Comment travaille Claude Code</p>
           <div className="relative h-[150px] md:h-[170px]">
             {STEPS.map((s, i) => (
               <div
                 key={s.k}
-                className="absolute inset-0 transition-all duration-500 ease-out"
+                className="absolute inset-0 transition-all duration-200 ease-out"
                 style={{ opacity: i === step ? 1 : 0, transform: `translateY(${(i - step) * 26}px)` }}
                 aria-hidden={i !== step}
               >
-                <h3 className="font-headline-lg text-[32px] md:text-[44px] leading-[1.02] font-extrabold mb-3">
-                  <span className="text-[#f2b23e]">{s.k}</span> {s.title}
+                <h3 className="text-h3 font-headline-lg   leading-[1.02] font-extrabold mb-3">
+                  <span className="text-primary">{s.k}</span> {s.title}
                 </h3>
-                <p className="text-[17px] md:text-[19px] leading-relaxed opacity-90">{s.text}</p>
+                <p className="text-body md:text-body leading-relaxed opacity-90">{s.text}</p>
               </div>
             ))}
           </div>
           <div className="mt-4 flex gap-2">
             {STEPS.map((s, i) => (
-              <span key={s.k} className="h-1.5 flex-1 rounded-full bg-white/20 overflow-hidden">
+              <span key={s.k} className="h-1.5 flex-1 rounded bg-outline-variant overflow-hidden">
                 <span
-                  className="block h-full bg-[#f2b23e]"
+                  className="block h-full bg-primary"
                   style={{ width: `${Math.min(1, Math.max(0, p * STEPS.length - i)) * 100}%` }}
                 />
               </span>
