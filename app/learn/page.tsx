@@ -1,118 +1,39 @@
-import Link from "next/link";
-import { ArrowRight, BookOpen, Clock, Layers } from "lucide-react";
 import { SiteHeader } from "@/components/site/SiteHeader";
 import { SiteFooter } from "@/components/site/SiteFooter";
-import { curriculum, totalLessons } from "@/lib/curriculum";
+import { CourseProgress } from "@/components/learn/CourseProgress";
+import { LearnCatalog } from "@/components/learn/LearnCatalog";
+import { curriculum } from "@/lib/curriculum";
+import { courseStats, jsonLd, learningLevels, lessonEntries, siteOrigin } from "@/lib/learning";
 
 export const metadata = {
-  title: "Formation — Claude Mastery",
-  description:
-    "Formation interactive et complète sur Claude Code, organisée en modules progressifs.",
+  title: "Formation Claude Code : programme et parcours",
+  description: "Apprenez Claude Code en français : modules progressifs, objectifs, quiz, exercices et projets. Accès gratuit, sans compte.",
+  alternates: { canonical: "/learn" },
 };
 
 export default function LearnIndexPage() {
-  const totalModules = curriculum.length;
-
-  return (
-    <div className="min-h-screen flex flex-col">
-      <SiteHeader active="code" showSearch />
-
-      <main className="flex-grow w-full max-w-container-max mx-auto px-margin-mobile md:px-margin-desktop py-16">
-        {/* Hero */}
-        <section className="py-section mb-16 max-w-3xl">
-          <div className="mb-6">
-            <span className="tag-note">
-              Formation Claude Code
-            </span>
-          </div>
-          <h1 className="text-h1 font-display-xl -xl font-extrabold tracking-tight mb-6 text-on-surface">
-            De zéro à <span className="text-mark">expert</span> Claude Code.
-          </h1>
-          <p className="font-body-rt text-body-rt md:text-body text-on-surface-variant leading-relaxed mb-8">
-            Une formation structurée en {totalModules} modules et{" "}
-            {totalLessons} leçons pratiques. Du premier prompt à l'orchestration
-            d'agents, tout est couvert.
-          </p>
-          <div className="flex flex-wrap gap-6 text-body-sm text-on-surface-variant">
-            <span className="inline-flex items-center gap-2">
-              <Layers className="w-4 h-4" strokeWidth={1.5} />
-              {totalModules} modules
-            </span>
-            <span className="inline-flex items-center gap-2">
-              <BookOpen className="w-4 h-4" strokeWidth={1.5} />
-              {totalLessons} leçons
-            </span>
-            <span className="inline-flex items-center gap-2">
-              <Clock className="w-4 h-4" strokeWidth={1.5} />
-              ~10 heures de contenu
-            </span>
-          </div>
-        </section>
-
-        {/* Modules */}
-        <section>
-          <h2 className="text-h2 font-headline-lg  text-on-surface mb-8">
-            Programme complet
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {curriculum.map((mod, idx) => {
-              const firstLesson = mod.lessons[0];
-              return (
-                <Link
-                  key={mod.id}
-                  href={
-                    firstLesson
-                      ? `/learn/${mod.id}/${firstLesson.id}`
-                      : `/learn`
-                  }
-                  className="bg-surface-container-lowest border border-outline-variant rounded-lg p-6 soft-lift flex flex-col group"
-                >
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="text-small font-code-md text-on-surface-variant">
-                      Module {String(idx + 1).padStart(2, "0")}
-                    </div>
-                    <span className="text-h3" aria-hidden>
-                      {mod.emoji}
-                    </span>
-                  </div>
-                  <h3 className="text-h3 font-body-rt text-body-rt font-semibold mb-3 text-on-surface group-hover:text-primary transition-colors">
-                    {mod.title}
-                  </h3>
-                  <ul className="space-y-1.5 mb-6 flex-grow">
-                    {mod.lessons.slice(0, 3).map((l) => (
-                      <li
-                        key={l.id}
-                        className="text-body-sm text-on-surface-variant flex items-center gap-2"
-                      >
-                        <span className="w-1 h-1 rounded bg-on-surface-variant" />
-                        <span className="truncate">{l.title}</span>
-                      </li>
-                    ))}
-                    {mod.lessons.length > 3 && (
-                      <li className="text-body-sm text-on-surface-variant italic pl-3">
-                        + {mod.lessons.length - 3} leçon
-                        {mod.lessons.length - 3 > 1 ? "s" : ""}…
-                      </li>
-                    )}
-                  </ul>
-                  <div className="flex items-center justify-between pt-3 border-t border-outline-variant">
-                    <span className="text-small font-code-md text-primary bg-primary-fixed/30 px-2 py-1 rounded">
-                      {mod.lessons.length} leçon
-                      {mod.lessons.length > 1 ? "s" : ""}
-                    </span>
-                    <ArrowRight
-                      className="w-4 h-4 text-on-surface-variant group-hover:text-primary group-hover:translate-x-1 transition-all"
-                      strokeWidth={1.75}
-                    />
-                  </div>
-                </Link>
-              );
-            })}
-          </div>
-        </section>
-      </main>
-
-      <SiteFooter />
-    </div>
-  );
+  const modules = [...curriculum].sort((a, b) => learningLevels.indexOf(a.level ?? "débutant") - learningLevels.indexOf(b.level ?? "débutant"));
+  return <div className="min-h-screen flex flex-col">
+    <SiteHeader active="learn" showSearch />
+    <main className="flex-grow w-full max-w-container-max mx-auto px-margin-mobile md:px-margin-desktop py-section">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd({
+        "@context": "https://schema.org", "@type": "Course", name: "Formation Claude Code en français",
+        description: metadata.description, inLanguage: "fr", isAccessibleForFree: true,
+        url: `${siteOrigin}/learn`, timeRequired: `PT${courseStats.minutes}M`,
+        provider: { "@type": "Organization", name: "Claude Mastery", url: siteOrigin },
+        hasPart: modules.map(module => ({ "@type": "Course", name: module.title, url: `${siteOrigin}/learn/${module.id}`, timeRequired: `PT${module.minutes}M` })),
+      }) }} />
+      <section className="mb-section max-w-reading">
+        <p className="tag-note mb-6">Formation Claude Code</p>
+        <h1 className="font-display-xl text-h1 font-bold tracking-tight mb-6">Apprendre, pratiquer, vérifier.</h1>
+        <p className="text-body text-on-surface-variant mb-8">Un parcours gratuit pour découvrir Claude Code, puis approfondir votre pratique. Chaque leçon présente ses objectifs, une mise en pratique et un quiz corrigé.</p>
+        <dl className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-6">
+          {[[courseStats.modules, "modules"], [courseStats.lessons, "leçons"], [(courseStats.minutes / 60).toLocaleString("fr-FR", { maximumFractionDigits: 1 }), "heures de leçons"], [courseStats.quizzes, "quiz"], [courseStats.exercises, "exercices et mini-projets"]].map(([value, label]) => <div key={label} className="border-t border-outline-variant pt-3"><dt className="text-small text-on-surface-variant">{label}</dt><dd className="text-h3 font-semibold tabular-nums">{value}</dd></div>)}
+        </dl>
+        <p className="text-small text-on-surface-variant mb-6">Durées de lecture estimées, hors pratique. Les exercices incluent les mini-projets des leçons.</p>
+        <CourseProgress ids={lessonEntries.map(({ lesson }) => lesson.id)} />
+      </section>
+      <LearnCatalog modules={modules.map(module => ({ id: module.id, title: module.title, level: module.level, outcome: module.outcome, minutes: module.minutes ?? 0, lessonIds: module.lessons.map(lesson => lesson.id) }))} />
+    </main><SiteFooter />
+  </div>;
 }
