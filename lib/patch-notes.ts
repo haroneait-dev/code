@@ -20,6 +20,17 @@ export const KIND_INFO: Record<NoteKind, { label: string; className: string }> =
 
 export const PATCH_NOTES: PatchNote[] = [
   {
+    date: "2026-10-12", kind: "site", version: "Site 3.3",
+    title: "Un manuel plus lisible et une formation guidée",
+    items: [
+      "Design unifié en clair et en sombre, navigation regroupée et animations plus discrètes.",
+      "Objectifs, prérequis, points à retenir, mini-projets, quiz corrigés et ressources pour chaque leçon.",
+      "Pages de module avec projet final, parcours par niveau et durées calculées.",
+      "Progression enregistrée dans votre navigateur, sans compte ni envoi de données.",
+      "Contrôle automatique des liens et des données de formation avant chaque build.",
+    ], href: "/learn",
+  },
+  {
     date: "2026-10-07",
     kind: "site",
     version: "Site 3.2",

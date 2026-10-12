@@ -23,8 +23,8 @@ export function BlurFade({
   className?: string;
 } & Omit<HTMLMotionProps<"div">, "children">) {
   const reduce = useReducedMotion();
-  const hidden = reduce ? { opacity: 0 } : { opacity: 0, y, filter: "blur(6px)" };
-  const shown = { opacity: 1, y: 0, filter: "blur(0px)" };
+  const hidden = reduce ? { opacity: 1 } : { opacity: 0, y };
+  const shown = { opacity: 1, y: 0 };
   return (
     <motion.div
       className={className}
@@ -32,7 +32,7 @@ export function BlurFade({
       {...(inView
         ? { whileInView: shown, viewport: { once: true, margin: "-60px" } }
         : { animate: shown })}
-      transition={{ duration: 0.45, delay, ease: [0.22, 1, 0.36, 1] }}
+      transition={{ duration: reduce ? 0 : 0.4, delay: reduce ? 0 : delay, ease: [0.22, 1, 0.36, 1] }}
       {...rest}
     >
       {children}
@@ -61,9 +61,9 @@ export function WordReveal({
           key={`${w}-${i}`}
           aria-hidden
           className="inline-block whitespace-pre"
-          initial={reduce ? { opacity: 0 } : { opacity: 0, y: "0.35em", filter: "blur(4px)" }}
-          animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-          transition={{ duration: 0.35, delay: delay + i * stagger, ease: [0.22, 1, 0.36, 1] }}
+          initial={reduce ? { opacity: 1 } : { opacity: 0, y: "0.35em" }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: reduce ? 0 : 0.2, delay: reduce ? 0 : Math.min(0.15, delay + i * stagger), ease: [0.22, 1, 0.36, 1] }}
         >
           {w}
           {i < words.length - 1 ? " " : ""}
@@ -75,15 +75,16 @@ export function WordReveal({
 
 // Barre de progression segmentée : un segment par question.
 export function StepProgress({ current, total }: { current: number; total: number }) {
+  const reduce = useReducedMotion();
   return (
-    <div className="flex gap-1.5" role="progressbar" aria-valuemin={0} aria-valuemax={total} aria-valuenow={current}>
+    <div aria-label="Progression" className="flex gap-1.5" role="progressbar" aria-valuemin={0} aria-valuemax={total} aria-valuenow={current}>
       {Array.from({ length: total }, (_, i) => (
-        <div key={i} className="h-2 flex-1 rounded-full bg-surface-container-high overflow-hidden">
+        <div key={i} className="h-2 flex-1 rounded bg-surface-container-high overflow-hidden">
           <motion.div
-            className="h-full rounded-full bg-primary"
+            className="h-full rounded bg-primary"
             initial={false}
             animate={{ width: i < current ? "100%" : "0%" }}
-            transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+            transition={{ duration: reduce ? 0 : 0.2, ease: [0.22, 1, 0.36, 1] }}
           />
         </div>
       ))}
@@ -93,13 +94,15 @@ export function StepProgress({ current, total }: { current: number; total: numbe
 
 // Jauge qui se remplit jusqu'à une valeur (0 à 1).
 export function Meter({ value, className }: { value: number; className?: string }) {
+  const reduce = useReducedMotion();
+  const percentage = Math.round(Math.min(1, Math.max(0, value)) * 100);
   return (
-    <div className={`h-3 rounded-full bg-surface-container-high overflow-hidden ${className ?? ""}`}>
+    <div role="progressbar" aria-label="Progression" aria-valuemin={0} aria-valuemax={100} aria-valuenow={percentage} className={`h-3 rounded bg-surface-container-high overflow-hidden ${className ?? ""}`}>
       <motion.div
-        className="h-full rounded-full bg-primary"
-        initial={{ width: 0 }}
-        animate={{ width: `${Math.round(value * 100)}%` }}
-        transition={{ duration: 0.9, delay: 0.3, ease: [0.22, 1, 0.36, 1] }}
+        className="h-full rounded bg-primary"
+        initial={false}
+        animate={{ width: `${percentage}%` }}
+        transition={{ duration: reduce ? 0 : 0.2, ease: [0.22, 1, 0.36, 1] }}
       />
     </div>
   );

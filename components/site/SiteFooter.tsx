@@ -54,9 +54,9 @@ export function SiteFooter() {
   return (
     <footer className="bg-surface-container-low border-t border-outline-variant mt-auto">
       <div className="w-full max-w-container-max mx-auto px-margin-mobile md:px-margin-desktop py-12">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-10">
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-8 mb-10">
           <div className="col-span-2">
-            <div className="font-headline-lg text-[22px] font-bold text-on-surface mb-3">
+            <div className="font-headline-lg text-h3 font-bold text-on-surface mb-3">
               Claude Mastery
             </div>
             <p className="text-body-sm text-on-surface-variant max-w-sm leading-relaxed">
@@ -71,7 +71,7 @@ export function SiteFooter() {
                     target="_blank"
                     rel="noopener noreferrer"
                     aria-label={s.label}
-                    className="w-9 h-9 rounded-md border border-outline-variant flex items-center justify-center text-on-surface-variant hover:text-primary hover:border-primary transition-colors"
+                    className="w-9 h-9 rounded border border-outline-variant flex items-center justify-center text-on-surface-variant hover:text-primary hover:border-primary transition-colors"
                   >
                     {s.icon}
                   </a>
@@ -105,29 +105,24 @@ export function SiteFooter() {
                   Wiki
                 </Link>
               </li>
-              <li>
-                <Link href="/fiches" className="hover:text-primary transition-colors">
-                  Fiches
-                </Link>
-              </li>
-              <li>
-                <Link href="/evolution" className="hover:text-primary transition-colors">
-                  L'évolution de Claude
-                </Link>
-              </li>
-              <li>
-                <Link href="/choisir-modele" className="hover:text-primary transition-colors">
-                  Quel modèle choisir ?
-                </Link>
-              </li>
-              <li>
-                <Link href="/patch-notes" className="hover:text-primary transition-colors">
-                  Patch notes
-                </Link>
-              </li>
+
+
+
+
             </ul>
           </div>
 
+          <div>
+            <div className="text-body-sm font-semibold text-on-surface mb-3">Ressources</div>
+            <ul className="text-body-sm text-on-surface-variant">
+              <li><Link href="/fiches">Fiches</Link></li>
+              <li><Link href="/prompts">Prompts</Link></li>
+              <li><Link href="/applications">Applications</Link></li>
+              <li><Link href="/evolution">Évolution</Link></li>
+              <li><Link href="/choisir-modele">Choisir un modèle</Link></li>
+              <li><Link href="/patch-notes">Patch notes</Link></li>
+            </ul>
+          </div>
           <div>
             <div className="text-body-sm font-semibold text-on-surface mb-3">
               Légal
@@ -163,7 +158,7 @@ export function SiteFooter() {
 
         <div className="pt-6 border-t border-outline-variant flex flex-col md:flex-row md:items-center md:justify-between gap-3 text-body-sm text-on-surface-variant">
           <div>© {year} Claude Mastery. Fait en France.</div>
-          <div className="text-xs">
+          <div className="text-small">
             Non affilié à Anthropic. Claude™ est une marque d'Anthropic, PBC.
           </div>
         </div>

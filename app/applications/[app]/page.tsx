@@ -70,26 +70,26 @@ export default async function AppPage({ params }: { params: Promise<{ app: strin
   return (
     <div className="min-h-screen flex flex-col bg-surface">
       <SiteHeader active="apps" />
-      <main className="flex-grow w-full px-margin-mobile md:px-margin-desktop py-12 md:py-16">
+      <main className="flex-grow w-full px-margin-mobile md:px-margin-desktop py-section">
         <div className="max-w-3xl mx-auto">
-          <nav className="text-[14px] text-on-surface-variant mb-6">
+          <nav className="text-small text-on-surface-variant mb-6">
             <Link href="/applications" className="hover:text-primary">Applications</Link> <span aria-hidden>›</span> {a.name}
           </nav>
           <p className="tag-note mb-6">{KIND_LABEL[a.kind]} · {a.uses.map((u) => u.theme.name).join(" · ")}</p>
-          <h1 className="font-display-xl font-extrabold tracking-tight text-on-surface text-[38px] leading-[1.05] md:text-[56px] md:leading-[1] mb-6">
+          <h1 className="text-h1 font-display-xl font-extrabold tracking-tight text-on-surface mb-6">
             Claude <span className="text-mark">+ {a.name}</span>
           </h1>
-          <p className="text-[18px] md:text-[20px] text-on-surface-variant leading-relaxed mb-10">{a.uses[0].what}</p>
+          <p className="text-body md:text-body text-on-surface-variant leading-relaxed mb-10">{a.uses[0].what}</p>
 
-          <section className="mb-12">
-            <h2 className="font-headline-lg text-[26px] md:text-[30px] font-bold mb-5">Ce que vous pouvez lui demander</h2>
+          <section className="py-section mb-12">
+            <h2 className="text-h2 font-headline-lg   font-bold mb-5">Ce que vous pouvez lui demander</h2>
             <ul className="flex flex-col gap-4">
               {a.uses.map((u) => (
-                <li key={u.theme.id} className="rounded-lg border-[1.5px] border-on-surface bg-surface-container-lowest p-5 shadow-[4px_4px_0_rgb(var(--c-mark))]">
-                  <p className="font-mono text-[12.5px] uppercase tracking-wider text-on-surface-variant mb-2">{u.theme.name}</p>
-                  {a.uses.length > 1 && <p className="text-[15.5px] text-on-surface-variant mb-3">{u.what}</p>}
+                <li key={u.theme.id} className="rounded-lg border-[1.5px] border-on-surface bg-surface-container-lowest p-5">
+                  <p className="font-mono text-small uppercase tracking-wider text-on-surface-variant mb-2">{u.theme.name}</p>
+                  {a.uses.length > 1 && <p className="text-small text-on-surface-variant mb-3">{u.what}</p>}
                   <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
-                    <p className="text-[16.5px] text-on-surface leading-relaxed">« {u.prompt} »</p>
+                    <p className="text-body text-on-surface leading-relaxed">« {u.prompt} »</p>
                     <CopyButton text={u.prompt} event={`app/${a.slug}`} />
                   </div>
                 </li>
@@ -97,19 +97,19 @@ export default async function AppPage({ params }: { params: Promise<{ app: strin
             </ul>
           </section>
 
-          <section className="mb-12">
-            <h2 className="font-headline-lg text-[26px] md:text-[30px] font-bold mb-5">{how.title}</h2>
+          <section className="py-section mb-12">
+            <h2 className="text-h2 font-headline-lg   font-bold mb-5">{how.title}</h2>
             <ol className="flex flex-col gap-3 mb-5">
               {how.steps.map((s, i) => (
                 <li key={s} className="grid grid-cols-[32px_1fr] gap-3">
-                  <span className="font-display-xl text-[22px] font-extrabold text-primary-fixed-dim tabular-nums">{i + 1}</span>
-                  <span className="text-[16px] text-on-surface leading-relaxed">{s}</span>
+                  <span className="font-display-xl text-h3 font-extrabold text-tertiary tabular-nums">{i + 1}</span>
+                  <span className="text-body text-on-surface leading-relaxed">{s}</span>
                 </li>
               ))}
             </ol>
             {a.setup && (
               <div className="flex items-center gap-3">
-                <pre className="flex-1 min-w-0 rounded-md bg-[#2b2119] text-[#f6efe3] p-3.5 font-mono text-[13px] overflow-x-auto">{a.setup}</pre>
+                <pre className="flex-1 min-w-0 rounded bg-[rgb(var(--c-on-surface))] text-[rgb(var(--c-on-surface))] p-3.5 font-mono text-small overflow-x-auto">{a.setup}</pre>
                 <CopyButton text={a.setup} label="Copier" />
               </div>
             )}
@@ -119,8 +119,8 @@ export default async function AppPage({ params }: { params: Promise<{ app: strin
             </a>
           </section>
 
-          <section className="mb-12 rounded-lg bg-surface-container-low border border-outline-variant p-6">
-            <h2 className="font-headline-lg text-[22px] font-bold mb-3">Pour progresser</h2>
+          <section className="mb-section rounded-lg bg-surface-container-low border border-outline-variant p-6">
+            <h2 className="text-h2 font-headline-lg  font-bold mb-3">Pour progresser</h2>
             <ul className="flex flex-col gap-2">
               {a.uses.map((u) => (
                 <li key={u.theme.id}>
@@ -140,10 +140,10 @@ export default async function AppPage({ params }: { params: Promise<{ app: strin
 
           {others.length > 0 && (
             <section>
-              <h2 className="font-headline-lg text-[22px] font-bold mb-4">Dans le même domaine</h2>
+              <h2 className="text-h2 font-headline-lg  font-bold mb-4">Dans le même domaine</h2>
               <div className="flex flex-wrap gap-2.5">
                 {others.map((o) => (
-                  <Link key={o.slug} href={`/applications/${o.slug}`} className="rounded-full border-[1.5px] border-on-surface px-4 py-2 text-[15px] font-semibold text-on-surface hover:bg-[rgb(var(--c-mark))] transition-colors">
+                  <Link key={o.slug} href={`/applications/${o.slug}`} className="rounded border-[1.5px] border-on-surface px-4 py-2 text-small font-semibold text-on-surface hover:bg-[rgb(var(--c-mark))] transition-colors">
                     {o.name}
                   </Link>
                 ))}

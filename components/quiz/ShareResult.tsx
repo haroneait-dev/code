@@ -33,7 +33,7 @@ export function ShareResult({ levelIndex, level, theme }: { levelIndex: number; 
 
   return (
     <div className="flex flex-wrap gap-2">
-      <button type="button" onClick={share} className="btn-secondary h-10 px-4 rounded-md inline-flex items-center gap-2 font-semibold text-[14.5px]">
+      <button type="button" onClick={share} className="btn-secondary inline-flex items-center gap-2">
         <Share2 className="w-4 h-4" strokeWidth={2} />
         Partager mon résultat
       </button>
@@ -41,7 +41,7 @@ export function ShareResult({ levelIndex, level, theme }: { levelIndex: number; 
         href={`https://wa.me/?text=${encodeURIComponent(`${text} ${url}`)}`}
         target="_blank"
         rel="noopener noreferrer"
-        className="h-10 px-4 rounded-md inline-flex items-center font-semibold text-[14.5px] border border-outline-variant hover:bg-surface-container-low"
+        className="h-10 px-4 rounded inline-flex items-center font-semibold text-small border border-outline-variant hover:bg-surface-container-low"
       >
         WhatsApp
       </a>
@@ -49,11 +49,11 @@ export function ShareResult({ levelIndex, level, theme }: { levelIndex: number; 
         href={`https://x.com/intent/post?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`}
         target="_blank"
         rel="noopener noreferrer"
-        className="h-10 px-4 rounded-md inline-flex items-center font-semibold text-[14.5px] border border-outline-variant hover:bg-surface-container-low"
+        className="h-10 px-4 rounded inline-flex items-center font-semibold text-small border border-outline-variant hover:bg-surface-container-low"
       >
         X
       </a>
-      <button type="button" onClick={copy} className="h-10 px-4 rounded-md inline-flex items-center gap-2 font-semibold text-[14.5px] border border-outline-variant hover:bg-surface-container-low">
+      <button type="button" onClick={copy} className="h-10 px-4 rounded inline-flex items-center gap-2 font-semibold text-small border border-outline-variant hover:bg-surface-container-low">
         {copied ? <Check className="w-4 h-4" strokeWidth={2.5} /> : <Link2 className="w-4 h-4" strokeWidth={2} />}
         {copied ? "Lien copié" : "Copier le lien"}
       </button>

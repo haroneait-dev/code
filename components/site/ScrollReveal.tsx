@@ -14,11 +14,13 @@ export function ScrollReveal({
   as?: "div" | "section" | "li" | "article";
 }) {
   const ref = useRef<HTMLDivElement | null>(null);
-  const [visible, setVisible] = useState(false);
+  const [visible, setVisible] = useState(true);
 
   useEffect(() => {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     const node = ref.current;
     if (!node) return;
+    if (node.getBoundingClientRect().top > window.innerHeight) setVisible(false);
     const obs = new IntersectionObserver(
       (entries) => {
         for (const e of entries) {
@@ -40,8 +42,8 @@ export function ScrollReveal({
       ref={ref}
       style={{
         opacity: visible ? 1 : 0,
-        transform: visible ? "translateY(0)" : "translateY(20px)",
-        transition: `opacity 0.7s ease-out ${delay}ms, transform 0.7s cubic-bezier(0.22, 1, 0.36, 1) ${delay}ms`,
+        transform: visible ? "translateY(0)" : "translateY(12px)",
+        transition: `opacity 0.4s ease-out ${Math.min(delay, 100)}ms, transform 0.4s cubic-bezier(0.22, 1, 0.36, 1) ${Math.min(delay, 100)}ms`,
       }}
       className={className}
     >

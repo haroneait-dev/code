@@ -5,7 +5,10 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "check:curriculum": "node scripts/run-typescript.cjs scripts/check-curriculum.ts",
+    "prebuild": "npm run check:curriculum",
+    "test:curriculum": "node scripts/run-typescript.cjs scripts/check-curriculum.test.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.88.0",

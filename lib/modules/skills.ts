@@ -8,7 +8,7 @@ export const skillsModule: Module = {
   lessons: [
     {
       id: "what-are-skills",
-      title: "Skills, agents et MCP — quelle différence ?",
+      title: "Skills, agents et MCP : quelle différence ?",
       duration: "8 min",
       tag: "Fondamentaux",
       intro:
@@ -18,9 +18,9 @@ export const skillsModule: Module = {
           heading: "Le trio Skills / Agents / MCP",
           body: "Claude Code propose <strong>trois mécanismes d'extension</strong> qu'on confond souvent. Chacun a son rôle précis :",
           bullets: [
-            "<strong>Skill</strong> — une <em>capability réutilisable</em> packagée dans un dossier (un <code>SKILL.md</code> + des fichiers). Claude la charge à la demande.",
-            "<strong>Agent</strong> — un <em>task delegate</em>, une sous-instance de Claude lancée pour une tâche spécifique (recherche, refacto, test...).",
-            "<strong>MCP</strong> — un <em>serveur externe</em> (Model Context Protocol) qui expose des outils et des ressources à Claude (Postgres, Slack, GitHub...).",
+            "<strong>Skill</strong> : une <em>capability réutilisable</em> packagée dans un dossier (un <code>SKILL.md</code> + des fichiers). Claude la charge à la demande.",
+            "<strong>Agent</strong> : un <em>task delegate</em>, une sous-instance de Claude lancée pour une tâche spécifique (recherche, refacto, test...).",
+            "<strong>MCP</strong> : un <em>serveur externe</em> (Model Context Protocol) qui expose des outils et des ressources à Claude (Postgres, Slack, GitHub...).",
           ],
         },
         {
@@ -37,11 +37,11 @@ export const skillsModule: Module = {
         },
         {
           heading: "Quand choisir un skill ?",
-          body: "Un skill est le bon choix dès que vous vous retrouvez à <strong>répéter les mêmes instructions</strong> à Claude (\"d'abord lis le fichier X, puis applique le format Y, puis génère Z\"). Le skill encode ce workflow une bonne fois.",
+          body: "Un skill est le bon choix dès que vous vous retrouvez à <strong>répéter les mêmes instructions</strong> à Claude (\"d'abord lis le fichier X, puis applique le format Y, puis générez Z\"). Le skill encode ce workflow une bonne fois.",
           callout: {
             type: "tip",
             icon: "💡",
-            text: "Règle simple : si tu pourrais l'écrire dans un Notion comme procédure, c'est un skill. Si ça nécessite du code qui tourne en continu, c'est un MCP.",
+            text: "Règle simple : si vous pourriez l'écrire dans un Notion comme procédure, c'est un skill. Si ça nécessite du code qui tourne en continu, c'est un MCP.",
           },
         },
         {
@@ -68,7 +68,7 @@ allowed-tools: Bash(git diff:*), Bash(git status:*)
             "Skill = procédure réutilisable, sous forme de dossier + SKILL.md",
             "Agent = sous-tâche déléguée (one-shot)",
             "MCP = serveur externe qui expose des outils en continu",
-            "Si tu te répètes plus de 3 fois → c'est un skill",
+            "Si vous vous répèvos plus de 3 fois → c'est un skill",
           ],
         },
       ],
@@ -99,11 +99,11 @@ allowed-tools: Bash(git diff:*), Bash(git status:*)
         },
         {
           heading: "Le frontmatter YAML",
-          body: "C'est l'<strong>en-tête</strong> du SKILL.md. Claude le lit pour décider quand activer le skill. Trois champs importants :",
+          body: "C'est l'<strong>en-têvous</strong> du SKILL.md. Claude le lit pour décider quand activer le skill. Trois champs importants :",
           bullets: [
-            "<code>name</code> — slug unique (kebab-case), sert d'identifiant",
-            "<code>description</code> — <strong>critique</strong> : c'est ce que Claude lit pour décider d'activer le skill. Sois précis sur le <em>quand</em>",
-            "<code>allowed-tools</code> — whitelist d'outils que le skill peut utiliser (avec patterns)",
+            "<code>name</code> : slug unique (kebab-case), sert d'identifiant",
+            "<code>description</code> : <strong>critique</strong> : c'est ce que Claude lit pour décider d'activer le skill. Sois précis sur le <em>quand</em>",
+            "<code>allowed-tools</code> : whitelist d'outils que le skill peut utiliser (avec patterns)",
           ],
         },
         {
@@ -145,7 +145,7 @@ Tu remplis un PDF formulaire à partir de données JSON.
           callout: {
             type: "warn",
             icon: "⚠️",
-            text: "La description doit indiquer QUAND utiliser le skill, pas juste CE QU'IL FAIT. \"Génère un PDF\" est mauvais. \"À utiliser quand l'utilisateur fournit un template PDF et des données JSON à remplir\" est bon.",
+            text: "La description doit indiquer QUAND utiliser le skill, pas juste CE QU'IL FAIT. \"Générez un PDF\" est mauvais. \"À utiliser quand l'utilisateur fournit un template PDF et des données JSON à remplir\" est bon.",
           },
         },
         {
@@ -153,7 +153,7 @@ Tu remplis un PDF formulaire à partir de données JSON.
           table: {
             headers: ["Pattern", "Effet"],
             rows: [
-              ["Read", "Autorise l'outil Read sans restriction"],
+              ["Read", "Autorisez l'outil Read sans restriction"],
               ["Bash(git diff:*)", "Bash uniquement pour git diff (tous les flags)"],
               ["Bash(npm test)", "Bash uniquement pour la commande exacte"],
               ["Write(./out/*)", "Write uniquement dans le dossier out/"],
@@ -175,12 +175,12 @@ Tu remplis un PDF formulaire à partir de données JSON.
       id: "install-and-use-skills",
       title: "Installer et utiliser des skills",
       duration: "9 min",
-      tag: "Pratique",
+      tag: "Pratiquez",
       intro:
-        "Trois façons d'ajouter des skills à ton Claude Code : via le registry, manuellement, ou en clonant un repo Git. Et deux façons de les déclencher.",
+        "Trois façons d'ajouter des skills à votre Claude Code : via le registry, manuellement, ou en clonant un repo Git. Et deux façons de les déclencher.",
       sections: [
         {
-          heading: "Méthode 1 — Le registry officiel",
+          heading: "Méthode 1 : Le registry officiel",
           body: "Le plus simple : utiliser <code>claude-mem</code> (le gestionnaire de skills communautaires) pour installer un skill publié.",
           code: {
             lang: "bash",
@@ -199,16 +199,16 @@ npx claude-mem update pdf-fill`,
           },
         },
         {
-          heading: "Méthode 2 — Installation manuelle",
-          body: "Tu peux simplement <strong>copier un dossier</strong> dans le bon emplacement :",
+          heading: "Méthode 2 : Installation manuelle",
+          body: "Vous peux simplement <strong>copier un dossier</strong> dans le bon emplacement :",
           bullets: [
             "<code>.claude/skills/&lt;nom&gt;/</code> → skill spécifique au projet (commit dans Git)",
-            "<code>~/.claude/skills/&lt;nom&gt;/</code> → skill global, dispo sur tous tes projets",
+            "<code>~/.claude/skills/&lt;nom&gt;/</code> → skill global, dispo sur tous vos projets",
             "Pas besoin de redémarrer Claude Code, c'est détecté au prochain message",
           ],
         },
         {
-          heading: "Méthode 3 — Depuis un repo Git",
+          heading: "Méthode 3 : Depuis un repo Git",
           code: {
             lang: "bash",
             label: "Clone direct",
@@ -228,7 +228,7 @@ git submodule add https://github.com/acme/awesome-skill.git`,
             headers: ["Mode", "Comment ça marche", "Quand l'utiliser"],
             rows: [
               ["Auto", "Claude lit la description et active si pertinent", "Skills à usage fréquent et bien décrits"],
-              ["Slash command", "/skill nom-du-skill", "Skills sensibles ou que tu veux contrôler"],
+              ["Slash command", "/skill nom-du-skill", "Skills sensibles ou que vous voulez contrôler"],
             ],
           },
         },
@@ -237,7 +237,7 @@ git submodule add https://github.com/acme/awesome-skill.git`,
           callout: {
             type: "success",
             icon: "✅",
-            text: "Tape /skills dans Claude Code pour voir la liste des skills chargés, leur source (local/global) et leur statut (actif/désactivé).",
+            text: "Tapez /skills dans Claude Code pour voir la liste des skills chargés, leur source (local/global) et leur statut (actif/désactivé).",
           },
         },
         {
@@ -274,7 +274,7 @@ npx claude-mem remove pdf-fill`,
         "On passe à la pratique : on crée un skill <code>release-notes</code> qui génère un changelog à partir des commits Git, on le teste localement, puis on le publie sur npm.",
       sections: [
         {
-          heading: "Étape 1 — Scaffolding",
+          heading: "Étape 1 : Scaffolding",
           code: {
             lang: "bash",
             label: "Création du dossier",
@@ -286,7 +286,7 @@ chmod +x scripts/extract-commits.sh`,
           },
         },
         {
-          heading: "Étape 2 — Écrire le SKILL.md",
+          heading: "Étape 2 : Écrire le SKILL.md",
           code: {
             lang: "markdown",
             label: ".claude/skills/release-notes/SKILL.md",
@@ -314,7 +314,7 @@ allowed-tools:
 ## Format de sortie
 
 \\\`\\\`\\\`markdown
-## [vX.Y.Z] — YYYY-MM-DD
+## [vX.Y.Z] : YYYY-MM-DD
 
 ### Features
 - ...
@@ -329,7 +329,7 @@ allowed-tools:
           },
         },
         {
-          heading: "Étape 3 — Le script helper",
+          heading: "Étape 3 : Le script helper",
           code: {
             lang: "bash",
             label: "scripts/extract-commits.sh",
@@ -346,12 +346,12 @@ fi`,
           },
         },
         {
-          heading: "Étape 4 — Tester en local",
-          body: "Ouvre Claude Code dans le projet, et lance simplement :",
+          heading: "Étape 4 : Tester en local",
+          body: "Ouvrez Claude Code dans le projet, et lancez simplement :",
           bullets: [
-            "<code>Génère-moi les release notes pour la v1.2.0</code> → le skill devrait s'activer auto",
+            "<code>Générez-moi les release notes pour la v1.2.0</code> → le skill devrait s'activer auto",
             "Sinon, force-le : <code>/skill release-notes</code>",
-            "Vérifie que les commits sont bien parsés et que le CHANGELOG.md est créé",
+            "Vérifiez que les commits sont bien parsés et que le CHANGELOG.md est créé",
           ],
           callout: {
             type: "tip",
@@ -360,7 +360,7 @@ fi`,
           },
         },
         {
-          heading: "Étape 5 — Publier sur npm",
+          heading: "Étape 5 : Publier sur npm",
           code: {
             lang: "bash",
             label: "package.json + publish",
@@ -386,21 +386,21 @@ npm publish --access public
         {
           heading: "Quelques idées de skills à créer",
           bullets: [
-            "<strong>db-migrate</strong> — génère une migration Supabase depuis un changement de schéma",
-            "<strong>component-gen</strong> — scaffolde un composant React + tests + Storybook",
-            "<strong>i18n-extract</strong> — extrait les strings hardcodés et génère un fichier de traduction",
-            "<strong>perf-audit</strong> — lance Lighthouse et résume les actions prioritaires",
+            "<strong>db-migrate</strong> : génère une migration Supabase depuis un changement de schéma",
+            "<strong>component-gen</strong> : scaffolde un composant React + tests + Storybook",
+            "<strong>i18n-extract</strong> : extrait les strings hardcodés et générez un fichier de traduction",
+            "<strong>perf-audit</strong> : lance Lighthouse et résume les actions prioritaires",
           ],
           callout: {
             type: "info",
             icon: "📦",
-            text: "Avant de publier sur npm, vérifie qu'aucun skill équivalent n'existe déjà dans le registry. Contribuer à un skill existant > en créer un doublon.",
+            text: "Avant de publier sur npm, vérifiez qu'aucun skill équivalent n'existe déjà dans le registry. Contribuer à un skill existant > en créer un doublon.",
           },
         },
         {
           keypoints: [
             "Scaffolding : mkdir + SKILL.md + scripts/",
-            "La description du frontmatter conditionne l'activation auto — soigne-la",
+            "La description du frontmatter conditionne l'activation auto : soigne-la",
             "Tester avant de publier : Claude Code recharge automatiquement",
             "Publier via npm avec le flag claudeSkill: true",
             "Toujours chercher un skill existant avant d'en créer un nouveau",

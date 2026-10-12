@@ -1,0 +1,510 @@
+{
+  "date": "2026-10-12",
+  "viewport": 390,
+  "checked": [
+    {
+      "route": "/learn/intro/chatting-vs-delegating",
+      "theme": "light",
+      "status": "ok"
+    },
+    {
+      "route": "/learn/intro/what-is-cc",
+      "theme": "light",
+      "status": "ok"
+    },
+    {
+      "route": "/learn/intro/installation",
+      "theme": "light",
+      "status": "ok"
+    },
+    {
+      "route": "/learn/intro/first-steps",
+      "theme": "light",
+      "status": "ok"
+    },
+    {
+      "route": "/learn/files/read-tool",
+      "theme": "light",
+      "status": "ok"
+    },
+    {
+      "route": "/learn/files/write-tool",
+      "theme": "light",
+      "status": "ok"
+    },
+    {
+      "route": "/learn/files/edit-tool",
+      "theme": "light",
+      "status": "ok"
+    },
+    {
+      "route": "/learn/files/glob-grep",
+      "theme": "light",
+      "status": "ok"
+    },
+    {
+      "route": "/learn/tokens/how-models-work",
+      "theme": "light",
+      "status": "ok"
+    },
+    {
+      "route": "/learn/tokens/pricing",
+      "theme": "light",
+      "status": "ok"
+    },
+    {
+      "route": "/learn/code/code-gen",
+      "theme": "light",
+      "status": "ok"
+    },
+    {
+      "route": "/learn/code/refactoring",
+      "theme": "light",
+      "status": "ok"
+    },
+    {
+      "route": "/learn/code/debugging",
+      "theme": "light",
+      "status": "ok"
+    },
+    {
+      "route": "/learn/git/git-ops",
+      "theme": "light",
+      "status": "ok"
+    },
+    {
+      "route": "/learn/git/github-pr",
+      "theme": "light",
+      "status": "ok"
+    },
+    {
+      "route": "/learn/git/bash",
+      "theme": "light",
+      "status": "ok"
+    },
+    {
+      "route": "/learn/memory/claude-md",
+      "theme": "light",
+      "status": "ok"
+    },
+    {
+      "route": "/learn/memory/memory-system",
+      "theme": "light",
+      "status": "ok"
+    },
+    {
+      "route": "/learn/memory/context-management",
+      "theme": "light",
+      "status": "ok"
+    },
+    {
+      "route": "/learn/productivity/slash-commands",
+      "theme": "light",
+      "status": "ok"
+    },
+    {
+      "route": "/learn/productivity/keyboard-shortcuts",
+      "theme": "light",
+      "status": "ok"
+    },
+    {
+      "route": "/learn/productivity/tips",
+      "theme": "light",
+      "status": "ok"
+    },
+    {
+      "route": "/learn/prompt-engineering/anatomie-prompt",
+      "theme": "light",
+      "status": "ok"
+    },
+    {
+      "route": "/learn/prompt-engineering/xml-tags",
+      "theme": "light",
+      "status": "ok"
+    },
+    {
+      "route": "/learn/prompt-engineering/few-shot-cot",
+      "theme": "light",
+      "status": "ok"
+    },
+    {
+      "route": "/learn/prompt-engineering/output-format",
+      "theme": "light",
+      "status": "ok"
+    },
+    {
+      "route": "/learn/prompt-engineering/iterate-debug-prompts",
+      "theme": "light",
+      "status": "ok"
+    },
+    {
+      "route": "/learn/config/settings",
+      "theme": "light",
+      "status": "ok"
+    },
+    {
+      "route": "/learn/config/mcp",
+      "theme": "light",
+      "status": "ok"
+    },
+    {
+      "route": "/learn/config/hooks",
+      "theme": "light",
+      "status": "ok"
+    },
+    {
+      "route": "/learn/plan-agents/plan-mode",
+      "theme": "light",
+      "status": "ok"
+    },
+    {
+      "route": "/learn/plan-agents/subagents",
+      "theme": "light",
+      "status": "ok"
+    },
+    {
+      "route": "/learn/plan-agents/multi-agent",
+      "theme": "light",
+      "status": "ok"
+    },
+    {
+      "route": "/learn/saas-project/project-setup",
+      "theme": "light",
+      "status": "ok"
+    },
+    {
+      "route": "/learn/saas-project/existing-project",
+      "theme": "light",
+      "status": "ok"
+    },
+    {
+      "route": "/learn/saas-project/professional-tips",
+      "theme": "light",
+      "status": "ok"
+    },
+    {
+      "route": "/learn/skills/what-are-skills",
+      "theme": "light",
+      "status": "ok"
+    },
+    {
+      "route": "/learn/skills/anatomy-skill",
+      "theme": "light",
+      "status": "ok"
+    },
+    {
+      "route": "/learn/skills/install-and-use-skills",
+      "theme": "light",
+      "status": "ok"
+    },
+    {
+      "route": "/learn/skills/create-custom-skill",
+      "theme": "light",
+      "status": "ok"
+    },
+    {
+      "route": "/learn/api/first-api-call",
+      "theme": "light",
+      "status": "ok"
+    },
+    {
+      "route": "/learn/api/streaming-and-tools",
+      "theme": "light",
+      "status": "ok"
+    },
+    {
+      "route": "/learn/api/prompt-caching",
+      "theme": "light",
+      "status": "ok"
+    },
+    {
+      "route": "/learn/api/production-best-practices",
+      "theme": "light",
+      "status": "ok"
+    },
+    {
+      "route": "/learn/saas-practical/supabase-setup",
+      "theme": "light",
+      "status": "ok"
+    },
+    {
+      "route": "/learn/saas-practical/auth-oauth-github",
+      "theme": "light",
+      "status": "ok"
+    },
+    {
+      "route": "/learn/saas-practical/vercel-deploy",
+      "theme": "light",
+      "status": "ok"
+    },
+    {
+      "route": "/learn/saas-practical/subagents-parallel-content",
+      "theme": "light",
+      "status": "ok"
+    },
+    {
+      "route": "/learn/saas-practical/debug-ssr-vs-client",
+      "theme": "light",
+      "status": "ok"
+    },
+    {
+      "route": "/learn/intro/chatting-vs-delegating",
+      "theme": "dark",
+      "status": "ok"
+    },
+    {
+      "route": "/learn/intro/what-is-cc",
+      "theme": "dark",
+      "status": "ok"
+    },
+    {
+      "route": "/learn/intro/installation",
+      "theme": "dark",
+      "status": "ok"
+    },
+    {
+      "route": "/learn/intro/first-steps",
+      "theme": "dark",
+      "status": "ok"
+    },
+    {
+      "route": "/learn/files/read-tool",
+      "theme": "dark",
+      "status": "ok"
+    },
+    {
+      "route": "/learn/files/write-tool",
+      "theme": "dark",
+      "status": "ok"
+    },
+    {
+      "route": "/learn/files/edit-tool",
+      "theme": "dark",
+      "status": "ok"
+    },
+    {
+      "route": "/learn/files/glob-grep",
+      "theme": "dark",
+      "status": "ok"
+    },
+    {
+      "route": "/learn/tokens/how-models-work",
+      "theme": "dark",
+      "status": "ok"
+    },
+    {
+      "route": "/learn/tokens/pricing",
+      "theme": "dark",
+      "status": "ok"
+    },
+    {
+      "route": "/learn/code/code-gen",
+      "theme": "dark",
+      "status": "ok"
+    },
+    {
+      "route": "/learn/code/refactoring",
+      "theme": "dark",
+      "status": "ok"
+    },
+    {
+      "route": "/learn/code/debugging",
+      "theme": "dark",
+      "status": "ok"
+    },
+    {
+      "route": "/learn/git/git-ops",
+      "theme": "dark",
+      "status": "ok"
+    },
+    {
+      "route": "/learn/git/github-pr",
+      "theme": "dark",
+      "status": "ok"
+    },
+    {
+      "route": "/learn/git/bash",
+      "theme": "dark",
+      "status": "ok"
+    },
+    {
+      "route": "/learn/memory/claude-md",
+      "theme": "dark",
+      "status": "ok"
+    },
+    {
+      "route": "/learn/memory/memory-system",
+      "theme": "dark",
+      "status": "ok"
+    },
+    {
+      "route": "/learn/memory/context-management",
+      "theme": "dark",
+      "status": "ok"
+    },
+    {
+      "route": "/learn/productivity/slash-commands",
+      "theme": "dark",
+      "status": "ok"
+    },
+    {
+      "route": "/learn/productivity/keyboard-shortcuts",
+      "theme": "dark",
+      "status": "ok"
+    },
+    {
+      "route": "/learn/productivity/tips",
+      "theme": "dark",
+      "status": "ok"
+    },
+    {
+      "route": "/learn/prompt-engineering/anatomie-prompt",
+      "theme": "dark",
+      "status": "ok"
+    },
+    {
+      "route": "/learn/prompt-engineering/xml-tags",
+      "theme": "dark",
+      "status": "ok"
+    },
+    {
+      "route": "/learn/prompt-engineering/few-shot-cot",
+      "theme": "dark",
+      "status": "ok"
+    },
+    {
+      "route": "/learn/prompt-engineering/output-format",
+      "theme": "dark",
+      "status": "ok"
+    },
+    {
+      "route": "/learn/prompt-engineering/iterate-debug-prompts",
+      "theme": "dark",
+      "status": "ok"
+    },
+    {
+      "route": "/learn/config/settings",
+      "theme": "dark",
+      "status": "ok"
+    },
+    {
+      "route": "/learn/config/mcp",
+      "theme": "dark",
+      "status": "ok"
+    },
+    {
+      "route": "/learn/config/hooks",
+      "theme": "dark",
+      "status": "ok"
+    },
+    {
+      "route": "/learn/plan-agents/plan-mode",
+      "theme": "dark",
+      "status": "ok"
+    },
+    {
+      "route": "/learn/plan-agents/subagents",
+      "theme": "dark",
+      "status": "ok"
+    },
+    {
+      "route": "/learn/plan-agents/multi-agent",
+      "theme": "dark",
+      "status": "ok"
+    },
+    {
+      "route": "/learn/saas-project/project-setup",
+      "theme": "dark",
+      "status": "ok"
+    },
+    {
+      "route": "/learn/saas-project/existing-project",
+      "theme": "dark",
+      "status": "ok"
+    },
+    {
+      "route": "/learn/saas-project/professional-tips",
+      "theme": "dark",
+      "status": "ok"
+    },
+    {
+      "route": "/learn/skills/what-are-skills",
+      "theme": "dark",
+      "status": "ok"
+    },
+    {
+      "route": "/learn/skills/anatomy-skill",
+      "theme": "dark",
+      "status": "ok"
+    },
+    {
+      "route": "/learn/skills/install-and-use-skills",
+      "theme": "dark",
+      "status": "ok"
+    },
+    {
+      "route": "/learn/skills/create-custom-skill",
+      "theme": "dark",
+      "status": "ok"
+    },
+    {
+      "route": "/learn/api/first-api-call",
+      "theme": "dark",
+      "status": "ok"
+    },
+    {
+      "route": "/learn/api/streaming-and-tools",
+      "theme": "dark",
+      "status": "ok"
+    },
+    {
+      "route": "/learn/api/prompt-caching",
+      "theme": "dark",
+      "status": "ok"
+    },
+    {
+      "route": "/learn/api/production-best-practices",
+      "theme": "dark",
+      "status": "ok"
+    },
+    {
+      "route": "/learn/saas-practical/supabase-setup",
+      "theme": "dark",
+      "status": "ok"
+    },
+    {
+      "route": "/learn/saas-practical/auth-oauth-github",
+      "theme": "dark",
+      "status": "ok"
+    },
+    {
+      "route": "/learn/saas-practical/vercel-deploy",
+      "theme": "dark",
+      "status": "ok"
+    },
+    {
+      "route": "/learn/saas-practical/subagents-parallel-content",
+      "theme": "dark",
+      "status": "ok"
+    },
+    {
+      "route": "/learn/saas-practical/debug-ssr-vs-client",
+      "theme": "dark",
+      "status": "ok"
+    }
+  ],
+  "modules": 14,
+  "uniqueTitles": 49,
+  "checks": [
+    "Filtre par niveau",
+    "Parcours module → leçon",
+    "Persistance et compteurs après rechargement",
+    "Quiz corrigé sans événement analytique",
+    "Menu clavier : focus, boucle et Échap",
+    "Stockage invalide et stockage refusé",
+    "Métadonnées uniques et JSON-LD de chaque leçon",
+    "Largeur des 49 leçons et 14 modules en clair et sombre",
+    "Navigation suivante conforme au parcours conseillé"
+  ],
+  "errors": []
+}

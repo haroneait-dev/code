@@ -123,14 +123,14 @@ export function TerminalDemo() {
   }
 
   return (
-    <div className="rounded-lg border-[1.5px] border-on-surface bg-[#2b2119] text-[#f6efe3] shadow-[6px_6px_0_rgb(var(--c-green-soft))] overflow-hidden">
+    <div className="rounded-lg border-[1.5px] border-on-surface bg-[#2b2119] text-[#f6efe3] overflow-hidden">
       <div className="flex items-center gap-2 px-4 py-2.5 border-b border-white/10">
-        <span className="w-2.5 h-2.5 rounded-full bg-[#f0a58f]" />
-        <span className="w-2.5 h-2.5 rounded-full bg-[#f2b23e]" />
-        <span className="w-2.5 h-2.5 rounded-full bg-[#9fd3b4]" />
-        <span className="ml-2 font-mono text-[12px] text-[#b8a993]">~/ma-boutique · claude</span>
+        <span className="w-2.5 h-2.5 rounded bg-[#f0a58f]" />
+        <span className="w-2.5 h-2.5 rounded bg-[#f2b23e]" />
+        <span className="w-2.5 h-2.5 rounded bg-[#9fd3b4]" />
+        <span className="ml-2 font-mono text-small text-[#b8a993]">~/ma-boutique · claude</span>
       </div>
-      <div ref={box} className="h-[300px] overflow-y-auto px-4 py-3 font-mono text-[13px] md:text-[14px] leading-[1.7]" aria-live="polite">
+      <div ref={box} className="h-[300px] overflow-y-auto px-4 py-3 font-mono text-small md:text-small leading-[1.7]" aria-live="polite">
         {history.length === 0 && (
           <p className="text-[#b8a993]">
             Tapez une demande comme vous le feriez à Claude Code, ou choisissez une suggestion ci-dessous.
@@ -146,7 +146,7 @@ export function TerminalDemo() {
                 {l.text}
               </p>
             ))}
-            {i === history.length - 1 && busy && <span className="inline-block w-2 h-4 bg-[#f6efe3] align-middle animate-pulse" />}
+            {i === history.length - 1 && busy && <span className="inline-block w-2 h-4 bg-[#f6efe3] align-middle" />}
           </div>
         ))}
       </div>
@@ -163,9 +163,9 @@ export function TerminalDemo() {
           onChange={(e) => setInput(e.target.value)}
           placeholder="ajoute des tests pour la TVA"
           aria-label="Votre demande à Claude Code"
-          className="flex-1 min-w-0 bg-transparent font-mono text-[16px] md:text-[14px] text-[#f6efe3] placeholder:text-[#7d6f5e] outline-none"
+          className="flex-1 min-w-0 bg-transparent font-mono text-body md:text-small text-[#f6efe3] placeholder:text-[#b8a993] outline-none"
         />
-        <button type="submit" disabled={busy} className="font-mono text-[12px] px-3 py-1.5 rounded bg-[#2f5d46] text-[#fbf6ee] disabled:opacity-50" data-ripple>
+        <button type="submit" disabled={busy} className="font-mono text-small px-3 py-1.5 rounded bg-[#2f5d46] text-[#fbf6ee] disabled:opacity-50" data-ripple>
           Entrée
         </button>
       </form>
@@ -176,7 +176,7 @@ export function TerminalDemo() {
             type="button"
             disabled={busy}
             onClick={() => run(s.label)}
-            className="font-mono text-[12px] px-2.5 py-1 rounded border border-white/20 text-[#e9dfcf] hover:border-[#f2b23e] hover:text-[#f2b23e] transition-colors disabled:opacity-50"
+            className="font-mono text-small px-2.5 py-1 rounded border border-white/20 text-[#e9dfcf] hover:border-[#f2b23e] hover:text-[#f2b23e] transition-colors disabled:opacity-50"
           >
             {s.label}
           </button>

@@ -1,0 +1,122 @@
+[
+  {
+    "theme": ":root",
+    "foreground": "on-surface",
+    "background": "surface",
+    "ratio": 14.63
+  },
+  {
+    "theme": ":root",
+    "foreground": "on-surface-variant",
+    "background": "surface",
+    "ratio": 6.45
+  },
+  {
+    "theme": ":root",
+    "foreground": "primary",
+    "background": "surface",
+    "ratio": 7.03
+  },
+  {
+    "theme": ":root",
+    "foreground": "tertiary",
+    "background": "surface",
+    "ratio": 5.91
+  },
+  {
+    "theme": ":root",
+    "foreground": "on-primary",
+    "background": "primary",
+    "ratio": 7.39
+  },
+  {
+    "theme": ":root",
+    "foreground": "on-primary-container",
+    "background": "primary-container",
+    "ratio": 4.94
+  },
+  {
+    "theme": ":root",
+    "foreground": "on-primary-fixed",
+    "background": "mark",
+    "ratio": 11.01
+  },
+  {
+    "theme": ":root",
+    "foreground": "on-tertiary-container",
+    "background": "tertiary-container",
+    "ratio": 9.05
+  },
+  {
+    "theme": ":root",
+    "foreground": "on-secondary-container",
+    "background": "secondary-container",
+    "ratio": 7.55
+  },
+  {
+    "theme": ":root",
+    "foreground": "error",
+    "background": "surface",
+    "ratio": 6
+  },
+  {
+    "theme": ".dark",
+    "foreground": "on-surface",
+    "background": "surface",
+    "ratio": 14.93
+  },
+  {
+    "theme": ".dark",
+    "foreground": "on-surface-variant",
+    "background": "surface",
+    "ratio": 8.96
+  },
+  {
+    "theme": ".dark",
+    "foreground": "primary",
+    "background": "surface",
+    "ratio": 9.25
+  },
+  {
+    "theme": ".dark",
+    "foreground": "tertiary",
+    "background": "surface",
+    "ratio": 10.74
+  },
+  {
+    "theme": ".dark",
+    "foreground": "on-primary",
+    "background": "primary",
+    "ratio": 8.24
+  },
+  {
+    "theme": ".dark",
+    "foreground": "on-primary-container",
+    "background": "primary-container",
+    "ratio": 6.64
+  },
+  {
+    "theme": ".dark",
+    "foreground": "on-primary-fixed",
+    "background": "mark",
+    "ratio": 7.18
+  },
+  {
+    "theme": ".dark",
+    "foreground": "on-tertiary-container",
+    "background": "tertiary-container",
+    "ratio": 9.05
+  },
+  {
+    "theme": ".dark",
+    "foreground": "on-secondary-container",
+    "background": "secondary-container",
+    "ratio": 9.07
+  },
+  {
+    "theme": ".dark",
+    "foreground": "error",
+    "background": "surface",
+    "ratio": 10.57
+  }
+]

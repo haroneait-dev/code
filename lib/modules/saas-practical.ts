@@ -2,7 +2,7 @@ import type { Module } from "../curriculum";
 
 export const saasPracticalModule: Module = {
   id: "saas-practical",
-  title: "SaaS Pratique (Supabase, Vercel, Auth)",
+  title: "SaaS Pratiquez (Supabase, Vercel, Auth)",
   emoji: "🚀",
   color: "#9a8060",
   lessons: [
@@ -12,11 +12,11 @@ export const saasPracticalModule: Module = {
       duration: "18 min",
       tag: "Backend",
       intro:
-        "Supabase = ton backend en 10 minutes : Postgres + Auth + Storage + Realtime. Voici le workflow exact qu'on utilise sur ce projet pour partir d'un schéma vide et arriver à une API sécurisée par RLS, le tout piloté par Claude Code.",
+        "Supabase = votre backend en 10 minutes : Postgres + Auth + Storage + Realtime. Voici le workflow exact qu'on utilise sur ce projet pour partir d'un schéma vide et arriver à une API sécurisée par RLS, le tout piloté par Claude Code.",
       sections: [
         {
           heading: "1. Créer le projet et récupérer les clés",
-          body: "Va sur <strong>supabase.com</strong> → New project → choisis une région proche de tes utilisateurs (eu-west-3 pour la France). Note bien le mot de passe Postgres, tu en auras besoin pour les migrations CLI plus tard. Une fois le projet provisionné (≈2 min), récupère les 3 clés depuis <code>Settings → API</code>.",
+          body: "Va sur <strong>supabase.com</strong> → New project → choisis une région proche de vos utilisateurs (eu-west-3 pour la France). Notez bien le mot de passe Postgres, vous en aurez besoin pour les migrations CLI plus tard. Une fois le projet provisionné (≈2 min), récupère les 3 clés depuis <code>Settings → API</code>.",
         },
         {
           code: {
@@ -24,19 +24,19 @@ export const saasPracticalModule: Module = {
             label: ".env.local",
             code: `NEXT_PUBLIC_SUPABASE_URL=https://xxxxx.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOi...
-SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOi...  # SERVEUR UNIQUEMENT — jamais NEXT_PUBLIC_`,
+SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOi...  # SERVEUR UNIQUEMENT : jamais NEXT_PUBLIC_`,
           },
         },
         {
           callout: {
             type: "warn",
             icon: "⚠️",
-            text: "La SERVICE_ROLE_KEY bypasse toutes les RLS. Si elle leak côté client, n'importe qui peut lire/écrire dans toutes tes tables. Ne la préfixe JAMAIS par NEXT_PUBLIC_ et ne la commit pas.",
+            text: "La SERVICE_ROLE_KEY bypasse toutes les RLS. Si elle leak côté client, n'importe qui peut lire/écrire dans toutes vos tables. Ne la préfixe JAMAIS par NEXT_PUBLIC_ et ne la commit pas.",
           },
         },
         {
           heading: "2. Schéma SQL via le SQL Editor",
-          body: "Plutôt que de cliquer dans Table Editor, demande à Claude Code de générer le SQL complet (tables + index + RLS) et colle-le dans <strong>SQL Editor → New query</strong>. Tu gardes ainsi le schéma versionné dans ton repo (<code>supabase/schema.sql</code>).",
+          body: "Plutôt que de cliquer dans Table Editor, demandez à Claude Code de générer le SQL complet (tables + index + RLS) et colle-le dans <strong>SQL Editor → New query</strong>. Vous gardez ainsi le schéma versionné dans votre repo (<code>supabase/schema.sql</code>).",
           code: {
             lang: "sql",
             label: "supabase/schema.sql",
@@ -89,13 +89,13 @@ export const supabase = new Proxy({} as ReturnType<typeof createBrowserClient>, 
           callout: {
             type: "tip",
             icon: "💡",
-            text: "Active RLS sur TOUTES tes tables dès la création, même les tables 'internes'. C'est plus simple d'ouvrir une policy plus tard que de découvrir une fuite en prod.",
+            text: "Active RLS sur TOUTES vos tables dès la création, même les tables 'internes'. C'est plus simple d'ouvrir une policy plus tard que de découvrir une fuite en prod.",
           },
         },
         {
           keypoints: [
             "3 env vars : URL + ANON_KEY (public) + SERVICE_ROLE_KEY (serveur strict)",
-            "Versionne ton schéma SQL dans le repo, pas dans Table Editor",
+            "Versionne votre schéma SQL dans le repo, pas dans Table Editor",
             "RLS activée partout, policies explicites par table",
             "Client Proxy lazy pour éviter le crash au build sans env vars",
           ],
@@ -112,13 +112,13 @@ export const supabase = new Proxy({} as ReturnType<typeof createBrowserClient>, 
       sections: [
         {
           heading: "1. Activer le provider GitHub",
-          body: "Dans Supabase : <code>Authentication → Providers → GitHub → Enable</code>. Il te demande Client ID + Client Secret. Va créer une OAuth App sur <strong>github.com/settings/developers</strong> avec comme Authorization callback URL : <code>https://xxxxx.supabase.co/auth/v1/callback</code> (l'URL Supabase, pas la tienne).",
+          body: "Dans Supabase : <code>Authentication → Providers → GitHub → Enable</code>. Il vous demande Client ID + Client Secret. Va créer une OAuth App sur <strong>github.com/settings/developers</strong> avec comme Authorization callback URL : <code>https://xxxxx.supabase.co/auth/v1/callback</code> (l'URL Supabase, pas la tienne).",
         },
         {
           callout: {
             type: "info",
             icon: "ℹ️",
-            text: "Pour le dev local, crée une SECONDE OAuth App GitHub avec callback localhost:3000. GitHub n'autorise qu'une seule callback URL par app.",
+            text: "Pour le dev local, créez une SECONDE OAuth App GitHub avec callback localhost:3000. GitHub n'autorise qu'une seule callback URL par app.",
           },
         },
         {
@@ -140,7 +140,7 @@ export const supabase = new Proxy({} as ReturnType<typeof createBrowserClient>, 
         },
         {
           heading: "3. Callback route (PKCE flow)",
-          body: "Supabase redirige vers <code>/auth/callback?code=xxx</code>. Tu dois échanger ce code contre une session, puis rediriger vers l'app. Le client SSR pose les cookies de session automatiquement.",
+          body: "Supabase redirige vers <code>/auth/callback?code=xxx</code>. Vous dois échanger ce code contre une session, puis rediriger vers l'app. Le client SSR pose les cookies de session automatiquement.",
           code: {
             lang: "ts",
             label: "app/auth/callback/route.ts",
@@ -175,7 +175,7 @@ export async function GET(request: Request) {
         },
         {
           heading: "4. Middleware pour rafraîchir la session",
-          body: "Sans middleware, le token JWT expire au bout d'une heure et l'utilisateur est déconnecté silencieusement. Le middleware Next.js (ou <code>proxy.ts</code> selon ta version) intercepte CHAQUE request pour refresh le token via le refresh_token cookie.",
+          body: "Sans middleware, le token JWT expire au bout d'une heure et l'utilisateur est déconnecté silencieusement. Le middleware Next.js (ou <code>proxy.ts</code> selon votre version) intercepte CHAQUE request pour refresh le token via le refresh_token cookie.",
           code: {
             lang: "ts",
             label: "middleware.ts (racine du projet)",
@@ -217,7 +217,7 @@ export const config = {
         },
         {
           keypoints: [
-            "Provider GitHub activé côté Supabase, callback URL pointant vers supabase.co (pas vers toi)",
+            "Provider GitHub activé côté Supabase, callback URL pointant vers supabase.co (pas vers vous)",
             "Route /auth/callback obligatoire pour échanger le code PKCE en session",
             "Middleware sur toutes les routes pour refresh le token JWT + gate les routes privées",
             "Vérif d'auth côté serveur, jamais juste côté client",
@@ -231,7 +231,7 @@ export const config = {
       duration: "15 min",
       tag: "Deploy",
       intro:
-        "Vercel + Next.js c'est 3 commandes pour passer du localhost à une URL publique en HTTPS, edge cache inclus. Voici le workflow CLI qu'on utilise au quotidien — sans cliquer dans le dashboard.",
+        "Vercel + Next.js c'est 3 commandes pour passer du localhost à une URL publique en HTTPS, edge cache inclus. Voici le workflow CLI qu'on utilise au quotidien : sans cliquer dans le dashboard.",
       sections: [
         {
           heading: "1. Installation et link initial",
@@ -251,7 +251,7 @@ vercel link
         },
         {
           heading: "2. Variables d'environnement",
-          body: "Ne JAMAIS copier-coller tes secrets dans le dashboard Vercel. Push-les en CLI, c'est plus rapide et tu peux scripter.",
+          body: "Ne JAMAIS copier-coller vos secrets dans le dashboard Vercel. Push-les en CLI, c'est plus rapide et vous pouvez scripter.",
           code: {
             lang: "bash",
             label: "Push env vars vers Vercel",
@@ -268,7 +268,7 @@ vercel env ls`,
         },
         {
           heading: "3. Preview vs Production",
-          body: "Chaque <code>git push</code> sur une branche crée une URL de preview unique (<code>mon-saas-git-feat-x.vercel.app</code>). Le push sur <strong>main</strong> déploie en production. Tu peux aussi forcer en CLI :",
+          body: "Chaque <code>git push</code> sur une branche crée une URL de preview unique (<code>mon-saas-git-feat-x.vercel.app</code>). Le push sur <strong>main</strong> déploie en production. Vous peux aussi forcer en CLI :",
           code: {
             lang: "bash",
             label: "Deploy commands",
@@ -282,12 +282,12 @@ vercel rollback     # Revenir au déploiement précédent`,
           callout: {
             type: "tip",
             icon: "🚀",
-            text: "Active Deployment Protection sur les previews (Settings → Deployment Protection → Vercel Authentication). Ça évite que Google indexe tes URL de staging et que les clients voient des features en cours.",
+            text: "Active Deployment Protection sur les previews (Settings → Deployment Protection → Vercel Authentication). Ça évite que Google indexe vos URL de staging et que les clients voient des features en cours.",
           },
         },
         {
           heading: "4. Custom domain",
-          body: "Settings → Domains → Add. Vercel te donne soit un CNAME (sous-domaine) soit des A records (apex domain). Le SSL est automatique via Let's Encrypt, propagation DNS en ~2 min.",
+          body: "Settings → Domains → Add. Vercel vous donne soit un CNAME (sous-domaine) soit des A records (apex domain). Le SSL est automatique via Let's Encrypt, propagation DNS en ~2 min.",
           table: {
             headers: ["Type domaine", "Record", "Valeur"],
             rows: [
@@ -301,7 +301,7 @@ vercel rollback     # Revenir au déploiement précédent`,
           callout: {
             type: "warn",
             icon: "⚠️",
-            text: "Si ton app utilise NEXT_PUBLIC_SITE_URL pour les redirects OAuth, n'oublie pas de l'updater APRÈS avoir branché le custom domain, sinon les redirections cassent en prod.",
+            text: "Si votre app utilise NEXT_PUBLIC_SITE_URL pour les redirects OAuth, n'oublie pas de l'updater APRÈS avoir branché le custom domain, sinon les redirections cassent en prod.",
           },
         },
         {
@@ -320,21 +320,21 @@ vercel rollback     # Revenir au déploiement précédent`,
       duration: "25 min",
       tag: "Workflow",
       intro:
-        "Tu dois générer 200 pages SEO, 50 articles MDX, ou traduire une doc complète ? Le pattern subagents parallèles te permet de paralléliser le travail tout en gardant un contrôle qualité. Cette leçon décrit le workflow exact qu'on a utilisé pour écrire 194 articles MDX en une après-midi.",
+        "Vous dois générer 200 pages SEO, 50 articles MDX, ou traduire une doc complèvous ? Le pattern subagents parallèles vous permet de paralléliser le travail tout en gardant un contrôle qualité. Cette leçon décrit le workflow exact qu'on a utilisé pour écrire 194 articles MDX en une après-midi.",
       sections: [
         {
           heading: "1. Le pattern orchestrateur → workers",
-          body: "L'idée : un agent <strong>orchestrateur</strong> (toi en chat principal) lance N <strong>subagents Task</strong> en parallèle, chacun avec un prompt focused sur UNE tâche atomique (ex: \"écris l'article sur X\"). Chaque subagent a son propre contexte vierge, donc pas de pollution croisée.",
+          body: "L'idée : un agent <strong>orchestrateur</strong> (vous en chat principal) lance N <strong>subagents Task</strong> en parallèle, chacun avec un prompt focused sur UNE tâche atomique (ex: \"écris l'article sur X\"). Chaque subagent a son propre contexte vierge, donc pas de pollution croisée.",
           bullets: [
             "Orchestrateur = découpe le plan, distribue, agrège",
             "Workers = exécutent une tâche unique, retournent un résultat structuré",
-            "Tu peux lancer 5-10 subagents simultanément en un seul message",
+            "Vous peux lancer 5-10 subagents simultanément en un seul message",
             "Coût ≈ N × coût d'un appel, mais latence ≈ celle d'1 seul",
           ],
         },
         {
           heading: "2. Préparer le plan en amont",
-          body: "Avant de lancer 200 subagents, génère d'abord un <strong>fichier de plan</strong> (CSV ou JSON) avec toutes les tâches. Chaque ligne = un slug + un titre + des keywords. Le subagent reçoit UNE ligne et produit UN fichier.",
+          body: "Avant de lancer 200 subagents, générez d'abord un <strong>fichier de plan</strong> (CSV ou JSON) avec toutes les tâches. Chaque ligne = un slug + un titre + des keywords. Le subagent reçoit UNE ligne et produit UN fichier.",
           code: {
             lang: "json",
             label: "content-plan.json",
@@ -400,13 +400,13 @@ comm -23 /tmp/expected.txt /tmp/done.txt`,
         },
         {
           heading: "5. Déduplication post-process",
-          body: "Les subagents indépendants peuvent produire du contenu similaire (intros copier-collées, mêmes exemples). Un dernier passage de <strong>linting sémantique</strong> détecte les doublons : embed chaque article, calcule la similarité cosine, flag les paires > 0.92.",
+          body: "Les subagents indépendants peuvent produire du contenu similaire (intros copier-collées, mêmes exemples). Un dernier passage de <strong>linting sémantique</strong> détecte les doublons : embed chaque article, calculez la similarité cosine, flag les paires > 0.92.",
         },
         {
           callout: {
             type: "warn",
             icon: "⚠️",
-            text: "Ne lance pas 50 subagents d'un coup si chacun fait des Write/Edit sur les MÊMES fichiers. Tu auras des conflits silencieux. Garantis qu'un subagent = un fichier de sortie unique.",
+            text: "Ne lance pas 50 subagents d'un coup si chacun fait des Write/Edit sur les MÊMES fichiers. Vous auras des conflits silencieux. Garantis qu'un subagent = un fichier de sortie unique.",
           },
         },
         {
@@ -430,7 +430,7 @@ comm -23 /tmp/expected.txt /tmp/done.txt`,
       sections: [
         {
           heading: "1. Vérifier les env vars Vercel (90% des cas)",
-          body: "L'erreur N°1 : tu as ajouté une nouvelle variable dans <code>.env.local</code> mais oublié de la pousser sur Vercel. Le build passe (Next.js ne crash pas sur env manquante), mais le runtime explose à la première utilisation.",
+          body: "L'erreur N°1 : vous avez ajouté une nouvelle variable dans <code>.env.local</code> mais oublié de la pousser sur Vercel. Le build passe (Next.js ne crash pas sur env manquante), mais le runtime explose à la première utilisation.",
           code: {
             lang: "bash",
             label: "Diagnostic env",
@@ -442,18 +442,18 @@ diff /tmp/local-env.txt /tmp/vercel-env.txt`,
         },
         {
           heading: "2. Deployment Protection activée par erreur",
-          body: "Si tu as activé <strong>Vercel Authentication</strong> sur ton projet, TOUTES les requêtes (y compris depuis ton frontend) reçoivent une page de login Vercel à la place de ta réponse JSON. Symptôme typique : <code>fetch('/api/...')</code> retourne du HTML au lieu de JSON, et JSON.parse explose.",
+          body: "Si vous avez activé <strong>Vercel Authentication</strong> sur votre projet, TOUTES les requêvos (y compris depuis votre frontend) reçoivent une page de login Vercel à la place de votre réponse JSON. Symptôme typique : <code>fetch('/api/...')</code> retourne du HTML au lieu de JSON, et JSON.parse explose.",
         },
         {
           callout: {
             type: "warn",
             icon: "🛡️",
-            text: "Settings → Deployment Protection → désactive sur 'Production' (laisse-la sur 'Preview' si tu veux). Ou ajoute des bypass tokens pour tes appels API legit.",
+            text: "Settings → Deployment Protection → désactive sur 'Production' (laisse-la sur 'Preview' si vous voulez). Ou ajoute des bypass tokens pour vos appels API legit.",
           },
         },
         {
           heading: "3. Session client-only qui ne suit pas en SSR",
-          body: "Tu utilises <code>supabase.auth.getSession()</code> côté serveur dans un Route Handler ? Si tu instancies un client browser, il n'a pas accès aux cookies. Résultat : <code>session = null</code> en prod, alors que ton client voit bien l'utilisateur connecté.",
+          body: "Vous utilisez <code>supabase.auth.getSession()</code> côté serveur dans un Route Handler ? Si vous instanciez un client browser, il n'a pas accès aux cookies. Résultat : <code>session = null</code> en prod, alors que votre client voit bien l'utilisateur connecté.",
           code: {
             lang: "ts",
             label: "Le bug classique",
@@ -474,7 +474,7 @@ export async function POST(req: Request) {
         },
         {
           heading: "4. Modales invisibles : backdrop-filter et z-index",
-          body: "Cas tordu mais fréquent : ta modale s'ouvre (le DOM est là, tu la vois dans l'inspecteur) mais elle est invisible. Causes typiques :",
+          body: "Cas tordu mais fréquent : votre modale s'ouvre (le DOM est là, vous la voyez dans l'inspecteur) mais elle est invisible. Causes typiques :",
           bullets: [
             "<code>backdrop-filter: blur()</code> appliqué sur un parent qui crée un nouveau stacking context → le z-index enfant ne grimpe plus au-dessus",
             "Un ancêtre avec <code>overflow: hidden</code> + <code>transform</code> qui clip la modale",
@@ -486,7 +486,7 @@ export async function POST(req: Request) {
           callout: {
             type: "info",
             icon: "🔍",
-            text: "Astuce : dans l'inspecteur Chrome, sélectionne ta modale → 3D View (Layers panel). Si elle n'est pas au top de la pile, tu vois immédiatement quel ancêtre la coince.",
+            text: "Astuce : dans l'inspecteur Chrome, sélectionne votre modale → 3D View (Layers panel). Si elle n'est pas au top de la pile, vous voyez immédiatement quel ancêtre la coince.",
           },
         },
         {
@@ -508,14 +508,14 @@ export async function POST(req: Request) {
           callout: {
             type: "tip",
             icon: "💡",
-            text: "Garde TOUJOURS <code>vercel logs --follow</code> ouvert dans un terminal pendant que tu reproduis le bug. 80% du temps, l'erreur exacte est dans les logs et te fait gagner 1h de debug.",
+            text: "Garde TOUJOURS <code>vercel logs --follow</code> ouvert dans un terminal pendant que vous reproduisez le bug. 80% du temps, l'erreur exacte est dans les logs et vous fait gagner 1h de debug.",
           },
         },
         {
           keypoints: [
             "Env vars Vercel décalées du .env.local = cause N°1",
-            "Deployment Protection sur production casse tous tes appels API",
-            "Client browser Supabase ne marche pas côté serveur, utilise le token Bearer",
+            "Deployment Protection sur production casse tous vos appels API",
+            "Client browser Supabase ne marche pas côté serveur, utilisez le token Bearer",
             "Modale invisible = stacking context cassé par un parent (backdrop-filter, transform)",
             "vercel logs --follow + reproduire avec npm run build && npm start",
           ],

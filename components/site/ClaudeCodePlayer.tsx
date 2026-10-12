@@ -34,8 +34,8 @@ export function ClaudeCodePlayer({ className = "" }: { className?: string }) {
   }, []);
 
   return (
-    <div ref={ref} className={`aspect-[16/10] w-full pointer-events-none select-none ${className}`} aria-label="Animation : Claude Code ajoute un mode sombre à un site et lance les tests" role="img">
-      {!visible && <div className="w-full h-full rounded-[18px] bg-[#2b2119] shadow-[10px_10px_0_rgb(var(--c-mark))] scale-[0.94]" />}
+    <div ref={ref} className={`aspect-[16/10] w-full select-none ${className}`} aria-label="Animation : Claude Code ajoute un mode sombre à un site et lance les tests" role="img">
+      {!visible && <div className="w-full h-full rounded-lg bg-[rgb(var(--c-on-surface))] scale-[0.94]" />}
       {visible && (
         <Player
           component={ClaudeCodeDemo}
@@ -44,9 +44,9 @@ export function ClaudeCodePlayer({ className = "" }: { className?: string }) {
           compositionWidth={880}
           compositionHeight={550}
           style={{ width: "100%", height: "100%" }}
-          autoPlay={!reduce}
-          loop
-          controls={false}
+          autoPlay={false}
+          loop={false}
+          controls={!reduce}
           initialFrame={reduce ? 300 : 0}
           acknowledgeRemotionLicense
         />

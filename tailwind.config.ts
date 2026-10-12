@@ -60,15 +60,13 @@ const config: Config = {
         background: "rgb(var(--c-background) / <alpha-value>)",
         "on-background": "rgb(var(--c-on-background) / <alpha-value>)",
       },
-      borderRadius: {
-        DEFAULT: "0.375rem",
-        sm: "0.25rem",
-        md: "0.5rem",
-        lg: "0.625rem",
-        xl: "0.875rem",
-        full: "9999px",
-      },
+      // Deux rayons : champs/boutons (petit), cartes (moyen).
+      borderRadius: { DEFAULT: "0.375rem", sm: "0.375rem", md: "0.375rem", lg: "0.75rem", xl: "0.75rem", "2xl": "0.75rem", full: "0.75rem" },
+      // Une seule ombre, réservée à un encart mis en avant par écran.
+      boxShadow: { note: "4px 4px 0 rgb(var(--c-mark))" },
       spacing: {
+        section: "var(--space-section)",
+        compact: "var(--space-compact)",
         unit: "8px",
         gutter: "24px",
         "margin-mobile": "20px",
@@ -76,6 +74,7 @@ const config: Config = {
         "container-max": "1200px",
       },
       maxWidth: {
+        reading: "70ch",
         "container-max": "1200px",
       },
       fontFamily: {
@@ -88,13 +87,21 @@ const config: Config = {
         sans: ["var(--font-body)", "Figtree", "ui-sans-serif", "sans-serif"],
         mono: ["var(--font-jbm)", "JetBrains Mono", "monospace"],
       },
+      // Six niveaux responsives, définis dans globals.css. Les alias
+      // historiques gardent les anciens composants compatibles.
       fontSize: {
-        "body-sm": ["14px", { lineHeight: "1.5", letterSpacing: "0", fontWeight: "400" }],
-        "code-md": ["14px", { lineHeight: "1.6", letterSpacing: "0", fontWeight: "400" }],
-        "headline-lg": ["32px", { lineHeight: "1.2", letterSpacing: "-0.01em", fontWeight: "600" }],
-        "body-rt": ["17px", { lineHeight: "1.6", letterSpacing: "0", fontWeight: "400" }],
-        "display-xl": ["48px", { lineHeight: "1.1", letterSpacing: "-0.02em", fontWeight: "700" }],
-        "headline-lg-mobile": ["28px", { lineHeight: "1.2", letterSpacing: "-0.01em", fontWeight: "600" }],
+        display: ["var(--type-display)", { lineHeight: "1.08" }],
+        h1: ["var(--type-h1)", { lineHeight: "1.15" }],
+        h2: ["var(--type-h2)", { lineHeight: "1.2" }],
+        h3: ["var(--type-h3)", { lineHeight: "1.3" }],
+        body: ["var(--type-body)", { lineHeight: "1.7" }],
+        small: ["var(--type-small)", { lineHeight: "1.6" }],
+        "body-sm": ["var(--type-small)", { lineHeight: "1.6" }],
+        "code-md": ["var(--type-small)", { lineHeight: "1.7" }],
+        "body-rt": ["var(--type-body)", { lineHeight: "1.7" }],
+        "display-xl": ["var(--type-display)", { lineHeight: "1.08" }],
+        "headline-lg": ["var(--type-h2)", { lineHeight: "1.2" }],
+        "headline-lg-mobile": ["var(--type-h2)", { lineHeight: "1.2" }],
       },
     },
   },

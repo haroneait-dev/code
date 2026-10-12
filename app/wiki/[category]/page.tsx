@@ -29,7 +29,7 @@ export default async function CategoryPage({
     <div className="min-h-screen flex flex-col">
       <SiteHeader active={cat?.section === "claude" ? "claude" : cat?.section === "code" ? "code" : "wiki"} showSearch />
 
-      <main className="flex-grow w-full max-w-container-max mx-auto px-margin-mobile md:px-margin-desktop py-12">
+      <main className="flex-grow w-full max-w-container-max mx-auto px-margin-mobile md:px-margin-desktop py-section">
         <nav className="flex items-center gap-2 text-on-surface-variant font-body-sm mb-8">
           <Link href="/wiki" className="hover:text-primary transition-colors">
             Wiki
@@ -38,10 +38,10 @@ export default async function CategoryPage({
           <span className="text-on-surface">{cat.name}</span>
         </nav>
 
-        <h1 className="font-display-xl text-[40px] md:text-[56px] font-extrabold tracking-tight mb-4 text-on-surface">
+        <h1 className="text-h1 font-display-xl font-extrabold tracking-tight mb-4 text-on-surface">
           {cat.name}
         </h1>
-        <p className="font-body-rt text-body-rt md:text-[19px] text-on-surface-variant mb-12 max-w-2xl">
+        <p className="font-body-rt text-body-rt md:text-body text-on-surface-variant mb-12 max-w-2xl">
           {cat.description}
         </p>
 

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { motion } from "motion/react";
+import { motion, useReducedMotion } from "motion/react";
 import { ArrowRight } from "lucide-react";
 import { MODELS } from "@/lib/models";
 
@@ -23,7 +23,7 @@ const fmtEur = (n: number) =>
 function Slider({ label, values, index, onChange, format }: { label: string; values: number[]; index: number; onChange: (i: number) => void; format: (n: number) => string }) {
   return (
     <label className="block">
-      <span className="flex justify-between text-[15px] mb-2">
+      <span className="flex justify-between text-small mb-2">
         <span className="text-on-surface-variant">{label}</span>
         <span className="font-mono font-semibold text-on-surface tabular-nums">{format(values[index])}</span>
       </span>
@@ -33,6 +33,7 @@ function Slider({ label, values, index, onChange, format }: { label: string; val
 }
 
 export function ModelPicker() {
+  const reduce = useReducedMotion();
   const [tier, setTier] = useState(1);
   const [vol, setVol] = useState(2);
   const [inp, setInp] = useState(1);
@@ -53,7 +54,7 @@ export function ModelPicker() {
     <div className="grid grid-cols-1 lg:grid-cols-[1fr_1fr] gap-6">
       <div className="rounded-lg border-[1.5px] border-on-surface bg-surface-container-lowest p-6 md:p-8 space-y-7">
         <div>
-          <p className="text-[15px] text-on-surface-variant mb-3">Ce que vous demandez surtout</p>
+          <p className="text-small text-on-surface-variant mb-3">Ce que vous demandez surtout</p>
           <div className="grid grid-cols-2 gap-2">
             {TASKS.map((t) => (
               <button
@@ -61,7 +62,7 @@ export function ModelPicker() {
                 type="button"
                 onClick={() => setTier(t.tier)}
                 aria-pressed={tier === t.tier}
-                className={`text-left text-[14px] leading-snug rounded-md border px-3 py-2.5 transition-colors ${tier === t.tier ? "border-primary bg-primary text-on-primary" : "border-outline-variant hover:border-on-surface"}`}
+                className={`text-left text-small leading-snug rounded border px-3 py-2.5 transition-colors ${tier === t.tier ? "border-primary bg-primary text-on-primary" : "border-outline-variant hover:border-on-surface"}`}
               >
                 {t.label}
               </button>
@@ -71,30 +72,30 @@ export function ModelPicker() {
         <Slider label="Demandes par jour" values={VOLUMES} index={vol} onChange={setVol} format={(n) => n.toLocaleString("fr-FR")} />
         <Slider label="Texte envoyé par demande (tokens)" values={INPUTS} index={inp} onChange={setInp} format={fmtTok} />
         <Slider label="Longueur des réponses (tokens)" values={OUTPUTS} index={out} onChange={setOut} format={fmtTok} />
-        <p className="text-[13px] text-on-surface-variant leading-relaxed">
+        <p className="text-small text-on-surface-variant leading-relaxed">
           1 000 tokens ≈ 750 mots. Ces prix concernent l'API. Avec un abonnement Claude (Pro, Max), vous ne payez pas au token.
         </p>
       </div>
 
-      <div className="rounded-lg border-[1.5px] border-on-surface bg-surface-container-low p-6 md:p-8 shadow-[6px_6px_0_rgb(var(--c-mark))]">
-        <p className="font-mono text-[13px] text-on-surface-variant mb-2">Notre conseil</p>
-        <motion.p key={pick.id} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="font-headline-lg text-[34px] md:text-[42px] leading-none font-extrabold text-on-surface mb-3">
+      <div className="rounded-lg border-[1.5px] border-on-surface bg-surface-container-low p-6 md:p-8">
+        <p className="font-mono text-small text-on-surface-variant mb-2">Notre conseil</p>
+        <motion.p key={pick.id} initial={reduce ? false : { opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="font-headline-lg text-h2 md:text-h1 leading-none font-extrabold text-on-surface mb-3">
           <span className="text-mark">{pick.name}</span>
         </motion.p>
-        <p className="text-[16px] text-on-surface-variant leading-relaxed mb-6">{pick.pitch}</p>
-        <p className="font-mono text-[13px] text-on-surface-variant mb-3">Coût estimé par mois</p>
+        <p className="text-body text-on-surface-variant leading-relaxed mb-6">{pick.pitch}</p>
+        <p className="font-mono text-small text-on-surface-variant mb-3">Coût estimé par mois</p>
         <div className="space-y-3 mb-6">
           {costs.map(({ m, monthly, fits }) => (
             <div key={m.id}>
-              <div className="flex justify-between text-[14px] mb-1">
+              <div className="flex justify-between text-small mb-1">
                 <span className={m.id === pick.id ? "font-bold text-on-surface" : "text-on-surface-variant"}>{m.name}</span>
                 <span className="font-mono tabular-nums">{fits ? fmtEur(monthly) : "contexte trop court"}</span>
               </div>
-              <div className="h-2.5 rounded-full bg-surface-container-high overflow-hidden">
+              <div className="h-2.5 rounded bg-surface-container-high overflow-hidden">
                 <motion.div
-                  className={`h-full rounded-full ${m.id === pick.id ? "bg-primary" : "bg-[rgb(var(--c-on-surface-variant)/0.35)]"}`}
+                  className={`h-full rounded ${m.id === pick.id ? "bg-primary" : "bg-[rgb(var(--c-on-surface-variant)/0.35)]"}`}
                   animate={{ width: fits ? `${Math.max(2, (monthly / max) * 100)}%` : "0%" }}
-                  transition={{ type: "spring", stiffness: 180, damping: 24 }}
+                  transition={{ duration: reduce ? 0 : 0.2 }}
                 />
               </div>
             </div>

@@ -35,7 +35,7 @@ export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: {
     default: "Claude Mastery : apprendre Claude et Claude Code en français",
-    template: "%s — Claude Mastery",
+    template: "%s : Claude Mastery",
   },
   description:
     "Apprendre Claude et Claude Code en français : guides pour l'assistant au quotidien, formation et wiki pour les développeurs. Gratuit, sans inscription.",
@@ -55,13 +55,13 @@ export const metadata: Metadata = {
     locale: "fr_FR",
     url: siteUrl,
     siteName: "Claude Mastery",
-    title: "Claude Mastery — Formation Claude Code en français",
+    title: "Claude Mastery  : Formation Claude Code en français",
     description:
       "Maîtrise Claude Code avec la formation francophone de référence. Modules pratiques, wiki et fiches, en accès libre.",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Claude Mastery — Formation Claude Code en français",
+    title: "Claude Mastery  : Formation Claude Code en français",
     description:
       "Maîtrise Claude Code avec la formation francophone de référence.",
   },

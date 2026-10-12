@@ -63,10 +63,10 @@ export function Quiz() {
     return (
       <div className="max-w-2xl mx-auto">
         <p className="tag-note mb-7">10 questions · 2 minutes · sans inscription</p>
-        <h1 className="font-display-xl font-extrabold tracking-tight text-on-surface text-[40px] leading-[1.05] md:text-[60px] md:leading-[1] mb-6">
+        <h1 className="text-h1 font-display-xl font-extrabold tracking-tight text-on-surface mb-6">
           Par où commencer ?
         </h1>
-        <p className="text-[18px] md:text-[20px] text-on-surface-variant leading-relaxed mb-8">
+        <p className="text-body md:text-body text-on-surface-variant leading-relaxed mb-8">
           Répondez à 10 questions. Vous obtenez votre niveau actuel et un
           parcours sur mesure : quoi lire, quoi pratiquer, et quel projet
           réaliser pour passer au niveau suivant.
@@ -78,7 +78,7 @@ export function Quiz() {
               track("test_commence");
               setStage("questions");
             }}
-            className="btn-primary h-12 px-6 rounded-md inline-flex items-center justify-center gap-2 font-semibold text-[16px] group"
+            className="btn-primary inline-flex items-center justify-center gap-2 group"
           >
             Commencer le test
             <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" strokeWidth={2} />
@@ -90,18 +90,18 @@ export function Quiz() {
                 setResult(previous);
                 setStage("result");
               }}
-              className="btn-secondary h-12 px-6 rounded-md inline-flex items-center justify-center font-semibold text-[15px]"
+              className="btn-secondary inline-flex items-center justify-center"
             >
               Revoir mon parcours ({previous.level})
             </button>
           ) : (
-            <Link href="/" className="btn-secondary h-12 px-6 rounded-md inline-flex items-center justify-center font-semibold text-[15px]">
+            <Link href="/" className="btn-secondary inline-flex items-center justify-center">
               Explorer librement
             </Link>
           )}
         </BlurFade>
         <BlurFade delay={0.55}>
-          <p className="text-[14px] text-on-surface-variant mt-6">
+          <p className="text-small text-on-surface-variant mt-6">
             Vos réponses restent dans votre navigateur. Rien n'est envoyé.
           </p>
         </BlurFade>
@@ -115,10 +115,10 @@ export function Quiz() {
       <div className="max-w-2xl mx-auto">
         <div className="mb-8">
           <div className="flex items-center justify-between mb-3">
-            <span className="font-mono text-[14px] text-on-surface tabular-nums">
+            <span className="font-mono text-small text-on-surface tabular-nums">
               Question <strong>{index + 1}</strong> sur {total}
             </span>
-            <span className="font-mono text-[13px] text-on-surface-variant">
+            <span className="font-mono text-small text-on-surface-variant">
               {q.kind === "profil" ? "Votre profil" : "Vos connaissances"}
             </span>
           </div>
@@ -128,15 +128,15 @@ export function Quiz() {
         <AnimatePresence mode="wait">
           <motion.div
             key={q.id}
-            initial={reduce ? { opacity: 0 } : { opacity: 0, x: 24 }}
+            initial={reduce ? false : { opacity: 0, x: 12 }}
             animate={{ opacity: 1, x: 0 }}
-            exit={reduce ? { opacity: 0 } : { opacity: 0, x: -24 }}
-            transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+            exit={reduce ? { opacity: 1 } : { opacity: 0, x: -12 }}
+            transition={{ duration: reduce ? 0 : 0.2, ease: [0.22, 1, 0.36, 1] }}
           >
-            <h2 className="font-headline-lg text-[26px] md:text-[34px] leading-[1.2] font-bold text-on-surface mb-3">
+            <h2 className="text-h2 font-headline-lg   leading-[1.2] font-bold text-on-surface mb-3">
               {q.question}
             </h2>
-            {q.hint && <p className="text-[16px] text-on-surface-variant mb-6">{q.hint}</p>}
+            {q.hint && <p className="text-body text-on-surface-variant mb-6">{q.hint}</p>}
             <ul className={`grid gap-3 ${q.hint ? "" : "mt-6"} ${q.options.length > 4 ? "sm:grid-cols-2" : ""}`}>
               {q.options.map((o, i) => {
                 const active = chosen === o.value;
@@ -145,15 +145,15 @@ export function Quiz() {
                     key={o.value}
                     initial={reduce ? false : { opacity: 0, y: 8 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.25, delay: 0.05 + i * 0.04 }}
+                    transition={{ duration: reduce ? 0 : 0.2, delay: reduce ? 0 : Math.min(0.1, i * 0.02) }}
                   >
                     <button
                       type="button"
                       onClick={() => choose(o.value)}
-                      className={`w-full text-left rounded-lg border-[1.5px] px-5 py-4 text-[16px] leading-relaxed transition-all ${
+                      className={`w-full text-left rounded-lg border-[1.5px] px-5 py-4 text-body leading-relaxed transition-all ${
                         active
-                          ? "border-primary bg-[rgb(var(--c-green-soft))] text-on-surface shadow-[4px_4px_0_rgb(var(--c-primary))]"
-                          : "border-on-surface/70 bg-surface-container-lowest text-on-surface hover:border-on-surface hover:shadow-[4px_4px_0_rgb(var(--c-mark))] hover:-translate-y-0.5"
+                          ? "border-primary bg-[rgb(var(--c-green-soft))] text-on-surface "
+                          : "border-on-surface/70 bg-surface-container-lowest text-on-surface hover:border-on-surface  hover:-translate-y-0.5"
                       }`}
                     >
                       {o.label}
@@ -169,12 +169,12 @@ export function Quiz() {
           <button
             type="button"
             onClick={() => (index === 0 ? setStage("intro") : setIndex(index - 1))}
-            className="inline-flex items-center gap-1.5 text-[15px] font-semibold text-on-surface-variant hover:text-on-surface"
+            className="inline-flex items-center gap-1.5 text-small font-semibold text-on-surface-variant hover:text-on-surface"
           >
             <ArrowLeft className="w-4 h-4" strokeWidth={2} />
             Retour
           </button>
-          <Link href="/" className="text-[14px] text-on-surface-variant hover:text-on-surface underline-offset-4 hover:underline">
+          <Link href="/" className="text-small text-on-surface-variant hover:text-on-surface underline-offset-4 hover:underline">
             Passer le test
           </Link>
         </div>
@@ -197,7 +197,7 @@ export function Quiz() {
         <p className="tag-note mb-6">Votre résultat</p>
       </BlurFade>
       <div className="flex items-start justify-between gap-4">
-      <h1 className="font-display-xl font-extrabold tracking-tight text-on-surface text-[38px] leading-[1.05] md:text-[56px] md:leading-[1] mb-5">
+      <h1 className="text-h1 font-display-xl font-extrabold tracking-tight text-on-surface mb-5">
         <WordReveal text={"Votre niveau\u00a0:"} />{" "}
         <BlurFade delay={0.3} className="inline-block">
           <span className="text-mark">{r.level}</span>
@@ -209,7 +209,7 @@ export function Quiz() {
         <div className="max-w-md mb-3">
           <Meter value={r.score / MAX_SCORE} />
         </div>
-        <p className="font-mono text-[14px] text-on-surface-variant mb-5 tabular-nums">
+        <p className="font-mono text-small text-on-surface-variant mb-5 tabular-nums">
           {r.score} points sur {MAX_SCORE} · thème : {theme?.name} · partie conseillée : {r.code ? "Claude Code" : "Claude"}
         </p>
         <div className="mb-10">
@@ -218,28 +218,28 @@ export function Quiz() {
       </BlurFade>
 
       {plan && (
-        <BlurFade delay={0.45} className="rounded-lg border-[1.5px] border-on-surface bg-surface-container-lowest p-6 md:p-8 shadow-[6px_6px_0_rgb(var(--c-mark))] mb-12">
-          <h2 className="font-headline-lg text-[24px] md:text-[30px] font-bold mb-2">Votre plan pour les prochains jours</h2>
-          <p className="text-[17px] text-on-surface font-semibold leading-relaxed mb-5">{plan.goal}</p>
+        <BlurFade delay={0.45} className="rounded-lg border-[1.5px] border-on-surface bg-surface-container-lowest p-6 md:p-8 mb-12">
+          <h2 className="text-h2 font-headline-lg   font-bold mb-2">Votre plan pour les prochains jours</h2>
+          <p className="text-body text-on-surface font-semibold leading-relaxed mb-5">{plan.goal}</p>
           <ol className="flex flex-col gap-4 mb-6">
             {plan.steps.map((s, i) => (
               <li key={s} className="grid grid-cols-[36px_1fr] gap-3 items-start">
-                <span className="font-display-xl text-[24px] leading-none font-extrabold text-primary-fixed-dim tabular-nums pt-0.5">{i + 1}</span>
-                <span className="text-[16px] text-on-surface leading-relaxed">{s}</span>
+                <span className="font-display-xl text-h3 leading-none font-extrabold text-tertiary tabular-nums pt-0.5">{i + 1}</span>
+                <span className="text-body text-on-surface leading-relaxed">{s}</span>
               </li>
             ))}
           </ol>
-          <p className="rounded-md bg-[rgb(var(--c-mark)/0.50)] border border-[#f2b23e]/40 px-4 py-3 text-[15.5px] text-on-surface leading-relaxed mb-5">
+          <p className="rounded bg-[rgb(var(--c-mark)/0.50)] border border-[rgb(var(--c-marigold))]/40 px-4 py-3 text-small text-on-surface leading-relaxed mb-5">
             <strong>Projet pour valider ce niveau :</strong> {plan.project}
           </p>
           {nextLevel && (
-            <p className="text-[15px] text-on-surface-variant mb-5">
+            <p className="text-small text-on-surface-variant mb-5">
               Ensuite, niveau {nextLevel.level} : {nextLevel.goal.charAt(0).toLowerCase() + nextLevel.goal.slice(1)}
             </p>
           )}
           <Link
             href={`/applications#${r.theme}`}
-            className="btn-primary h-12 px-6 rounded-md inline-flex items-center justify-center gap-2 font-semibold text-[15px] group"
+            className="btn-primary inline-flex items-center justify-center gap-2 group"
           >
             Voir le parcours complet et les applications
             <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" strokeWidth={2} />
@@ -248,13 +248,13 @@ export function Quiz() {
       )}
 
       <BlurFade inView className="mb-12">
-        <h2 className="font-headline-lg text-[24px] md:text-[28px] font-bold mb-5">À lire en premier</h2>
+        <h2 className="text-h2 font-headline-lg   font-bold mb-5">À lire en premier</h2>
         <ul className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {readings.map((a, i) => (
             <BlurFade key={a.href} inView delay={i * 0.06}>
               <Link href={a.href} className="group block h-full rounded-lg border border-outline-variant bg-surface-container-lowest p-5 soft-lift">
-                <span className="block font-semibold text-[17px] text-on-surface group-hover:text-primary transition-colors mb-1">{a.title}</span>
-                <span className="block text-[15px] text-on-surface-variant leading-relaxed">{a.why}</span>
+                <span className="block font-semibold text-body text-on-surface group-hover:text-primary transition-colors mb-1">{a.title}</span>
+                <span className="block text-small text-on-surface-variant leading-relaxed">{a.why}</span>
               </Link>
             </BlurFade>
           ))}
@@ -263,8 +263,8 @@ export function Quiz() {
 
       {hasAnswers && (
         <BlurFade inView className="mb-12">
-          <h2 className="font-headline-lg text-[24px] md:text-[28px] font-bold mb-2">Vos réponses, corrigées</h2>
-          <p className="text-[15.5px] text-on-surface-variant mb-5">Chaque correction renvoie vers l'article qui l'explique.</p>
+          <h2 className="text-h2 font-headline-lg   font-bold mb-2">Vos réponses, corrigées</h2>
+          <p className="text-small text-on-surface-variant mb-5">Chaque correction renvoie vers l'article qui l'explique.</p>
           <ul className="flex flex-col gap-3">
             {knowledge.map((k) => {
               const opt = k.options.find((o) => o.value === answers[k.id]);
@@ -273,13 +273,13 @@ export function Quiz() {
               return (
                 <li key={k.id} className="rounded-lg border border-outline-variant bg-surface-container-lowest p-5">
                   <div className="flex items-start gap-3">
-                    <span className={`mt-0.5 inline-flex w-6 h-6 shrink-0 items-center justify-center rounded-full ${ok ? "bg-primary text-on-primary" : "bg-[#f2b23e] text-[#2b2119]"}`}>
+                    <span className={`mt-0.5 inline-flex w-6 h-6 shrink-0 items-center justify-center rounded ${ok ? "bg-primary text-on-primary" : "bg-[rgb(var(--c-marigold))] text-[rgb(var(--c-on-surface))]"}`}>
                       {ok ? <Check className="w-3.5 h-3.5" strokeWidth={3} /> : <X className="w-3.5 h-3.5" strokeWidth={3} />}
                     </span>
                     <div className="min-w-0">
-                      <p className="font-semibold text-[16px] text-on-surface mb-1">{k.question}</p>
-                      {!ok && good && <p className="text-[15px] text-on-surface mb-1">Bonne réponse : {good.label}</p>}
-                      <p className="text-[15px] text-on-surface-variant leading-relaxed">
+                      <p className="font-semibold text-body text-on-surface mb-1">{k.question}</p>
+                      {!ok && good && <p className="text-small text-on-surface mb-1">Bonne réponse : {good.label}</p>}
+                      <p className="text-small text-on-surface-variant leading-relaxed">
                         {k.explain}{" "}
                         {k.href && (
                           <Link href={k.href} className="text-primary font-semibold hover:underline underline-offset-4">
@@ -297,10 +297,10 @@ export function Quiz() {
       )}
 
       <BlurFade inView className="flex flex-col sm:flex-row gap-3 border-t border-outline-variant pt-8">
-        <Link href={r.code ? "/claude-code" : "/claude"} className="btn-secondary h-12 px-6 rounded-md inline-flex items-center justify-center font-semibold text-[15px]">
+        <Link href={r.code ? "/claude-code" : "/claude"} className="btn-secondary inline-flex items-center justify-center">
           Aller à la partie {r.code ? "Claude Code" : "Claude"}
         </Link>
-        <button type="button" onClick={restart} className="h-12 px-6 rounded-md inline-flex items-center justify-center gap-2 font-semibold text-[15px] text-on-surface-variant hover:text-on-surface">
+        <button type="button" onClick={restart} className="h-12 px-6 rounded inline-flex items-center justify-center gap-2 font-semibold text-small text-on-surface-variant hover:text-on-surface">
           <RotateCcw className="w-4 h-4" strokeWidth={2} />
           Refaire le test
         </button>

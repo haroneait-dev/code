@@ -4,7 +4,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { AnimatePresence, motion } from "motion/react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { BookOpen, CornerDownLeft, FileText, LayoutGrid, Search } from "lucide-react";
 import type { SearchResult } from "@/lib/search";
 
@@ -18,6 +18,7 @@ const SUGGESTIONS: SearchResult[] = [
 ];
 
 export function CommandPalette() {
+  const reduce = useReducedMotion();
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
@@ -101,21 +102,21 @@ export function CommandPalette() {
       {open && (
         <motion.div
           className="fixed inset-0 z-[80] flex items-start justify-center px-4 pt-[12vh] bg-[rgb(var(--c-ink)/0.35)]"
-          initial={{ opacity: 0 }}
+          initial={reduce ? false : { opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          transition={{ duration: 0.15 }}
+          transition={{ duration: reduce ? 0 : 0.15 }}
           onMouseDown={(e) => e.target === e.currentTarget && setOpen(false)}
           role="dialog"
           aria-modal="true"
           aria-label="Recherche"
         >
           <motion.div
-            className="w-full max-w-xl rounded-lg border-[1.5px] border-on-surface bg-surface-container-lowest shadow-[6px_6px_0_rgb(var(--c-mark))] overflow-hidden"
-            initial={{ y: -8, scale: 0.98 }}
+            className="w-full max-w-xl rounded-lg border-[1.5px] border-on-surface bg-surface-container-lowest overflow-hidden"
+            initial={reduce ? false : { y: -8, scale: 0.98 }}
             animate={{ y: 0, scale: 1 }}
             exit={{ y: -8, scale: 0.98 }}
-            transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+            transition={{ duration: reduce ? 0 : 0.18, ease: [0.22, 1, 0.36, 1] }}
           >
             <div className="flex items-center gap-3 px-4 border-b border-outline-variant">
               <Search className="w-5 h-5 text-on-surface-variant shrink-0" strokeWidth={1.75} />
@@ -125,13 +126,13 @@ export function CommandPalette() {
                 onChange={(e) => setQ(e.target.value)}
                 onKeyDown={onKeyDown}
                 placeholder="Rechercher un article, une app, un prompt…"
-                className="h-14 flex-1 min-w-0 bg-transparent text-[17px] text-on-surface placeholder:text-on-surface-variant outline-none"
+                className="h-14 flex-1 min-w-0 bg-transparent text-body text-on-surface placeholder:text-on-surface-variant outline-none"
                 aria-label="Rechercher"
               />
-              <kbd className="hidden sm:inline font-mono text-[11px] text-on-surface-variant border border-outline-variant rounded px-1.5 py-0.5">Échap</kbd>
+              <kbd className="hidden sm:inline font-mono text-small text-on-surface-variant border border-outline-variant rounded px-1.5 py-0.5">Échap</kbd>
             </div>
             <ul className="max-h-[55vh] overflow-y-auto py-2">
-              {q.trim().length < 2 && <li className="px-4 pt-1 pb-2 font-mono text-[12px] uppercase tracking-wider text-on-surface-variant">Pour commencer</li>}
+              {q.trim().length < 2 && <li className="px-4 pt-1 pb-2 font-mono text-small uppercase tracking-wider text-on-surface-variant">Pour commencer</li>}
               {list.map((r, i) => (
                 <li key={r.href}>
                   <button
@@ -142,15 +143,15 @@ export function CommandPalette() {
                   >
                     <span className="mt-0.5 text-on-surface-variant"><Icon type={r.type} /></span>
                     <span className="min-w-0 flex-1">
-                      <span className="block font-semibold text-[15.5px] text-on-surface truncate">{r.title}</span>
-                      <span className="block text-[13.5px] text-on-surface-variant truncate">{r.context} · {r.description}</span>
+                      <span className="block font-semibold text-small text-on-surface truncate">{r.title}</span>
+                      <span className="block text-small text-on-surface-variant truncate">{r.context} · {r.description}</span>
                     </span>
                     {i === active && <CornerDownLeft className="w-4 h-4 mt-1 text-on-surface-variant shrink-0" strokeWidth={1.75} />}
                   </button>
                 </li>
               ))}
               {q.trim().length >= 2 && list.length === 0 && (
-                <li className="px-4 py-6 text-[15px] text-on-surface-variant">Aucun résultat pour « {q} ».</li>
+                <li className="px-4 py-6 text-small text-on-surface-variant">Aucun résultat pour « {q} ».</li>
               )}
             </ul>
           </motion.div>
@@ -167,7 +168,7 @@ export function SearchButton() {
       onClick={() => window.dispatchEvent(new Event(OPEN_SEARCH))}
       aria-label="Rechercher (Ctrl+K)"
       title="Rechercher (Ctrl+K)"
-      className="inline-flex items-center justify-center w-9 h-9 rounded-full text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors"
+      className="inline-flex items-center justify-center w-11 h-11 rounded text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors"
     >
       <Search className="w-[18px] h-[18px]" strokeWidth={1.75} />
     </button>

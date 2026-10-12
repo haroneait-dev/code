@@ -28,7 +28,7 @@ export function ScrollFX() {
     const marks = document.querySelectorAll<HTMLElement>("main .text-mark:not(.cm-mark)");
     marks.forEach((el) => {
       el.classList.add("cm-mark");
-      if (el.getBoundingClientRect().top < vh) setTimeout(() => el.classList.add("cm-in"), 250);
+      if (el.getBoundingClientRect().top < vh) setTimeout(() => el.classList.add("cm-in"), 0);
       else io.observe(el);
     });
 
