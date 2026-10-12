@@ -316,7 +316,7 @@
   height: auto;
   margin: 2rem 0;
   border: 1px solid rgb(var(--c-outline-variant));
-  border-radius: 0.625rem;
+  border-radius: 0.75rem;
 }
 
 /* Retour visuel au clic */
@@ -395,7 +395,7 @@
 }
 /* Articles et leçons : 70 caractères, interligne 1,7 et code défilable. */
 .prose-claude, .lesson-content { max-width: 70ch; line-height: 1.7; overflow-wrap: anywhere; }
-.prose-claude h2, .lesson-content h2 { margin-top: 3rem; }
+.prose-claude h2 { margin-top: 3rem; }
 .prose-claude pre, .lesson-content pre { max-width: 100%; overflow-x: auto; overflow-wrap: normal; }
 .prose-claude table, .lesson-content table { min-width: 32rem; }
 main { min-width: 0; }
@@ -406,3 +406,8 @@ header a, footer a { min-height: 44px; display: inline-flex; align-items: center
   *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
   .cm-route-progress { display: none; }
 }
+
+input[type="checkbox"] { accent-color: rgb(var(--c-primary)); }
+
+button, summary { min-width: 44px; }
+.lesson-content p, .lesson-content li { line-height: 1.7; }

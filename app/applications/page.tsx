@@ -144,7 +144,7 @@ export default function ApplicationsPage() {
                     {PATHS[t.id].map((lv, i) => (
                       <li key={lv.level} className="rounded-lg border border-outline-variant bg-surface-container-lowest p-6">
                         <div className="flex items-baseline gap-3 mb-2">
-                          <span className="font-display-xl text-h2 leading-none font-extrabold text-primary-fixed-dim tabular-nums">{i + 1}</span>
+                          <span className="font-display-xl text-h2 leading-none font-extrabold text-tertiary tabular-nums">{i + 1}</span>
                           <span className="font-headline-lg text-body font-bold text-on-surface">{lv.level}</span>
                         </div>
                         <p className="text-small text-on-surface font-semibold leading-relaxed mb-3">{lv.goal}</p>

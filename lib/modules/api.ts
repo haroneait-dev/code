@@ -73,7 +73,7 @@ print(f"Tokens: {message.usage.input_tokens} in / {message.usage.output_tokens} 
         {
           heading: "4. SDK TypeScript",
           body:
-            "Côté JS/TS — parfait pour Next.js, Bun ou Node — installez <code>npm i @anthropic-ai/sdk</code>. L'API est quasi identique à la version Python.",
+            "Côté JS/TS : parfait pour Next.js, Bun ou Node : installez <code>npm i @anthropic-ai/sdk</code>. L'API est quasi identique à la version Python.",
           code: {
             lang: "ts",
             label: "lib/anthropic.ts",
@@ -100,7 +100,7 @@ if (first.type === "text") {
           callout: {
             type: "tip",
             icon: "💡",
-            text: "Le paramètre <code>system</code> est séparé du tableau <code>messages</code> — c'est là que vous définissez la personnalité et les contraintes globales de Claude.",
+            text: "Le paramètre <code>system</code> est séparé du tableau <code>messages</code> : c'est là que vous définissez la personnalité et les contraintes globales de Claude.",
           },
         },
         {
@@ -124,7 +124,7 @@ if (first.type === "text") {
         {
           heading: "1. Activer le streaming",
           body:
-            "Avec <code>stream: true</code>, le SDK renvoie un itérable d'événements (<code>message_start</code>, <code>content_block_delta</code>, <code>message_stop</code>). Vous affichez chaque <em>delta</em> dès qu'il arrive — UX façon ChatGPT.",
+            "Avec <code>stream: true</code>, le SDK renvoie un itérable d'événements (<code>message_start</code>, <code>content_block_delta</code>, <code>message_stop</code>). Vous affichez chaque <em>delta</em> dès qu'il arrive : UX façon ChatGPT.",
           code: {
             lang: "ts",
             label: "streaming.ts",
@@ -151,7 +151,7 @@ console.log("\\nStop reason:", final.stop_reason);`,
           callout: {
             type: "info",
             icon: "📡",
-            text: "Côté Next.js, on relaie ce flux dans une <code>Response</code> avec un <code>ReadableStream</code> — c'est exactement ce que fait <code>/api/chat</code> dans ce projet.",
+            text: "Côté Next.js, on relaie ce flux dans une <code>Response</code> avec un <code>ReadableStream</code> : c'est exactement ce que fait <code>/api/chat</code> dans ce projet.",
           },
         },
         {
@@ -229,7 +229,7 @@ response = client.messages.create(
           callout: {
             type: "tip",
             icon: "🧰",
-            text: "Pensez vos outils comme des fonctions pures : nom verbal explicite, description courte et précise, schema strict. Claude n'invente pas un outil — il choisit dans votre liste.",
+            text: "Pensez vos outils comme des fonctions pures : nom verbal explicite, description courte et précise, schema strict. Claude n'invente pas un outil : il choisit dans votre liste.",
           },
         },
         {
@@ -249,7 +249,7 @@ response = client.messages.create(
       duration: "14 min",
       tag: "Optimisation",
       intro:
-        "Si vous renvoyez le même gros system prompt (10k tokens de documentation, par exemple) à chaque requête, vous payez 10k tokens d'entrée à chaque fois. Le <strong>prompt caching</strong> permet à Anthropic de mémoriser la partie statique de votre prompt et de ne facturer que <strong>10%</strong> du prix sur les cache hits.",
+        "Si vous renvoyez le même gros system prompt (10k tokens de documentation, par exemple) à chaque requêvous, vous payez 10k tokens d'entrée à chaque fois. Le <strong>prompt caching</strong> permet à Anthropic de mémoriser la partie statique de votre prompt et de ne facturer que <strong>10%</strong> du prix sur les cache hits.",
       sections: [
         {
           heading: "1. Le principe",
@@ -306,11 +306,11 @@ console.log(response.usage);
         {
           heading: "4. TTL : 5 minutes ou 1 heure",
           body:
-            "Par défaut, le cache vit <strong>5 minutes</strong> et se renouvelle à chaque hit. Pour les workloads à faible fréquence, vous pouvez passer en TTL <strong>1 heure</strong> via <code>cache_control: { type: 'ephemeral', ttl: '1h' }</code> — légèrement plus cher à l'écriture, mais survit aux trous d'inactivité.",
+            "Par défaut, le cache vit <strong>5 minutes</strong> et se renouvelle à chaque hit. Pour les workloads à faible fréquence, vous pouvez passer en TTL <strong>1 heure</strong> via <code>cache_control: { type: 'ephemeral', ttl: '1h' }</code> : légèrement plus cher à l'écriture, mais survit aux trous d'inactivité.",
           bullets: [
             "<strong>5 min (default)</strong> : idéal pour conversations actives",
             "<strong>1 h</strong> : idéal pour batch jobs périodiques ou agents lents",
-            "Jusqu'à 4 markers <code>cache_control</code> par requête (cache hiérarchique)",
+            "Jusqu'à 4 markers <code>cache_control</code> par requêvous (cache hiérarchique)",
           ],
         },
         {
@@ -377,7 +377,7 @@ async function callWithBackoff<T>(fn: () => Promise<T>, attempts = 5) {
           table: {
             headers: ["Header", "Signification"],
             rows: [
-              ["anthropic-ratelimit-requests-remaining", "Requêtes restantes dans la fenêtre"],
+              ["anthropic-ratelimit-requests-remaining", "Requêvos restantes dans la fenêtre"],
               ["anthropic-ratelimit-requests-reset", "Timestamp ISO du reset"],
               ["anthropic-ratelimit-input-tokens-remaining", "Input tokens restants"],
               ["anthropic-ratelimit-output-tokens-remaining", "Output tokens restants"],
@@ -395,7 +395,7 @@ async function callWithBackoff<T>(fn: () => Promise<T>, attempts = 5) {
         {
           heading: "3. Fallback Sonnet → Haiku",
           body:
-            "Quand l'API renvoie <code>529 Overloaded</code> ou que la latence explose, basculez automatiquement vers <code>claude-haiku-4-5-20251001</code>. Plus rapide, moins cher, et largement suffisant pour la majorité des requêtes simples.",
+            "Quand l'API renvoie <code>529 Overloaded</code> ou que la latence explose, basculez automatiquement vers <code>claude-haiku-4-5-20251001</code>. Plus rapide, moins cher, et largement suffisant pour la majorité des requêvos simples.",
           code: {
             lang: "python",
             label: "fallback.py",
@@ -436,7 +436,7 @@ def ask(messages, **kwargs):
           callout: {
             type: "tip",
             icon: "🛡️",
-            text: "Mettez un <strong>timeout client</strong> (ex. 60s) en plus du retry — un appel zombie qui pend 5 minutes est pire qu'une erreur claire.",
+            text: "Mettez un <strong>timeout client</strong> (ex. 60s) en plus du retry : un appel zombie qui pend 5 minutes est pire qu'une erreur claire.",
           },
         },
         {

@@ -1,7 +1,7 @@
-import { curriculum, type LearningLevel } from "./curriculum";
+import { curriculum } from "./curriculum";
 import { exercisesByLesson } from "./exercises";
 
-export const learningLevels: LearningLevel[] = ["débutant", "intermédiaire", "avancé"];
+export { learningLevels } from "./curriculum";
 export const lessonEntries = curriculum.flatMap(module => module.lessons.map(lesson => ({ module, lesson, href: `/learn/${module.id}/${lesson.id}` })));
 export function findLesson(id: string) { return lessonEntries.find(entry => entry.lesson.id === id); }
 export const courseStats = {

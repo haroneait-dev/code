@@ -13,9 +13,9 @@ import {
 } from "@/lib/fiches";
 
 const DIFFICULTY_STYLE: Record<FicheDifficulty, string> = {
-  Débutant: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400",
-  Intermédiaire: "bg-amber-500/15 text-amber-600 dark:text-amber-400",
-  Avancé: "bg-rose-500/15 text-rose-600 dark:text-rose-400",
+  Débutant: "bg-primary-fixed text-on-primary-fixed",
+  Intermédiaire: "bg-tertiary-container text-on-tertiary-container",
+  Avancé: "bg-secondary-container text-on-secondary-container",
 };
 
 export function FichesBrowser() {

@@ -70,7 +70,7 @@ export default async function AppPage({ params }: { params: Promise<{ app: strin
   return (
     <div className="min-h-screen flex flex-col bg-surface">
       <SiteHeader active="apps" />
-      <main className="flex-grow w-full px-margin-mobile md:px-margin-desktop py-12 md:py-16">
+      <main className="flex-grow w-full px-margin-mobile md:px-margin-desktop py-section">
         <div className="max-w-3xl mx-auto">
           <nav className="text-small text-on-surface-variant mb-6">
             <Link href="/applications" className="hover:text-primary">Applications</Link> <span aria-hidden>›</span> {a.name}
@@ -102,7 +102,7 @@ export default async function AppPage({ params }: { params: Promise<{ app: strin
             <ol className="flex flex-col gap-3 mb-5">
               {how.steps.map((s, i) => (
                 <li key={s} className="grid grid-cols-[32px_1fr] gap-3">
-                  <span className="font-display-xl text-h3 font-extrabold text-primary-fixed-dim tabular-nums">{i + 1}</span>
+                  <span className="font-display-xl text-h3 font-extrabold text-tertiary tabular-nums">{i + 1}</span>
                   <span className="text-body text-on-surface leading-relaxed">{s}</span>
                 </li>
               ))}
@@ -119,7 +119,7 @@ export default async function AppPage({ params }: { params: Promise<{ app: strin
             </a>
           </section>
 
-          <section className="py-section mb-12 rounded-lg bg-surface-container-low border border-outline-variant p-6">
+          <section className="mb-section rounded-lg bg-surface-container-low border border-outline-variant p-6">
             <h2 className="text-h2 font-headline-lg  font-bold mb-3">Pour progresser</h2>
             <ul className="flex flex-col gap-2">
               {a.uses.map((u) => (

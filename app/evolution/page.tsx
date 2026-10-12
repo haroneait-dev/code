@@ -87,7 +87,7 @@ export default function EvolutionPage() {
               <div className="lg:sticky lg:top-24 rounded-lg border-[1.5px] border-on-surface bg-surface-container-lowest p-6">
                 <div className="flex items-center gap-2.5 mb-5">
                   <span className="relative flex w-3 h-3">
-                    <span className="absolute inline-flex h-full w-full rounded bg-primary opacity-60 motion-safe:animate-ping" />
+                    <span className="absolute inline-flex h-full w-full rounded bg-primary opacity-60" />
                     <span className="relative inline-flex w-3 h-3 rounded bg-primary" />
                   </span>
                   <h2 className="text-h2 font-headline-lg text-body font-bold">En direct</h2>

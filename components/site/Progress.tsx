@@ -4,7 +4,7 @@
 
 import { useEffect, useState } from "react";
 import { Check } from "lucide-react";
-import { motion } from "motion/react";
+import { motion, useReducedMotion } from "motion/react";
 
 const KEY = "cm-progres";
 const EVENT = "cm-progres-change";
@@ -67,6 +67,7 @@ export function StepCheck({ id, text }: { id: string; text: string }) {
 }
 
 export function ThemeProgress({ ids }: { ids: string[] }) {
+  const reduce = useReducedMotion();
   const done = useDone();
   const n = ids.filter((id) => done.includes(id)).length;
   const pct = ids.length ? n / ids.length : 0;
@@ -77,7 +78,7 @@ export function ThemeProgress({ ids }: { ids: string[] }) {
           className="h-full rounded bg-primary"
           initial={false}
           animate={{ width: `${Math.round(pct * 100)}%` }}
-          transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+          transition={{ duration: reduce ? 0 : 0.2, ease: [0.22, 1, 0.36, 1] }}
         />
       </div>
       <span className="font-mono text-small text-on-surface-variant tabular-nums shrink-0">
@@ -90,6 +91,7 @@ export function ThemeProgress({ ids }: { ids: string[] }) {
 // Badge affiché quand toutes les étapes d'un niveau sont cochées.
 export function LevelBadge({ ids, theme, levelIndex, level }: { ids: string[]; theme: string; levelIndex: number; level: string }) {
   const done = useDone();
+  const reduce = useReducedMotion();
   const complete = ids.length > 0 && ids.every((id) => done.includes(id));
   const [copied, setCopied] = useState(false);
   if (!complete) return null;
@@ -114,8 +116,9 @@ export function LevelBadge({ ids, theme, levelIndex, level }: { ids: string[]; t
 
   return (
     <motion.div
-      initial={{ opacity: 0, scale: 0.96 }}
-      animate={{ opacity: 1, scale: 1 }}
+      initial={reduce ? false : { opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: reduce ? 0 : 0.2 }}
       className="mt-4 flex items-center justify-between gap-3 rounded bg-primary text-on-primary px-4 py-3"
     >
       <span className="inline-flex items-center gap-2 font-semibold text-small">

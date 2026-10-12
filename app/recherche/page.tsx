@@ -6,7 +6,7 @@ import { SearchPageInput } from "@/components/site/SearchPageInput";
 import { searchSite } from "@/lib/search";
 
 export const metadata = {
-  title: "Recherche — Claude Mastery",
+  title: "Recherche : Claude Mastery",
   description:
     "Recherchez dans toute la formation Claude Code et le wiki francophone.",
 };
@@ -24,8 +24,8 @@ export default async function SearchPage({ searchParams }: Props) {
     <div className="min-h-screen flex flex-col">
       <SiteHeader showSearch />
 
-      <main className="flex-grow w-full max-w-3xl mx-auto px-margin-mobile md:px-margin-desktop py-12">
-        <h1 className="text-h1 font-display-xl -xl font-extrabold tracking-tight mb-6 text-on-surface">
+      <main className="flex-grow w-full max-w-3xl mx-auto px-margin-mobile md:px-margin-desktop py-section">
+        <h1 className="text-h1 font-display-xl font-extrabold tracking-tight mb-6 text-on-surface">
           Recherche
         </h1>
 
@@ -57,7 +57,7 @@ export default async function SearchPage({ searchParams }: Props) {
               Aucun résultat pour « {query} ».
             </p>
             <p className="text-body-sm text-on-surface-variant max-w-sm">
-              Essaie un terme plus court ou différent — par exemple « hooks »,
+              Essaie un terme plus court ou différent : par exemple « hooks »,
               « mcp », « prompt » ou « streaming ».
             </p>
           </div>

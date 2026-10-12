@@ -4,7 +4,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { AnimatePresence, motion } from "motion/react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { BookOpen, CornerDownLeft, FileText, LayoutGrid, Search } from "lucide-react";
 import type { SearchResult } from "@/lib/search";
 
@@ -18,6 +18,7 @@ const SUGGESTIONS: SearchResult[] = [
 ];
 
 export function CommandPalette() {
+  const reduce = useReducedMotion();
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
@@ -101,10 +102,10 @@ export function CommandPalette() {
       {open && (
         <motion.div
           className="fixed inset-0 z-[80] flex items-start justify-center px-4 pt-[12vh] bg-[rgb(var(--c-ink)/0.35)]"
-          initial={{ opacity: 0 }}
+          initial={reduce ? false : { opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          transition={{ duration: 0.15 }}
+          transition={{ duration: reduce ? 0 : 0.15 }}
           onMouseDown={(e) => e.target === e.currentTarget && setOpen(false)}
           role="dialog"
           aria-modal="true"
@@ -112,10 +113,10 @@ export function CommandPalette() {
         >
           <motion.div
             className="w-full max-w-xl rounded-lg border-[1.5px] border-on-surface bg-surface-container-lowest overflow-hidden"
-            initial={{ y: -8, scale: 0.98 }}
+            initial={reduce ? false : { y: -8, scale: 0.98 }}
             animate={{ y: 0, scale: 1 }}
             exit={{ y: -8, scale: 0.98 }}
-            transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+            transition={{ duration: reduce ? 0 : 0.18, ease: [0.22, 1, 0.36, 1] }}
           >
             <div className="flex items-center gap-3 px-4 border-b border-outline-variant">
               <Search className="w-5 h-5 text-on-surface-variant shrink-0" strokeWidth={1.75} />

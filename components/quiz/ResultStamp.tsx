@@ -9,9 +9,9 @@ export function ResultStamp({ level, className = "" }: { level: string; classNam
     <motion.div
       aria-hidden
       className={`w-28 h-28 md:w-36 md:h-36 shrink-0 rounded bg-primary text-on-primary border-[6px] border-[rgb(var(--c-mark))] flex flex-col items-center justify-center text-center  ${className}`}
-      initial={reduce ? { opacity: 0, rotate: -8 } : { opacity: 0, scale: 2.4, rotate: -24 }}
-      animate={{ opacity: 1, scale: 1, rotate: -8 }}
-      transition={reduce ? { duration: 0.2, delay: 0.3 } : { delay: 1.15, type: "spring", stiffness: 420, damping: 16, mass: 0.9 }}
+      initial={reduce ? false : { opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: reduce ? 0 : 0.2 }}
     >
       <span className="font-mono text-small md:text-small uppercase tracking-wider opacity-80">Niveau</span>
       <span className="font-display-xl font-extrabold text-body md:text-h3 leading-tight px-2">{level}</span>

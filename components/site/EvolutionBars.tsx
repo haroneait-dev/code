@@ -20,7 +20,7 @@ export function EvolutionBars({ bars, max, color = "primary" }: { bars: Bar[]; m
               initial={{ width: reduce ? `${(b.value / max) * 100}%` : "0%" }}
               whileInView={{ width: `${(b.value / max) * 100}%` }}
               viewport={{ once: true, margin: "-40px" }}
-              transition={{ duration: 1.1, delay: i * 0.12, ease: [0.22, 1, 0.36, 1] }}
+              transition={{ duration: reduce ? 0 : 0.4, delay: 0, ease: [0.22, 1, 0.36, 1] }}
             />
           </div>
           {b.note && <p className="text-small text-on-surface-variant mt-1">{b.note}</p>}

@@ -4,7 +4,7 @@ import { FichesBrowser } from "@/components/fiches/FichesBrowser";
 import { ficheCount } from "@/lib/fiches";
 
 export const metadata = {
-  title: "Fiches — Claude Mastery",
+  title: "Fiches : Claude Mastery",
   description:
     "Base de fiches de connaissances sur l'écosystème Claude : Claude Code, MCP, prompt engineering, entreprise, recherche et sécurité. Filtrable et actionnable.",
 };
@@ -14,18 +14,18 @@ export default function FichesPage() {
     <div className="min-h-screen flex flex-col">
       <SiteHeader active="fiches" showSearch />
 
-      <main className="flex-grow w-full max-w-container-max mx-auto px-margin-mobile md:px-margin-desktop py-16">
-        <section className="py-section mb-12 max-w-3xl">
+      <main className="flex-grow w-full max-w-container-max mx-auto px-margin-mobile md:px-margin-desktop py-section">
+        <section className="mb-section max-w-3xl">
           <div className="mb-6">
             <span className="tag-note">
               Fiches · {ficheCount()} entrées
             </span>
           </div>
-          <h1 className="text-h1 font-display-xl -xl font-extrabold tracking-tight mb-6 text-on-surface">
+          <h1 className="text-h1 font-display-xl font-extrabold tracking-tight mb-6 text-on-surface">
             Les <span className="text-mark">fiches</span> essentielles.
           </h1>
           <p className="font-body-rt text-body-rt md:text-body text-on-surface-variant leading-relaxed">
-            Des fiches courtes et actionnables sur tout l'écosystème Claude —
+            Des fiches courtes et actionnables sur tout l'écosystème Claude :
             modèles, Claude Code, MCP, prompt engineering, entreprise, recherche
             et sécurité. Filtre par thème et par niveau, ou cherche directement.
           </p>

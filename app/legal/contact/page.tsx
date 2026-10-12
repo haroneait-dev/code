@@ -6,7 +6,7 @@ export const metadata = {
 export default function ContactPage() {
   return (
     <>
-      <h1 className="text-h1 font-display-xl -xl font-bold tracking-tight mb-6 text-on-surface">
+      <h1 className="text-h1 font-display-xl font-bold tracking-tight mb-6 text-on-surface">
         Contact
       </h1>
       <p className="text-body-rt text-on-surface-variant leading-relaxed mb-8">

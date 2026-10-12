@@ -128,10 +128,10 @@ export function Quiz() {
         <AnimatePresence mode="wait">
           <motion.div
             key={q.id}
-            initial={reduce ? { opacity: 0 } : { opacity: 0, x: 24 }}
+            initial={reduce ? false : { opacity: 0, x: 12 }}
             animate={{ opacity: 1, x: 0 }}
-            exit={reduce ? { opacity: 0 } : { opacity: 0, x: -24 }}
-            transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+            exit={reduce ? { opacity: 1 } : { opacity: 0, x: -12 }}
+            transition={{ duration: reduce ? 0 : 0.2, ease: [0.22, 1, 0.36, 1] }}
           >
             <h2 className="text-h2 font-headline-lg   leading-[1.2] font-bold text-on-surface mb-3">
               {q.question}
@@ -145,7 +145,7 @@ export function Quiz() {
                     key={o.value}
                     initial={reduce ? false : { opacity: 0, y: 8 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.25, delay: 0.05 + i * 0.04 }}
+                    transition={{ duration: reduce ? 0 : 0.2, delay: reduce ? 0 : Math.min(0.1, i * 0.02) }}
                   >
                     <button
                       type="button"
@@ -224,7 +224,7 @@ export function Quiz() {
           <ol className="flex flex-col gap-4 mb-6">
             {plan.steps.map((s, i) => (
               <li key={s} className="grid grid-cols-[36px_1fr] gap-3 items-start">
-                <span className="font-display-xl text-h3 leading-none font-extrabold text-primary-fixed-dim tabular-nums pt-0.5">{i + 1}</span>
+                <span className="font-display-xl text-h3 leading-none font-extrabold text-tertiary tabular-nums pt-0.5">{i + 1}</span>
                 <span className="text-body text-on-surface leading-relaxed">{s}</span>
               </li>
             ))}

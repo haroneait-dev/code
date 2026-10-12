@@ -55,7 +55,7 @@ export function SiteSearch({ initialQuery = "" }: { initialQuery?: string }) {
         setActiveIndex(-1);
         setOpen(true);
       } catch {
-        /* requête annulée — on ignore */
+        /* requête annulée : on ignore */
       }
     }, 150);
     return () => {

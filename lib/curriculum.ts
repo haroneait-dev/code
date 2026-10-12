@@ -1,5 +1,5 @@
 import type { MiniQuestion } from "./article-quizzes";
-import { applyCurriculumDetails } from "./curriculum-details";
+import { applyCurriculumDetails } from "./curriculum-enrichment";
 import { extraModules } from "./modules/_index";
 
 export interface CodeExample {
@@ -23,6 +23,7 @@ export interface Exercise {
 }
 
 export type LearningLevel = "débutant" | "intermédiaire" | "avancé";
+export const learningLevels: LearningLevel[] = ["débutant", "intermédiaire", "avancé"];
 export interface LearningResource { title: string; href: string }
 export interface LessonCommand { command: string; description: string }
 export interface Practice { title: string; description: string; success: string }
@@ -71,7 +72,7 @@ export interface Module {
 
 export const curriculum: Module[] = [
   // ─────────────────────────────────────────────────────────
-  // MODULE 1 — INTRODUCTION
+  // MODULE 1 : INTRODUCTION
   // ─────────────────────────────────────────────────────────
   {
     id: "intro",
@@ -81,15 +82,15 @@ export const curriculum: Module[] = [
     lessons: [
       {
         id: "chatting-vs-delegating",
-        title: "Chatter vs Déléguer — le mindset qui change tout",
+        title: "Chatter vs Déléguer : le mindset qui change tout",
         duration: "6 min",
         tag: "Mindset",
         intro:
-          "La majorité des gens utilisent Claude pour chatter — poser des questions, obtenir des réponses, comme un moteur de recherche amélioré. Les experts, eux, délèguent — ils confient des missions entières à Claude et récupèrent des résultats concrets. Cette leçon est la plus importante de toute la formation.",
+          "La majorité des gens utilisent Claude pour chatter : poser des questions, obtenir des réponses, comme un moteur de recherche amélioré. Les experts, eux, délèguent : ils confient des missions entières à Claude et récupèrent des résultats concrets. Cette leçon est la plus importante de toute la formation.",
         sections: [
           {
             heading: "La différence fondamentale",
-            body: "Chatter, c'est demander à Claude d'écrire une fonction. Déléguer, c'est lui confier d'implémenter toute la feature d'authentification, de la tester, de la committer et d'ouvrir la PR — pendant que vous faites autre chose.",
+            body: "Chatter, c'est demander à Claude d'écrire une fonction. Déléguer, c'est lui confier d'implémenter toute la feature d'authentification, de la tester, de la committer et d'ouvrir la PR : pendant que vous faites autre chose.",
           },
           {
             table: {
@@ -97,8 +98,8 @@ export const curriculum: Module[] = [
               rows: [
                 ["\"Écris-moi une fonction de tri\"", "\"Implémenter le tri et la pagination sur /api/products\""],
                 ["Une réponse, une action", "Un objectif, N actions autonomes"],
-                ["Vous guidez chaque étape", "Claude planifie et exécute seul"],
-                ["Résultat : un bout de code", "Résultat : une feature complète et testée"],
+                ["Vous guidez chaque étape", "Claude planifie et exécutez seul"],
+                ["Résultat : un bout de code", "Résultat : une feature complèvous et testée"],
                 ["Gain de temps : 10 min", "Gain de temps : 2-4 heures"],
               ],
             },
@@ -106,15 +107,15 @@ export const curriculum: Module[] = [
           {
             heading: "Pourquoi la plupart restent bloqués en mode \"chat\"",
             bullets: [
-              "Ils ont appris Claude comme un chatbot — ancrer sa réponse immédiate",
+              "Ils ont appris Claude comme un chatbot : ancrer sa réponse immédiate",
               "Ils ne font pas confiance à l'IA pour prendre des décisions",
-              "Ils ne savent pas comment structurer une mission complète",
+              "Ils ne savent pas comment structurer une mission complèvous",
               "Ils n'ont pas de CLAUDE.md pour donner le contexte projet",
             ],
           },
           {
             heading: "Le shift mental à opérer",
-            body: "Arrêtez de voir Claude comme un assistant qui répond à vos questions. Commencez à le voir comme un senior dev à qui vous confiez des missions. Vous définissez l'objectif et les contraintes — Claude gère l'exécution.",
+            body: "Arrêtez de voir Claude comme un assistant qui répond à vos questions. Commencez à le voir comme un senior dev à qui vous confiez des missions. Vous définissez l'objectif et les contraintes : Claude gère l'exécution.",
           },
           {
             callout: {
@@ -149,23 +150,23 @@ export const curriculum: Module[] = [
           {
             level: "débutant",
             icon: "✍️",
-            title: "Convertis un prompt \"chat\" en délégation",
-            description: "Prends ce prompt : \"Comment créer un composant Button en React ?\" et réécris-le en mode délégation — donne une vraie mission à Claude avec contexte et objectif final.",
-            hint: "Pense à : quel est le vrai résultat que tu veux ? Dans quel projet ? Avec quelles contraintes ?",
+            title: "Convertissez un prompt \"chat\" en délégation",
+            description: "Prenez ce prompt : \"Comment créer un composant Button en React ?\" et réécris-le en mode délégation : donne une vraie mission à Claude avec contexte et objectif final.",
+            hint: "Pensez à : quel est le vrai résultat que vous voulez ? Dans quel projet ? Avec quelles contraintes ?",
           },
           {
             level: "intermédiaire",
             icon: "🚀",
-            title: "Ta première vraie délégation",
-            description: "Ouvre Claude Code sur un projet réel (ou crée un dossier test). Délègue-lui la création d'un fichier README.md complet basé sur la structure du projet — sans lui donner d'instructions step-by-step.",
-            hint: "Dis juste : \"analyse ce projet et génère un README.md complet et professionnel\"",
+            title: "Votre première vraie délégation",
+            description: "Ouvrez Claude Code sur un projet réel (ou crée un dossier test). Déléguez-lui la création d'un fichier README.md complet basé sur la structure du projet : sans lui donner d'instructions step-by-step.",
+            hint: "Dites juste : \"analyse ce projet et générez un README.md complet et professionnel\"",
           },
           {
             level: "avancé",
             icon: "🏆",
             title: "Mission autonome de bout en bout",
-            description: "Donne à Claude une mission qui touche au moins 5 fichiers différents. Observe comment il planifie, exécute et itère sans que tu intervienne. Note ce qui t'a surpris.",
-            hint: "Ex: \"Ajoute un système de logging structuré (Winston/Pino) à toutes les routes API de ce projet\"",
+            description: "Donnez à Claude une mission qui touche au moins 5 fichiers différents. Observez comment il planifie, exécutez et itère sans que vous intervienne. Notez ce qui t'a surpris.",
+            hint: "Ex: \"Ajoutez un système de logging structuré (Winston/Pino) à toutes les routes API de ce projet\"",
           },
         ],
       },
@@ -180,22 +181,22 @@ export const curriculum: Module[] = [
           {
             level: "débutant",
             icon: "🔍",
-            title: "Explore la doc officielle",
-            description: "Va sur claude.ai et demande à Claude de t'expliquer la différence entre l'interface web et Claude Code CLI. Note 3 choses que Claude Code peut faire que le chat ne peut pas.",
+            title: "Explorez la doc officielle",
+            description: "Va sur claude.ai et demandez à Claude de t'expliquer la différence entre l'interface web et Claude Code CLI. Notez 3 choses que Claude Code peut faire que le chat ne peut pas.",
             hint: "Focus sur : filesystem, terminal, autonomie",
           },
           {
             level: "intermédiaire",
             icon: "⚡",
-            title: "Compare avec GitHub Copilot",
-            description: "Si tu as déjà utilisé Copilot ou Cursor, écris un court paragraphe sur la différence fondamentale d'approche entre un outil d'autocomplétion et un agent autonome comme Claude Code.",
+            title: "Comparez avec GitHub Copilot",
+            description: "Si vous avez déjà utilisé Copilot ou Cursor, écrivez un court paragraphe sur la différence fondamentale d'approche entre un outil d'autocomplétion et un agent autonome comme Claude Code.",
             hint: "La clé : autocomplete réagit à votre code, Claude Code agit sur votre projet",
           },
           {
             level: "avancé",
             icon: "🏗️",
-            title: "Identifie 5 cas d'usage dans ton projet actuel",
-            description: "Prends ton projet principal et liste 5 tâches répétitives ou complexes que tu pourrais déléguer à Claude Code dès aujourd'hui. Estime le temps gagné par tâche.",
+            title: "Identifiez 5 cas d'usage dans votre projet actuel",
+            description: "Prenez votre projet principal et liste 5 tâches répétitives ou complexes que vous pourriez déléguer à Claude Code dès aujourd'hui. Estimez le temps gagné par tâche.",
             hint: "Types de tâches : refactoring, génération de tests, documentation, migrations, review",
           },
         ],
@@ -208,7 +209,7 @@ export const curriculum: Module[] = [
             callout: {
               type: "info",
               icon: "💡",
-              text: "<strong>Définition :</strong> Claude Code est un \"agentic coding assistant\" — il planifie, agit et itère jusqu'à atteindre l'objectif, sans que vous ayez à tout détailler step by step.",
+              text: "<strong>Définition :</strong> Claude Code est un \"agentic coding assistant\" : il planifie, agit et itère jusqu'à atteindre l'objectif, sans que vous ayez à tout détailler step by step.",
             },
           },
           {
@@ -317,7 +318,7 @@ claude
         id: "first-steps",
         title: "Premiers pas dans le terminal",
         duration: "6 min",
-        tag: "Pratique",
+        tag: "Pratiquez",
         intro:
           "Une fois Claude Code installé, découvrons comment naviguer dans l'interface, envoyer des messages et comprendre les réponses.",
         sections: [
@@ -382,7 +383,7 @@ claude "explique la structure de ce projet"`,
   },
 
   // ─────────────────────────────────────────────────────────
-  // MODULE 2 — OUTILS FICHIERS
+  // MODULE 2 : OUTILS FICHIERS
   // ─────────────────────────────────────────────────────────
   {
     id: "files",
@@ -400,7 +401,7 @@ claude "explique la structure de ce projet"`,
         sections: [
           {
             heading: "Comment fonctionne l'outil Read",
-            body: "Quand vous demandez à Claude de comprendre votre code, il utilise automatiquement l'outil Read pour accéder aux fichiers. Vous n'avez pas à le spécifier — Claude décide seul des fichiers à lire selon votre demande.",
+            body: "Quand vous demandez à Claude de comprendre votre code, il utilise automatiquement l'outil Read pour accéder aux fichiers. Vous n'avez pas à le spécifier : Claude décide seul des fichiers à lire selon votre demande.",
           },
           {
             code: {
@@ -430,9 +431,9 @@ claude "explique la structure de ce projet"`,
             heading: "Formats supportés",
             bullets: [
               "Fichiers texte (.ts, .js, .py, .go, .rs, .java, .md, etc.)",
-              "Images (.png, .jpg, .gif, .webp) — Claude les \"voit\"",
-              "PDFs — lecture jusqu'à 20 pages par requête",
-              "Notebooks Jupyter (.ipynb) — code, texte et outputs",
+              "Images (.png, .jpg, .gif, .webp) : Claude les \"voit\"",
+              "PDFs : lecture jusqu'à 20 pages par requêvous",
+              "Notebooks Jupyter (.ipynb) : code, texte et outputs",
             ],
           },
         ],
@@ -485,7 +486,7 @@ claude "explique la structure de ce projet"`,
             callout: {
               type: "tip",
               icon: "🚀",
-              text: "Claude peut créer plusieurs fichiers en une seule réponse. Pour des features complètes, demandez-lui de tout générer d'un coup avec le contexte de votre projet.",
+              text: "Claude peut créer plusieurs fichiers en une seule réponse. Pour des features complèvos, demandez-lui de tout générer d'un coup avec le contexte de votre projet.",
             },
           },
         ],
@@ -523,7 +524,7 @@ claude "explique la structure de ce projet"`,
             callout: {
               type: "info",
               icon: "📝",
-              text: "<strong>replace_all :</strong> Pour renommer une variable dans tout un fichier, Claude peut utiliser replace_all qui remplace toutes les occurrences d'un coup — idéal pour les renames de variables ou de fonctions.",
+              text: "<strong>replace_all :</strong> Pour renommer une variable dans tout un fichier, Claude peut utiliser replace_all qui remplace toutes les occurrences d'un coup : idéal pour les renames de variables ou de fonctions.",
             },
           },
           {
@@ -559,7 +560,7 @@ git checkout -- src/auth.ts`,
           "Glob et Grep permettent à Claude de naviguer efficacement dans de larges codebases : Glob pour trouver des fichiers par pattern, Grep pour chercher du texte dans les fichiers.",
         sections: [
           {
-            heading: "L'outil Glob — trouver des fichiers",
+            heading: "L'outil Glob : trouver des fichiers",
             body: "Glob supporte les patterns de type *.js, **/*.tsx, src/**/*.test.ts etc. Il retourne les fichiers triés par date de modification.",
             code: {
               lang: "text",
@@ -574,8 +575,8 @@ git checkout -- src/auth.ts`,
             },
           },
           {
-            heading: "L'outil Grep — chercher dans le contenu",
-            body: "Grep supporte les expressions régulières complètes. Il peut filtrer par type de fichier, afficher le contexte autour des matches, et compter les occurrences.",
+            heading: "L'outil Grep : chercher dans le contenu",
+            body: "Grep supporte les expressions régulières complèvos. Il peut filtrer par type de fichier, afficher le contexte autour des matches, et compter les occurrences.",
             code: {
               lang: "text",
               label: "Exemples d'usage de Grep",
@@ -605,7 +606,7 @@ git checkout -- src/auth.ts`,
   },
 
   // ─────────────────────────────────────────────────────────
-  // MODULE 3 — CODE & DEBUG
+  // MODULE 3 : CODE & DEBUG
   // ─────────────────────────────────────────────────────────
   {
     id: "code",
@@ -617,7 +618,7 @@ git checkout -- src/auth.ts`,
         id: "code-gen",
         title: "Génération de code",
         duration: "8 min",
-        tag: "Pratique",
+        tag: "Pratiquez",
         intro:
           "Claude Code excelle dans la génération de code de haute qualité. Plus vous lui donnez de contexte, plus le code généré sera précis et adapté à votre projet.",
         sections: [
@@ -677,7 +678,7 @@ git checkout -- src/auth.ts`,
         id: "refactoring",
         title: "Refactoring de code",
         duration: "7 min",
-        tag: "Pratique",
+        tag: "Pratiquez",
         intro:
           "Claude Code est excellent pour moderniser et améliorer du code existant. Il comprend le contexte global du projet avant de proposer des changements.",
         sections: [
@@ -727,7 +728,7 @@ git checkout -- src/auth.ts`,
         id: "debugging",
         title: "Debug & résolution de bugs",
         duration: "8 min",
-        tag: "Pratique",
+        tag: "Pratiquez",
         intro:
           "Claude Code est un partenaire de debugging redoutable. Il peut analyser des stack traces, reproduire des bugs, et proposer des corrections précises.",
         sections: [
@@ -777,7 +778,7 @@ FAIL src/auth/__tests__/auth.test.ts
             callout: {
               type: "info",
               icon: "🔄",
-              text: "<strong>Itération automatique :</strong> Claude Code peut rentrer dans une boucle \"fix → test → fix\" de façon autonome jusqu'à la résolution complète. C'est l'un de ses super-pouvoirs.",
+              text: "<strong>Itération automatique :</strong> Claude Code peut rentrer dans une boucle \"fix → test → fix\" de façon autonome jusqu'à la résolution complèvous. C'est l'un de ses super-pouvoirs.",
             },
           },
         ],
@@ -786,7 +787,7 @@ FAIL src/auth/__tests__/auth.test.ts
   },
 
   // ─────────────────────────────────────────────────────────
-  // MODULE 4 — GIT & TERMINAL
+  // MODULE 4 : GIT & TERMINAL
   // ─────────────────────────────────────────────────────────
   {
     id: "git",
@@ -985,7 +986,7 @@ kill $(lsof -t -i:3000)`,
   },
 
   // ─────────────────────────────────────────────────────────
-  // MODULE 5 — CONFIGURATION AVANCÉE
+  // MODULE 5 : CONFIGURATION AVANCÉE
   // ─────────────────────────────────────────────────────────
   {
     id: "config",
@@ -1045,7 +1046,7 @@ kill $(lsof -t -i:3000)`,
               rows: [
                 [
                   "default",
-                  "Demande confirmation pour les actions risquées",
+                  "Demandez confirmation pour les actions risquées",
                   "Usage quotidien",
                 ],
                 [
@@ -1112,7 +1113,7 @@ kill $(lsof -t -i:3000)`,
             heading: "Configurer un MCP server",
             code: {
               lang: "json",
-              label: "~/.claude/settings.json — section mcpServers",
+              label: "~/.claude/settings.json : section mcpServers",
               code: `{
   "mcpServers": {
     "filesystem": {
@@ -1142,8 +1143,8 @@ kill $(lsof -t -i:3000)`,
             table: {
               headers: ["Server", "Description", "Usage"],
               rows: [
-                ["@mcp/server-github", "GitHub API complète", "Issues, PRs, repos"],
-                ["@mcp/server-postgres", "Requêtes SQL directes", "Exploration de BDD"],
+                ["@mcp/server-github", "GitHub API complèvous", "Issues, PRs, repos"],
+                ["@mcp/server-postgres", "Requêvos SQL directes", "Exploration de BDD"],
                 ["@mcp/server-brave-search", "Recherche web Brave", "Info temps réel"],
                 ["@mcp/server-slack", "Slack API", "Lire/écrire messages"],
                 ["@mcp/server-puppeteer", "Browser automation", "Tests E2E, scraping"],
@@ -1223,7 +1224,7 @@ server.setRequestHandler("tools/call", async (req) => {
             heading: "Configuration des hooks",
             code: {
               lang: "json",
-              label: "~/.claude/settings.json — section hooks",
+              label: "~/.claude/settings.json : section hooks",
               code: `{
   "hooks": {
     "PostToolUse": [
@@ -1305,7 +1306,7 @@ server.setRequestHandler("tools/call", async (req) => {
   },
 
   // ─────────────────────────────────────────────────────────
-  // MODULE 6 — MÉMOIRE & CONTEXTE
+  // MODULE 6 : MÉMOIRE & CONTEXTE
   // ─────────────────────────────────────────────────────────
   {
     id: "memory",
@@ -1334,7 +1335,7 @@ server.setRequestHandler("tools/call", async (req) => {
             code: {
               lang: "markdown",
               label: "CLAUDE.md (exemple complet)",
-              code: `# Mon Projet — Context pour Claude
+              code: `# Mon Projet : Context pour Claude
 
 ## Stack technique
 - Runtime: Node.js 20 + TypeScript 5.4
@@ -1349,15 +1350,15 @@ server.setRequestHandler("tools/call", async (req) => {
 - Commits en anglais, format Conventional Commits
 
 ## Architecture
-- src/controllers/ — handlers HTTP
-- src/services/ — logique métier
-- src/repositories/ — accès BDD via Prisma
-- src/utils/ — helpers partagés
+- src/controllers/ : handlers HTTP
+- src/services/ : logique métier
+- src/repositories/ : accès BDD via Prisma
+- src/utils/ : helpers partagés
 
 ## Commandes utiles
-- npm run dev — serveur de dev avec hot reload
-- npm test — vitest en watch mode
-- npm run db:migrate — migrations Prisma
+- npm run dev : serveur de dev avec hot reload
+- npm test : vitest en watch mode
+- npm run db:migrate : migrations Prisma
 
 ## Pièges à éviter
 - Ne jamais commiter .env
@@ -1501,7 +1502,7 @@ server.setRequestHandler("tools/call", async (req) => {
   },
 
   // ─────────────────────────────────────────────────────────
-  // MODULE 7 — PRODUCTIVITÉ
+  // MODULE 7 : PRODUCTIVITÉ
   // ─────────────────────────────────────────────────────────
   {
     id: "productivity",
@@ -1530,11 +1531,11 @@ server.setRequestHandler("tools/call", async (req) => {
                 ["/config", "Affiche la configuration actuelle"],
                 ["/cost", "Affiche le coût de la session en cours"],
                 ["/fast", "Bascule en mode Fast (même modèle, output plus rapide)"],
-                ["/review", "Lance une revue de code sur le diff courant"],
+                ["/review", "Lancez une revue de code sur le diff courant"],
                 ["/security-review", "Audit de sécurité du diff courant (vulnérabilités, secrets)"],
                 ["/init", "Bootstrap un CLAUDE.md initial pour le projet"],
                 ["/agents", "Affiche et gère les subagents configurés"],
-                ["/permissions", "Configure interactivement les permissions"],
+                ["/permissions", "Configurez interactivement les permissions"],
                 ["/mcp", "Liste et gère les serveurs MCP"],
                 ["/resume", "Reprend une session interrompue"],
               ],
@@ -1560,12 +1561,12 @@ Créer un commit Git propre avec ces étapes :
           {
             heading: "Skills populaires de la communauté",
             bullets: [
-              "/commit — Créer un commit propre",
-              "/review-pr — Revue de code d'une PR",
-              "/test — Générer et lancer des tests",
-              "/deploy — Déploiement guidé",
-              "/docs — Générer la documentation",
-              "/refactor — Refactoring guidé avec plan",
+              "/commit : Créer un commit propre",
+              "/review-pr : Revue de code d'une PR",
+              "/test : Générer et lancer des tests",
+              "/deploy : Déploiement guidé",
+              "/docs : Générer la documentation",
+              "/refactor : Refactoring guidé avec plan",
             ],
           },
           {
@@ -1635,7 +1636,7 @@ Créer un commit Git propre avec ces étapes :
           "Ces conseils avancés vous permettront de tirer le maximum de Claude Code au quotidien et d'éviter les pièges courants.",
         sections: [
           {
-            heading: "1. Donner des tâches complètes, pas des micro-instructions",
+            heading: "1. Donner des tâches complèvos, pas des micro-instructions",
             body: "Claude Code est plus efficace quand vous lui donnez des objectifs complets plutôt que des instructions step-by-step. Faites confiance à son jugement pour planifier.",
             code: {
               lang: "text",
@@ -1685,11 +1686,11 @@ Créer un commit Git propre avec ces étapes :
           },
           {
             heading: "5. Mode autonome pour les tâches longues",
-            body: "Pour les refactorings ou features complexes, donnez à Claude une description complète et laissez-le travailler en autonomie. Revenez pour valider le résultat.",
+            body: "Pour les refactorings ou features complexes, donnez à Claude une description complèvous et laissez-le travailler en autonomie. Revenez pour valider le résultat.",
             callout: {
               type: "success",
               icon: "🏆",
-              text: "<strong>Pattern gagnant :</strong> Décrivez la tâche complète → Claude planifie et exécute → Vous reviewez avec <code>git diff</code> → Feedback si besoin.",
+              text: "<strong>Pattern gagnant :</strong> Décrivez la tâche complèvous → Claude planifie et exécutez → Vous reviewez avec <code>git diff</code> → Feedback si besoin.",
             },
           },
           {
@@ -1737,7 +1738,7 @@ console.log(parsed.result);`,
     ],
   },
   // ─────────────────────────────────────────────────────────
-  // MODULE 8 — TOKENS & MODÈLES IA
+  // MODULE 8 : TOKENS & MODÈLES IA
   // ─────────────────────────────────────────────────────────
   {
     id: "tokens",
@@ -1751,11 +1752,11 @@ console.log(parsed.result);`,
         duration: "8 min",
         tag: "Théorie",
         intro:
-          "Comprendre comment Claude fonctionne sous le capot vous permet de l'utiliser bien plus efficacement. Tokens, fenêtre de contexte, attention — ces concepts ont un impact direct sur votre workflow.",
+          "Comprendre comment Claude fonctionne sous le capot vous permet de l'utiliser bien plus efficacement. Tokens, fenêtre de contexte, attention : ces concepts ont un impact direct sur votre workflow.",
         sections: [
           {
             heading: "Qu'est-ce qu'un token ?",
-            body: "Un token est la plus petite unité de texte traitée par le modèle. Ce n'est ni un mot, ni un caractère — c'est un fragment de texte d'environ 3-4 caractères en moyenne en anglais (un peu plus en français). Le modèle lit et génère des tokens, pas des mots.",
+            body: "Un token est la plus petite unité de texte traitée par le modèle. Ce n'est ni un mot, ni un caractère : c'est un fragment de texte d'environ 3-4 caractères en moyenne en anglais (un peu plus en français). Le modèle lit et générez des tokens, pas des mots.",
           },
           {
             callout: {
@@ -1766,7 +1767,7 @@ console.log(parsed.result);`,
           },
           {
             heading: "La fenêtre de contexte",
-            body: "Le modèle a une limite de tokens qu'il peut traiter en une fois — c'est la fenêtre de contexte. Dans Claude Code, Opus 5.5, Sonnet 5.5 et Fable 5.1 ont une fenêtre de 1 million de tokens (environ 750 000 mots) ; Haiku 4.5 reste à 200 000. Tout ce que Claude peut \"voir\" à un instant T (historique, fichiers lus, instructions) doit tenir dans cette fenêtre.",
+            body: "Le modèle a une limite de tokens qu'il peut traiter en une fois : c'est la fenêtre de contexte. Dans Claude Code, Opus 5.5, Sonnet 5.5 et Fable 5.1 ont une fenêtre de 1 million de tokens (environ 750 000 mots) ; Haiku 4.5 reste à 200 000. Tout ce que Claude peut \"voir\" à un instant T (historique, fichiers lus, instructions) doit tenir dans cette fenêtre.",
           },
           {
             heading: "Le mécanisme d'attention",
@@ -1790,7 +1791,7 @@ console.log(parsed.result);`,
           },
           {
             heading: "Prompt caching",
-            body: "Claude Code utilise le prompt caching d'Anthropic : si le début d'un contexte reste identique entre deux requêtes, les tokens en cache sont jusqu'à 10x moins chers. C'est pourquoi les CLAUDE.md et instructions stables au début du contexte réduisent significativement les coûts.",
+            body: "Claude Code utilise le prompt caching d'Anthropic : si le début d'un contexte reste identique entre deux requêvos, les tokens en cache sont jusqu'à 10x moins chers. C'est pourquoi les CLAUDE.md et instructions stables au début du contexte réduisent significativement les coûts.",
           },
         ],
       },
@@ -1798,7 +1799,7 @@ console.log(parsed.result);`,
         id: "pricing",
         title: "Tarification & gestion des coûts",
         duration: "7 min",
-        tag: "Pratique",
+        tag: "Pratiquez",
         intro:
           "Claude Code se paie soit par abonnement (Pro, Max, Team, Enterprise), soit à l'usage via l'API. Comprendre la tarification vous permet d'optimiser vos coûts sans sacrifier la qualité.",
         sections: [
@@ -1854,7 +1855,7 @@ Session cost: $0.23
               headers: ["Tâche", "Coût estimé", "Modèle recommandé"],
               rows: [
                 ["Bug fix simple", "$0.02-0.10", "Sonnet"],
-                ["Feature complète (200 lignes)", "$0.20-0.80", "Sonnet/Opus"],
+                ["Feature complèvous (200 lignes)", "$0.20-0.80", "Sonnet/Opus"],
                 ["Refactoring d'un module", "$0.50-2.00", "Opus"],
                 ["Session de 2h sur un projet", "$2-8", "Sonnet"],
                 ["Revue de PR automatisée (CI)", "$0.05-0.20", "Haiku/Sonnet"],
@@ -1874,7 +1875,7 @@ Session cost: $0.23
   },
 
   // ─────────────────────────────────────────────────────────
-  // MODULE 9 — PLAN MODE & AGENTS
+  // MODULE 9 : PLAN MODE & AGENTS
   // ─────────────────────────────────────────────────────────
   {
     id: "plan-agents",
@@ -1884,7 +1885,7 @@ Session cost: $0.23
     lessons: [
       {
         id: "plan-mode",
-        title: "Plan Mode — planifier avant d'agir",
+        title: "Plan Mode : planifier avant d'agir",
         duration: "8 min",
         tag: "Fonctionnalité clé",
         intro:
@@ -1932,15 +1933,15 @@ Session cost: $0.23
 ## Plan d'implémentation
 
 ### Backend (Express)
-1. src/websocket/wsServer.ts — serveur WebSocket avec ws
-2. src/websocket/notificationService.ts — logique métier
-3. src/models/notification.ts — modèle Prisma
+1. src/websocket/wsServer.ts : serveur WebSocket avec ws
+2. src/websocket/notificationService.ts : logique métier
+3. src/models/notification.ts : modèle Prisma
 4. Migration BDD pour la table notifications
 
 ### Frontend (React)
-5. src/hooks/useNotifications.ts — hook WebSocket
-6. src/components/NotificationBell.tsx — UI
-7. src/components/NotificationList.tsx — liste
+5. src/hooks/useNotifications.ts : hook WebSocket
+6. src/components/NotificationBell.tsx : UI
+7. src/components/NotificationList.tsx : liste
 
 ### Risques identifiés
 - Gestion des reconnexions WebSocket côté client
@@ -1960,13 +1961,13 @@ Validez ce plan ? Je commence par le backend.
           },
           {
             heading: "Modifier le plan avant l'exécution",
-            body: "Le Plan Mode est un aller-retour. Vous pouvez demander à Claude de modifier son plan (\"n'utilise pas WebSockets, utilise SSE plutôt\") avant qu'il commence à coder. C'est le moment idéal pour aligner sur l'architecture.",
+            body: "Le Plan Mode est un aller-retour. Vous pouvez demander à Claude de modifier son plan (\"n'utilise pas WebSockets, utilisez SSE plutôt\") avant qu'il commence à coder. C'est le moment idéal pour aligner sur l'architecture.",
           },
         ],
       },
       {
         id: "subagents",
-        title: "Subagents — déléguer des sous-tâches",
+        title: "Subagents : déléguer des sous-tâches",
         duration: "9 min",
         tag: "Avancé",
         intro:
@@ -2014,7 +2015,7 @@ Validez ce plan ? Je commence par le backend.
               headers: ["Type", "Spécialité", "Outils disponibles"],
               rows: [
                 ["general-purpose", "Tâches générales (catch-all)", "Tous les outils"],
-                ["Explore", "Recherche / exploration de code (read-only)", "Glob, Grep, Read, Bash lecture"],
+                ["Explorez", "Recherche / exploration de code (read-only)", "Glob, Grep, Read, Bash lecture"],
                 ["Plan", "Architecture, planification, design doc", "Analyse seulement, pas d'édition"],
                 ["code-reviewer", "Revue de code indépendante d'une PR ou d'un diff", "Read, Glob, Grep + analyse"],
               ],
@@ -2024,14 +2025,14 @@ Validez ce plan ? Je commence par le backend.
             callout: {
               type: "tip",
               icon: "🧩",
-              text: "<strong>Subagents custom :</strong> Vous pouvez créer vos propres types dans <code>.claude/agents/&lt;nom&gt;.md</code> avec un frontmatter (<code>name</code>, <code>description</code>, <code>tools</code>, <code>model</code>) et un prompt système — idéal pour des audits métier récurrents.",
+              text: "<strong>Subagents custom :</strong> Vous pouvez créer vos propres types dans <code>.claude/agents/&lt;nom&gt;.md</code> avec un frontmatter (<code>name</code>, <code>description</code>, <code>tools</code>, <code>model</code>) et un prompt système : idéal pour des audits métier récurrents.",
             },
           },
           {
             callout: {
               type: "warn",
               icon: "💸",
-              text: "<strong>Coût :</strong> Chaque subagent démarre avec un contexte frais — il ne bénéficie pas du cache. Sur des tâches simples, un subagent peut coûter plus cher qu'une réponse directe. Utilisez-les pour des tâches qui le justifient.",
+              text: "<strong>Coût :</strong> Chaque subagent démarre avec un contexte frais : il ne bénéficie pas du cache. Sur des tâches simples, un subagent peut coûter plus cher qu'une réponse directe. Utilisez-les pour des tâches qui le justifient.",
             },
           },
         ],
@@ -2046,7 +2047,7 @@ Validez ce plan ? Je commence par le backend.
         sections: [
           {
             heading: "Pattern Orchestrateur → Agents spécialisés",
-            body: "L'orchestrateur reçoit l'objectif global, décompose en sous-tâches, délègue à des agents spécialisés (un pour la recherche, un pour l'implémentation, un pour les tests), puis consolide les résultats.",
+            body: "L'orchestrateur reçoit l'objectif global, décompose en sous-tâches, déléguez à des agents spécialisés (un pour la recherche, un pour l'implémentation, un pour les tests), puis consolidez les résultats.",
           },
           {
             code: {
@@ -2078,7 +2079,7 @@ Validez ce plan ? Je commence par le backend.
             },
           },
           {
-            heading: "Isolation de contexte — pourquoi c'est crucial",
+            heading: "Isolation de contexte : pourquoi c'est crucial",
             body: "Quand un agent explore un large module ou fait des recherches, il peut lire des dizaines de fichiers. Si c'est dans le contexte principal, toute cette info \"pollue\" la fenêtre et dilue l'attention sur l'essentiel. Les subagents isolent cette exploration.",
           },
           {
@@ -2106,7 +2107,7 @@ Validez ce plan ? Je commence par le backend.
   },
 
   // ─────────────────────────────────────────────────────────
-  // MODULE 10 — PROJET SAAS COMPLET
+  // MODULE 10 : PROJET SAAS COMPLET
   // ─────────────────────────────────────────────────────────
   {
     id: "saas-project",
@@ -2219,7 +2220,7 @@ Validez ce plan ? Je commence par le backend.
             callout: {
               type: "info",
               icon: "🔍",
-              text: "<strong>Cette étape est cruciale :</strong> Un CLAUDE.md bien fait au départ évite les incohérences. Claude va lire la codebase, comprendre les patterns, et les respecter automatiquement dans toutes les sessions suivantes.",
+              text: "<strong>Cette étape est cruciale :</strong> Un CLAUDE.md bien fait au départ évitez les incohérences. Claude va lire la codebase, comprendre les patterns, et les respecter automatiquement dans toutes les sessions suivantes.",
             },
           },
           {
@@ -2361,7 +2362,7 @@ cd projet && git checkout fix/bugs && claude
           {
             heading: "Conclusion : le bon état d'esprit",
             bullets: [
-              "Claude Code est un senior dev junior — très compétent, mais à guider",
+              "Claude Code est un senior dev junior : très compétent, mais à guider",
               "Plus vous lui donnez de contexte, meilleur est le résultat",
               "Vérifiez toujours le code généré avec git diff avant de committer",
               "Les CLAUDE.md sont votre investissement le plus rentable",
@@ -2378,6 +2379,8 @@ cd projet && git checkout fix/bugs && claude
 // Merge in extra modules from lib/modules/
 curriculum.push(...extraModules);
 applyCurriculumDetails(curriculum);
+// La navigation précédente/suivante suit le même parcours que le catalogue.
+curriculum.sort((a, b) => learningLevels.indexOf(a.level ?? "débutant") - learningLevels.indexOf(b.level ?? "débutant"));
 
 export const totalLessons = curriculum.reduce(
   (acc, mod) => acc + mod.lessons.length,

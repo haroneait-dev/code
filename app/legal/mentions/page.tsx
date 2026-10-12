@@ -6,7 +6,7 @@ export const metadata = {
 export default function MentionsPage() {
   return (
     <>
-      <h1 className="text-h1 font-display-xl -xl font-bold tracking-tight mb-6 text-on-surface">
+      <h1 className="text-h1 font-display-xl font-bold tracking-tight mb-6 text-on-surface">
         Mentions légales
       </h1>
       <p className="text-body-rt text-on-surface-variant leading-relaxed mb-6">
@@ -20,7 +20,7 @@ export default function MentionsPage() {
       <div className="space-y-4 text-body-sm text-on-surface-variant">
         <div>
           <div className="font-semibold text-on-surface">Éditeur</div>
-          <div>Claude Mastery — France</div>
+          <div>Claude Mastery : France</div>
         </div>
         <div>
           <div className="font-semibold text-on-surface">Hébergeur</div>

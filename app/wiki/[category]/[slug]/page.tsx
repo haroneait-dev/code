@@ -63,7 +63,7 @@ export async function generateMetadata({
 }) {
   const { category, slug } = await params;
   const article = await loadArticle(category as CategoryId, slug);
-  if (!article) return { title: "Wiki — Claude Mastery" };
+  if (!article) return { title: "Wiki : Claude Mastery" };
   return {
     title: article.title,
     description: article.description,
@@ -150,7 +150,7 @@ export default async function ArticlePage({
       <SiteHeader active={cat?.section === "claude" ? "claude" : cat?.section === "code" ? "code" : "wiki"} showSearch />
 
       <div className="flex-grow w-full max-w-[1440px] mx-auto px-margin-mobile md:px-10 xl:px-margin-desktop flex gap-10 xl:gap-12 py-8 relative">
-        {/* Left sidebar — categories + articles in current cat */}
+        {/* Left sidebar : categories + articles in current cat */}
         <aside className="hidden lg:block w-60 xl:w-64 flex-shrink-0 sticky top-[96px] h-[calc(100vh-120px)] overflow-y-auto pr-2">
           <h3 className="text-h3 font-body-sm text-on-surface-variant uppercase tracking-wider mb-4 font-semibold text-small">
             <Link href={section?.href ?? "/wiki"} className="hover:text-primary transition-colors">
@@ -303,7 +303,7 @@ export default async function ArticlePage({
           </article>
         </main>
 
-        {/* Right sidebar — TOC */}
+        {/* Right sidebar : TOC */}
         <aside className="hidden 2xl:block w-60 flex-shrink-0 sticky top-[96px] h-[calc(100vh-120px)] pl-6 border-l border-outline-variant overflow-y-auto">
           <h3 className="text-h3 font-body-sm text-on-surface-variant uppercase tracking-wider mb-4 font-semibold text-small">
             Sur cette page

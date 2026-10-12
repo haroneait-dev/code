@@ -8,7 +8,7 @@
         "title": "Mettre en pratique : Introduction",
         "description": "Vous pouvez ouvrir Claude Code et lui confier une première mission définie.",
         "steps": [
-          "Réécrire une demande de composant en mission complète.",
+          "Réécrire une demande de composant en mission complèvous.",
           "Préparer une mission adaptée à votre projet.",
           "Préparer un environnement de travail local.",
           "Explorer un petit projet dans le terminal."
@@ -116,7 +116,8 @@
         "description": "Vous pouvez expliquer la consommation d’une session et repérer les éléments qui influencent son coût.",
         "steps": [
           "Annoter une conversation simple.",
-          "Préparer une grille de suivi de session."
+          "Préparer une grille de suivi de session.",
+          "Vérifier votre grille de suivi avec les éléments de consommation présentés dans les deux leçons."
         ],
         "success": "Présentez un dossier avec le résultat de chaque étape et ses vérifications. Chaque résultat doit satisfaire le critère de réussite de la leçon associée."
       }
@@ -205,7 +206,7 @@
       "outcome": "Vous pouvez préparer la configuration, la connexion et le déploiement d’un projet de test.",
       "minutes": 100,
       "project": {
-        "title": "Mettre en pratique : SaaS Pratique (Supabase, Vercel, Auth)",
+        "title": "Mettre en pratique : SaaS Pratiquez (Supabase, Vercel, Auth)",
         "description": "Vous pouvez préparer la configuration, la connexion et le déploiement d’un projet de test.",
         "steps": [
           "Préparer la configuration d’un projet de test.",
@@ -279,7 +280,7 @@
         }
       ],
       "practice": {
-        "title": "Réécrire une demande de composant en mission complète",
+        "title": "Réécrire une demande de composant en mission complèvous",
         "description": "Reprenez les exemples de la leçon « Chatter vs Déléguer : le mindset qui change tout » sur un petit projet ou dans un dossier de test. Conservez le résultat et les vérifications effectuées.",
         "success": "La demande indique le résultat attendu, le contexte du projet et une manière de vérifier le résultat."
       },
@@ -399,7 +400,12 @@
           "why": "La section « Se connecter » précise : Au premier lancement, Claude Code ouvre votre navigateur pour vous connecter à votre compte claude.ai (abonnement) ou Console (API)."
         }
       ],
-      "commands": [],
+      "commands": [
+        {
+          "command": "claude",
+          "description": "Ouvrir Claude Code dans le dossier du projet."
+        }
+      ],
       "resources": [
         {
           "title": "Installation de Claude Code",
@@ -467,7 +473,16 @@
           "why": "La section « Exemples de premières interactions » précise : L’exemple « Exemples de prompts » utilise : > explique-moi la structure de ce projet > quels sont les bugs dans src/auth.ts ?"
         }
       ],
-      "commands": [],
+      "commands": [
+        {
+          "command": "Ctrl+C",
+          "description": "Interrompre une action en cours."
+        },
+        {
+          "command": "claude",
+          "description": "Ouvrir Claude Code dans le dossier du projet."
+        }
+      ],
       "resources": [
         {
           "title": "Configurer un projet pour Claude Code",
@@ -569,7 +584,7 @@
       "takeaways": [
         "L’exemple « Prompts exemples » utilise : > crée un fichier utils/formatDate.ts avec des fonctions de formatage de dates en TypeScript",
         "Claude Code lit toujours un fichier existant avant de le réécrire afin de conserver le contexte et d'éviter de perdre du code.",
-        "L’exemple « Exemple de prompt avancé » utilise : > crée une feature d'authentification complète : - src/auth/authService.ts (logique métier)"
+        "L’exemple « Exemple de prompt avancé » utilise : > crée une feature d'authentification complèvous : - src/auth/authService.ts (logique métier)"
       ],
       "quiz": [
         {
@@ -595,12 +610,12 @@
         {
           "q": "Quelle explication correspond à « Création de fichiers multiples » dans cette leçon ?",
           "options": [
-            "L’exemple « Exemple de prompt avancé » utilise : > crée une feature d'authentification complète : - src/auth/authService.ts (logique métier)",
+            "L’exemple « Exemple de prompt avancé » utilise : > crée une feature d'authentification complèvous : - src/auth/authService.ts (logique métier)",
             "L'outil Edit est le plus utilisé de Claude Code.",
             "Glob et Grep permettent à Claude de naviguer efficacement dans de larges codebases : Glob pour trouver des fichiers par pattern, Grep pour chercher du texte dans les fichiers."
           ],
           "answer": 0,
-          "why": "La section « Création de fichiers multiples » précise : L’exemple « Exemple de prompt avancé » utilise : > crée une feature d'authentification complète : - src/auth/authService.ts (logique métier)"
+          "why": "La section « Création de fichiers multiples » précise : L’exemple « Exemple de prompt avancé » utilise : > crée une feature d'authentification complèvous : - src/auth/authService.ts (logique métier)"
         }
       ],
       "commands": [],
@@ -671,7 +686,16 @@
           "why": "La section « Vérification des changements » précise : L’exemple « Vérifier ce que Claude a modifié » utilise : git diff git status"
         }
       ],
-      "commands": [],
+      "commands": [
+        {
+          "command": "git diff",
+          "description": "Examiner les différences entre les versions des fichiers."
+        },
+        {
+          "command": "git status",
+          "description": "Consulter l’état des fichiers dans le dépôt."
+        }
+      ],
       "resources": [
         {
           "title": "L'outil Edit",
@@ -704,7 +728,7 @@
       ],
       "takeaways": [
         "Glob supporte les patterns de type *.js, **/*.tsx, src/**/*.test.ts etc.",
-        "Grep supporte les expressions régulières complètes.",
+        "Grep supporte les expressions régulières complèvos.",
         "Claude combine souvent Glob et Grep pour naviguer dans votre codebase : d'abord Glob pour trouver les fichiers pertinents, puis Grep pour localiser le code précis, puis Read pour comprendre le contexte."
       ],
       "quiz": [
@@ -722,11 +746,11 @@
           "q": "Quelle explication correspond à « L'outil Grep : chercher dans le contenu » dans cette leçon ?",
           "options": [
             "Claude Code a un accès complet à Git via la commande bash.",
-            "Grep supporte les expressions régulières complètes.",
+            "Grep supporte les expressions régulières complèvos.",
             "Via le CLI gh de GitHub, Claude Code peut créer des PR, commenter des issues, déclencher des workflows CI/CD et interagir avec l'écosystème GitHub."
           ],
           "answer": 1,
-          "why": "La section « L'outil Grep : chercher dans le contenu » précise : Grep supporte les expressions régulières complètes."
+          "why": "La section « L'outil Grep : chercher dans le contenu » précise : Grep supporte les expressions régulières complèvos."
         },
         {
           "q": "Quelle explication correspond à « Combinaison puissante » dans cette leçon ?",
@@ -1011,7 +1035,16 @@
           "why": "La section « Résolution de conflits » précise : L’exemple « Résoudre des conflits » utilise : > j'ai des conflits de merge dans src/models/user.ts, résous-les en gardant les changements des deux branches si possible"
         }
       ],
-      "commands": [],
+      "commands": [
+        {
+          "command": "git diff",
+          "description": "Examiner les différences entre les versions des fichiers."
+        },
+        {
+          "command": "git status",
+          "description": "Consulter l’état des fichiers dans le dépôt."
+        }
+      ],
       "resources": [
         {
           "title": "Résolution des conflits d'installation",
@@ -1079,7 +1112,16 @@
           "why": "La section « Demandes PR courantes » précise : Workflow complet : Claude peut gérer tout le cycle de vie d'une feature : créer la branche → implémenter → tester → commit → PR → adresser les reviews → merge."
         }
       ],
-      "commands": [],
+      "commands": [
+        {
+          "command": "git diff",
+          "description": "Examiner les différences entre les versions des fichiers."
+        },
+        {
+          "command": "gh pr create",
+          "description": "Ouvrir une pull request depuis le terminal."
+        }
+      ],
       "resources": [
         {
           "title": "Créer une slash command custom",
@@ -1147,7 +1189,12 @@
           "why": "La section « Timeout et limites » précise : Timeout par défaut : 2 minutes par commande"
         }
       ],
-      "commands": [],
+      "commands": [
+        {
+          "command": "npm test",
+          "description": "Lancer les tests définis par le projet."
+        }
+      ],
       "resources": [
         {
           "title": "L'outil Bash",
@@ -1181,7 +1228,7 @@
       "takeaways": [
         "Global (utilisateur) : ~/.claude/settings.json",
         "L’exemple « ~/.claude/settings.json » utilise : { // Modèle Claude à utiliser",
-        "default : Demande confirmation pour les actions risquées : Usage quotidien"
+        "default : Demandez confirmation pour les actions risquées : Usage quotidien"
       ],
       "quiz": [
         {
@@ -1209,10 +1256,10 @@
           "options": [
             "L'installation de Claude Code se fait en une commande npm.",
             "Une fois Claude Code installé, découvrons comment naviguer dans l'interface, envoyer des messages et comprendre les réponses.",
-            "default : Demande confirmation pour les actions risquées : Usage quotidien"
+            "default : Demandez confirmation pour les actions risquées : Usage quotidien"
           ],
           "answer": 2,
-          "why": "La section « Modes de permission » précise : default : Demande confirmation pour les actions risquées : Usage quotidien"
+          "why": "La section « Modes de permission » précise : default : Demandez confirmation pour les actions risquées : Usage quotidien"
         }
       ],
       "commands": [],
@@ -1249,7 +1296,7 @@
       "takeaways": [
         "MCP est un protocole client-serveur.",
         "L’exemple « ~/.claude/settings.json : section mcpServers » utilise : { \"mcpServers\": {",
-        "@mcp/server-github : GitHub API complète : Issues, PRs, repos"
+        "@mcp/server-github : GitHub API complèvous : Issues, PRs, repos"
       ],
       "quiz": [
         {
@@ -1275,12 +1322,12 @@
         {
           "q": "Quelle explication correspond à « MCP servers populaires » dans cette leçon ?",
           "options": [
-            "@mcp/server-github : GitHub API complète : Issues, PRs, repos",
+            "@mcp/server-github : GitHub API complèvous : Issues, PRs, repos",
             "L'outil Edit est le plus utilisé de Claude Code.",
             "Glob et Grep permettent à Claude de naviguer efficacement dans de larges codebases : Glob pour trouver des fichiers par pattern, Grep pour chercher du texte dans les fichiers."
           ],
           "answer": 0,
-          "why": "La section « MCP servers populaires » précise : @mcp/server-github : GitHub API complète : Issues, PRs, repos"
+          "why": "La section « MCP servers populaires » précise : @mcp/server-github : GitHub API complèvous : Issues, PRs, repos"
         }
       ],
       "commands": [],
@@ -1419,7 +1466,12 @@
           "why": "La section « Maintenir le CLAUDE.md à jour » précise : Demandez à Claude lui-même de mettre à jour le CLAUDE.md quand vous ajoutez une nouvelle convention ou technologie au projet."
         }
       ],
-      "commands": [],
+      "commands": [
+        {
+          "command": "npm test",
+          "description": "Lancer les tests définis par le projet."
+        }
+      ],
       "resources": [
         {
           "title": "Mémoire & gestion du contexte (CLAUDE.md)",
@@ -1452,7 +1504,7 @@
       ],
       "takeaways": [
         "user : Profil, préférences, expertise : Pour adapter les réponses",
-        "L’exemple « Commandes de mémoire » utilise : > souviens-toi que je préfère les réponses concises sans résumé à la fin",
+        "L’exemple « Commandes de mémoire » utilise : > souviens-vous que je préfère les réponses concises sans résumé à la fin",
         "L’exemple « Fichiers de mémoire » utilise : ~/.claude/memory/MEMORY.md # Index ~/.claude/memory/user_profile.md # Profil utilisateur"
       ],
       "quiz": [
@@ -1471,10 +1523,10 @@
           "options": [
             "L'outil Write permet à Claude de créer de nouveaux fichiers ou de réécrire entièrement des fichiers existants.",
             "L'outil Edit est le plus utilisé de Claude Code.",
-            "L’exemple « Commandes de mémoire » utilise : > souviens-toi que je préfère les réponses concises sans résumé à la fin"
+            "L’exemple « Commandes de mémoire » utilise : > souviens-vous que je préfère les réponses concises sans résumé à la fin"
           ],
           "answer": 2,
-          "why": "La section « Demander à Claude de se souvenir » précise : L’exemple « Commandes de mémoire » utilise : > souviens-toi que je préfère les réponses concises sans résumé à la fin"
+          "why": "La section « Demander à Claude de se souvenir » précise : L’exemple « Commandes de mémoire » utilise : > souviens-vous que je préfère les réponses concises sans résumé à la fin"
         },
         {
           "q": "Quelle explication correspond à « Localisation de la mémoire » dans cette leçon ?",
@@ -1677,6 +1729,18 @@
         {
           "command": "/status",
           "description": "Consulter l’état de la session."
+        },
+        {
+          "command": "git diff",
+          "description": "Examiner les différences entre les versions des fichiers."
+        },
+        {
+          "command": "git status",
+          "description": "Consulter l’état des fichiers dans le dépôt."
+        },
+        {
+          "command": "/resume",
+          "description": "Reprendre une conversation enregistrée."
         }
       ],
       "resources": [
@@ -1746,7 +1810,16 @@
           "why": "La section « Personnaliser les raccourcis » précise : Les raccourcis se règlent dans ~/.claude/keybindings.json."
         }
       ],
-      "commands": [],
+      "commands": [
+        {
+          "command": "Ctrl+C",
+          "description": "Interrompre une action en cours."
+        },
+        {
+          "command": "/keybindings",
+          "description": "Ouvrir la configuration des raccourcis."
+        }
+      ],
       "resources": [
         {
           "title": "Effort, fast mode et advisor",
@@ -1771,7 +1844,7 @@
     "tips": {
       "level": "intermédiaire",
       "objectives": [
-        "Structurer une tâche complète",
+        "Structurer une tâche complèvous",
         "Organiser les contrôles du travail délégué"
       ],
       "prerequisites": [
@@ -1784,14 +1857,14 @@
       ],
       "quiz": [
         {
-          "q": "Quelle explication correspond à « 1. Donner des tâches complètes, pas des micro-instructions » dans cette leçon ?",
+          "q": "Quelle explication correspond à « 1. Donner des tâches complèvos, pas des micro-instructions » dans cette leçon ?",
           "options": [
             "Claude Code excelle dans la génération de code de haute qualité.",
             "Claude Code est excellent pour moderniser et améliorer du code existant.",
             "Claude Code est plus efficace quand vous lui donnez des objectifs complets plutôt que des instructions step-by-step."
           ],
           "answer": 2,
-          "why": "La section « 1. Donner des tâches complètes, pas des micro-instructions » précise : Claude Code est plus efficace quand vous lui donnez des objectifs complets plutôt que des instructions step-by-step."
+          "why": "La section « 1. Donner des tâches complèvos, pas des micro-instructions » précise : Claude Code est plus efficace quand vous lui donnez des objectifs complets plutôt que des instructions step-by-step."
         },
         {
           "q": "Quelle explication correspond à « 2. Profiter de la recherche parallèle » dans cette leçon ?",
@@ -1822,6 +1895,14 @@
         {
           "command": "/cost",
           "description": "Consulter la consommation de la session."
+        },
+        {
+          "command": "git diff",
+          "description": "Examiner les différences entre les versions des fichiers."
+        },
+        {
+          "command": "npm test",
+          "description": "Lancer les tests définis par le projet."
         }
       ],
       "resources": [
@@ -2005,7 +2086,7 @@
       ],
       "takeaways": [
         "Sans plan, Claude peut foncer dans l'implémentation et prendre de mauvaises décisions architecturales qui nécessitent un refactoring complet.",
-        "L’exemple « Activer explicitement » utilise : > avant de coder, fais d'abord un plan détaillé de comment tu vas implémenter le système d'authentification",
+        "L’exemple « Activer explicitement » utilise : > avant de coder, faites d'abord un plan détaillé de comment vous allez implémenter le système d'authentification",
         "Liste des fichiers à créer/modifier avec leur rôle"
       ],
       "quiz": [
@@ -2023,11 +2104,11 @@
           "q": "Quelle explication correspond à « Activer le Plan Mode » dans cette leçon ?",
           "options": [
             "L'installation de Claude Code se fait en une commande npm.",
-            "L’exemple « Activer explicitement » utilise : > avant de coder, fais d'abord un plan détaillé de comment tu vas implémenter le système d'authentification",
+            "L’exemple « Activer explicitement » utilise : > avant de coder, faites d'abord un plan détaillé de comment vous allez implémenter le système d'authentification",
             "Une fois Claude Code installé, découvrons comment naviguer dans l'interface, envoyer des messages et comprendre les réponses."
           ],
           "answer": 1,
-          "why": "La section « Activer le Plan Mode » précise : L’exemple « Activer explicitement » utilise : > avant de coder, fais d'abord un plan détaillé de comment tu vas implémenter le système d'authentification"
+          "why": "La section « Activer le Plan Mode » précise : L’exemple « Activer explicitement » utilise : > avant de coder, faites d'abord un plan détaillé de comment vous allez implémenter le système d'authentification"
         },
         {
           "q": "Quelle explication correspond à « Ce que Claude produit en Plan Mode » dans cette leçon ?",
@@ -2145,7 +2226,7 @@
         "subagents"
       ],
       "takeaways": [
-        "L'orchestrateur reçoit l'objectif global, décompose en sous-tâches, délègue à des agents spécialisés (un pour la recherche, un pour l'implémentation, un pour les tests), puis consolide les résultats.",
+        "L'orchestrateur reçoit l'objectif global, décompose en sous-tâches, déléguez à des agents spécialisés (un pour la recherche, un pour l'implémentation, un pour les tests), puis consolidez les résultats.",
         "Un pattern très puissant : spawner un agent dont le seul rôle est de chercher de l'information (dans le code, sur le web, dans la doc) et de la synthétiser pour l'agent principal.",
         "Quand un agent explore un large module ou fait des recherches, il peut lire des dizaines de fichiers."
       ],
@@ -2155,10 +2236,10 @@
           "options": [
             "L'outil Edit est le plus utilisé de Claude Code.",
             "Claude Code excelle dans la génération de code de haute qualité.",
-            "L'orchestrateur reçoit l'objectif global, décompose en sous-tâches, délègue à des agents spécialisés (un pour la recherche, un pour l'implémentation, un pour les tests), puis consolide les résultats."
+            "L'orchestrateur reçoit l'objectif global, décompose en sous-tâches, déléguez à des agents spécialisés (un pour la recherche, un pour l'implémentation, un pour les tests), puis consolidez les résultats."
           ],
           "answer": 2,
-          "why": "La section « Pattern Orchestrateur → Agents spécialisés » précise : L'orchestrateur reçoit l'objectif global, décompose en sous-tâches, délègue à des agents spécialisés (un pour la recherche, un pour l'implémentation, un pour les tests), puis consolide les résultats."
+          "why": "La section « Pattern Orchestrateur → Agents spécialisés » précise : L'orchestrateur reçoit l'objectif global, décompose en sous-tâches, déléguez à des agents spécialisés (un pour la recherche, un pour l'implémentation, un pour les tests), puis consolidez les résultats."
         },
         {
           "q": "Quelle explication correspond à « Agents de recherche (Research agents) » dans cette leçon ?",
@@ -2181,7 +2262,12 @@
           "why": "La section « Isolation de contexte : pourquoi c'est crucial » précise : Quand un agent explore un large module ou fait des recherches, il peut lire des dizaines de fichiers."
         }
       ],
-      "commands": [],
+      "commands": [
+        {
+          "command": "npm test",
+          "description": "Lancer les tests définis par le projet."
+        }
+      ],
       "resources": [
         {
           "title": "Pourquoi utiliser des subagents ?",
@@ -2286,8 +2372,8 @@
         "project-setup"
       ],
       "takeaways": [
-        "L’exemple « Première session sur un projet existant » utilise : > explore ce projet et crée un CLAUDE.md complet qui documente : - l'architecture globale",
-        "L’exemple « Audit rapide » utilise : > fais un audit rapide du projet et identifie : - les 5 plus gros problèmes de qualité/dette technique",
+        "L’exemple « Première session sur un projet existant » utilise : > explore ce projet et créez un CLAUDE.md complet qui documente : - l'architecture globale",
+        "L’exemple « Audit rapide » utilise : > faites un audit rapide du projet et identifie : - les 5 plus gros problèmes de qualité/dette technique",
         "Pour du code legacy sans tests, la règle d'or est : tests d'abord, refactoring ensuite."
       ],
       "quiz": [
@@ -2295,21 +2381,21 @@
           "q": "Quelle explication correspond à « Étape 1 : Onboarding Claude sur le projet » dans cette leçon ?",
           "options": [
             "L'outil Read est le point d'entrée de Claude Code pour explorer votre codebase.",
-            "L’exemple « Première session sur un projet existant » utilise : > explore ce projet et crée un CLAUDE.md complet qui documente : - l'architecture globale",
+            "L’exemple « Première session sur un projet existant » utilise : > explore ce projet et créez un CLAUDE.md complet qui documente : - l'architecture globale",
             "L'outil Write permet à Claude de créer de nouveaux fichiers ou de réécrire entièrement des fichiers existants."
           ],
           "answer": 1,
-          "why": "La section « Étape 1 : Onboarding Claude sur le projet » précise : L’exemple « Première session sur un projet existant » utilise : > explore ce projet et crée un CLAUDE.md complet qui documente : - l'architecture globale"
+          "why": "La section « Étape 1 : Onboarding Claude sur le projet » précise : L’exemple « Première session sur un projet existant » utilise : > explore ce projet et créez un CLAUDE.md complet qui documente : - l'architecture globale"
         },
         {
           "q": "Quelle explication correspond à « Étape 2 : Identifier les quick wins » dans cette leçon ?",
           "options": [
             "L'outil Write permet à Claude de créer de nouveaux fichiers ou de réécrire entièrement des fichiers existants.",
             "L'outil Edit est le plus utilisé de Claude Code.",
-            "L’exemple « Audit rapide » utilise : > fais un audit rapide du projet et identifie : - les 5 plus gros problèmes de qualité/dette technique"
+            "L’exemple « Audit rapide » utilise : > faites un audit rapide du projet et identifie : - les 5 plus gros problèmes de qualité/dette technique"
           ],
           "answer": 2,
-          "why": "La section « Étape 2 : Identifier les quick wins » précise : L’exemple « Audit rapide » utilise : > fais un audit rapide du projet et identifie : - les 5 plus gros problèmes de qualité/dette technique"
+          "why": "La section « Étape 2 : Identifier les quick wins » précise : L’exemple « Audit rapide » utilise : > faites un audit rapide du projet et identifie : - les 5 plus gros problèmes de qualité/dette technique"
         },
         {
           "q": "Quelle explication correspond à « Gestion du code legacy » dans cette leçon ?",
@@ -2356,7 +2442,7 @@
       "takeaways": [
         "On écrit plus de specs/prompts et moins de code boilerplate",
         "Une technique pro : ouvrir plusieurs instances de Claude Code en parallèle, chacune sur une branche différente pour des features distinctes.",
-        "L’exemple « Review de code approfondie » utilise : > fais une revue de sécurité de ce diff en cherchant : injections SQL, XSS, IDOR, secrets exposés,"
+        "L’exemple « Review de code approfondie » utilise : > faites une revue de sécurité de ce diff en cherchant : injections SQL, XSS, IDOR, secrets exposés,"
       ],
       "quiz": [
         {
@@ -2383,14 +2469,19 @@
           "q": "Quelle explication correspond à « Stratégies avancées de code review » dans cette leçon ?",
           "options": [
             "Claude Code excelle dans la génération de code de haute qualité.",
-            "L’exemple « Review de code approfondie » utilise : > fais une revue de sécurité de ce diff en cherchant : injections SQL, XSS, IDOR, secrets exposés,",
+            "L’exemple « Review de code approfondie » utilise : > faites une revue de sécurité de ce diff en cherchant : injections SQL, XSS, IDOR, secrets exposés,",
             "Claude Code est excellent pour moderniser et améliorer du code existant."
           ],
           "answer": 1,
-          "why": "La section « Stratégies avancées de code review » précise : L’exemple « Review de code approfondie » utilise : > fais une revue de sécurité de ce diff en cherchant : injections SQL, XSS, IDOR, secrets exposés,"
+          "why": "La section « Stratégies avancées de code review » précise : L’exemple « Review de code approfondie » utilise : > faites une revue de sécurité de ce diff en cherchant : injections SQL, XSS, IDOR, secrets exposés,"
         }
       ],
-      "commands": [],
+      "commands": [
+        {
+          "command": "git diff",
+          "description": "Examiner les différences entre les versions des fichiers."
+        }
+      ],
       "resources": [
         {
           "title": "Code review automatisé",
@@ -2694,7 +2785,7 @@
         "output-format"
       ],
       "takeaways": [
-        "Sans eval set, vous ne faites pas du prompt engineering : vous faites de la divination. 20 cas bien choisis valent mieux que 200 cas aléatoires.",
+        "Sans eval set, vous ne faites pas du prompt engineering : vous faites de la divination. 20 cas bien choisissez valent mieux que 200 cas aléatoires.",
         "Consignes vagues : « Sois concis » est subjectif : « Maximum 3 phrases de 20 mots »",
         "Quand un input précis donne une mauvaise réponse, ajoutez temporairement un bloc &lt;thinking&gt; pour voir le raisonnement du modèle."
       ],
@@ -2703,11 +2794,11 @@
           "q": "Quelle explication correspond à « La boucle d'amélioration en 4 étapes » dans cette leçon ?",
           "options": [
             "Claude Code peut exécuter n'importe quelle commande bash, lancer des processus en background, et interagir avec votre environnement système.",
-            "Sans eval set, vous ne faites pas du prompt engineering : vous faites de la divination. 20 cas bien choisis valent mieux que 200 cas aléatoires.",
+            "Sans eval set, vous ne faites pas du prompt engineering : vous faites de la divination. 20 cas bien choisissez valent mieux que 200 cas aléatoires.",
             "Le fichier settings.json contrôle le comportement de Claude Code : permissions, outils autorisés, variables d'environnement, et plus encore."
           ],
           "answer": 1,
-          "why": "La section « La boucle d'amélioration en 4 étapes » précise : Sans eval set, vous ne faites pas du prompt engineering : vous faites de la divination. 20 cas bien choisis valent mieux que 200 cas aléatoires."
+          "why": "La section « La boucle d'amélioration en 4 étapes » précise : Sans eval set, vous ne faites pas du prompt engineering : vous faites de la divination. 20 cas bien choisissez valent mieux que 200 cas aléatoires."
         },
         {
           "q": "Quelle explication correspond à « Les anti-patterns qui tuent la qualité » dans cette leçon ?",
@@ -2764,7 +2855,7 @@
       "takeaways": [
         "Skill : une capability réutilisable packagée dans un dossier (un SKILL.md + des fichiers).",
         "Forme : Dossier + markdown : Prompt + tools : Serveur (stdio/http)",
-        "Un skill est le bon choix dès que vous vous retrouvez à répéter les mêmes instructions à Claude (\"d'abord lis le fichier X, puis applique le format Y, puis génère Z\")."
+        "Un skill est le bon choix dès que vous vous retrouvez à répéter les mêmes instructions à Claude (\"d'abord lis le fichier X, puis applique le format Y, puis générez Z\")."
       ],
       "quiz": [
         {
@@ -2792,13 +2883,22 @@
           "options": [
             "L'installation de Claude Code se fait en une commande npm.",
             "Une fois Claude Code installé, découvrons comment naviguer dans l'interface, envoyer des messages et comprendre les réponses.",
-            "Un skill est le bon choix dès que vous vous retrouvez à répéter les mêmes instructions à Claude (\"d'abord lis le fichier X, puis applique le format Y, puis génère Z\")."
+            "Un skill est le bon choix dès que vous vous retrouvez à répéter les mêmes instructions à Claude (\"d'abord lis le fichier X, puis applique le format Y, puis générez Z\")."
           ],
           "answer": 2,
-          "why": "La section « Quand choisir un skill ? » précise : Un skill est le bon choix dès que vous vous retrouvez à répéter les mêmes instructions à Claude (\"d'abord lis le fichier X, puis applique le format Y, puis génère Z\")."
+          "why": "La section « Quand choisir un skill ? » précise : Un skill est le bon choix dès que vous vous retrouvez à répéter les mêmes instructions à Claude (\"d'abord lis le fichier X, puis applique le format Y, puis générez Z\")."
         }
       ],
-      "commands": [],
+      "commands": [
+        {
+          "command": "git diff",
+          "description": "Examiner les différences entre les versions des fichiers."
+        },
+        {
+          "command": "git status",
+          "description": "Consulter l’état des fichiers dans le dépôt."
+        }
+      ],
       "resources": [
         {
           "title": "Structure d'un skill",
@@ -2866,7 +2966,16 @@
           "why": "La section « Exemple complet » précise : L’exemple « SKILL.md complet » utilise : --- name: pdf-fill"
         }
       ],
-      "commands": [],
+      "commands": [
+        {
+          "command": "git diff",
+          "description": "Examiner les différences entre les versions des fichiers."
+        },
+        {
+          "command": "npm test",
+          "description": "Lancer les tests définis par le projet."
+        }
+      ],
       "resources": [
         {
           "title": "Structure d'un skill",
@@ -2900,7 +3009,7 @@
       "takeaways": [
         "Le plus simple : utiliser claude-mem (le gestionnaire de skills communautaires) pour installer un skill publié.",
         ".claude/skills/&lt;nom&gt;/ → skill spécifique au projet (commit dans Git)",
-        "L’exemple « Clone direct » utilise : cd ~/.claude/skills git clone https://github.com/acme/awesome-skill.git"
+        "L’exemple « Clonez direct » utilise : cd ~/.claude/skills git clone https://github.com/acme/awesome-skill.git"
       ],
       "quiz": [
         {
@@ -2927,11 +3036,11 @@
           "q": "Quelle explication correspond à « Méthode 3 : Depuis un repo Git » dans cette leçon ?",
           "options": [
             "Claude Code est excellent pour moderniser et améliorer du code existant.",
-            "L’exemple « Clone direct » utilise : cd ~/.claude/skills git clone https://github.com/acme/awesome-skill.git",
+            "L’exemple « Clonez direct » utilise : cd ~/.claude/skills git clone https://github.com/acme/awesome-skill.git",
             "Claude Code est un partenaire de debugging redoutable."
           ],
           "answer": 1,
-          "why": "La section « Méthode 3 : Depuis un repo Git » précise : L’exemple « Clone direct » utilise : cd ~/.claude/skills git clone https://github.com/acme/awesome-skill.git"
+          "why": "La section « Méthode 3 : Depuis un repo Git » précise : L’exemple « Clonez direct » utilise : cd ~/.claude/skills git clone https://github.com/acme/awesome-skill.git"
         }
       ],
       "commands": [],
@@ -3306,30 +3415,30 @@
         "project-setup"
       ],
       "takeaways": [
-        "Va sur supabase.com → New project → choisis une région proche de tes utilisateurs (eu-west-3 pour la France).",
-        "Plutôt que de cliquer dans Table Editor, demande à Claude Code de générer le SQL complet (tables + index + RLS) et colle-le dans SQL Editor → New query.",
+        "Allez sur supabase.com → New project → choisissez une région proche de vos utilisateurs (eu-west-3 pour la France).",
+        "Plutôt que de cliquer dans Table Editor, demandez à Claude Code de générer le SQL complet (tables + index + RLS) et colle-le dans SQL Editor → New query.",
         "Deux clients distincts selon le contexte : @supabase/ssr pour les Route Handlers / Server Components (lit les cookies), et un client lazy pour le browser."
       ],
       "quiz": [
         {
           "q": "Quelle explication correspond à « 1. Créer le projet et récupérer les clés » dans cette leçon ?",
           "options": [
-            "Va sur supabase.com → New project → choisis une région proche de tes utilisateurs (eu-west-3 pour la France).",
+            "Allez sur supabase.com → New project → choisissez une région proche de vos utilisateurs (eu-west-3 pour la France).",
             "La majorité des gens utilisent Claude pour chatter : poser des questions, obtenir des réponses, comme un moteur de recherche amélioré.",
             "L'installation de Claude Code se fait en une commande npm."
           ],
           "answer": 0,
-          "why": "La section « 1. Créer le projet et récupérer les clés » précise : Va sur supabase.com → New project → choisis une région proche de tes utilisateurs (eu-west-3 pour la France)."
+          "why": "La section « 1. Créer le projet et récupérer les clés » précise : Allez sur supabase.com → New project → choisissez une région proche de vos utilisateurs (eu-west-3 pour la France)."
         },
         {
           "q": "Quelle explication correspond à « 2. Schéma SQL via le SQL Editor » dans cette leçon ?",
           "options": [
             "L'installation de Claude Code se fait en une commande npm.",
-            "Plutôt que de cliquer dans Table Editor, demande à Claude Code de générer le SQL complet (tables + index + RLS) et colle-le dans SQL Editor → New query.",
+            "Plutôt que de cliquer dans Table Editor, demandez à Claude Code de générer le SQL complet (tables + index + RLS) et colle-le dans SQL Editor → New query.",
             "Une fois Claude Code installé, découvrons comment naviguer dans l'interface, envoyer des messages et comprendre les réponses."
           ],
           "answer": 1,
-          "why": "La section « 2. Schéma SQL via le SQL Editor » précise : Plutôt que de cliquer dans Table Editor, demande à Claude Code de générer le SQL complet (tables + index + RLS) et colle-le dans SQL Editor → New query."
+          "why": "La section « 2. Schéma SQL via le SQL Editor » précise : Plutôt que de cliquer dans Table Editor, demandez à Claude Code de générer le SQL complet (tables + index + RLS) et colle-le dans SQL Editor → New query."
         },
         {
           "q": "Quelle explication correspond à « 3. Client SSR vs client browser » dans cette leçon ?",
@@ -3443,7 +3552,7 @@
       ],
       "takeaways": [
         "L’exemple « Setup one-time » utilise : npm i -g vercel vercel link",
-        "Ne JAMAIS copier-coller tes secrets dans le dashboard Vercel.",
+        "Ne JAMAIS copier-coller vos secrets dans le dashboard Vercel.",
         "Chaque git push sur une branche crée une URL de preview unique (mon-saas-git-feat-x.vercel.app)."
       ],
       "quiz": [
@@ -3460,12 +3569,12 @@
         {
           "q": "Quelle explication correspond à « 2. Variables d'environnement » dans cette leçon ?",
           "options": [
-            "Ne JAMAIS copier-coller tes secrets dans le dashboard Vercel.",
+            "Ne JAMAIS copier-coller vos secrets dans le dashboard Vercel.",
             "Claude Code excelle dans la génération de code de haute qualité.",
             "Claude Code est excellent pour moderniser et améliorer du code existant."
           ],
           "answer": 0,
-          "why": "La section « 2. Variables d'environnement » précise : Ne JAMAIS copier-coller tes secrets dans le dashboard Vercel."
+          "why": "La section « 2. Variables d'environnement » précise : Ne JAMAIS copier-coller vos secrets dans le dashboard Vercel."
         },
         {
           "q": "Quelle explication correspond à « 3. Preview vs Production » dans cette leçon ?",
@@ -3511,7 +3620,7 @@
       ],
       "takeaways": [
         "Orchestrateur = découpe le plan, distribue, agrège",
-        "Avant de lancer 200 subagents, génère d'abord un fichier de plan (CSV ou JSON) avec toutes les tâches.",
+        "Avant de lancer 200 subagents, générez d'abord un fichier de plan (CSV ou JSON) avec toutes les tâches.",
         "Le prompt doit être auto-suffisant : un subagent ne voit pas l'historique du chat principal."
       ],
       "quiz": [
@@ -3529,11 +3638,11 @@
           "q": "Quelle explication correspond à « 2. Préparer le plan en amont » dans cette leçon ?",
           "options": [
             "Claude Code est un partenaire de debugging redoutable.",
-            "Avant de lancer 200 subagents, génère d'abord un fichier de plan (CSV ou JSON) avec toutes les tâches.",
+            "Avant de lancer 200 subagents, générez d'abord un fichier de plan (CSV ou JSON) avec toutes les tâches.",
             "Claude Code a un accès complet à Git via la commande bash."
           ],
           "answer": 1,
-          "why": "La section « 2. Préparer le plan en amont » précise : Avant de lancer 200 subagents, génère d'abord un fichier de plan (CSV ou JSON) avec toutes les tâches."
+          "why": "La section « 2. Préparer le plan en amont » précise : Avant de lancer 200 subagents, générez d'abord un fichier de plan (CSV ou JSON) avec toutes les tâches."
         },
         {
           "q": "Quelle explication correspond à « 3. Le prompt subagent type » dans cette leçon ?",
@@ -3578,43 +3687,48 @@
         "subagents-parallel-content"
       ],
       "takeaways": [
-        "L'erreur N°1 : tu as ajouté une nouvelle variable dans .env.local mais oublié de la pousser sur Vercel.",
-        "Si tu as activé Vercel Authentication sur ton projet, TOUTES les requêtes (y compris depuis ton frontend) reçoivent une page de login Vercel à la place de ta réponse JSON.",
-        "Tu utilises supabase.auth.getSession() côté serveur dans un Route Handler ?"
+        "L'erreur N°1 : vous avez ajouté une nouvelle variable dans .env.local mais oublié de la pousser sur Vercel.",
+        "Si vous avez activé Vercel Authentication sur votre projet, TOUTES les requêvos (y compris depuis votre frontend) reçoivent une page de login Vercel à la place de votre réponse JSON.",
+        "Vous utilisez supabase.auth.getSession() côté serveur dans un Route Handler ?"
       ],
       "quiz": [
         {
           "q": "Quelle explication correspond à « 1. Vérifier les env vars Vercel (90% des cas) » dans cette leçon ?",
           "options": [
             "Claude Code peut exécuter n'importe quelle commande bash, lancer des processus en background, et interagir avec votre environnement système.",
-            "L'erreur N°1 : tu as ajouté une nouvelle variable dans .env.local mais oublié de la pousser sur Vercel.",
+            "L'erreur N°1 : vous avez ajouté une nouvelle variable dans .env.local mais oublié de la pousser sur Vercel.",
             "Le fichier settings.json contrôle le comportement de Claude Code : permissions, outils autorisés, variables d'environnement, et plus encore."
           ],
           "answer": 1,
-          "why": "La section « 1. Vérifier les env vars Vercel (90% des cas) » précise : L'erreur N°1 : tu as ajouté une nouvelle variable dans .env.local mais oublié de la pousser sur Vercel."
+          "why": "La section « 1. Vérifier les env vars Vercel (90% des cas) » précise : L'erreur N°1 : vous avez ajouté une nouvelle variable dans .env.local mais oublié de la pousser sur Vercel."
         },
         {
           "q": "Quelle explication correspond à « 2. Deployment Protection activée par erreur » dans cette leçon ?",
           "options": [
             "Le fichier settings.json contrôle le comportement de Claude Code : permissions, outils autorisés, variables d'environnement, et plus encore.",
             "Le Model Context Protocol (MCP) est un standard ouvert qui permet à Claude Code de se connecter à des services externes : bases de données, APIs, outils DevOps, et plus.",
-            "Si tu as activé Vercel Authentication sur ton projet, TOUTES les requêtes (y compris depuis ton frontend) reçoivent une page de login Vercel à la place de ta réponse JSON."
+            "Si vous avez activé Vercel Authentication sur votre projet, TOUTES les requêvos (y compris depuis votre frontend) reçoivent une page de login Vercel à la place de votre réponse JSON."
           ],
           "answer": 2,
-          "why": "La section « 2. Deployment Protection activée par erreur » précise : Si tu as activé Vercel Authentication sur ton projet, TOUTES les requêtes (y compris depuis ton frontend) reçoivent une page de login Vercel à la place de ta réponse JSON."
+          "why": "La section « 2. Deployment Protection activée par erreur » précise : Si vous avez activé Vercel Authentication sur votre projet, TOUTES les requêvos (y compris depuis votre frontend) reçoivent une page de login Vercel à la place de votre réponse JSON."
         },
         {
           "q": "Quelle explication correspond à « 3. Session client-only qui ne suit pas en SSR » dans cette leçon ?",
           "options": [
-            "Tu utilises supabase.auth.getSession() côté serveur dans un Route Handler ?",
+            "Vous utilisez supabase.auth.getSession() côté serveur dans un Route Handler ?",
             "Le Model Context Protocol (MCP) est un standard ouvert qui permet à Claude Code de se connecter à des services externes : bases de données, APIs, outils DevOps, et plus.",
             "Les hooks permettent d'exécuter des commandes shell automatiquement avant ou après les actions de Claude Code."
           ],
           "answer": 0,
-          "why": "La section « 3. Session client-only qui ne suit pas en SSR » précise : Tu utilises supabase.auth.getSession() côté serveur dans un Route Handler ?"
+          "why": "La section « 3. Session client-only qui ne suit pas en SSR » précise : Vous utilisez supabase.auth.getSession() côté serveur dans un Route Handler ?"
         }
       ],
-      "commands": [],
+      "commands": [
+        {
+          "command": "npm run build",
+          "description": "Lancer le build défini par le projet."
+        }
+      ],
       "resources": [
         {
           "title": "Debug avec Claude",

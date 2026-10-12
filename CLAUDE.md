@@ -54,7 +54,7 @@ app/
   page.tsx                  # Accueil (portes Claude / Claude Code, nouveautés, bandeau de guidage)
   claude/  claude-code/     # Les deux parties du site, avec parcours conseillé
   wiki/                     # Index, catégories, articles ([category]/[slug])
-  learn/                    # Formation Claude Code (modules et leçons)
+  learn/                    # Formation Claude Code (index, pages module et leçons)
   fiches/                   # Fiches mémo
   applications/             # Apps et MCP par thème + parcours débutant → expert
   prompts/                  # Prompts prêts à copier
@@ -104,7 +104,7 @@ next.config.mjs             # Redirections des articles retirés
 ### Animations et vidéos
 - Rendre une vidéo Remotion : `npx remotion render remotion/index.ts <Composition> sortie.mp4 --browser-executable=<chemin headless_shell>`.
 - Le logo 3D est un rendu Blender (Cycles) assemblé en MP4 avec ffmpeg sur le fond clair et sur le fond sombre.
-- Effets globaux dans layout.tsx : PageCurtain (rideau entre les pages ; `data-no-curtain` sur un lien pour l'éviter), ScrollFX (surligneur et apparitions au défilement), ClickRipple.
+- Effets globaux dans layout.tsx : PageCurtain (fine barre de 180 ms, aucun lien intercepté), ScrollFX (surligneur et apparitions au défilement), ClickRipple (uniquement `.btn-primary`).
 - Section « scroll stop » de l'accueil : ScrollStory, planche de 48 images Blender (public/media/scroll-3d.webp, 8 × 6).
 - Toute animation doit respecter « réduire les animations » et ne pas retarder l'affichage du contenu principal (vérifier avec Lighthouse).
 
@@ -137,3 +137,31 @@ git push       # Une branche crée un aperçu Vercel ; main part en production
 - Vérifier les faits sur Claude dans la documentation officielle avant de les écrire, et citer les sources en fin d'article.
 - Ne pas toucher aux routes API sans vérifier l'auth.
 - À chaque mise à jour du site ou nouveauté de Claude : ajouter une entrée en haut de `lib/patch-notes.ts` (page /patch-notes).
+
+## Sobriété et système visuel (12 octobre 2026)
+
+- Six niveaux : `text-display` (38/64 px), `text-h1` (32/48), `text-h2` (26/34), `text-h3` (21/24), `text-body` (17/17), `text-small` (14/14). Les tailles mobile/desktop sont des variables dans globals.css. Les alias historiques pointent sur ces mêmes niveaux.
+- Sections : `py-section` (48/64 px) et `py-compact` (24/32 px). Les espacements internes des cartes restent distincts des espacements de section.
+- Rayons : `rounded` (6 px, champs et boutons), `rounded-lg` (12 px, cartes). Pas de variantes locales.
+- Ombre : `shadow-note`, un décalage de 4 px couleur `--c-mark`, uniquement pour une mise en avant isolée ; les cartes courantes n’ont qu’une bordure.
+- `.btn-primary` et `.btn-secondary` portent toute la géométrie des boutons : minimum 48 px, padding commun et poids 600.
+- Lecture : `max-w-reading` (70 caractères), interligne 1,7. Tableaux et blocs de code défilent dans leur conteneur.
+- Aucune boucle d’animation hors logo 3D, aucun compteur animé, flou ou rotation de révélation. ScrollFX : 12 px, 400 ms ; navigation jamais retardée. Respecter la réduction des animations dans CSS et Motion.
+- Le dépôt ne contient pas les MP4 du logo ; l’accueil utilise les posters WebP déjà versionnés. Le lecteur de démonstration est lancé à la demande, sans boucle.
+
+## Données et affichage de formation
+
+- `Lesson` ajoute les champs **optionnels** `level`, `objectives`, `prerequisites` (IDs de leçons), `takeaways`, `quiz` (`MiniQuestion[]` du wiki), `commands`, `resources`, `practice`, `minutes`.
+- `Module` ajoute les champs **optionnels** `level`, `outcome`, `minutes`, `project` (3 à 5 étapes et un critère).
+- `lib/curriculum-details.json` contient les données éditoriales explicites. `lib/curriculum-enrichment.ts` les applique aux 14 modules, y compris ceux de `lib/modules/`. La durée d’un module est recalculée à partir de ses leçons.
+- `lib/learning.ts` centralise la résolution des prérequis, les totaux calculés, l’origine du site et l’échappement JSON-LD.
+- `LessonDetails` et `LessonOverview` rendent les encarts côté serveur. `LearnCatalog` reçoit uniquement des résumés de modules, sans transférer tout le cours au navigateur.
+- `CourseProgress` réutilise Meter et StepProgress. `LessonCompletion` sauvegarde les IDs dans `cm-lecons-terminees` (localStorage), synchronise les onglets et reste utilisable en mémoire lorsque le stockage est refusé. Aucun événement de progression n’est envoyé.
+- Les quiz de leçon réutilisent ArticleQuiz avec `analytics={false}`. Les métadonnées par leçon et les JSON-LD Course/LearningResource sont produits côté serveur.
+- `npm run check:curriculum` contrôle les liens wiki/leçons, prérequis et cycles, quiz, commandes attestées dans le wiki, objectifs, points à retenir, projets et durées. `prebuild` le lance automatiquement. `npm run test:curriculum` vérifie aussi que des données volontairement invalides sont rejetées.
+- Pour ajouter une leçon : ajouter son contenu et sa fiche dans curriculum-details.json, puis lancer les contrôles et le build avant le commit.
+- L’audit et les 56 captures initiales sont dans `docs/audit-design.md` et `docs/captures/avant/` ; les captures finales et les limites de vérification y sont également documentées.
+
+### Conflits résolus
+
+La mission du 12 octobre demande une navigation sans rideau, des ombres rares et des animations sobres. Elle remplace la précédente description du rideau plein écran et de la vidéo en boucle. Les anciennes valeurs de rayons et de titres sont remplacées par les jetons ci-dessus. Les API, le proxy, Supabase désactivé, les URL et next.config.mjs sont conservés.

@@ -21,8 +21,8 @@ export default function WikiIndexPage() {
     <div className="min-h-screen flex flex-col">
       <SiteHeader active="wiki" showSearch />
 
-      <main className="flex-grow w-full max-w-container-max mx-auto px-margin-mobile md:px-margin-desktop py-14 md:py-20">
-        <section className="py-section mb-14 max-w-3xl">
+      <main className="flex-grow w-full max-w-container-max mx-auto px-margin-mobile md:px-margin-desktop py-section">
+        <section className="mb-section max-w-3xl">
           <p className="tag-note mb-7">Wiki · {articleCount()} articles</p>
           <h1 className="text-h1 font-display-xl font-extrabold tracking-tight text-on-surface mb-6">
             Tout le savoir, <span className="text-mark">rangé</span>.

@@ -16,13 +16,13 @@ export const promptEngineeringModule: Module = {
       sections: [
         {
           heading: "Les 5 composants d'un prompt solide",
-          body: "Un prompt professionnel se décompose presque toujours en cinq blocs distincts. Les omettre, c'est laisser le modèle deviner — et donc halluciner.",
+          body: "Un prompt professionnel se décompose presque toujours en cinq blocs distincts. Les omettre, c'est laisser le modèle deviner : et donc halluciner.",
           bullets: [
-            "<strong>Contexte</strong> — qui parle, à qui, dans quel domaine",
-            "<strong>Instructions</strong> — la règle du jeu, ce qu'il faut faire et ne pas faire",
-            "<strong>Format</strong> — la forme attendue (JSON, markdown, liste, ton)",
-            "<strong>Exemples</strong> — 1 à 5 démonstrations few-shot",
-            "<strong>Tâche</strong> — l'input concret à traiter, placé en dernier",
+            "<strong>Contexte</strong> : qui parle, à qui, dans quel domaine",
+            "<strong>Instructions</strong> : la règle du jeu, ce qu'il faut faire et ne pas faire",
+            "<strong>Format</strong> : la forme attendue (JSON, markdown, liste, ton)",
+            "<strong>Exemples</strong> : 1 à 5 démonstrations few-shot",
+            "<strong>Tâche</strong> : l'input concret à traiter, placé en dernier",
           ],
         },
         {
@@ -48,8 +48,8 @@ Réponds en markdown, une section par clause à risque.
 </format>
 
 <example>
-Input: "Article 3 — Le client renonce à tout recours..."
-Output: ### Article 3 — Renonciation à recours
+Input: "Article 3 : Le client renonce à tout recours..."
+Output: ### Article 3 : Renonciation à recours
 **Risque:** élevé. Clause potentiellement abusive (art. L.212-1 C.conso).
 </example>
 
@@ -63,7 +63,7 @@ Voici le contrat à analyser :
           callout: {
             type: "tip",
             icon: "💡",
-            text: "Règle d'or : la tâche (l'input variable) va TOUJOURS à la fin du prompt. Les instructions stables vont en haut — c'est aussi ce qui permet le prompt caching.",
+            text: "Règle d'or : la tâche (l'input variable) va TOUJOURS à la fin du prompt. Les instructions stables vont en haut : c'est aussi ce qui permet le prompt caching.",
           },
         },
         {
@@ -73,7 +73,7 @@ Voici le contrat à analyser :
         {
           keypoints: [
             "5 composants : contexte, instructions, format, exemples, tâche",
-            "Tâche toujours en dernier — Claude pondère la fin du prompt",
+            "Tâche toujours en dernier : Claude pondère la fin du prompt",
             "Instructions stables en haut = compatible prompt caching",
             "Sans format explicite, le modèle improvise",
           ],
@@ -90,7 +90,7 @@ Voici le contrat à analyser :
       sections: [
         {
           heading: "Pourquoi XML et pas Markdown ?",
-          body: "Le markdown est ambigu : un <code>#</code> peut être un titre ou un commentaire de code. Une balise <code>&lt;document&gt;</code> n'a aucune ambiguïté — Claude sait exactement où commence et finit le bloc, même s'il contient lui-même du markdown, du code ou d'autres documents.",
+          body: "Le markdown est ambigu : un <code>#</code> peut être un titre ou un commentaire de code. Une balise <code>&lt;document&gt;</code> n'a aucune ambiguïté : Claude sait exactement où commence et finit le bloc, même s'il contient lui-même du markdown, du code ou d'autres documents.",
         },
         {
           heading: "Les balises canoniques",
@@ -147,7 +147,7 @@ le plus progressé. Cite la source pour chaque chiffre.
             "XML > Markdown pour la structure : zéro ambiguïté de parsing",
             "Balises courantes : <task>, <document>, <example>, <thinking>",
             "Indexer les documents permet la citation par numéro",
-            "Cohérence du nommage > élégance — ne renommez pas en route",
+            "Cohérence du nommage > élégance : ne renommez pas en route",
           ],
         },
       ],
@@ -216,7 +216,7 @@ Classifie ce message client :
           callout: {
             type: "info",
             icon: "🧠",
-            text: "Avec Claude Sonnet 4.6+, le mode extended thinking active ce comportement nativement via le paramètre thinking de l'API — plus besoin de balises manuelles pour les tâches lourdes.",
+            text: "Avec Claude Sonnet 4.6+, le mode extended thinking active ce comportement nativement via le paramètre thinking de l'API : plus besoin de balises manuelles pour les tâches lourdes.",
           },
         },
         {
@@ -238,12 +238,12 @@ Classifie ce message client :
       id: "output-format",
       title: "Forcer un format de sortie strict",
       duration: "9 min",
-      tag: "Pratique",
+      tag: "Pratiquez",
       intro:
         "En production, vous parsez la sortie de Claude avec du code. Un seul caractère parasite et c'est l'exception. Voici trois techniques pour garantir un format à 100%.",
       sections: [
         {
-          heading: "1 — Spécifier ET montrer le format",
+          heading: "1 : Spécifier ET montrer le format",
           body: "Décrire le format en texte ne suffit pas. Montrez un exemple exact dans le prompt, avec exactement les clés, les types et l'ordre attendus. Claude calque sa sortie sur cet exemple.",
         },
         {
@@ -272,7 +272,7 @@ Pas de markdown, pas de texte avant ou après le JSON.`,
           },
         },
         {
-          heading: "2 — Prefilling : forcer le premier token",
+          heading: "2 : Prefilling : forcer le premier token",
           body: "Dans l'API Messages, vous pouvez fournir le début de la réponse de l'assistant. Claude est <strong>obligé</strong> de continuer à partir de là. Préfiller avec <code>{</code> élimine 100% des préambules type « Voici votre JSON : ».",
         },
         {
@@ -288,7 +288,7 @@ Pas de markdown, pas de texte avant ou après le JSON.`,
   ],
 });
 
-// La réponse commencera forcément par { — il suffit
+// La réponse commencera forcément par { : il suffit
 // de la reconcaténer avec "{" pour parser du JSON pur.
 const json = JSON.parse("{" + response.content[0].text);`,
           },
@@ -301,8 +301,8 @@ const json = JSON.parse("{" + response.content[0].text);`,
           },
         },
         {
-          heading: "3 — Tool use : la voie royale",
-          body: "Pour une structure garantie, définissez un <em>tool</em> avec un JSON Schema. Claude renvoie alors un appel d'outil strictement conforme — c'est validé côté API. Idéal pour les pipelines de production et les agents.",
+          heading: "3 : Tool use : la voie royale",
+          body: "Pour une structure garantie, définissez un <em>tool</em> avec un JSON Schema. Claude renvoie alors un appel d'outil strictement conforme : c'est validé côté API. Idéal pour les pipelines de production et les agents.",
         },
         {
           code: {
@@ -352,17 +352,17 @@ const res = await anthropic.messages.create({
         {
           heading: "La boucle d'amélioration en 4 étapes",
           bullets: [
-            "<strong>1. Eval set</strong> — constituer 20 à 50 inputs représentatifs avec sortie attendue",
-            "<strong>2. Baseline</strong> — mesurer le prompt actuel (précision, format valide, latence, coût)",
-            "<strong>3. Une variable à la fois</strong> — modifier UNE chose et re-mesurer",
-            "<strong>4. Garder ou jeter</strong> — accepter le changement seulement si la métrique progresse",
+            "<strong>1. Eval set</strong> : constituer 20 à 50 inputs représentatifs avec sortie attendue",
+            "<strong>2. Baseline</strong> : mesurer le prompt actuel (précision, format valide, latence, coût)",
+            "<strong>3. Une variable à la fois</strong> : modifier UNE chose et re-mesurer",
+            "<strong>4. Garder ou jeter</strong> : accepter le changement seulement si la métrique progresse",
           ],
         },
         {
           callout: {
             type: "info",
             icon: "📊",
-            text: "Sans eval set, vous ne faites pas du prompt engineering — vous faites de la divination. 20 cas bien choisis valent mieux que 200 cas aléatoires.",
+            text: "Sans eval set, vous ne faites pas du prompt engineering : vous faites de la divination. 20 cas bien choisis valent mieux que 200 cas aléatoires.",
           },
         },
         {
@@ -436,7 +436,7 @@ const v3 = await runEval(promptV3); // 0.81 ❌ on jette`,
         {
           keypoints: [
             "Eval set de 20-50 cas = condition non-négociable",
-            "Une variable à la fois — sinon on ne sait pas ce qui a marché",
+            "Une variable à la fois : sinon on ne sait pas ce qui a marché",
             "Éviter : vague, négations, mur de texte, règles contradictoires",
             "<thinking> temporaire pour debugger les cas qui échouent",
             "Versionner les prompts comme du code source",

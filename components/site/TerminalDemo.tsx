@@ -163,7 +163,7 @@ export function TerminalDemo() {
           onChange={(e) => setInput(e.target.value)}
           placeholder="ajoute des tests pour la TVA"
           aria-label="Votre demande à Claude Code"
-          className="flex-1 min-w-0 bg-transparent font-mono text-body md:text-small text-[#f6efe3] placeholder:text-[#7d6f5e] outline-none"
+          className="flex-1 min-w-0 bg-transparent font-mono text-body md:text-small text-[#f6efe3] placeholder:text-[#b8a993] outline-none"
         />
         <button type="submit" disabled={busy} className="font-mono text-small px-3 py-1.5 rounded bg-[#2f5d46] text-[#fbf6ee] disabled:opacity-50" data-ripple>
           Entrée

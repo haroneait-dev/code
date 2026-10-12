@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { motion } from "motion/react";
+import { motion, useReducedMotion } from "motion/react";
 import { ArrowRight } from "lucide-react";
 import { MODELS } from "@/lib/models";
 
@@ -33,6 +33,7 @@ function Slider({ label, values, index, onChange, format }: { label: string; val
 }
 
 export function ModelPicker() {
+  const reduce = useReducedMotion();
   const [tier, setTier] = useState(1);
   const [vol, setVol] = useState(2);
   const [inp, setInp] = useState(1);
@@ -78,7 +79,7 @@ export function ModelPicker() {
 
       <div className="rounded-lg border-[1.5px] border-on-surface bg-surface-container-low p-6 md:p-8">
         <p className="font-mono text-small text-on-surface-variant mb-2">Notre conseil</p>
-        <motion.p key={pick.id} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="font-headline-lg text-h2 md:text-h1 leading-none font-extrabold text-on-surface mb-3">
+        <motion.p key={pick.id} initial={reduce ? false : { opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="font-headline-lg text-h2 md:text-h1 leading-none font-extrabold text-on-surface mb-3">
           <span className="text-mark">{pick.name}</span>
         </motion.p>
         <p className="text-body text-on-surface-variant leading-relaxed mb-6">{pick.pitch}</p>
@@ -94,7 +95,7 @@ export function ModelPicker() {
                 <motion.div
                   className={`h-full rounded ${m.id === pick.id ? "bg-primary" : "bg-[rgb(var(--c-on-surface-variant)/0.35)]"}`}
                   animate={{ width: fits ? `${Math.max(2, (monthly / max) * 100)}%` : "0%" }}
-                  transition={{ type: "spring", stiffness: 180, damping: 24 }}
+                  transition={{ duration: reduce ? 0 : 0.2 }}
                 />
               </div>
             </div>

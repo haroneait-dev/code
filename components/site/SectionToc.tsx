@@ -61,7 +61,7 @@ export function LearningPath({
       {steps.map((s, i) => (
         <li key={s.href} className="border-t border-outline-variant">
           <Link href={s.href} className="grid grid-cols-[44px_1fr] gap-3 py-5 group">
-            <span className="font-display-xl text-h2 leading-none font-extrabold text-primary-fixed-dim tabular-nums">
+            <span className="font-display-xl text-h2 leading-none font-extrabold text-tertiary tabular-nums">
               {i + 1}
             </span>
             <span className="min-w-0">

@@ -23,7 +23,7 @@ export function SiteHeader({
         <div className="flex items-center gap-6 xl:gap-8 min-w-0">
           <Link
             href="/"
-            className="flex items-center gap-2 font-headline-lg text-h3 font-bold text-on-surface tracking-tight whitespace-nowrap"
+            className="flex items-center gap-2 font-headline-lg text-body md:text-h3 font-bold text-on-surface tracking-tight whitespace-nowrap"
           >
             <span
               aria-hidden

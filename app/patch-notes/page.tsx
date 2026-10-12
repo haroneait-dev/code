@@ -25,7 +25,7 @@ export default function PatchNotesPage() {
   return (
     <div className="min-h-screen flex flex-col bg-surface">
       <SiteHeader active="patch" />
-      <main className="flex-grow w-full px-margin-mobile md:px-margin-desktop py-14 md:py-20">
+      <main className="flex-grow w-full px-margin-mobile md:px-margin-desktop py-section">
         <div className="max-w-3xl mx-auto">
           <p className="tag-note mb-7">Mis à jour le {formatDate(PATCH_NOTES[0].date)}</p>
           <h1 className="text-h1 font-display-xl font-extrabold tracking-tight text-on-surface mb-6">

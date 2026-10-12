@@ -1,30 +1,41 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import { Menu, X } from "lucide-react";
 import { NAV_LINKS as LINKS, type NavKey } from "@/lib/nav";
 
 export function MobileNav({ active = null }: { active?: NavKey }) {
+  const drawerRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
     if (!open) return;
     const prev = document.body.style.overflow;
+    const controls = () => Array.from(drawerRef.current?.querySelectorAll<HTMLElement>('a[href], button, summary, input, select') ?? []);
+    controls()[0]?.focus();
     document.body.style.overflow = "hidden";
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") setOpen(false);
+      if (e.key === "Tab") {
+        const items = controls(); const first = items[0]; const last = items[items.length - 1];
+        if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last?.focus(); }
+        else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first?.focus(); }
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => {
       document.body.style.overflow = prev;
       window.removeEventListener("keydown", onKey);
+      triggerRef.current?.focus();
     };
   }, [open]);
 
   return (
     <>
       <button
+        ref={triggerRef}
         type="button"
         onClick={() => setOpen(true)}
         aria-label="Ouvrir le menu"
@@ -37,6 +48,7 @@ export function MobileNav({ active = null }: { active?: NavKey }) {
 
       {open && (
         <div
+          ref={drawerRef}
           id="mobile-nav-drawer"
           role="dialog"
           aria-modal="true"

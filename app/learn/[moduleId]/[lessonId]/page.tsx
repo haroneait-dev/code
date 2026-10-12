@@ -28,9 +28,9 @@ export async function generateMetadata({
   const { moduleId, lessonId } = await params;
   const mod = curriculum.find((m) => m.id === moduleId);
   const lesson = mod?.lessons.find((l) => l.id === lessonId);
-  if (!lesson || !mod) return { title: "Leçon — Claude Mastery" };
+  if (!lesson || !mod) return { title: "Leçon : Claude Mastery" };
   return {
-    title: `${lesson.title} — ${mod.title} — Claude Mastery`,
+    title: `${lesson.title} : ${mod.title}`,
     description: `${lesson.title} : ${lesson.objectives?.join(". ") ?? lesson.intro}`.slice(0, 160),
     alternates: { canonical: `/learn/${mod.id}/${lesson.id}` },
   };
@@ -64,7 +64,7 @@ export default async function LessonPage({
       <SiteHeader active="learn" showSearch />
 
       <div className="flex-grow w-full max-w-container-max mx-auto px-margin-mobile md:px-margin-desktop flex gap-gutter py-8 relative">
-        {/* Left sidebar — module lessons */}
+        {/* Left sidebar : module lessons */}
         <aside className="hidden lg:block w-60 flex-shrink-0 sticky top-[96px] h-[calc(100vh-120px)] overflow-y-auto pr-4">
           <Link
             href="/learn"
@@ -139,16 +139,13 @@ export default async function LessonPage({
             <h1 className="text-h1 font-display-xl font-extrabold tracking-tight mb-4 text-on-surface">
               {lesson.title}
             </h1>
+            <LessonOverview lesson={lesson} />
             <p
               className="text-on-surface-variant text-body mb-6 leading-relaxed"
               dangerouslySetInnerHTML={{ __html: lesson.intro }}
             />
-            <div className="flex items-center gap-4 text-body-sm text-on-surface-variant pb-8 border-b border-outline-variant mb-10">
-              <Clock className="w-4 h-4" strokeWidth={1.75} />
-              <span>{lesson.duration}</span>
-            </div>
 
-            <LessonOverview lesson={lesson} />
+
             <details className="mb-8 border border-outline-variant rounded-lg p-4">
               <summary className="cursor-pointer text-small font-semibold flex items-center">Sur cette page</summary>
               <ul className="mt-3 space-y-2 text-small">{headings.map(heading => <li key={heading.heading}><a className="text-primary inline-flex items-center min-h-11" href={`#${slugify(heading.heading!)}`}>{heading.heading}</a></li>)}</ul>

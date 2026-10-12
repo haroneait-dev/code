@@ -93,7 +93,7 @@ export function PromptsExplorer({ groups }: { groups: PromptGroup[] }) {
           <div className="max-w-container-max mx-auto">
             <div className="grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-6 lg:gap-10 mb-8">
               <div>
-                <h2 className="font-headline-lg text-h2 md:text-h1 leading-[1.1] font-bold tracking-tight mb-2">{g.name}</h2>
+                <h2 className="font-headline-lg text-h2 leading-[1.1] font-bold tracking-tight mb-2">{g.name}</h2>
                 <p className="text-body text-on-surface-variant leading-relaxed">{g.intro}</p>
               </div>
               {g.method && !filtering && (

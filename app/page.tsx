@@ -67,7 +67,7 @@ export default function LandingPage() {
 
       <main className="flex-grow">
         {/* Ouverture */}
-        <section className="py-section w-full px-margin-mobile md:px-margin-desktop    ">
+        <section className="pt-section pb-compact w-full px-margin-mobile md:px-margin-desktop    ">
           <div className="max-w-container-max mx-auto lg:grid lg:grid-cols-[1fr_400px] lg:gap-8 lg:items-center">
             <div>
             <div className="flex items-start justify-between gap-4">
@@ -92,7 +92,7 @@ export default function LandingPage() {
         </section>
 
         {/* Les deux parties */}
-        <section className="py-section w-full px-margin-mobile md:px-margin-desktop  ">
+        <section className="py-compact w-full px-margin-mobile md:px-margin-desktop  ">
           <div className="max-w-container-max mx-auto grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Claude */}
             <Link
@@ -102,7 +102,7 @@ export default function LandingPage() {
               <span className="font-mono text-small text-on-surface-variant mb-3">
                 Pour tout le monde · {articleCountBySection("claude")} articles
               </span>
-              <span className="font-headline-lg text-h2 md:text-h1 leading-[1.05] font-extrabold text-on-surface mb-4">
+              <span className="font-headline-lg text-h2 leading-[1.05] font-extrabold text-on-surface mb-4">
                 Claude
               </span>
               <span className="text-body text-on-surface-variant leading-relaxed mb-7">
@@ -123,7 +123,7 @@ export default function LandingPage() {
               <span className="font-mono text-small text-on-surface-variant mb-3">
                 Pour les développeurs · {totalModules} modules · {articleCountBySection("code")} articles
               </span>
-              <span className="font-headline-lg text-h2 md:text-h1 leading-[1.05] font-extrabold text-on-surface mb-4">
+              <span className="font-headline-lg text-h2 leading-[1.05] font-extrabold text-on-surface mb-4">
                 Claude Code
               </span>
               <span className="text-body text-on-surface-variant leading-relaxed mb-7">

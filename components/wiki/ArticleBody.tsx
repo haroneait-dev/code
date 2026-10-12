@@ -101,7 +101,7 @@ export function ArticleBody({ body }: { body: string }) {
           hr: () => <hr className="my-12 border-outline-variant" />,
         }}
       >
-        {body}
+        {body.replace(/—/g, ";")}
       </ReactMarkdown>
     </div>
   );

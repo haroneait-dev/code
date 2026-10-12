@@ -25,7 +25,7 @@ export default async function BadgePage({ params }: { params: Promise<{ theme: s
   return (
     <div className="min-h-screen flex flex-col bg-surface">
       <SiteHeader active="apps" />
-      <main className="flex-grow w-full px-margin-mobile md:px-margin-desktop py-16 md:py-24">
+      <main className="flex-grow w-full px-margin-mobile md:px-margin-desktop py-section">
         <div className="max-w-2xl mx-auto">
           <p className="tag-note mb-7">Badge partagé</p>
           <h1 className="text-h1 font-display-xl font-extrabold tracking-tight text-on-surface mb-6">
