@@ -1,0 +1,3640 @@
+{
+  "modules": {
+    "intro": {
+      "level": "débutant",
+      "outcome": "Vous pouvez ouvrir Claude Code et lui confier une première mission définie.",
+      "minutes": 25,
+      "project": {
+        "title": "Mettre en pratique : Introduction",
+        "description": "Vous pouvez ouvrir Claude Code et lui confier une première mission définie.",
+        "steps": [
+          "Réécrire une demande de composant en mission complète.",
+          "Préparer une mission adaptée à votre projet.",
+          "Préparer un environnement de travail local.",
+          "Explorer un petit projet dans le terminal."
+        ],
+        "success": "Présentez un dossier avec le résultat de chaque étape et ses vérifications. Chaque résultat doit satisfaire le critère de réussite de la leçon associée."
+      }
+    },
+    "files": {
+      "level": "débutant",
+      "outcome": "Vous pouvez retrouver, lire, créer et modifier les fichiers utiles à une tâche.",
+      "minutes": 23,
+      "project": {
+        "title": "Mettre en pratique : Outils Fichiers",
+        "description": "Vous pouvez retrouver, lire, créer et modifier les fichiers utiles à une tâche.",
+        "steps": [
+          "Examiner un fichier de votre projet.",
+          "Créer un fichier de documentation.",
+          "Modifier un composant existant.",
+          "Retrouver les usages d’une fonction."
+        ],
+        "success": "Présentez un dossier avec le résultat de chaque étape et ses vérifications. Chaque résultat doit satisfaire le critère de réussite de la leçon associée."
+      }
+    },
+    "code": {
+      "level": "intermédiaire",
+      "outcome": "Vous pouvez générer, améliorer et corriger du code en vérifiant son comportement.",
+      "minutes": 23,
+      "project": {
+        "title": "Mettre en pratique : Code & Debug",
+        "description": "Vous pouvez générer, améliorer et corriger du code en vérifiant son comportement.",
+        "steps": [
+          "Générer un petit composant avec ses tests.",
+          "Simplifier une fonction existante.",
+          "Corriger un bug reproductible."
+        ],
+        "success": "Présentez un dossier avec le résultat de chaque étape et ses vérifications. Chaque résultat doit satisfaire le critère de réussite de la leçon associée."
+      }
+    },
+    "git": {
+      "level": "intermédiaire",
+      "outcome": "Vous pouvez préparer une branche, un commit et une pull request vérifiables.",
+      "minutes": 21,
+      "project": {
+        "title": "Mettre en pratique : Git & Terminal",
+        "description": "Vous pouvez préparer une branche, un commit et une pull request vérifiables.",
+        "steps": [
+          "Enregistrer une modification sur une branche.",
+          "Rédiger une pull request de votre branche.",
+          "Lancer un contrôle du projet dans le terminal."
+        ],
+        "success": "Présentez un dossier avec le résultat de chaque étape et ses vérifications. Chaque résultat doit satisfaire le critère de réussite de la leçon associée."
+      }
+    },
+    "config": {
+      "level": "avancé",
+      "outcome": "Vous pouvez organiser les permissions, les connexions MCP et les hooks d’un projet.",
+      "minutes": 28,
+      "project": {
+        "title": "Mettre en pratique : Configuration Avancée",
+        "description": "Vous pouvez organiser les permissions, les connexions MCP et les hooks d’un projet.",
+        "steps": [
+          "Documenter une configuration de projet.",
+          "Préparer la connexion à un serveur MCP.",
+          "Préparer un hook de contrôle."
+        ],
+        "success": "Présentez un dossier avec le résultat de chaque étape et ses vérifications. Chaque résultat doit satisfaire le critère de réussite de la leçon associée."
+      }
+    },
+    "memory": {
+      "level": "intermédiaire",
+      "outcome": "Vous pouvez organiser les instructions et le contexte entre les sessions.",
+      "minutes": 22,
+      "project": {
+        "title": "Mettre en pratique : Mémoire & Contexte",
+        "description": "Vous pouvez organiser les instructions et le contexte entre les sessions.",
+        "steps": [
+          "Créer un CLAUDE.md pour un petit projet.",
+          "Documenter une préférence de travail.",
+          "Préparer la reprise d’une tâche."
+        ],
+        "success": "Présentez un dossier avec le résultat de chaque étape et ses vérifications. Chaque résultat doit satisfaire le critère de réussite de la leçon associée."
+      }
+    },
+    "productivity": {
+      "level": "intermédiaire",
+      "outcome": "Vous pouvez choisir les commandes et les raccourcis utiles à votre travail.",
+      "minutes": 22,
+      "project": {
+        "title": "Mettre en pratique : Productivité",
+        "description": "Vous pouvez choisir les commandes et les raccourcis utiles à votre travail.",
+        "steps": [
+          "Constituer votre fiche de commandes.",
+          "Préparer une fiche de raccourcis utiles.",
+          "Améliorer votre prochaine mission."
+        ],
+        "success": "Présentez un dossier avec le résultat de chaque étape et ses vérifications. Chaque résultat doit satisfaire le critère de réussite de la leçon associée."
+      }
+    },
+    "tokens": {
+      "level": "débutant",
+      "outcome": "Vous pouvez expliquer la consommation d’une session et repérer les éléments qui influencent son coût.",
+      "minutes": 15,
+      "project": {
+        "title": "Mettre en pratique : Tokens & Modèles IA",
+        "description": "Vous pouvez expliquer la consommation d’une session et repérer les éléments qui influencent son coût.",
+        "steps": [
+          "Annoter une conversation simple.",
+          "Préparer une grille de suivi de session."
+        ],
+        "success": "Présentez un dossier avec le résultat de chaque étape et ses vérifications. Chaque résultat doit satisfaire le critère de réussite de la leçon associée."
+      }
+    },
+    "plan-agents": {
+      "level": "avancé",
+      "outcome": "Vous pouvez planifier une mission et la répartir entre des tâches bornées.",
+      "minutes": 27,
+      "project": {
+        "title": "Mettre en pratique : Plan Mode & Agents",
+        "description": "Vous pouvez planifier une mission et la répartir entre des tâches bornées.",
+        "steps": [
+          "Planifier une modification de votre projet.",
+          "Rédiger une mission de sous-agent.",
+          "Concevoir un plan de travail avec plusieurs agents."
+        ],
+        "success": "Présentez un dossier avec le résultat de chaque étape et ses vérifications. Chaque résultat doit satisfaire le critère de réussite de la leçon associée."
+      }
+    },
+    "saas-project": {
+      "level": "avancé",
+      "outcome": "Vous pouvez préparer un projet et organiser son développement par étapes.",
+      "minutes": 28,
+      "project": {
+        "title": "Mettre en pratique : Projet SaaS Complet",
+        "description": "Vous pouvez préparer un projet et organiser son développement par étapes.",
+        "steps": [
+          "Rédiger le plan d’un petit SaaS.",
+          "Préparer une intervention sur un projet existant.",
+          "Documenter votre méthode de revue."
+        ],
+        "success": "Présentez un dossier avec le résultat de chaque étape et ses vérifications. Chaque résultat doit satisfaire le critère de réussite de la leçon associée."
+      }
+    },
+    "prompt-engineering": {
+      "level": "intermédiaire",
+      "outcome": "Vous pouvez structurer, tester et améliorer un prompt à partir de cas concrets.",
+      "minutes": 47,
+      "project": {
+        "title": "Mettre en pratique : Prompt Engineering",
+        "description": "Vous pouvez structurer, tester et améliorer un prompt à partir de cas concrets.",
+        "steps": [
+          "Réécrire un prompt imprécis.",
+          "Structurer un prompt avec des balises XML.",
+          "Préparer un prompt avec des exemples.",
+          "Préparer une demande de sortie JSON.",
+          "Améliorer un prompt à partir d’un cas d’échec."
+        ],
+        "success": "Présentez un dossier avec le résultat de chaque étape et ses vérifications. Chaque résultat doit satisfaire le critère de réussite de la leçon associée."
+      }
+    },
+    "skills": {
+      "level": "avancé",
+      "outcome": "Vous pouvez préparer et tester un skill adapté à une tâche réutilisable.",
+      "minutes": 42,
+      "project": {
+        "title": "Mettre en pratique : Skills (Agent SDK)",
+        "description": "Vous pouvez préparer et tester un skill adapté à une tâche réutilisable.",
+        "steps": [
+          "Comparer trois besoins de votre projet.",
+          "Préparer le dossier d’un skill.",
+          "Préparer et vérifier un skill local.",
+          "Créer un skill de votre projet."
+        ],
+        "success": "Présentez un dossier avec le résultat de chaque étape et ses vérifications. Chaque résultat doit satisfaire le critère de réussite de la leçon associée."
+      }
+    },
+    "api": {
+      "level": "avancé",
+      "outcome": "Vous pouvez préparer des appels API, des outils et des contrôles d’erreur.",
+      "minutes": 60,
+      "project": {
+        "title": "Mettre en pratique : API Anthropic",
+        "description": "Vous pouvez préparer des appels API, des outils et des contrôles d’erreur.",
+        "steps": [
+          "Réaliser un premier appel dans un projet de test.",
+          "Préparer un exemple de boucle d’outil.",
+          "Préparer deux appels avec un contexte réutilisable.",
+          "Préparer une fiche de gestion des erreurs."
+        ],
+        "success": "Présentez un dossier avec le résultat de chaque étape et ses vérifications. Chaque résultat doit satisfaire le critère de réussite de la leçon associée."
+      }
+    },
+    "saas-practical": {
+      "level": "avancé",
+      "outcome": "Vous pouvez préparer la configuration, la connexion et le déploiement d’un projet de test.",
+      "minutes": 100,
+      "project": {
+        "title": "Mettre en pratique : SaaS Pratique (Supabase, Vercel, Auth)",
+        "description": "Vous pouvez préparer la configuration, la connexion et le déploiement d’un projet de test.",
+        "steps": [
+          "Préparer la configuration d’un projet de test.",
+          "Tracer le parcours de connexion GitHub.",
+          "Préparer une checklist de déploiement.",
+          "Préparer un lot de contenus à déléguer.",
+          "Construire une fiche de diagnostic reproductible."
+        ],
+        "success": "Présentez un dossier avec le résultat de chaque étape et ses vérifications. Chaque résultat doit satisfaire le critère de réussite de la leçon associée."
+      }
+    }
+  },
+  "lessons": {
+    "chatting-vs-delegating": {
+      "level": "débutant",
+      "objectives": [
+        "Distinguer une question d’une mission déléguée",
+        "Formuler un objectif avec son contexte et ses contraintes"
+      ],
+      "prerequisites": [],
+      "takeaways": [
+        "Chatter, c'est demander à Claude d'écrire une fonction.",
+        "Ils ont appris Claude comme un chatbot : ancrer sa réponse immédiate",
+        "Arrêtez de voir Claude comme un assistant qui répond à vos questions."
+      ],
+      "quiz": [
+        {
+          "q": "Quelle explication correspond à « La différence fondamentale » dans cette leçon ?",
+          "options": [
+            "Chatter, c'est demander à Claude d'écrire une fonction.",
+            "Claude Code est le CLI officiel d'Anthropic qui amène Claude directement dans votre terminal.",
+            "L'installation de Claude Code se fait en une commande npm."
+          ],
+          "answer": 0,
+          "why": "La section « La différence fondamentale » précise : Chatter, c'est demander à Claude d'écrire une fonction."
+        },
+        {
+          "q": "Quelle explication correspond à « Pourquoi la plupart restent bloqués en mode \"chat\" » dans cette leçon ?",
+          "options": [
+            "L'installation de Claude Code se fait en une commande npm.",
+            "Ils ont appris Claude comme un chatbot : ancrer sa réponse immédiate",
+            "Une fois Claude Code installé, découvrons comment naviguer dans l'interface, envoyer des messages et comprendre les réponses."
+          ],
+          "answer": 1,
+          "why": "La section « Pourquoi la plupart restent bloqués en mode \"chat\" » précise : Ils ont appris Claude comme un chatbot : ancrer sa réponse immédiate"
+        },
+        {
+          "q": "Quelle explication correspond à « Le shift mental à opérer » dans cette leçon ?",
+          "options": [
+            "Une fois Claude Code installé, découvrons comment naviguer dans l'interface, envoyer des messages et comprendre les réponses.",
+            "L'outil Read est le point d'entrée de Claude Code pour explorer votre codebase.",
+            "Arrêtez de voir Claude comme un assistant qui répond à vos questions."
+          ],
+          "answer": 2,
+          "why": "La section « Le shift mental à opérer » précise : Arrêtez de voir Claude comme un assistant qui répond à vos questions."
+        }
+      ],
+      "commands": [],
+      "resources": [
+        {
+          "title": "Modes interactif vs one-shot",
+          "href": "/wiki/demarrer/modes-interactif-one-shot"
+        },
+        {
+          "title": "Installation de Claude Code",
+          "href": "/wiki/demarrer/installation"
+        },
+        {
+          "title": "Documentation officielle de Claude Code",
+          "href": "https://code.claude.com/docs/en/overview"
+        }
+      ],
+      "practice": {
+        "title": "Réécrire une demande de composant en mission complète",
+        "description": "Reprenez les exemples de la leçon « Chatter vs Déléguer : le mindset qui change tout » sur un petit projet ou dans un dossier de test. Conservez le résultat et les vérifications effectuées.",
+        "success": "La demande indique le résultat attendu, le contexte du projet et une manière de vérifier le résultat."
+      },
+      "minutes": 6
+    },
+    "what-is-cc": {
+      "level": "débutant",
+      "objectives": [
+        "Décrire le rôle d’un agent dans le terminal",
+        "Identifier les tâches présentées pour Claude Code"
+      ],
+      "prerequisites": [
+        "chatting-vs-delegating"
+      ],
+      "takeaways": [
+        "Contrairement à l'interface web de Claude, Claude Code a accès à votre système de fichiers, à votre terminal et à vos outils de développement.",
+        "Lire et comprendre n'importe quel codebase en profondeur",
+        "Des outils comme GitHub Copilot sont des assistants d'auto-complétion intégrés dans l'IDE."
+      ],
+      "quiz": [
+        {
+          "q": "Quelle explication correspond à « Un agent, pas un simple chatbot » dans cette leçon ?",
+          "options": [
+            "L'outil Read est le point d'entrée de Claude Code pour explorer votre codebase.",
+            "Contrairement à l'interface web de Claude, Claude Code a accès à votre système de fichiers, à votre terminal et à vos outils de développement.",
+            "L'outil Write permet à Claude de créer de nouveaux fichiers ou de réécrire entièrement des fichiers existants."
+          ],
+          "answer": 1,
+          "why": "La section « Un agent, pas un simple chatbot » précise : Contrairement à l'interface web de Claude, Claude Code a accès à votre système de fichiers, à votre terminal et à vos outils de développement."
+        },
+        {
+          "q": "Quelle explication correspond à « Ce que Claude Code peut faire » dans cette leçon ?",
+          "options": [
+            "L'outil Write permet à Claude de créer de nouveaux fichiers ou de réécrire entièrement des fichiers existants.",
+            "L'outil Edit est le plus utilisé de Claude Code.",
+            "Lire et comprendre n'importe quel codebase en profondeur"
+          ],
+          "answer": 2,
+          "why": "La section « Ce que Claude Code peut faire » précise : Lire et comprendre n'importe quel codebase en profondeur"
+        },
+        {
+          "q": "Quelle explication correspond à « Pourquoi c'est différent des autres outils IA » dans cette leçon ?",
+          "options": [
+            "Des outils comme GitHub Copilot sont des assistants d'auto-complétion intégrés dans l'IDE.",
+            "L'outil Edit est le plus utilisé de Claude Code.",
+            "Glob et Grep permettent à Claude de naviguer efficacement dans de larges codebases : Glob pour trouver des fichiers par pattern, Grep pour chercher du texte dans les fichiers."
+          ],
+          "answer": 0,
+          "why": "La section « Pourquoi c'est différent des autres outils IA » précise : Des outils comme GitHub Copilot sont des assistants d'auto-complétion intégrés dans l'IDE."
+        }
+      ],
+      "commands": [],
+      "resources": [
+        {
+          "title": "Configurer un projet pour Claude Code",
+          "href": "/wiki/demarrer/configurer-projet"
+        },
+        {
+          "title": "Mémoire & gestion du contexte (CLAUDE.md)",
+          "href": "/wiki/demarrer/claude-md"
+        },
+        {
+          "title": "Documentation officielle de Claude Code",
+          "href": "https://code.claude.com/docs/en/overview"
+        }
+      ],
+      "practice": {
+        "title": "Préparer une mission adaptée à votre projet",
+        "description": "Reprenez les exemples de la leçon « Qu'est-ce que Claude Code ? » sur un petit projet ou dans un dossier de test. Conservez le résultat et les vérifications effectuées.",
+        "success": "La mission associe un objectif à des fichiers ou à des commandes utiles, comme dans la leçon."
+      },
+      "minutes": 5
+    },
+    "installation": {
+      "level": "débutant",
+      "objectives": [
+        "Installer Claude Code avec la méthode présentée",
+        "Configurer la connexion et l’environnement de travail"
+      ],
+      "prerequisites": [
+        "what-is-cc"
+      ],
+      "takeaways": [
+        "macOS, Linux (ou WSL), ou Windows 10/11",
+        "L’exemple « Terminal » utilise : curl -fsSL https://claude.ai/install.sh | bash irm https://claude.ai/install.ps1 | iex",
+        "Au premier lancement, Claude Code ouvre votre navigateur pour vous connecter à votre compte claude.ai (abonnement) ou Console (API)."
+      ],
+      "quiz": [
+        {
+          "q": "Quelle explication correspond à « Prérequis » dans cette leçon ?",
+          "options": [
+            "Glob et Grep permettent à Claude de naviguer efficacement dans de larges codebases : Glob pour trouver des fichiers par pattern, Grep pour chercher du texte dans les fichiers.",
+            "Claude Code excelle dans la génération de code de haute qualité.",
+            "macOS, Linux (ou WSL), ou Windows 10/11"
+          ],
+          "answer": 2,
+          "why": "La section « Prérequis » précise : macOS, Linux (ou WSL), ou Windows 10/11"
+        },
+        {
+          "q": "Quelle explication correspond à « Installation globale » dans cette leçon ?",
+          "options": [
+            "L’exemple « Terminal » utilise : curl -fsSL https://claude.ai/install.sh | bash irm https://claude.ai/install.ps1 | iex",
+            "Claude Code excelle dans la génération de code de haute qualité.",
+            "Claude Code est excellent pour moderniser et améliorer du code existant."
+          ],
+          "answer": 0,
+          "why": "La section « Installation globale » précise : L’exemple « Terminal » utilise : curl -fsSL https://claude.ai/install.sh | bash irm https://claude.ai/install.ps1 | iex"
+        },
+        {
+          "q": "Quelle explication correspond à « Se connecter » dans cette leçon ?",
+          "options": [
+            "Claude Code est excellent pour moderniser et améliorer du code existant.",
+            "Au premier lancement, Claude Code ouvre votre navigateur pour vous connecter à votre compte claude.ai (abonnement) ou Console (API).",
+            "Claude Code est un partenaire de debugging redoutable."
+          ],
+          "answer": 1,
+          "why": "La section « Se connecter » précise : Au premier lancement, Claude Code ouvre votre navigateur pour vous connecter à votre compte claude.ai (abonnement) ou Console (API)."
+        }
+      ],
+      "commands": [],
+      "resources": [
+        {
+          "title": "Installation de Claude Code",
+          "href": "/wiki/demarrer/installation"
+        },
+        {
+          "title": "Configurer un projet pour Claude Code",
+          "href": "/wiki/demarrer/configurer-projet"
+        },
+        {
+          "title": "Documentation officielle de Claude Code",
+          "href": "https://code.claude.com/docs/en/overview"
+        }
+      ],
+      "practice": {
+        "title": "Préparer un environnement de travail local",
+        "description": "Reprenez les exemples de la leçon « Installation & Configuration » sur un petit projet ou dans un dossier de test. Conservez le résultat et les vérifications effectuées.",
+        "success": "Vous pouvez ouvrir Claude Code dans un dossier de projet et accéder à son interface."
+      },
+      "minutes": 8
+    },
+    "first-steps": {
+      "level": "débutant",
+      "objectives": [
+        "Ouvrir une session dans votre projet",
+        "Interrompre une action et reprendre le travail"
+      ],
+      "prerequisites": [
+        "installation"
+      ],
+      "takeaways": [
+        "L’exemple « Terminal » utilise : claude cd mon-projet",
+        "Une fois lancé, vous verrez un prompt où vous tapez vos instructions.",
+        "L’exemple « Exemples de prompts » utilise : > explique-moi la structure de ce projet > quels sont les bugs dans src/auth.ts ?"
+      ],
+      "quiz": [
+        {
+          "q": "Quelle explication correspond à « Lancer Claude Code » dans cette leçon ?",
+          "options": [
+            "L’exemple « Terminal » utilise : claude cd mon-projet",
+            "Claude Code a un accès complet à Git via la commande bash.",
+            "Via le CLI gh de GitHub, Claude Code peut créer des PR, commenter des issues, déclencher des workflows CI/CD et interagir avec l'écosystème GitHub."
+          ],
+          "answer": 0,
+          "why": "La section « Lancer Claude Code » précise : L’exemple « Terminal » utilise : claude cd mon-projet"
+        },
+        {
+          "q": "Quelle explication correspond à « L'interface interactive » dans cette leçon ?",
+          "options": [
+            "Via le CLI gh de GitHub, Claude Code peut créer des PR, commenter des issues, déclencher des workflows CI/CD et interagir avec l'écosystème GitHub.",
+            "Une fois lancé, vous verrez un prompt où vous tapez vos instructions.",
+            "Le fichier settings.json contrôle le comportement de Claude Code : permissions, outils autorisés, variables d'environnement, et plus encore."
+          ],
+          "answer": 1,
+          "why": "La section « L'interface interactive » précise : Une fois lancé, vous verrez un prompt où vous tapez vos instructions."
+        },
+        {
+          "q": "Quelle explication correspond à « Exemples de premières interactions » dans cette leçon ?",
+          "options": [
+            "Le fichier settings.json contrôle le comportement de Claude Code : permissions, outils autorisés, variables d'environnement, et plus encore.",
+            "Le Model Context Protocol (MCP) est un standard ouvert qui permet à Claude Code de se connecter à des services externes : bases de données, APIs, outils DevOps, et plus.",
+            "L’exemple « Exemples de prompts » utilise : > explique-moi la structure de ce projet > quels sont les bugs dans src/auth.ts ?"
+          ],
+          "answer": 2,
+          "why": "La section « Exemples de premières interactions » précise : L’exemple « Exemples de prompts » utilise : > explique-moi la structure de ce projet > quels sont les bugs dans src/auth.ts ?"
+        }
+      ],
+      "commands": [],
+      "resources": [
+        {
+          "title": "Configurer un projet pour Claude Code",
+          "href": "/wiki/demarrer/configurer-projet"
+        },
+        {
+          "title": "Claude Code, Cursor ou GitHub Copilot ?",
+          "href": "/wiki/comparatifs/claude-code-cursor-copilot"
+        },
+        {
+          "title": "Documentation officielle de Claude Code",
+          "href": "https://code.claude.com/docs/en/overview"
+        }
+      ],
+      "practice": {
+        "title": "Explorer un petit projet dans le terminal",
+        "description": "Reprenez les exemples de la leçon « Premiers pas dans le terminal » sur un petit projet ou dans un dossier de test. Conservez le résultat et les vérifications effectuées.",
+        "success": "Vous avez obtenu une description du projet et identifié un fichier à examiner."
+      },
+      "minutes": 6
+    },
+    "read-tool": {
+      "level": "débutant",
+      "objectives": [
+        "Demander la lecture d’un fichier",
+        "Cibler une portion utile d’un fichier volumineux"
+      ],
+      "prerequisites": [
+        "first-steps"
+      ],
+      "takeaways": [
+        "Quand vous demandez à Claude de comprendre votre code, il utilise automatiquement l'outil Read pour accéder aux fichiers.",
+        "Pour les fichiers volumineux, Claude Code peut lire par plages de lignes grâce aux paramètres offset et limit.",
+        "Fichiers texte (.ts, .js, .py, .go, .rs, .java, .md, etc.)"
+      ],
+      "quiz": [
+        {
+          "q": "Quelle explication correspond à « Comment fonctionne l'outil Read » dans cette leçon ?",
+          "options": [
+            "Quand vous demandez à Claude de comprendre votre code, il utilise automatiquement l'outil Read pour accéder aux fichiers.",
+            "La majorité des gens utilisent Claude pour chatter : poser des questions, obtenir des réponses, comme un moteur de recherche amélioré.",
+            "Claude Code est le CLI officiel d'Anthropic qui amène Claude directement dans votre terminal."
+          ],
+          "answer": 0,
+          "why": "La section « Comment fonctionne l'outil Read » précise : Quand vous demandez à Claude de comprendre votre code, il utilise automatiquement l'outil Read pour accéder aux fichiers."
+        },
+        {
+          "q": "Quelle explication correspond à « Lecture partielle de grands fichiers » dans cette leçon ?",
+          "options": [
+            "Claude Code est le CLI officiel d'Anthropic qui amène Claude directement dans votre terminal.",
+            "Pour les fichiers volumineux, Claude Code peut lire par plages de lignes grâce aux paramètres offset et limit.",
+            "L'installation de Claude Code se fait en une commande npm."
+          ],
+          "answer": 1,
+          "why": "La section « Lecture partielle de grands fichiers » précise : Pour les fichiers volumineux, Claude Code peut lire par plages de lignes grâce aux paramètres offset et limit."
+        },
+        {
+          "q": "Quelle explication correspond à « Formats supportés » dans cette leçon ?",
+          "options": [
+            "L'installation de Claude Code se fait en une commande npm.",
+            "Une fois Claude Code installé, découvrons comment naviguer dans l'interface, envoyer des messages et comprendre les réponses.",
+            "Fichiers texte (.ts, .js, .py, .go, .rs, .java, .md, etc.)"
+          ],
+          "answer": 2,
+          "why": "La section « Formats supportés » précise : Fichiers texte (.ts, .js, .py, .go, .rs, .java, .md, etc.)"
+        }
+      ],
+      "commands": [],
+      "resources": [
+        {
+          "title": "L'outil Read",
+          "href": "/wiki/outils/read"
+        },
+        {
+          "title": "L'outil Glob",
+          "href": "/wiki/outils/glob"
+        },
+        {
+          "title": "Documentation officielle de Claude Code",
+          "href": "https://code.claude.com/docs/en/overview"
+        }
+      ],
+      "practice": {
+        "title": "Examiner un fichier de votre projet",
+        "description": "Reprenez les exemples de la leçon « Lire des fichiers (Read) » sur un petit projet ou dans un dossier de test. Conservez le résultat et les vérifications effectuées.",
+        "success": "Vous pouvez expliquer le rôle du fichier et retrouver le passage qui justifie votre réponse."
+      },
+      "minutes": 5
+    },
+    "write-tool": {
+      "level": "débutant",
+      "objectives": [
+        "Créer un fichier avec un contenu défini",
+        "Vérifier l’existant avant d’écrire"
+      ],
+      "prerequisites": [
+        "read-tool"
+      ],
+      "takeaways": [
+        "L’exemple « Prompts exemples » utilise : > crée un fichier utils/formatDate.ts avec des fonctions de formatage de dates en TypeScript",
+        "Claude Code lit toujours un fichier existant avant de le réécrire afin de conserver le contexte et d'éviter de perdre du code.",
+        "L’exemple « Exemple de prompt avancé » utilise : > crée une feature d'authentification complète : - src/auth/authService.ts (logique métier)"
+      ],
+      "quiz": [
+        {
+          "q": "Quelle explication correspond à « Créer de nouveaux fichiers » dans cette leçon ?",
+          "options": [
+            "Une fois Claude Code installé, découvrons comment naviguer dans l'interface, envoyer des messages et comprendre les réponses.",
+            "L’exemple « Prompts exemples » utilise : > crée un fichier utils/formatDate.ts avec des fonctions de formatage de dates en TypeScript",
+            "L'outil Read est le point d'entrée de Claude Code pour explorer votre codebase."
+          ],
+          "answer": 1,
+          "why": "La section « Créer de nouveaux fichiers » précise : L’exemple « Prompts exemples » utilise : > crée un fichier utils/formatDate.ts avec des fonctions de formatage de dates en TypeScript"
+        },
+        {
+          "q": "Quelle explication correspond à « Bonne pratique : Read avant Write » dans cette leçon ?",
+          "options": [
+            "L'outil Read est le point d'entrée de Claude Code pour explorer votre codebase.",
+            "L'outil Edit est le plus utilisé de Claude Code.",
+            "Claude Code lit toujours un fichier existant avant de le réécrire afin de conserver le contexte et d'éviter de perdre du code."
+          ],
+          "answer": 2,
+          "why": "La section « Bonne pratique : Read avant Write » précise : Claude Code lit toujours un fichier existant avant de le réécrire afin de conserver le contexte et d'éviter de perdre du code."
+        },
+        {
+          "q": "Quelle explication correspond à « Création de fichiers multiples » dans cette leçon ?",
+          "options": [
+            "L’exemple « Exemple de prompt avancé » utilise : > crée une feature d'authentification complète : - src/auth/authService.ts (logique métier)",
+            "L'outil Edit est le plus utilisé de Claude Code.",
+            "Glob et Grep permettent à Claude de naviguer efficacement dans de larges codebases : Glob pour trouver des fichiers par pattern, Grep pour chercher du texte dans les fichiers."
+          ],
+          "answer": 0,
+          "why": "La section « Création de fichiers multiples » précise : L’exemple « Exemple de prompt avancé » utilise : > crée une feature d'authentification complète : - src/auth/authService.ts (logique métier)"
+        }
+      ],
+      "commands": [],
+      "resources": [
+        {
+          "title": "L'outil Read",
+          "href": "/wiki/outils/read"
+        },
+        {
+          "title": "L'outil Write",
+          "href": "/wiki/outils/write"
+        },
+        {
+          "title": "Documentation officielle de Claude Code",
+          "href": "https://code.claude.com/docs/en/overview"
+        }
+      ],
+      "practice": {
+        "title": "Créer un fichier de documentation",
+        "description": "Reprenez les exemples de la leçon « Créer des fichiers (Write) » sur un petit projet ou dans un dossier de test. Conservez le résultat et les vérifications effectuées.",
+        "success": "Le fichier existe, répond à votre demande et ne remplace aucun contenu utile sans vérification."
+      },
+      "minutes": 5
+    },
+    "edit-tool": {
+      "level": "débutant",
+      "objectives": [
+        "Décrire une modification ciblée",
+        "Contrôler les changements dans les fichiers"
+      ],
+      "prerequisites": [
+        "write-tool"
+      ],
+      "takeaways": [
+        "Edit prend un old_string et un new_string.",
+        "Claude Code peut effectuer plusieurs Edit sur différents fichiers dans une même réponse.",
+        "L’exemple « Vérifier ce que Claude a modifié » utilise : git diff git status"
+      ],
+      "quiz": [
+        {
+          "q": "Quelle explication correspond à « Fonctionnement du Edit » dans cette leçon ?",
+          "options": [
+            "Glob et Grep permettent à Claude de naviguer efficacement dans de larges codebases : Glob pour trouver des fichiers par pattern, Grep pour chercher du texte dans les fichiers.",
+            "Claude Code excelle dans la génération de code de haute qualité.",
+            "Edit prend un old_string et un new_string."
+          ],
+          "answer": 2,
+          "why": "La section « Fonctionnement du Edit » précise : Edit prend un old_string et un new_string."
+        },
+        {
+          "q": "Quelle explication correspond à « Éditions multiples simultanées » dans cette leçon ?",
+          "options": [
+            "Claude Code peut effectuer plusieurs Edit sur différents fichiers dans une même réponse.",
+            "Claude Code excelle dans la génération de code de haute qualité.",
+            "Claude Code est excellent pour moderniser et améliorer du code existant."
+          ],
+          "answer": 0,
+          "why": "La section « Éditions multiples simultanées » précise : Claude Code peut effectuer plusieurs Edit sur différents fichiers dans une même réponse."
+        },
+        {
+          "q": "Quelle explication correspond à « Vérification des changements » dans cette leçon ?",
+          "options": [
+            "Claude Code est excellent pour moderniser et améliorer du code existant.",
+            "L’exemple « Vérifier ce que Claude a modifié » utilise : git diff git status",
+            "Claude Code est un partenaire de debugging redoutable."
+          ],
+          "answer": 1,
+          "why": "La section « Vérification des changements » précise : L’exemple « Vérifier ce que Claude a modifié » utilise : git diff git status"
+        }
+      ],
+      "commands": [],
+      "resources": [
+        {
+          "title": "L'outil Edit",
+          "href": "/wiki/outils/edit"
+        },
+        {
+          "title": "NotebookEdit en profondeur",
+          "href": "/wiki/outils/notebook-edit"
+        },
+        {
+          "title": "Documentation officielle de Claude Code",
+          "href": "https://code.claude.com/docs/en/overview"
+        }
+      ],
+      "practice": {
+        "title": "Modifier un composant existant",
+        "description": "Reprenez les exemples de la leçon « Éditer des fichiers (Edit) » sur un petit projet ou dans un dossier de test. Conservez le résultat et les vérifications effectuées.",
+        "success": "Le diff contient la modification demandée et vous avez vérifié les lignes concernées."
+      },
+      "minutes": 7
+    },
+    "glob-grep": {
+      "level": "débutant",
+      "objectives": [
+        "Trouver des fichiers par leur nom",
+        "Rechercher un motif dans le contenu"
+      ],
+      "prerequisites": [
+        "edit-tool"
+      ],
+      "takeaways": [
+        "Glob supporte les patterns de type *.js, **/*.tsx, src/**/*.test.ts etc.",
+        "Grep supporte les expressions régulières complètes.",
+        "Claude combine souvent Glob et Grep pour naviguer dans votre codebase : d'abord Glob pour trouver les fichiers pertinents, puis Grep pour localiser le code précis, puis Read pour comprendre le contexte."
+      ],
+      "quiz": [
+        {
+          "q": "Quelle explication correspond à « L'outil Glob : trouver des fichiers » dans cette leçon ?",
+          "options": [
+            "Glob supporte les patterns de type *.js, **/*.tsx, src/**/*.test.ts etc.",
+            "Claude Code est un partenaire de debugging redoutable.",
+            "Claude Code a un accès complet à Git via la commande bash."
+          ],
+          "answer": 0,
+          "why": "La section « L'outil Glob : trouver des fichiers » précise : Glob supporte les patterns de type *.js, **/*.tsx, src/**/*.test.ts etc."
+        },
+        {
+          "q": "Quelle explication correspond à « L'outil Grep : chercher dans le contenu » dans cette leçon ?",
+          "options": [
+            "Claude Code a un accès complet à Git via la commande bash.",
+            "Grep supporte les expressions régulières complètes.",
+            "Via le CLI gh de GitHub, Claude Code peut créer des PR, commenter des issues, déclencher des workflows CI/CD et interagir avec l'écosystème GitHub."
+          ],
+          "answer": 1,
+          "why": "La section « L'outil Grep : chercher dans le contenu » précise : Grep supporte les expressions régulières complètes."
+        },
+        {
+          "q": "Quelle explication correspond à « Combinaison puissante » dans cette leçon ?",
+          "options": [
+            "Via le CLI gh de GitHub, Claude Code peut créer des PR, commenter des issues, déclencher des workflows CI/CD et interagir avec l'écosystème GitHub.",
+            "Claude Code peut exécuter n'importe quelle commande bash, lancer des processus en background, et interagir avec votre environnement système.",
+            "Claude combine souvent Glob et Grep pour naviguer dans votre codebase : d'abord Glob pour trouver les fichiers pertinents, puis Grep pour localiser le code précis, puis Read pour comprendre le contexte."
+          ],
+          "answer": 2,
+          "why": "La section « Combinaison puissante » précise : Claude combine souvent Glob et Grep pour naviguer dans votre codebase : d'abord Glob pour trouver les fichiers pertinents, puis Grep pour localiser le code précis, puis Read pour comprendre le contexte."
+        }
+      ],
+      "commands": [],
+      "resources": [
+        {
+          "title": "L'outil Glob",
+          "href": "/wiki/outils/glob"
+        },
+        {
+          "title": "L'outil Grep",
+          "href": "/wiki/outils/grep"
+        },
+        {
+          "title": "Documentation officielle de Claude Code",
+          "href": "https://code.claude.com/docs/en/overview"
+        }
+      ],
+      "practice": {
+        "title": "Retrouver les usages d’une fonction",
+        "description": "Reprenez les exemples de la leçon « Recherche avec Glob & Grep » sur un petit projet ou dans un dossier de test. Conservez le résultat et les vérifications effectuées.",
+        "success": "Vous avez une liste de fichiers et au moins un passage où la fonction est utilisée."
+      },
+      "minutes": 6
+    },
+    "code-gen": {
+      "level": "intermédiaire",
+      "objectives": [
+        "Fournir le contexte nécessaire à la génération",
+        "Demander des tests pour le code produit"
+      ],
+      "prerequisites": [
+        "edit-tool"
+      ],
+      "takeaways": [
+        "Avant de générer du code, Claude lit automatiquement les fichiers pertinents de votre projet pour comprendre les conventions, les types existants, les patterns utilisés.",
+        "L’exemple « Exemple React/Next.js » utilise : > crée un composant DataTable réutilisable avec : - TypeScript generics pour les données",
+        "L’exemple « Génération de tests » utilise : > génère les tests unitaires pour src/auth/authService.ts utilise Jest et les mocks pattern déjà en place dans __mocks__/"
+      ],
+      "quiz": [
+        {
+          "q": "Quelle explication correspond à « Donner du contexte pour un meilleur résultat » dans cette leçon ?",
+          "options": [
+            "Avant de générer du code, Claude lit automatiquement les fichiers pertinents de votre projet pour comprendre les conventions, les types existants, les patterns utilisés.",
+            "La majorité des gens utilisent Claude pour chatter : poser des questions, obtenir des réponses, comme un moteur de recherche amélioré.",
+            "Claude Code est le CLI officiel d'Anthropic qui amène Claude directement dans votre terminal."
+          ],
+          "answer": 0,
+          "why": "La section « Donner du contexte pour un meilleur résultat » précise : Avant de générer du code, Claude lit automatiquement les fichiers pertinents de votre projet pour comprendre les conventions, les types existants, les patterns utilisés."
+        },
+        {
+          "q": "Quelle explication correspond à « Génération de composants UI » dans cette leçon ?",
+          "options": [
+            "Claude Code est le CLI officiel d'Anthropic qui amène Claude directement dans votre terminal.",
+            "L’exemple « Exemple React/Next.js » utilise : > crée un composant DataTable réutilisable avec : - TypeScript generics pour les données",
+            "L'installation de Claude Code se fait en une commande npm."
+          ],
+          "answer": 1,
+          "why": "La section « Génération de composants UI » précise : L’exemple « Exemple React/Next.js » utilise : > crée un composant DataTable réutilisable avec : - TypeScript generics pour les données"
+        },
+        {
+          "q": "Quelle explication correspond à « Génération de tests » dans cette leçon ?",
+          "options": [
+            "L'installation de Claude Code se fait en une commande npm.",
+            "Une fois Claude Code installé, découvrons comment naviguer dans l'interface, envoyer des messages et comprendre les réponses.",
+            "L’exemple « Génération de tests » utilise : > génère les tests unitaires pour src/auth/authService.ts utilise Jest et les mocks pattern déjà en place dans __mocks__/"
+          ],
+          "answer": 2,
+          "why": "La section « Génération de tests » précise : L’exemple « Génération de tests » utilise : > génère les tests unitaires pour src/auth/authService.ts utilise Jest et les mocks pattern déjà en place dans __mocks__/"
+        }
+      ],
+      "commands": [],
+      "resources": [
+        {
+          "title": "Génération de tests",
+          "href": "/wiki/workflows/generation-tests"
+        },
+        {
+          "title": "Configurer un projet pour Claude Code",
+          "href": "/wiki/demarrer/configurer-projet"
+        },
+        {
+          "title": "Documentation officielle de Claude Code",
+          "href": "https://code.claude.com/docs/en/overview"
+        }
+      ],
+      "practice": {
+        "title": "Générer un petit composant avec ses tests",
+        "description": "Reprenez les exemples de la leçon « Génération de code » sur un petit projet ou dans un dossier de test. Conservez le résultat et les vérifications effectuées.",
+        "success": "Le composant respecte la demande et les tests associés passent."
+      },
+      "minutes": 8
+    },
+    "refactoring": {
+      "level": "intermédiaire",
+      "objectives": [
+        "Définir une amélioration sans changer le comportement",
+        "Découper un refactoring en modifications vérifiables"
+      ],
+      "prerequisites": [
+        "code-gen"
+      ],
+      "takeaways": [
+        "Migration callbacks → async/await → Promises",
+        "Pour les grands refactorings, il vaut mieux procéder par étapes.",
+        "Conversion JavaScript → TypeScript"
+      ],
+      "quiz": [
+        {
+          "q": "Quelle explication correspond à « Types de refactoring supportés » dans cette leçon ?",
+          "options": [
+            "Une fois Claude Code installé, découvrons comment naviguer dans l'interface, envoyer des messages et comprendre les réponses.",
+            "Migration callbacks → async/await → Promises",
+            "L'outil Read est le point d'entrée de Claude Code pour explorer votre codebase."
+          ],
+          "answer": 1,
+          "why": "La section « Types de refactoring supportés » précise : Migration callbacks → async/await → Promises"
+        },
+        {
+          "q": "Quelle explication correspond à « Refactoring progressif » dans cette leçon ?",
+          "options": [
+            "L'outil Read est le point d'entrée de Claude Code pour explorer votre codebase.",
+            "L'outil Write permet à Claude de créer de nouveaux fichiers ou de réécrire entièrement des fichiers existants.",
+            "Pour les grands refactorings, il vaut mieux procéder par étapes."
+          ],
+          "answer": 2,
+          "why": "La section « Refactoring progressif » précise : Pour les grands refactorings, il vaut mieux procéder par étapes."
+        },
+        {
+          "q": "Quelle explication correspond à « Types de refactoring supportés » dans cette leçon ?",
+          "options": [
+            "Conversion JavaScript → TypeScript",
+            "L'outil Write permet à Claude de créer de nouveaux fichiers ou de réécrire entièrement des fichiers existants.",
+            "L'outil Edit est le plus utilisé de Claude Code."
+          ],
+          "answer": 0,
+          "why": "La section « Types de refactoring supportés » précise : Conversion JavaScript → TypeScript"
+        }
+      ],
+      "commands": [],
+      "resources": [
+        {
+          "title": "Code review automatisé",
+          "href": "/wiki/workflows/code-review-auto"
+        },
+        {
+          "title": "Migrations de base de données avec Claude Code",
+          "href": "/wiki/workflows/migration-db"
+        },
+        {
+          "title": "Documentation officielle de Claude Code",
+          "href": "https://code.claude.com/docs/en/overview"
+        }
+      ],
+      "practice": {
+        "title": "Simplifier une fonction existante",
+        "description": "Reprenez les exemples de la leçon « Refactoring de code » sur un petit projet ou dans un dossier de test. Conservez le résultat et les vérifications effectuées.",
+        "success": "Les tests passent et vous pouvez expliquer pourquoi le comportement est conservé."
+      },
+      "minutes": 7
+    },
+    "debugging": {
+      "level": "intermédiaire",
+      "objectives": [
+        "Transmettre une erreur avec son contexte",
+        "Vérifier une correction avec les tests"
+      ],
+      "prerequisites": [
+        "refactoring"
+      ],
+      "takeaways": [
+        "L’exemple « Debug avec stack trace » utilise : > j'ai cette erreur, aide-moi à la corriger : TypeError: Cannot read properties of undefined (reading 'map')",
+        "Vous pouvez aussi laisser Claude investiguer lui-même.",
+        "L’exemple « Boucle test-fix » utilise : > lance les tests, corriges les erreurs, relances, jusqu'à ce que tout soit vert"
+      ],
+      "quiz": [
+        {
+          "q": "Quelle explication correspond à « Passer une erreur directement » dans cette leçon ?",
+          "options": [
+            "L'outil Edit est le plus utilisé de Claude Code.",
+            "Glob et Grep permettent à Claude de naviguer efficacement dans de larges codebases : Glob pour trouver des fichiers par pattern, Grep pour chercher du texte dans les fichiers.",
+            "L’exemple « Debug avec stack trace » utilise : > j'ai cette erreur, aide-moi à la corriger : TypeError: Cannot read properties of undefined (reading 'map')"
+          ],
+          "answer": 2,
+          "why": "La section « Passer une erreur directement » précise : L’exemple « Debug avec stack trace » utilise : > j'ai cette erreur, aide-moi à la corriger : TypeError: Cannot read properties of undefined (reading 'map')"
+        },
+        {
+          "q": "Quelle explication correspond à « Debug en autonomie » dans cette leçon ?",
+          "options": [
+            "Vous pouvez aussi laisser Claude investiguer lui-même.",
+            "Glob et Grep permettent à Claude de naviguer efficacement dans de larges codebases : Glob pour trouver des fichiers par pattern, Grep pour chercher du texte dans les fichiers.",
+            "Claude Code excelle dans la génération de code de haute qualité."
+          ],
+          "answer": 0,
+          "why": "La section « Debug en autonomie » précise : Vous pouvez aussi laisser Claude investiguer lui-même."
+        },
+        {
+          "q": "Quelle explication correspond à « Lancer et corriger les tests en boucle » dans cette leçon ?",
+          "options": [
+            "Claude Code excelle dans la génération de code de haute qualité.",
+            "L’exemple « Boucle test-fix » utilise : > lance les tests, corriges les erreurs, relances, jusqu'à ce que tout soit vert",
+            "Claude Code est excellent pour moderniser et améliorer du code existant."
+          ],
+          "answer": 1,
+          "why": "La section « Lancer et corriger les tests en boucle » précise : L’exemple « Boucle test-fix » utilise : > lance les tests, corriges les erreurs, relances, jusqu'à ce que tout soit vert"
+        }
+      ],
+      "commands": [],
+      "resources": [
+        {
+          "title": "Debug avec Claude",
+          "href": "/wiki/workflows/debug-avec-claude"
+        },
+        {
+          "title": "Génération de tests",
+          "href": "/wiki/workflows/generation-tests"
+        },
+        {
+          "title": "Documentation officielle de Claude Code",
+          "href": "https://code.claude.com/docs/en/overview"
+        }
+      ],
+      "practice": {
+        "title": "Corriger un bug reproductible",
+        "description": "Reprenez les exemples de la leçon « Debug & résolution de bugs » sur un petit projet ou dans un dossier de test. Conservez le résultat et les vérifications effectuées.",
+        "success": "Vous reproduisez l’erreur avant la correction et le même contrôle réussit ensuite."
+      },
+      "minutes": 8
+    },
+    "git-ops": {
+      "level": "intermédiaire",
+      "objectives": [
+        "Préparer un commit à partir du diff",
+        "Organiser le travail sur une branche"
+      ],
+      "prerequisites": [
+        "first-steps"
+      ],
+      "takeaways": [
+        "Claude Code suit un protocole strict pour les commits : il vérifie d'abord git status et git diff, analyse les changements, rédige un message de commit clair, puis commit avec la co-authorship Claude.",
+        "L’exemple « Prompts Git courants » utilise : > crée une branche feature/user-auth et bascule dessus > merge la branche develop dans main",
+        "L’exemple « Résoudre des conflits » utilise : > j'ai des conflits de merge dans src/models/user.ts, résous-les en gardant les changements des deux branches si possible"
+      ],
+      "quiz": [
+        {
+          "q": "Quelle explication correspond à « Créer des commits » dans cette leçon ?",
+          "options": [
+            "Claude Code suit un protocole strict pour les commits : il vérifie d'abord git status et git diff, analyse les changements, rédige un message de commit clair, puis commit avec la co-authorship Claude.",
+            "La majorité des gens utilisent Claude pour chatter : poser des questions, obtenir des réponses, comme un moteur de recherche amélioré.",
+            "Claude Code est le CLI officiel d'Anthropic qui amène Claude directement dans votre terminal."
+          ],
+          "answer": 0,
+          "why": "La section « Créer des commits » précise : Claude Code suit un protocole strict pour les commits : il vérifie d'abord git status et git diff, analyse les changements, rédige un message de commit clair, puis commit avec la co-authorship Claude."
+        },
+        {
+          "q": "Quelle explication correspond à « Opérations de branching » dans cette leçon ?",
+          "options": [
+            "Claude Code est le CLI officiel d'Anthropic qui amène Claude directement dans votre terminal.",
+            "L’exemple « Prompts Git courants » utilise : > crée une branche feature/user-auth et bascule dessus > merge la branche develop dans main",
+            "L'installation de Claude Code se fait en une commande npm."
+          ],
+          "answer": 1,
+          "why": "La section « Opérations de branching » précise : L’exemple « Prompts Git courants » utilise : > crée une branche feature/user-auth et bascule dessus > merge la branche develop dans main"
+        },
+        {
+          "q": "Quelle explication correspond à « Résolution de conflits » dans cette leçon ?",
+          "options": [
+            "L'installation de Claude Code se fait en une commande npm.",
+            "Une fois Claude Code installé, découvrons comment naviguer dans l'interface, envoyer des messages et comprendre les réponses.",
+            "L’exemple « Résoudre des conflits » utilise : > j'ai des conflits de merge dans src/models/user.ts, résous-les en gardant les changements des deux branches si possible"
+          ],
+          "answer": 2,
+          "why": "La section « Résolution de conflits » précise : L’exemple « Résoudre des conflits » utilise : > j'ai des conflits de merge dans src/models/user.ts, résous-les en gardant les changements des deux branches si possible"
+        }
+      ],
+      "commands": [],
+      "resources": [
+        {
+          "title": "Résolution des conflits d'installation",
+          "href": "/wiki/demarrer/troubleshooting-installation"
+        },
+        {
+          "title": "Créer une slash command custom",
+          "href": "/wiki/slash-commands/creer-slash-command"
+        },
+        {
+          "title": "Documentation officielle de Claude Code",
+          "href": "https://code.claude.com/docs/en/overview"
+        }
+      ],
+      "practice": {
+        "title": "Enregistrer une modification sur une branche",
+        "description": "Reprenez les exemples de la leçon « Opérations Git » sur un petit projet ou dans un dossier de test. Conservez le résultat et les vérifications effectuées.",
+        "success": "Le commit contient uniquement les fichiers attendus et son message explique la modification."
+      },
+      "minutes": 8
+    },
+    "github-pr": {
+      "level": "intermédiaire",
+      "objectives": [
+        "Décrire une modification dans une pull request",
+        "Préparer les éléments utiles à la revue"
+      ],
+      "prerequisites": [
+        "git-ops"
+      ],
+      "takeaways": [
+        "L’exemple « Ce que Claude exécute pour une PR » utilise : git log main...HEAD --oneline git diff main...HEAD",
+        "L’exemple « Prompts GitHub » utilise : > crée une PR depuis ma branche feature/auth vers develop > liste les PR ouvertes sur ce repo",
+        "Workflow complet : Claude peut gérer tout le cycle de vie d'une feature : créer la branche → implémenter → tester → commit → PR → adresser les reviews → merge."
+      ],
+      "quiz": [
+        {
+          "q": "Quelle explication correspond à « Créer une Pull Request » dans cette leçon ?",
+          "options": [
+            "Une fois Claude Code installé, découvrons comment naviguer dans l'interface, envoyer des messages et comprendre les réponses.",
+            "L’exemple « Ce que Claude exécute pour une PR » utilise : git log main...HEAD --oneline git diff main...HEAD",
+            "L'outil Read est le point d'entrée de Claude Code pour explorer votre codebase."
+          ],
+          "answer": 1,
+          "why": "La section « Créer une Pull Request » précise : L’exemple « Ce que Claude exécute pour une PR » utilise : git log main...HEAD --oneline git diff main...HEAD"
+        },
+        {
+          "q": "Quelle explication correspond à « Demandes PR courantes » dans cette leçon ?",
+          "options": [
+            "L'outil Read est le point d'entrée de Claude Code pour explorer votre codebase.",
+            "L'outil Edit est le plus utilisé de Claude Code.",
+            "L’exemple « Prompts GitHub » utilise : > crée une PR depuis ma branche feature/auth vers develop > liste les PR ouvertes sur ce repo"
+          ],
+          "answer": 2,
+          "why": "La section « Demandes PR courantes » précise : L’exemple « Prompts GitHub » utilise : > crée une PR depuis ma branche feature/auth vers develop > liste les PR ouvertes sur ce repo"
+        },
+        {
+          "q": "Quelle explication correspond à « Demandes PR courantes » dans cette leçon ?",
+          "options": [
+            "Workflow complet : Claude peut gérer tout le cycle de vie d'une feature : créer la branche → implémenter → tester → commit → PR → adresser les reviews → merge.",
+            "L'outil Edit est le plus utilisé de Claude Code.",
+            "Glob et Grep permettent à Claude de naviguer efficacement dans de larges codebases : Glob pour trouver des fichiers par pattern, Grep pour chercher du texte dans les fichiers."
+          ],
+          "answer": 0,
+          "why": "La section « Demandes PR courantes » précise : Workflow complet : Claude peut gérer tout le cycle de vie d'une feature : créer la branche → implémenter → tester → commit → PR → adresser les reviews → merge."
+        }
+      ],
+      "commands": [],
+      "resources": [
+        {
+          "title": "Créer une slash command custom",
+          "href": "/wiki/slash-commands/creer-slash-command"
+        },
+        {
+          "title": "Créer un subagent personnalisé",
+          "href": "/wiki/subagents/creer-subagent-custom"
+        },
+        {
+          "title": "Documentation officielle de Claude Code",
+          "href": "https://code.claude.com/docs/en/overview"
+        }
+      ],
+      "practice": {
+        "title": "Rédiger une pull request de votre branche",
+        "description": "Reprenez les exemples de la leçon « GitHub & Pull Requests » sur un petit projet ou dans un dossier de test. Conservez le résultat et les vérifications effectuées.",
+        "success": "Le titre, la description et les vérifications permettent de comprendre la modification sans lire toute la conversation."
+      },
+      "minutes": 7
+    },
+    "bash": {
+      "level": "intermédiaire",
+      "objectives": [
+        "Définir une commande à exécuter",
+        "Examiner la sortie et les limites d’exécution"
+      ],
+      "prerequisites": [
+        "github-pr"
+      ],
+      "takeaways": [
+        "L’exemple « Exemples de commandes bash » utilise : > lance npm test et montre-moi les résultats > build le projet et dis-moi si il y a des erreurs TypeScript",
+        "Claude peut lancer des processus en background (serveurs, watchers, etc.) et revenir les vérifier plus tard.",
+        "Timeout par défaut : 2 minutes par commande"
+      ],
+      "quiz": [
+        {
+          "q": "Quelle explication correspond à « Exécution de commandes » dans cette leçon ?",
+          "options": [
+            "L'outil Edit est le plus utilisé de Claude Code.",
+            "Glob et Grep permettent à Claude de naviguer efficacement dans de larges codebases : Glob pour trouver des fichiers par pattern, Grep pour chercher du texte dans les fichiers.",
+            "L’exemple « Exemples de commandes bash » utilise : > lance npm test et montre-moi les résultats > build le projet et dis-moi si il y a des erreurs TypeScript"
+          ],
+          "answer": 2,
+          "why": "La section « Exécution de commandes » précise : L’exemple « Exemples de commandes bash » utilise : > lance npm test et montre-moi les résultats > build le projet et dis-moi si il y a des erreurs TypeScript"
+        },
+        {
+          "q": "Quelle explication correspond à « Processus en background » dans cette leçon ?",
+          "options": [
+            "Claude peut lancer des processus en background (serveurs, watchers, etc.) et revenir les vérifier plus tard.",
+            "Glob et Grep permettent à Claude de naviguer efficacement dans de larges codebases : Glob pour trouver des fichiers par pattern, Grep pour chercher du texte dans les fichiers.",
+            "Claude Code excelle dans la génération de code de haute qualité."
+          ],
+          "answer": 0,
+          "why": "La section « Processus en background » précise : Claude peut lancer des processus en background (serveurs, watchers, etc.) et revenir les vérifier plus tard."
+        },
+        {
+          "q": "Quelle explication correspond à « Timeout et limites » dans cette leçon ?",
+          "options": [
+            "Claude Code excelle dans la génération de code de haute qualité.",
+            "Timeout par défaut : 2 minutes par commande",
+            "Claude Code est excellent pour moderniser et améliorer du code existant."
+          ],
+          "answer": 1,
+          "why": "La section « Timeout et limites » précise : Timeout par défaut : 2 minutes par commande"
+        }
+      ],
+      "commands": [],
+      "resources": [
+        {
+          "title": "L'outil Bash",
+          "href": "/wiki/outils/bash"
+        },
+        {
+          "title": "Offres et limites d'usage",
+          "href": "/wiki/claude-bases/offres-et-limites"
+        },
+        {
+          "title": "Documentation officielle de Claude Code",
+          "href": "https://code.claude.com/docs/en/overview"
+        }
+      ],
+      "practice": {
+        "title": "Lancer un contrôle du projet dans le terminal",
+        "description": "Reprenez les exemples de la leçon « Terminal & Commandes Bash » sur un petit projet ou dans un dossier de test. Conservez le résultat et les vérifications effectuées.",
+        "success": "Vous avez conservé la commande, son résultat et l’action à mener en cas d’échec."
+      },
+      "minutes": 6
+    },
+    "settings": {
+      "level": "avancé",
+      "objectives": [
+        "Repérer les fichiers de configuration",
+        "Définir des permissions adaptées au projet"
+      ],
+      "prerequisites": [
+        "git-ops"
+      ],
+      "takeaways": [
+        "Global (utilisateur) : ~/.claude/settings.json",
+        "L’exemple « ~/.claude/settings.json » utilise : { // Modèle Claude à utiliser",
+        "default : Demande confirmation pour les actions risquées : Usage quotidien"
+      ],
+      "quiz": [
+        {
+          "q": "Quelle explication correspond à « Localisation des settings » dans cette leçon ?",
+          "options": [
+            "Global (utilisateur) : ~/.claude/settings.json",
+            "La majorité des gens utilisent Claude pour chatter : poser des questions, obtenir des réponses, comme un moteur de recherche amélioré.",
+            "Claude Code est le CLI officiel d'Anthropic qui amène Claude directement dans votre terminal."
+          ],
+          "answer": 0,
+          "why": "La section « Localisation des settings » précise : Global (utilisateur) : ~/.claude/settings.json"
+        },
+        {
+          "q": "Quelle explication correspond à « Structure du settings.json » dans cette leçon ?",
+          "options": [
+            "Claude Code est le CLI officiel d'Anthropic qui amène Claude directement dans votre terminal.",
+            "L’exemple « ~/.claude/settings.json » utilise : { // Modèle Claude à utiliser",
+            "L'installation de Claude Code se fait en une commande npm."
+          ],
+          "answer": 1,
+          "why": "La section « Structure du settings.json » précise : L’exemple « ~/.claude/settings.json » utilise : { // Modèle Claude à utiliser"
+        },
+        {
+          "q": "Quelle explication correspond à « Modes de permission » dans cette leçon ?",
+          "options": [
+            "L'installation de Claude Code se fait en une commande npm.",
+            "Une fois Claude Code installé, découvrons comment naviguer dans l'interface, envoyer des messages et comprendre les réponses.",
+            "default : Demande confirmation pour les actions risquées : Usage quotidien"
+          ],
+          "answer": 2,
+          "why": "La section « Modes de permission » précise : default : Demande confirmation pour les actions risquées : Usage quotidien"
+        }
+      ],
+      "commands": [],
+      "resources": [
+        {
+          "title": "Le fichier settings.json",
+          "href": "/wiki/cli/settings-json"
+        },
+        {
+          "title": "/config et réglages en cours de session",
+          "href": "/wiki/slash-commands/config-modifications-chaud"
+        },
+        {
+          "title": "Documentation officielle de Claude Code",
+          "href": "https://code.claude.com/docs/en/overview"
+        }
+      ],
+      "practice": {
+        "title": "Documenter une configuration de projet",
+        "description": "Reprenez les exemples de la leçon « Settings & Permissions » sur un petit projet ou dans un dossier de test. Conservez le résultat et les vérifications effectuées.",
+        "success": "Vous pouvez expliquer chaque permission retenue et son emplacement dans la configuration."
+      },
+      "minutes": 9
+    },
+    "mcp": {
+      "level": "avancé",
+      "objectives": [
+        "Expliquer le rôle d’un serveur MCP",
+        "Préparer sa configuration dans le projet"
+      ],
+      "prerequisites": [
+        "settings"
+      ],
+      "takeaways": [
+        "MCP est un protocole client-serveur.",
+        "L’exemple « ~/.claude/settings.json : section mcpServers » utilise : { \"mcpServers\": {",
+        "@mcp/server-github : GitHub API complète : Issues, PRs, repos"
+      ],
+      "quiz": [
+        {
+          "q": "Quelle explication correspond à « Qu'est-ce que MCP ? » dans cette leçon ?",
+          "options": [
+            "Une fois Claude Code installé, découvrons comment naviguer dans l'interface, envoyer des messages et comprendre les réponses.",
+            "MCP est un protocole client-serveur.",
+            "L'outil Read est le point d'entrée de Claude Code pour explorer votre codebase."
+          ],
+          "answer": 1,
+          "why": "La section « Qu'est-ce que MCP ? » précise : MCP est un protocole client-serveur."
+        },
+        {
+          "q": "Quelle explication correspond à « Configurer un MCP server » dans cette leçon ?",
+          "options": [
+            "L'outil Read est le point d'entrée de Claude Code pour explorer votre codebase.",
+            "L'outil Edit est le plus utilisé de Claude Code.",
+            "L’exemple « ~/.claude/settings.json : section mcpServers » utilise : { \"mcpServers\": {"
+          ],
+          "answer": 2,
+          "why": "La section « Configurer un MCP server » précise : L’exemple « ~/.claude/settings.json : section mcpServers » utilise : { \"mcpServers\": {"
+        },
+        {
+          "q": "Quelle explication correspond à « MCP servers populaires » dans cette leçon ?",
+          "options": [
+            "@mcp/server-github : GitHub API complète : Issues, PRs, repos",
+            "L'outil Edit est le plus utilisé de Claude Code.",
+            "Glob et Grep permettent à Claude de naviguer efficacement dans de larges codebases : Glob pour trouver des fichiers par pattern, Grep pour chercher du texte dans les fichiers."
+          ],
+          "answer": 0,
+          "why": "La section « MCP servers populaires » précise : @mcp/server-github : GitHub API complète : Issues, PRs, repos"
+        }
+      ],
+      "commands": [],
+      "resources": [
+        {
+          "title": "Configurer un projet pour Claude Code",
+          "href": "/wiki/demarrer/configurer-projet"
+        },
+        {
+          "title": "Créer une slash command custom",
+          "href": "/wiki/slash-commands/creer-slash-command"
+        },
+        {
+          "title": "Documentation officielle de Claude Code",
+          "href": "https://code.claude.com/docs/en/overview"
+        }
+      ],
+      "practice": {
+        "title": "Préparer la connexion à un serveur MCP",
+        "description": "Reprenez les exemples de la leçon « MCP Servers » sur un petit projet ou dans un dossier de test. Conservez le résultat et les vérifications effectuées.",
+        "success": "La configuration suit l’exemple étudié et les outils attendus sont identifiés avant utilisation."
+      },
+      "minutes": 10
+    },
+    "hooks": {
+      "level": "avancé",
+      "objectives": [
+        "Associer un hook à un événement",
+        "Décrire les données reçues par le hook"
+      ],
+      "prerequisites": [
+        "mcp"
+      ],
+      "takeaways": [
+        "PreToolUse : Avant chaque appel d'outil : Validation, logging",
+        "L’exemple « ~/.claude/settings.json : section hooks » utilise : { \"hooks\": {",
+        "Nom de l'outil (Edit, Bash…) : JSON sur stdin : .tool_name"
+      ],
+      "quiz": [
+        {
+          "q": "Quelle explication correspond à « Types de hooks » dans cette leçon ?",
+          "options": [
+            "L'outil Edit est le plus utilisé de Claude Code.",
+            "Glob et Grep permettent à Claude de naviguer efficacement dans de larges codebases : Glob pour trouver des fichiers par pattern, Grep pour chercher du texte dans les fichiers.",
+            "PreToolUse : Avant chaque appel d'outil : Validation, logging"
+          ],
+          "answer": 2,
+          "why": "La section « Types de hooks » précise : PreToolUse : Avant chaque appel d'outil : Validation, logging"
+        },
+        {
+          "q": "Quelle explication correspond à « Configuration des hooks » dans cette leçon ?",
+          "options": [
+            "L’exemple « ~/.claude/settings.json : section hooks » utilise : { \"hooks\": {",
+            "Glob et Grep permettent à Claude de naviguer efficacement dans de larges codebases : Glob pour trouver des fichiers par pattern, Grep pour chercher du texte dans les fichiers.",
+            "Claude Code excelle dans la génération de code de haute qualité."
+          ],
+          "answer": 0,
+          "why": "La section « Configuration des hooks » précise : L’exemple « ~/.claude/settings.json : section hooks » utilise : { \"hooks\": {"
+        },
+        {
+          "q": "Quelle explication correspond à « Ce que reçoit un hook » dans cette leçon ?",
+          "options": [
+            "Claude Code excelle dans la génération de code de haute qualité.",
+            "Nom de l'outil (Edit, Bash…) : JSON sur stdin : .tool_name",
+            "Claude Code est excellent pour moderniser et améliorer du code existant."
+          ],
+          "answer": 1,
+          "why": "La section « Ce que reçoit un hook » précise : Nom de l'outil (Edit, Bash…) : JSON sur stdin : .tool_name"
+        }
+      ],
+      "commands": [],
+      "resources": [
+        {
+          "title": "Hook lifecycle",
+          "href": "/wiki/hooks/hook-lifecycle"
+        },
+        {
+          "title": "Debugging hooks",
+          "href": "/wiki/hooks/debugging-hooks"
+        },
+        {
+          "title": "Documentation officielle de Claude Code",
+          "href": "https://code.claude.com/docs/en/overview"
+        }
+      ],
+      "practice": {
+        "title": "Préparer un hook de contrôle",
+        "description": "Reprenez les exemples de la leçon « Le système de Hooks » sur un petit projet ou dans un dossier de test. Conservez le résultat et les vérifications effectuées.",
+        "success": "Le hook est relié à l’événement voulu et vous pouvez vérifier son effet sur un cas simple."
+      },
+      "minutes": 9
+    },
+    "claude-md": {
+      "level": "intermédiaire",
+      "objectives": [
+        "Écrire les conventions du projet dans CLAUDE.md",
+        "Choisir l’emplacement des instructions"
+      ],
+      "prerequisites": [
+        "edit-tool"
+      ],
+      "takeaways": [
+        "Racine du projet (chargé toujours)",
+        "L’exemple « CLAUDE.md (exemple complet) » utilise : - Runtime: Node.js 20 + TypeScript 5.4 - Framework: Express 5 + Prisma ORM",
+        "Demandez à Claude lui-même de mettre à jour le CLAUDE.md quand vous ajoutez une nouvelle convention ou technologie au projet."
+      ],
+      "quiz": [
+        {
+          "q": "Quelle explication correspond à « Où placer les CLAUDE.md » dans cette leçon ?",
+          "options": [
+            "Racine du projet (chargé toujours)",
+            "La majorité des gens utilisent Claude pour chatter : poser des questions, obtenir des réponses, comme un moteur de recherche amélioré.",
+            "L'installation de Claude Code se fait en une commande npm."
+          ],
+          "answer": 0,
+          "why": "La section « Où placer les CLAUDE.md » précise : Racine du projet (chargé toujours)"
+        },
+        {
+          "q": "Quelle explication correspond à « Que mettre dans CLAUDE.md » dans cette leçon ?",
+          "options": [
+            "L'installation de Claude Code se fait en une commande npm.",
+            "L’exemple « CLAUDE.md (exemple complet) » utilise : - Runtime: Node.js 20 + TypeScript 5.4 - Framework: Express 5 + Prisma ORM",
+            "Une fois Claude Code installé, découvrons comment naviguer dans l'interface, envoyer des messages et comprendre les réponses."
+          ],
+          "answer": 1,
+          "why": "La section « Que mettre dans CLAUDE.md » précise : L’exemple « CLAUDE.md (exemple complet) » utilise : - Runtime: Node.js 20 + TypeScript 5.4 - Framework: Express 5 + Prisma ORM"
+        },
+        {
+          "q": "Quelle explication correspond à « Maintenir le CLAUDE.md à jour » dans cette leçon ?",
+          "options": [
+            "Une fois Claude Code installé, découvrons comment naviguer dans l'interface, envoyer des messages et comprendre les réponses.",
+            "L'outil Read est le point d'entrée de Claude Code pour explorer votre codebase.",
+            "Demandez à Claude lui-même de mettre à jour le CLAUDE.md quand vous ajoutez une nouvelle convention ou technologie au projet."
+          ],
+          "answer": 2,
+          "why": "La section « Maintenir le CLAUDE.md à jour » précise : Demandez à Claude lui-même de mettre à jour le CLAUDE.md quand vous ajoutez une nouvelle convention ou technologie au projet."
+        }
+      ],
+      "commands": [],
+      "resources": [
+        {
+          "title": "Mémoire & gestion du contexte (CLAUDE.md)",
+          "href": "/wiki/demarrer/claude-md"
+        },
+        {
+          "title": "Configurer un projet pour Claude Code",
+          "href": "/wiki/demarrer/configurer-projet"
+        },
+        {
+          "title": "Documentation officielle de Claude Code",
+          "href": "https://code.claude.com/docs/en/overview"
+        }
+      ],
+      "practice": {
+        "title": "Créer un CLAUDE.md pour un petit projet",
+        "description": "Reprenez les exemples de la leçon « Fichiers CLAUDE.md » sur un petit projet ou dans un dossier de test. Conservez le résultat et les vérifications effectuées.",
+        "success": "Le fichier décrit le projet, ses conventions et les contrôles à lancer, sans information inutile."
+      },
+      "minutes": 8
+    },
+    "memory-system": {
+      "level": "intermédiaire",
+      "objectives": [
+        "Distinguer les types de mémoire présentés",
+        "Retrouver les informations conservées"
+      ],
+      "prerequisites": [
+        "claude-md"
+      ],
+      "takeaways": [
+        "user : Profil, préférences, expertise : Pour adapter les réponses",
+        "L’exemple « Commandes de mémoire » utilise : > souviens-toi que je préfère les réponses concises sans résumé à la fin",
+        "L’exemple « Fichiers de mémoire » utilise : ~/.claude/memory/MEMORY.md # Index ~/.claude/memory/user_profile.md # Profil utilisateur"
+      ],
+      "quiz": [
+        {
+          "q": "Quelle explication correspond à « Types de mémoires » dans cette leçon ?",
+          "options": [
+            "L'outil Read est le point d'entrée de Claude Code pour explorer votre codebase.",
+            "user : Profil, préférences, expertise : Pour adapter les réponses",
+            "L'outil Write permet à Claude de créer de nouveaux fichiers ou de réécrire entièrement des fichiers existants."
+          ],
+          "answer": 1,
+          "why": "La section « Types de mémoires » précise : user : Profil, préférences, expertise : Pour adapter les réponses"
+        },
+        {
+          "q": "Quelle explication correspond à « Demander à Claude de se souvenir » dans cette leçon ?",
+          "options": [
+            "L'outil Write permet à Claude de créer de nouveaux fichiers ou de réécrire entièrement des fichiers existants.",
+            "L'outil Edit est le plus utilisé de Claude Code.",
+            "L’exemple « Commandes de mémoire » utilise : > souviens-toi que je préfère les réponses concises sans résumé à la fin"
+          ],
+          "answer": 2,
+          "why": "La section « Demander à Claude de se souvenir » précise : L’exemple « Commandes de mémoire » utilise : > souviens-toi que je préfère les réponses concises sans résumé à la fin"
+        },
+        {
+          "q": "Quelle explication correspond à « Localisation de la mémoire » dans cette leçon ?",
+          "options": [
+            "L’exemple « Fichiers de mémoire » utilise : ~/.claude/memory/MEMORY.md # Index ~/.claude/memory/user_profile.md # Profil utilisateur",
+            "L'outil Edit est le plus utilisé de Claude Code.",
+            "Glob et Grep permettent à Claude de naviguer efficacement dans de larges codebases : Glob pour trouver des fichiers par pattern, Grep pour chercher du texte dans les fichiers."
+          ],
+          "answer": 0,
+          "why": "La section « Localisation de la mémoire » précise : L’exemple « Fichiers de mémoire » utilise : ~/.claude/memory/MEMORY.md # Index ~/.claude/memory/user_profile.md # Profil utilisateur"
+        }
+      ],
+      "commands": [
+        {
+          "command": "/memory",
+          "description": "Ouvrir les instructions de mémoire."
+        }
+      ],
+      "resources": [
+        {
+          "title": "Mémoire & gestion du contexte (CLAUDE.md)",
+          "href": "/wiki/demarrer/claude-md"
+        },
+        {
+          "title": "Configurer un projet pour Claude Code",
+          "href": "/wiki/demarrer/configurer-projet"
+        },
+        {
+          "title": "Documentation officielle de Claude Code",
+          "href": "https://code.claude.com/docs/en/overview"
+        }
+      ],
+      "practice": {
+        "title": "Documenter une préférence de travail",
+        "description": "Reprenez les exemples de la leçon « Système de mémoire persistante » sur un petit projet ou dans un dossier de test. Conservez le résultat et les vérifications effectuées.",
+        "success": "Vous retrouvez l’information mémorisée et pouvez expliquer sa portée."
+      },
+      "minutes": 8
+    },
+    "context-management": {
+      "level": "intermédiaire",
+      "objectives": [
+        "Repérer les commandes de gestion du contexte",
+        "Choisir quand résumer ou repartir sur une session"
+      ],
+      "prerequisites": [
+        "memory-system"
+      ],
+      "takeaways": [
+        "/clear : Efface toute la conversation (repart de zéro)",
+        "L’exemple « Signaux pour compacter » utilise :",
+        "Pour les tâches importantes et complexes, commencez une nouvelle session propre avec /clear ou en relançant claude."
+      ],
+      "quiz": [
+        {
+          "q": "Quelle explication correspond à « Commandes de gestion du contexte » dans cette leçon ?",
+          "options": [
+            "L'outil Edit est le plus utilisé de Claude Code.",
+            "Glob et Grep permettent à Claude de naviguer efficacement dans de larges codebases : Glob pour trouver des fichiers par pattern, Grep pour chercher du texte dans les fichiers.",
+            "/clear : Efface toute la conversation (repart de zéro)"
+          ],
+          "answer": 2,
+          "why": "La section « Commandes de gestion du contexte » précise : /clear : Efface toute la conversation (repart de zéro)"
+        },
+        {
+          "q": "Quelle explication correspond à « Quand compacter la conversation » dans cette leçon ?",
+          "options": [
+            "L’exemple « Signaux pour compacter » utilise :",
+            "Glob et Grep permettent à Claude de naviguer efficacement dans de larges codebases : Glob pour trouver des fichiers par pattern, Grep pour chercher du texte dans les fichiers.",
+            "Claude Code excelle dans la génération de code de haute qualité."
+          ],
+          "answer": 0,
+          "why": "La section « Quand compacter la conversation » précise : L’exemple « Signaux pour compacter » utilise :"
+        },
+        {
+          "q": "Quelle explication correspond à « Lancer une session fraîche sur une tâche » dans cette leçon ?",
+          "options": [
+            "Claude Code excelle dans la génération de code de haute qualité.",
+            "Pour les tâches importantes et complexes, commencez une nouvelle session propre avec /clear ou en relançant claude.",
+            "Claude Code est excellent pour moderniser et améliorer du code existant."
+          ],
+          "answer": 1,
+          "why": "La section « Lancer une session fraîche sur une tâche » précise : Pour les tâches importantes et complexes, commencez une nouvelle session propre avec /clear ou en relançant claude."
+        }
+      ],
+      "commands": [
+        {
+          "command": "/clear",
+          "description": "Repartir avec une conversation vide."
+        },
+        {
+          "command": "/compact",
+          "description": "Résumer la conversation pour réduire le contexte."
+        },
+        {
+          "command": "/status",
+          "description": "Consulter l’état de la session."
+        }
+      ],
+      "resources": [
+        {
+          "title": "Mémoire & gestion du contexte (CLAUDE.md)",
+          "href": "/wiki/demarrer/claude-md"
+        },
+        {
+          "title": "Modes interactif vs one-shot",
+          "href": "/wiki/demarrer/modes-interactif-one-shot"
+        },
+        {
+          "title": "Documentation officielle de Claude Code",
+          "href": "https://code.claude.com/docs/en/overview"
+        }
+      ],
+      "practice": {
+        "title": "Préparer la reprise d’une tâche",
+        "description": "Reprenez les exemples de la leçon « Gérer le contexte de conversation » sur un petit projet ou dans un dossier de test. Conservez le résultat et les vérifications effectuées.",
+        "success": "Le résumé contient l’objectif, les fichiers utiles, les décisions prises et le prochain contrôle."
+      },
+      "minutes": 6
+    },
+    "slash-commands": {
+      "level": "intermédiaire",
+      "objectives": [
+        "Identifier les commandes utiles à une session",
+        "Distinguer une commande intégrée d’un skill"
+      ],
+      "prerequisites": [
+        "first-steps"
+      ],
+      "takeaways": [
+        "/help : Affiche l'aide et toutes les commandes disponibles",
+        "Les skills sont des fichiers markdown dans ~/.claude/commands/ ou .claude/commands/ qui définissent des workflows complets.",
+        "/commit : Créer un commit propre"
+      ],
+      "quiz": [
+        {
+          "q": "Quelle explication correspond à « Commandes intégrées » dans cette leçon ?",
+          "options": [
+            "/help : Affiche l'aide et toutes les commandes disponibles",
+            "La majorité des gens utilisent Claude pour chatter : poser des questions, obtenir des réponses, comme un moteur de recherche amélioré.",
+            "Claude Code est le CLI officiel d'Anthropic qui amène Claude directement dans votre terminal."
+          ],
+          "answer": 0,
+          "why": "La section « Commandes intégrées » précise : /help : Affiche l'aide et toutes les commandes disponibles"
+        },
+        {
+          "q": "Quelle explication correspond à « Skills (commandes customs) » dans cette leçon ?",
+          "options": [
+            "Claude Code est le CLI officiel d'Anthropic qui amène Claude directement dans votre terminal.",
+            "Les skills sont des fichiers markdown dans ~/.claude/commands/ ou .claude/commands/ qui définissent des workflows complets.",
+            "L'installation de Claude Code se fait en une commande npm."
+          ],
+          "answer": 1,
+          "why": "La section « Skills (commandes customs) » précise : Les skills sont des fichiers markdown dans ~/.claude/commands/ ou .claude/commands/ qui définissent des workflows complets."
+        },
+        {
+          "q": "Quelle explication correspond à « Skills populaires de la communauté » dans cette leçon ?",
+          "options": [
+            "L'installation de Claude Code se fait en une commande npm.",
+            "Une fois Claude Code installé, découvrons comment naviguer dans l'interface, envoyer des messages et comprendre les réponses.",
+            "/commit : Créer un commit propre"
+          ],
+          "answer": 2,
+          "why": "La section « Skills populaires de la communauté » précise : /commit : Créer un commit propre"
+        }
+      ],
+      "commands": [
+        {
+          "command": "/help",
+          "description": "Afficher l’aide des commandes."
+        },
+        {
+          "command": "/init",
+          "description": "Préparer les instructions CLAUDE.md du projet."
+        },
+        {
+          "command": "/clear",
+          "description": "Repartir avec une conversation vide."
+        },
+        {
+          "command": "/compact",
+          "description": "Résumer la conversation pour réduire le contexte."
+        },
+        {
+          "command": "/cost",
+          "description": "Consulter la consommation de la session."
+        },
+        {
+          "command": "/config",
+          "description": "Ouvrir les réglages."
+        },
+        {
+          "command": "/memory",
+          "description": "Ouvrir les instructions de mémoire."
+        },
+        {
+          "command": "/permissions",
+          "description": "Examiner les permissions."
+        },
+        {
+          "command": "/status",
+          "description": "Consulter l’état de la session."
+        }
+      ],
+      "resources": [
+        {
+          "title": "Skills et slash commands : ce qui a changé",
+          "href": "/wiki/slash-commands/skills-vs-slash"
+        },
+        {
+          "title": "Partager les commandes en équipe",
+          "href": "/wiki/slash-commands/partage-equipe"
+        },
+        {
+          "title": "Documentation officielle de Claude Code",
+          "href": "https://code.claude.com/docs/en/overview"
+        }
+      ],
+      "practice": {
+        "title": "Constituer votre fiche de commandes",
+        "description": "Reprenez les exemples de la leçon « Slash Commands intégrées » sur un petit projet ou dans un dossier de test. Conservez le résultat et les vérifications effectuées.",
+        "success": "Chaque commande retenue figure dans la leçon et vous pouvez expliquer quand l’utiliser."
+      },
+      "minutes": 7
+    },
+    "keyboard-shortcuts": {
+      "level": "intermédiaire",
+      "objectives": [
+        "Repérer les raccourcis présentés",
+        "Identifier les possibilités de personnalisation"
+      ],
+      "prerequisites": [
+        "slash-commands"
+      ],
+      "takeaways": [
+        "Ctrl+C : Interrompre l'action en cours de Claude",
+        "La commande /fast sert Opus plus rapidement, au double du tarif (8 $ / 40 $ par million de tokens sur Opus 5.5).",
+        "Les raccourcis se règlent dans ~/.claude/keybindings.json."
+      ],
+      "quiz": [
+        {
+          "q": "Quelle explication correspond à « Raccourcis essentiels » dans cette leçon ?",
+          "options": [
+            "Une fois Claude Code installé, découvrons comment naviguer dans l'interface, envoyer des messages et comprendre les réponses.",
+            "Ctrl+C : Interrompre l'action en cours de Claude",
+            "L'outil Read est le point d'entrée de Claude Code pour explorer votre codebase."
+          ],
+          "answer": 1,
+          "why": "La section « Raccourcis essentiels » précise : Ctrl+C : Interrompre l'action en cours de Claude"
+        },
+        {
+          "q": "Quelle explication correspond à « Mode Fast » dans cette leçon ?",
+          "options": [
+            "L'outil Read est le point d'entrée de Claude Code pour explorer votre codebase.",
+            "L'outil Write permet à Claude de créer de nouveaux fichiers ou de réécrire entièrement des fichiers existants.",
+            "La commande /fast sert Opus plus rapidement, au double du tarif (8 $ / 40 $ par million de tokens sur Opus 5.5)."
+          ],
+          "answer": 2,
+          "why": "La section « Mode Fast » précise : La commande /fast sert Opus plus rapidement, au double du tarif (8 $ / 40 $ par million de tokens sur Opus 5.5)."
+        },
+        {
+          "q": "Quelle explication correspond à « Personnaliser les raccourcis » dans cette leçon ?",
+          "options": [
+            "Les raccourcis se règlent dans ~/.claude/keybindings.json.",
+            "L'outil Write permet à Claude de créer de nouveaux fichiers ou de réécrire entièrement des fichiers existants.",
+            "L'outil Edit est le plus utilisé de Claude Code."
+          ],
+          "answer": 0,
+          "why": "La section « Personnaliser les raccourcis » précise : Les raccourcis se règlent dans ~/.claude/keybindings.json."
+        }
+      ],
+      "commands": [],
+      "resources": [
+        {
+          "title": "Effort, fast mode et advisor",
+          "href": "/wiki/cli/effort-fast-advisor"
+        },
+        {
+          "title": "Mode headless (claude -p)",
+          "href": "/wiki/cli/headless-mode"
+        },
+        {
+          "title": "Documentation officielle de Claude Code",
+          "href": "https://code.claude.com/docs/en/overview"
+        }
+      ],
+      "practice": {
+        "title": "Préparer une fiche de raccourcis utiles",
+        "description": "Reprenez les exemples de la leçon « Raccourcis clavier » sur un petit projet ou dans un dossier de test. Conservez le résultat et les vérifications effectuées.",
+        "success": "La fiche associe chaque raccourci à son action et vous avez vérifié ceux que vous utilisez."
+      },
+      "minutes": 5
+    },
+    "tips": {
+      "level": "intermédiaire",
+      "objectives": [
+        "Structurer une tâche complète",
+        "Organiser les contrôles du travail délégué"
+      ],
+      "prerequisites": [
+        "keyboard-shortcuts"
+      ],
+      "takeaways": [
+        "Claude Code est plus efficace quand vous lui donnez des objectifs complets plutôt que des instructions step-by-step.",
+        "Claude peut appeler plusieurs outils en parallèle.",
+        "Un CLAUDE.md bien rédigé au démarrage d'un projet économise des heures de re-contextualisation."
+      ],
+      "quiz": [
+        {
+          "q": "Quelle explication correspond à « 1. Donner des tâches complètes, pas des micro-instructions » dans cette leçon ?",
+          "options": [
+            "Claude Code excelle dans la génération de code de haute qualité.",
+            "Claude Code est excellent pour moderniser et améliorer du code existant.",
+            "Claude Code est plus efficace quand vous lui donnez des objectifs complets plutôt que des instructions step-by-step."
+          ],
+          "answer": 2,
+          "why": "La section « 1. Donner des tâches complètes, pas des micro-instructions » précise : Claude Code est plus efficace quand vous lui donnez des objectifs complets plutôt que des instructions step-by-step."
+        },
+        {
+          "q": "Quelle explication correspond à « 2. Profiter de la recherche parallèle » dans cette leçon ?",
+          "options": [
+            "Claude peut appeler plusieurs outils en parallèle.",
+            "Claude Code est excellent pour moderniser et améliorer du code existant.",
+            "Claude Code est un partenaire de debugging redoutable."
+          ],
+          "answer": 0,
+          "why": "La section « 2. Profiter de la recherche parallèle » précise : Claude peut appeler plusieurs outils en parallèle."
+        },
+        {
+          "q": "Quelle explication correspond à « 3. Utiliser les CLAUDE.md pour le onboarding » dans cette leçon ?",
+          "options": [
+            "Claude Code est un partenaire de debugging redoutable.",
+            "Un CLAUDE.md bien rédigé au démarrage d'un projet économise des heures de re-contextualisation.",
+            "Claude Code a un accès complet à Git via la commande bash."
+          ],
+          "answer": 1,
+          "why": "La section « 3. Utiliser les CLAUDE.md pour le onboarding » précise : Un CLAUDE.md bien rédigé au démarrage d'un projet économise des heures de re-contextualisation."
+        }
+      ],
+      "commands": [
+        {
+          "command": "/compact",
+          "description": "Résumer la conversation pour réduire le contexte."
+        },
+        {
+          "command": "/cost",
+          "description": "Consulter la consommation de la session."
+        }
+      ],
+      "resources": [
+        {
+          "title": "Commandes avec arguments complexes",
+          "href": "/wiki/slash-commands/arguments-complexes"
+        },
+        {
+          "title": "Meta-Prompting avec Claude",
+          "href": "/wiki/prompt-engineering/meta-prompting"
+        },
+        {
+          "title": "Documentation officielle de Claude Code",
+          "href": "https://code.claude.com/docs/en/overview"
+        }
+      ],
+      "practice": {
+        "title": "Améliorer votre prochaine mission",
+        "description": "Reprenez les exemples de la leçon « Tips & Meilleures pratiques » sur un petit projet ou dans un dossier de test. Conservez le résultat et les vérifications effectuées.",
+        "success": "La mission précise le contexte, les contraintes et les vérifications attendues."
+      },
+      "minutes": 10
+    },
+    "how-models-work": {
+      "level": "débutant",
+      "objectives": [
+        "Expliquer les tokens d’entrée et de sortie",
+        "Distinguer le contexte du mécanisme de cache"
+      ],
+      "prerequisites": [
+        "what-is-cc"
+      ],
+      "takeaways": [
+        "Un token est la plus petite unité de texte traitée par le modèle.",
+        "Le modèle a une limite de tokens qu'il peut traiter en une fois : c'est la fenêtre de contexte.",
+        "Le modèle utilise un mécanisme d'attention pour pondérer l'importance de chaque token par rapport aux autres."
+      ],
+      "quiz": [
+        {
+          "q": "Quelle explication correspond à « Qu'est-ce qu'un token ? » dans cette leçon ?",
+          "options": [
+            "Un token est la plus petite unité de texte traitée par le modèle.",
+            "La majorité des gens utilisent Claude pour chatter : poser des questions, obtenir des réponses, comme un moteur de recherche amélioré.",
+            "Claude Code est le CLI officiel d'Anthropic qui amène Claude directement dans votre terminal."
+          ],
+          "answer": 0,
+          "why": "La section « Qu'est-ce qu'un token ? » précise : Un token est la plus petite unité de texte traitée par le modèle."
+        },
+        {
+          "q": "Quelle explication correspond à « La fenêtre de contexte » dans cette leçon ?",
+          "options": [
+            "Claude Code est le CLI officiel d'Anthropic qui amène Claude directement dans votre terminal.",
+            "Le modèle a une limite de tokens qu'il peut traiter en une fois : c'est la fenêtre de contexte.",
+            "L'installation de Claude Code se fait en une commande npm."
+          ],
+          "answer": 1,
+          "why": "La section « La fenêtre de contexte » précise : Le modèle a une limite de tokens qu'il peut traiter en une fois : c'est la fenêtre de contexte."
+        },
+        {
+          "q": "Quelle explication correspond à « Le mécanisme d'attention » dans cette leçon ?",
+          "options": [
+            "L'installation de Claude Code se fait en une commande npm.",
+            "Une fois Claude Code installé, découvrons comment naviguer dans l'interface, envoyer des messages et comprendre les réponses.",
+            "Le modèle utilise un mécanisme d'attention pour pondérer l'importance de chaque token par rapport aux autres."
+          ],
+          "answer": 2,
+          "why": "La section « Le mécanisme d'attention » précise : Le modèle utilise un mécanisme d'attention pour pondérer l'importance de chaque token par rapport aux autres."
+        }
+      ],
+      "commands": [],
+      "resources": [
+        {
+          "title": "Fenêtre de contexte : 200K, 1M et compaction",
+          "href": "/wiki/modeles/contexte-200k"
+        },
+        {
+          "title": "Comparatif des modèles Claude",
+          "href": "/wiki/modeles/comparatif-modeles"
+        },
+        {
+          "title": "Documentation officielle de Claude Code",
+          "href": "https://code.claude.com/docs/en/overview"
+        }
+      ],
+      "practice": {
+        "title": "Annoter une conversation simple",
+        "description": "Reprenez les exemples de la leçon « Comment fonctionnent les modèles IA » sur un petit projet ou dans un dossier de test. Conservez le résultat et les vérifications effectuées.",
+        "success": "Vous distinguez les informations envoyées, la réponse produite et le contexte utilisé."
+      },
+      "minutes": 8
+    },
+    "pricing": {
+      "level": "débutant",
+      "objectives": [
+        "Repérer les éléments qui composent le coût",
+        "Identifier les moyens de suivre la consommation"
+      ],
+      "prerequisites": [
+        "how-models-work"
+      ],
+      "takeaways": [
+        "claude-fable-5-1 : $10 : $50 : Problèmes où Opus bute",
+        "L’exemple « Dans Claude Code » utilise : /cost Session cost: $0.23",
+        "Utiliser /compact régulièrement pour réduire les tokens input"
+      ],
+      "quiz": [
+        {
+          "q": "Quelle explication correspond à « Modèles disponibles et prix » dans cette leçon ?",
+          "options": [
+            "Une fois Claude Code installé, découvrons comment naviguer dans l'interface, envoyer des messages et comprendre les réponses.",
+            "claude-fable-5-1 : $10 : $50 : Problèmes où Opus bute",
+            "L'outil Read est le point d'entrée de Claude Code pour explorer votre codebase."
+          ],
+          "answer": 1,
+          "why": "La section « Modèles disponibles et prix » précise : claude-fable-5-1 : $10 : $50 : Problèmes où Opus bute"
+        },
+        {
+          "q": "Quelle explication correspond à « Voir le coût de votre session » dans cette leçon ?",
+          "options": [
+            "L'outil Read est le point d'entrée de Claude Code pour explorer votre codebase.",
+            "L'outil Write permet à Claude de créer de nouveaux fichiers ou de réécrire entièrement des fichiers existants.",
+            "L’exemple « Dans Claude Code » utilise : /cost Session cost: $0.23"
+          ],
+          "answer": 2,
+          "why": "La section « Voir le coût de votre session » précise : L’exemple « Dans Claude Code » utilise : /cost Session cost: $0.23"
+        },
+        {
+          "q": "Quelle explication correspond à « Stratégies pour réduire les coûts » dans cette leçon ?",
+          "options": [
+            "Utiliser /compact régulièrement pour réduire les tokens input",
+            "L'outil Write permet à Claude de créer de nouveaux fichiers ou de réécrire entièrement des fichiers existants.",
+            "L'outil Edit est le plus utilisé de Claude Code."
+          ],
+          "answer": 0,
+          "why": "La section « Stratégies pour réduire les coûts » précise : Utiliser /compact régulièrement pour réduire les tokens input"
+        }
+      ],
+      "commands": [
+        {
+          "command": "/compact",
+          "description": "Résumer la conversation pour réduire le contexte."
+        },
+        {
+          "command": "/cost",
+          "description": "Consulter la consommation de la session."
+        },
+        {
+          "command": "/model",
+          "description": "Choisir le modèle de la session."
+        }
+      ],
+      "resources": [
+        {
+          "title": "Comparatif des modèles Claude",
+          "href": "/wiki/modeles/comparatif-modeles"
+        },
+        {
+          "title": "Tarification & optimisation des coûts",
+          "href": "/wiki/modeles/pricing-tokens"
+        },
+        {
+          "title": "Documentation officielle de Claude Code",
+          "href": "https://code.claude.com/docs/en/overview"
+        }
+      ],
+      "practice": {
+        "title": "Préparer une grille de suivi de session",
+        "description": "Reprenez les exemples de la leçon « Tarification & gestion des coûts » sur un petit projet ou dans un dossier de test. Conservez le résultat et les vérifications effectuées.",
+        "success": "La grille sépare les éléments de consommation présentés et indique où vérifier les prix actuels."
+      },
+      "minutes": 7
+    },
+    "plan-mode": {
+      "level": "avancé",
+      "objectives": [
+        "Préparer un plan avant l’exécution",
+        "Relire les étapes et leurs vérifications"
+      ],
+      "prerequisites": [
+        "claude-md"
+      ],
+      "takeaways": [
+        "Sans plan, Claude peut foncer dans l'implémentation et prendre de mauvaises décisions architecturales qui nécessitent un refactoring complet.",
+        "L’exemple « Activer explicitement » utilise : > avant de coder, fais d'abord un plan détaillé de comment tu vas implémenter le système d'authentification",
+        "Liste des fichiers à créer/modifier avec leur rôle"
+      ],
+      "quiz": [
+        {
+          "q": "Quelle explication correspond à « Pourquoi utiliser le Plan Mode ? » dans cette leçon ?",
+          "options": [
+            "Sans plan, Claude peut foncer dans l'implémentation et prendre de mauvaises décisions architecturales qui nécessitent un refactoring complet.",
+            "La majorité des gens utilisent Claude pour chatter : poser des questions, obtenir des réponses, comme un moteur de recherche amélioré.",
+            "L'installation de Claude Code se fait en une commande npm."
+          ],
+          "answer": 0,
+          "why": "La section « Pourquoi utiliser le Plan Mode ? » précise : Sans plan, Claude peut foncer dans l'implémentation et prendre de mauvaises décisions architecturales qui nécessitent un refactoring complet."
+        },
+        {
+          "q": "Quelle explication correspond à « Activer le Plan Mode » dans cette leçon ?",
+          "options": [
+            "L'installation de Claude Code se fait en une commande npm.",
+            "L’exemple « Activer explicitement » utilise : > avant de coder, fais d'abord un plan détaillé de comment tu vas implémenter le système d'authentification",
+            "Une fois Claude Code installé, découvrons comment naviguer dans l'interface, envoyer des messages et comprendre les réponses."
+          ],
+          "answer": 1,
+          "why": "La section « Activer le Plan Mode » précise : L’exemple « Activer explicitement » utilise : > avant de coder, fais d'abord un plan détaillé de comment tu vas implémenter le système d'authentification"
+        },
+        {
+          "q": "Quelle explication correspond à « Ce que Claude produit en Plan Mode » dans cette leçon ?",
+          "options": [
+            "Une fois Claude Code installé, découvrons comment naviguer dans l'interface, envoyer des messages et comprendre les réponses.",
+            "L'outil Read est le point d'entrée de Claude Code pour explorer votre codebase.",
+            "Liste des fichiers à créer/modifier avec leur rôle"
+          ],
+          "answer": 2,
+          "why": "La section « Ce que Claude produit en Plan Mode » précise : Liste des fichiers à créer/modifier avec leur rôle"
+        }
+      ],
+      "commands": [
+        {
+          "command": "/plan",
+          "description": "Passer à la préparation d’un plan."
+        }
+      ],
+      "resources": [
+        {
+          "title": "Pourquoi utiliser des subagents ?",
+          "href": "/wiki/subagents/pourquoi-subagents"
+        },
+        {
+          "title": "L'évolution des modèles Claude",
+          "href": "/wiki/modeles/evolution-claude"
+        },
+        {
+          "title": "Documentation officielle de Claude Code",
+          "href": "https://code.claude.com/docs/en/overview"
+        }
+      ],
+      "practice": {
+        "title": "Planifier une modification de votre projet",
+        "description": "Reprenez les exemples de la leçon « Plan Mode : planifier avant d'agir » sur un petit projet ou dans un dossier de test. Conservez le résultat et les vérifications effectuées.",
+        "success": "Le plan indique les fichiers concernés, les étapes et les contrôles avant toute exécution."
+      },
+      "minutes": 8
+    },
+    "subagents": {
+      "level": "avancé",
+      "objectives": [
+        "Découper une mission en sous-tâches",
+        "Définir une tâche bornée pour un sous-agent"
+      ],
+      "prerequisites": [
+        "plan-mode"
+      ],
+      "takeaways": [
+        "Un subagent est une instance séparée de Claude qui travaille sur une sous-tâche spécifique.",
+        "Recherche dans de larges codebases (protège le contexte principal)",
+        "general-purpose : Tâches générales (catch-all) : Tous les outils"
+      ],
+      "quiz": [
+        {
+          "q": "Quelle explication correspond à « Concept des subagents » dans cette leçon ?",
+          "options": [
+            "Une fois Claude Code installé, découvrons comment naviguer dans l'interface, envoyer des messages et comprendre les réponses.",
+            "Un subagent est une instance séparée de Claude qui travaille sur une sous-tâche spécifique.",
+            "L'outil Read est le point d'entrée de Claude Code pour explorer votre codebase."
+          ],
+          "answer": 1,
+          "why": "La section « Concept des subagents » précise : Un subagent est une instance séparée de Claude qui travaille sur une sous-tâche spécifique."
+        },
+        {
+          "q": "Quelle explication correspond à « Quand utiliser les subagents » dans cette leçon ?",
+          "options": [
+            "L'outil Read est le point d'entrée de Claude Code pour explorer votre codebase.",
+            "L'outil Write permet à Claude de créer de nouveaux fichiers ou de réécrire entièrement des fichiers existants.",
+            "Recherche dans de larges codebases (protège le contexte principal)"
+          ],
+          "answer": 2,
+          "why": "La section « Quand utiliser les subagents » précise : Recherche dans de larges codebases (protège le contexte principal)"
+        },
+        {
+          "q": "Quelle explication correspond à « Types de subagents disponibles » dans cette leçon ?",
+          "options": [
+            "general-purpose : Tâches générales (catch-all) : Tous les outils",
+            "L'outil Write permet à Claude de créer de nouveaux fichiers ou de réécrire entièrement des fichiers existants.",
+            "L'outil Edit est le plus utilisé de Claude Code."
+          ],
+          "answer": 0,
+          "why": "La section « Types de subagents disponibles » précise : general-purpose : Tâches générales (catch-all) : Tous les outils"
+        }
+      ],
+      "commands": [],
+      "resources": [
+        {
+          "title": "Quand déléguer à un subagent ?",
+          "href": "/wiki/subagents/quand-deleguer"
+        },
+        {
+          "title": "Sous-traitance récursive : des subagents qui lancent des subagents",
+          "href": "/wiki/subagents/sous-traitance-recursive"
+        },
+        {
+          "title": "Documentation officielle de Claude Code",
+          "href": "https://code.claude.com/docs/en/overview"
+        }
+      ],
+      "practice": {
+        "title": "Rédiger une mission de sous-agent",
+        "description": "Reprenez les exemples de la leçon « Subagents : déléguer des sous-tâches » sur un petit projet ou dans un dossier de test. Conservez le résultat et les vérifications effectuées.",
+        "success": "La mission précise le contexte utile, le livrable et le critère de réussite."
+      },
+      "minutes": 9
+    },
+    "multi-agent": {
+      "level": "avancé",
+      "objectives": [
+        "Répartir des tâches entre agents spécialisés",
+        "Prévoir la synthèse des résultats"
+      ],
+      "prerequisites": [
+        "subagents"
+      ],
+      "takeaways": [
+        "L'orchestrateur reçoit l'objectif global, décompose en sous-tâches, délègue à des agents spécialisés (un pour la recherche, un pour l'implémentation, un pour les tests), puis consolide les résultats.",
+        "Un pattern très puissant : spawner un agent dont le seul rôle est de chercher de l'information (dans le code, sur le web, dans la doc) et de la synthétiser pour l'agent principal.",
+        "Quand un agent explore un large module ou fait des recherches, il peut lire des dizaines de fichiers."
+      ],
+      "quiz": [
+        {
+          "q": "Quelle explication correspond à « Pattern Orchestrateur → Agents spécialisés » dans cette leçon ?",
+          "options": [
+            "L'outil Edit est le plus utilisé de Claude Code.",
+            "Claude Code excelle dans la génération de code de haute qualité.",
+            "L'orchestrateur reçoit l'objectif global, décompose en sous-tâches, délègue à des agents spécialisés (un pour la recherche, un pour l'implémentation, un pour les tests), puis consolide les résultats."
+          ],
+          "answer": 2,
+          "why": "La section « Pattern Orchestrateur → Agents spécialisés » précise : L'orchestrateur reçoit l'objectif global, décompose en sous-tâches, délègue à des agents spécialisés (un pour la recherche, un pour l'implémentation, un pour les tests), puis consolide les résultats."
+        },
+        {
+          "q": "Quelle explication correspond à « Agents de recherche (Research agents) » dans cette leçon ?",
+          "options": [
+            "Un pattern très puissant : spawner un agent dont le seul rôle est de chercher de l'information (dans le code, sur le web, dans la doc) et de la synthétiser pour l'agent principal.",
+            "Claude Code excelle dans la génération de code de haute qualité.",
+            "Claude Code est excellent pour moderniser et améliorer du code existant."
+          ],
+          "answer": 0,
+          "why": "La section « Agents de recherche (Research agents) » précise : Un pattern très puissant : spawner un agent dont le seul rôle est de chercher de l'information (dans le code, sur le web, dans la doc) et de la synthétiser pour l'agent principal."
+        },
+        {
+          "q": "Quelle explication correspond à « Isolation de contexte : pourquoi c'est crucial » dans cette leçon ?",
+          "options": [
+            "Claude Code est excellent pour moderniser et améliorer du code existant.",
+            "Quand un agent explore un large module ou fait des recherches, il peut lire des dizaines de fichiers.",
+            "Claude Code est un partenaire de debugging redoutable."
+          ],
+          "answer": 1,
+          "why": "La section « Isolation de contexte : pourquoi c'est crucial » précise : Quand un agent explore un large module ou fait des recherches, il peut lire des dizaines de fichiers."
+        }
+      ],
+      "commands": [],
+      "resources": [
+        {
+          "title": "Pourquoi utiliser des subagents ?",
+          "href": "/wiki/subagents/pourquoi-subagents"
+        },
+        {
+          "title": "Dynamic workflows : des dizaines d'agents",
+          "href": "/wiki/cli/dynamic-workflows-agents-arriere-plan"
+        },
+        {
+          "title": "Documentation officielle de Claude Code",
+          "href": "https://code.claude.com/docs/en/overview"
+        }
+      ],
+      "practice": {
+        "title": "Concevoir un plan de travail avec plusieurs agents",
+        "description": "Reprenez les exemples de la leçon « Workflows multi-agents » sur un petit projet ou dans un dossier de test. Conservez le résultat et les vérifications effectuées.",
+        "success": "Chaque tâche a un périmètre distinct et le plan décrit comment vérifier et réunir les résultats."
+      },
+      "minutes": 10
+    },
+    "project-setup": {
+      "level": "avancé",
+      "objectives": [
+        "Définir le périmètre d’un projet",
+        "Organiser son implémentation par fonctionnalités"
+      ],
+      "prerequisites": [
+        "plan-mode"
+      ],
+      "takeaways": [
+        "L’exemple « Prompt d'initialisation » utilise : > je veux créer un SaaS de gestion de tâches pour les équipes.",
+        "Claude va créer la structure de dossiers, installer les dépendances, configurer TypeScript, ESLint, Prettier, configurer la base de données et écrire le CLAUDE.md de référence pour toute la suite du projet.",
+        "L’exemple « Workflow feature » utilise : > /plan implémenter l'authentification avec NextAuth.js > ok, commence par le backend (providers + API routes)"
+      ],
+      "quiz": [
+        {
+          "q": "Quelle explication correspond à « Étape 1 : Définir le projet et le stack » dans cette leçon ?",
+          "options": [
+            "L’exemple « Prompt d'initialisation » utilise : > je veux créer un SaaS de gestion de tâches pour les équipes.",
+            "La majorité des gens utilisent Claude pour chatter : poser des questions, obtenir des réponses, comme un moteur de recherche amélioré.",
+            "L'installation de Claude Code se fait en une commande npm."
+          ],
+          "answer": 0,
+          "why": "La section « Étape 1 : Définir le projet et le stack » précise : L’exemple « Prompt d'initialisation » utilise : > je veux créer un SaaS de gestion de tâches pour les équipes."
+        },
+        {
+          "q": "Quelle explication correspond à « Étape 2 : Laisser Claude créer la structure » dans cette leçon ?",
+          "options": [
+            "L'installation de Claude Code se fait en une commande npm.",
+            "Claude va créer la structure de dossiers, installer les dépendances, configurer TypeScript, ESLint, Prettier, configurer la base de données et écrire le CLAUDE.md de référence pour toute la suite du projet.",
+            "Une fois Claude Code installé, découvrons comment naviguer dans l'interface, envoyer des messages et comprendre les réponses."
+          ],
+          "answer": 1,
+          "why": "La section « Étape 2 : Laisser Claude créer la structure » précise : Claude va créer la structure de dossiers, installer les dépendances, configurer TypeScript, ESLint, Prettier, configurer la base de données et écrire le CLAUDE.md de référence pour toute la suite du projet."
+        },
+        {
+          "q": "Quelle explication correspond à « Étape 3 : Implémenter feature par feature » dans cette leçon ?",
+          "options": [
+            "Une fois Claude Code installé, découvrons comment naviguer dans l'interface, envoyer des messages et comprendre les réponses.",
+            "L'outil Read est le point d'entrée de Claude Code pour explorer votre codebase.",
+            "L’exemple « Workflow feature » utilise : > /plan implémenter l'authentification avec NextAuth.js > ok, commence par le backend (providers + API routes)"
+          ],
+          "answer": 2,
+          "why": "La section « Étape 3 : Implémenter feature par feature » précise : L’exemple « Workflow feature » utilise : > /plan implémenter l'authentification avec NextAuth.js > ok, commence par le backend (providers + API routes)"
+        }
+      ],
+      "commands": [
+        {
+          "command": "/plan",
+          "description": "Passer à la préparation d’un plan."
+        }
+      ],
+      "resources": [
+        {
+          "title": "Créer un serveur MCP Python : setup & primitives",
+          "href": "/wiki/mcp/creer-serveur-py-setup"
+        },
+        {
+          "title": "Configurer un projet pour Claude Code",
+          "href": "/wiki/demarrer/configurer-projet"
+        },
+        {
+          "title": "Documentation officielle de Claude Code",
+          "href": "https://code.claude.com/docs/en/overview"
+        }
+      ],
+      "practice": {
+        "title": "Rédiger le plan d’un petit SaaS",
+        "description": "Reprenez les exemples de la leçon « Démarrer un projet from scratch » sur un petit projet ou dans un dossier de test. Conservez le résultat et les vérifications effectuées.",
+        "success": "Le plan indique le stack, la structure et une première fonctionnalité vérifiable."
+      },
+      "minutes": 10
+    },
+    "existing-project": {
+      "level": "avancé",
+      "objectives": [
+        "Présenter un projet existant à Claude Code",
+        "Choisir une première amélioration limitée"
+      ],
+      "prerequisites": [
+        "project-setup"
+      ],
+      "takeaways": [
+        "L’exemple « Première session sur un projet existant » utilise : > explore ce projet et crée un CLAUDE.md complet qui documente : - l'architecture globale",
+        "L’exemple « Audit rapide » utilise : > fais un audit rapide du projet et identifie : - les 5 plus gros problèmes de qualité/dette technique",
+        "Pour du code legacy sans tests, la règle d'or est : tests d'abord, refactoring ensuite."
+      ],
+      "quiz": [
+        {
+          "q": "Quelle explication correspond à « Étape 1 : Onboarding Claude sur le projet » dans cette leçon ?",
+          "options": [
+            "L'outil Read est le point d'entrée de Claude Code pour explorer votre codebase.",
+            "L’exemple « Première session sur un projet existant » utilise : > explore ce projet et crée un CLAUDE.md complet qui documente : - l'architecture globale",
+            "L'outil Write permet à Claude de créer de nouveaux fichiers ou de réécrire entièrement des fichiers existants."
+          ],
+          "answer": 1,
+          "why": "La section « Étape 1 : Onboarding Claude sur le projet » précise : L’exemple « Première session sur un projet existant » utilise : > explore ce projet et crée un CLAUDE.md complet qui documente : - l'architecture globale"
+        },
+        {
+          "q": "Quelle explication correspond à « Étape 2 : Identifier les quick wins » dans cette leçon ?",
+          "options": [
+            "L'outil Write permet à Claude de créer de nouveaux fichiers ou de réécrire entièrement des fichiers existants.",
+            "L'outil Edit est le plus utilisé de Claude Code.",
+            "L’exemple « Audit rapide » utilise : > fais un audit rapide du projet et identifie : - les 5 plus gros problèmes de qualité/dette technique"
+          ],
+          "answer": 2,
+          "why": "La section « Étape 2 : Identifier les quick wins » précise : L’exemple « Audit rapide » utilise : > fais un audit rapide du projet et identifie : - les 5 plus gros problèmes de qualité/dette technique"
+        },
+        {
+          "q": "Quelle explication correspond à « Gestion du code legacy » dans cette leçon ?",
+          "options": [
+            "Pour du code legacy sans tests, la règle d'or est : tests d'abord, refactoring ensuite.",
+            "L'outil Edit est le plus utilisé de Claude Code.",
+            "Glob et Grep permettent à Claude de naviguer efficacement dans de larges codebases : Glob pour trouver des fichiers par pattern, Grep pour chercher du texte dans les fichiers."
+          ],
+          "answer": 0,
+          "why": "La section « Gestion du code legacy » précise : Pour du code legacy sans tests, la règle d'or est : tests d'abord, refactoring ensuite."
+        }
+      ],
+      "commands": [],
+      "resources": [
+        {
+          "title": "Configurer un projet pour Claude Code",
+          "href": "/wiki/demarrer/configurer-projet"
+        },
+        {
+          "title": "Code review automatisé",
+          "href": "/wiki/workflows/code-review-auto"
+        },
+        {
+          "title": "Documentation officielle de Claude Code",
+          "href": "https://code.claude.com/docs/en/overview"
+        }
+      ],
+      "practice": {
+        "title": "Préparer une intervention sur un projet existant",
+        "description": "Reprenez les exemples de la leçon « Intégration dans un projet existant » sur un petit projet ou dans un dossier de test. Conservez le résultat et les vérifications effectuées.",
+        "success": "Vous avez une description du projet, une modification bornée et un contrôle du comportement existant."
+      },
+      "minutes": 8
+    },
+    "professional-tips": {
+      "level": "avancé",
+      "objectives": [
+        "Organiser la revue du code généré",
+        "Préparer des instructions réutilisables"
+      ],
+      "prerequisites": [
+        "existing-project"
+      ],
+      "takeaways": [
+        "On écrit plus de specs/prompts et moins de code boilerplate",
+        "Une technique pro : ouvrir plusieurs instances de Claude Code en parallèle, chacune sur une branche différente pour des features distinctes.",
+        "L’exemple « Review de code approfondie » utilise : > fais une revue de sécurité de ce diff en cherchant : injections SQL, XSS, IDOR, secrets exposés,"
+      ],
+      "quiz": [
+        {
+          "q": "Quelle explication correspond à « Ce qui change vraiment dans le workflow » dans cette leçon ?",
+          "options": [
+            "L'outil Edit est le plus utilisé de Claude Code.",
+            "Glob et Grep permettent à Claude de naviguer efficacement dans de larges codebases : Glob pour trouver des fichiers par pattern, Grep pour chercher du texte dans les fichiers.",
+            "On écrit plus de specs/prompts et moins de code boilerplate"
+          ],
+          "answer": 2,
+          "why": "La section « Ce qui change vraiment dans le workflow » précise : On écrit plus de specs/prompts et moins de code boilerplate"
+        },
+        {
+          "q": "Quelle explication correspond à « Gérer plusieurs terminaux » dans cette leçon ?",
+          "options": [
+            "Une technique pro : ouvrir plusieurs instances de Claude Code en parallèle, chacune sur une branche différente pour des features distinctes.",
+            "Glob et Grep permettent à Claude de naviguer efficacement dans de larges codebases : Glob pour trouver des fichiers par pattern, Grep pour chercher du texte dans les fichiers.",
+            "Claude Code excelle dans la génération de code de haute qualité."
+          ],
+          "answer": 0,
+          "why": "La section « Gérer plusieurs terminaux » précise : Une technique pro : ouvrir plusieurs instances de Claude Code en parallèle, chacune sur une branche différente pour des features distinctes."
+        },
+        {
+          "q": "Quelle explication correspond à « Stratégies avancées de code review » dans cette leçon ?",
+          "options": [
+            "Claude Code excelle dans la génération de code de haute qualité.",
+            "L’exemple « Review de code approfondie » utilise : > fais une revue de sécurité de ce diff en cherchant : injections SQL, XSS, IDOR, secrets exposés,",
+            "Claude Code est excellent pour moderniser et améliorer du code existant."
+          ],
+          "answer": 1,
+          "why": "La section « Stratégies avancées de code review » précise : L’exemple « Review de code approfondie » utilise : > fais une revue de sécurité de ce diff en cherchant : injections SQL, XSS, IDOR, secrets exposés,"
+        }
+      ],
+      "commands": [],
+      "resources": [
+        {
+          "title": "Code review automatisé",
+          "href": "/wiki/workflows/code-review-auto"
+        },
+        {
+          "title": "/init, /review, /security-review",
+          "href": "/wiki/slash-commands/init-review-security"
+        },
+        {
+          "title": "Documentation officielle de Claude Code",
+          "href": "https://code.claude.com/docs/en/overview"
+        }
+      ],
+      "practice": {
+        "title": "Documenter votre méthode de revue",
+        "description": "Reprenez les exemples de la leçon « Usage professionnel & retours terrain » sur un petit projet ou dans un dossier de test. Conservez le résultat et les vérifications effectuées.",
+        "success": "Votre fiche décrit les vérifications à effectuer et les informations à transmettre à la session suivante."
+      },
+      "minutes": 10
+    },
+    "anatomie-prompt": {
+      "level": "intermédiaire",
+      "objectives": [
+        "Structurer une demande avec les éléments présentés",
+        "Adapter le contexte et le format à la tâche"
+      ],
+      "prerequisites": [
+        "first-steps"
+      ],
+      "takeaways": [
+        "Contexte : qui parle, à qui, dans quel domaine",
+        "Claude lit le prompt de haut en bas et donne plus de poids aux instructions placées juste avant la tâche.",
+        "Écrire « Résume ce texte » et coller 10 000 mots derrière."
+      ],
+      "quiz": [
+        {
+          "q": "Quelle explication correspond à « Les 5 composants d'un prompt solide » dans cette leçon ?",
+          "options": [
+            "Contexte : qui parle, à qui, dans quel domaine",
+            "La majorité des gens utilisent Claude pour chatter : poser des questions, obtenir des réponses, comme un moteur de recherche amélioré.",
+            "Claude Code est le CLI officiel d'Anthropic qui amène Claude directement dans votre terminal."
+          ],
+          "answer": 0,
+          "why": "La section « Les 5 composants d'un prompt solide » précise : Contexte : qui parle, à qui, dans quel domaine"
+        },
+        {
+          "q": "Quelle explication correspond à « Pourquoi l'ordre compte » dans cette leçon ?",
+          "options": [
+            "Claude Code est le CLI officiel d'Anthropic qui amène Claude directement dans votre terminal.",
+            "Claude lit le prompt de haut en bas et donne plus de poids aux instructions placées juste avant la tâche.",
+            "L'installation de Claude Code se fait en une commande npm."
+          ],
+          "answer": 1,
+          "why": "La section « Pourquoi l'ordre compte » précise : Claude lit le prompt de haut en bas et donne plus de poids aux instructions placées juste avant la tâche."
+        },
+        {
+          "q": "Quelle explication correspond à « Anti-pattern classique » dans cette leçon ?",
+          "options": [
+            "L'installation de Claude Code se fait en une commande npm.",
+            "Une fois Claude Code installé, découvrons comment naviguer dans l'interface, envoyer des messages et comprendre les réponses.",
+            "Écrire « Résume ce texte » et coller 10 000 mots derrière."
+          ],
+          "answer": 2,
+          "why": "La section « Anti-pattern classique » précise : Écrire « Résume ce texte » et coller 10 000 mots derrière."
+        }
+      ],
+      "commands": [],
+      "resources": [
+        {
+          "title": "Anatomie d'un prompt",
+          "href": "/wiki/prompt-engineering/anatomie-prompt"
+        },
+        {
+          "title": "Prompt Caching : concepts et stratégies",
+          "href": "/wiki/prompt-engineering/prompt-caching-concepts"
+        },
+        {
+          "title": "Documentation officielle de Claude Code",
+          "href": "https://code.claude.com/docs/en/overview"
+        }
+      ],
+      "practice": {
+        "title": "Réécrire un prompt imprécis",
+        "description": "Reprenez les exemples de la leçon « Anatomie d'un prompt efficace » sur un petit projet ou dans un dossier de test. Conservez le résultat et les vérifications effectuées.",
+        "success": "La demande explicite le contexte, l’objectif, les contraintes et le format attendu."
+      },
+      "minutes": 9
+    },
+    "xml-tags": {
+      "level": "intermédiaire",
+      "objectives": [
+        "Séparer les parties d’un prompt avec des balises",
+        "Vérifier la cohérence de la structure"
+      ],
+      "prerequisites": [
+        "anatomie-prompt"
+      ],
+      "takeaways": [
+        "Le markdown est ambigu : un # peut être un titre ou un commentaire de code.",
+        "&lt;task&gt; : La consigne principale à exécuter",
+        "Vous pouvez imbriquer librement (&lt;examples&gt; contenant plusieurs &lt;example&gt;)."
+      ],
+      "quiz": [
+        {
+          "q": "Quelle explication correspond à « Pourquoi XML et pas Markdown ? » dans cette leçon ?",
+          "options": [
+            "Une fois Claude Code installé, découvrons comment naviguer dans l'interface, envoyer des messages et comprendre les réponses.",
+            "Le markdown est ambigu : un # peut être un titre ou un commentaire de code.",
+            "L'outil Read est le point d'entrée de Claude Code pour explorer votre codebase."
+          ],
+          "answer": 1,
+          "why": "La section « Pourquoi XML et pas Markdown ? » précise : Le markdown est ambigu : un # peut être un titre ou un commentaire de code."
+        },
+        {
+          "q": "Quelle explication correspond à « Les balises canoniques » dans cette leçon ?",
+          "options": [
+            "L'outil Read est le point d'entrée de Claude Code pour explorer votre codebase.",
+            "L'outil Write permet à Claude de créer de nouveaux fichiers ou de réécrire entièrement des fichiers existants.",
+            "&lt;task&gt; : La consigne principale à exécuter"
+          ],
+          "answer": 2,
+          "why": "La section « Les balises canoniques » précise : &lt;task&gt; : La consigne principale à exécuter"
+        },
+        {
+          "q": "Quelle explication correspond à « Imbrication et cohérence » dans cette leçon ?",
+          "options": [
+            "Vous pouvez imbriquer librement (&lt;examples&gt; contenant plusieurs &lt;example&gt;).",
+            "L'outil Write permet à Claude de créer de nouveaux fichiers ou de réécrire entièrement des fichiers existants.",
+            "L'outil Edit est le plus utilisé de Claude Code."
+          ],
+          "answer": 0,
+          "why": "La section « Imbrication et cohérence » précise : Vous pouvez imbriquer librement (&lt;examples&gt; contenant plusieurs &lt;example&gt;)."
+        }
+      ],
+      "commands": [],
+      "resources": [
+        {
+          "title": "Balises XML pour structurer",
+          "href": "/wiki/prompt-engineering/balises-xml"
+        },
+        {
+          "title": "Pourquoi utiliser des subagents ?",
+          "href": "/wiki/subagents/pourquoi-subagents"
+        },
+        {
+          "title": "Documentation officielle de Claude Code",
+          "href": "https://code.claude.com/docs/en/overview"
+        }
+      ],
+      "practice": {
+        "title": "Structurer un prompt avec des balises XML",
+        "description": "Reprenez les exemples de la leçon « Structurer avec des balises XML » sur un petit projet ou dans un dossier de test. Conservez le résultat et les vérifications effectuées.",
+        "success": "Les balises distinguent les instructions des données et sont correctement fermées."
+      },
+      "minutes": 8
+    },
+    "few-shot-cot": {
+      "level": "intermédiaire",
+      "objectives": [
+        "Choisir des exemples utiles à la tâche",
+        "Décrire une démarche de résolution"
+      ],
+      "prerequisites": [
+        "xml-tags"
+      ],
+      "takeaways": [
+        "Décrire une tâche en mots est moins efficace que la montrer. 2 exemples couvrent le cas nominal, 5 exemples couvrent les edge cases.",
+        "Pour toute tâche qui demande un raisonnement (math, logique, analyse), demandez à Claude de réfléchir à voix haute dans une zone dédiée avant de produire la réponse finale.",
+        "Les exemples few-shot peuvent eux-mêmes contenir un bloc &lt;thinking&gt;."
+      ],
+      "quiz": [
+        {
+          "q": "Quelle explication correspond à « Few-shot : 2 à 5 exemples suffisent » dans cette leçon ?",
+          "options": [
+            "L'outil Edit est le plus utilisé de Claude Code.",
+            "Glob et Grep permettent à Claude de naviguer efficacement dans de larges codebases : Glob pour trouver des fichiers par pattern, Grep pour chercher du texte dans les fichiers.",
+            "Décrire une tâche en mots est moins efficace que la montrer. 2 exemples couvrent le cas nominal, 5 exemples couvrent les edge cases."
+          ],
+          "answer": 2,
+          "why": "La section « Few-shot : 2 à 5 exemples suffisent » précise : Décrire une tâche en mots est moins efficace que la montrer. 2 exemples couvrent le cas nominal, 5 exemples couvrent les edge cases."
+        },
+        {
+          "q": "Quelle explication correspond à « Chain of Thought : penser avant de répondre » dans cette leçon ?",
+          "options": [
+            "Pour toute tâche qui demande un raisonnement (math, logique, analyse), demandez à Claude de réfléchir à voix haute dans une zone dédiée avant de produire la réponse finale.",
+            "Glob et Grep permettent à Claude de naviguer efficacement dans de larges codebases : Glob pour trouver des fichiers par pattern, Grep pour chercher du texte dans les fichiers.",
+            "Claude Code excelle dans la génération de code de haute qualité."
+          ],
+          "answer": 0,
+          "why": "La section « Chain of Thought : penser avant de répondre » précise : Pour toute tâche qui demande un raisonnement (math, logique, analyse), demandez à Claude de réfléchir à voix haute dans une zone dédiée avant de produire la réponse finale."
+        },
+        {
+          "q": "Quelle explication correspond à « Combiner les deux » dans cette leçon ?",
+          "options": [
+            "Claude Code excelle dans la génération de code de haute qualité.",
+            "Les exemples few-shot peuvent eux-mêmes contenir un bloc &lt;thinking&gt;.",
+            "Claude Code est excellent pour moderniser et améliorer du code existant."
+          ],
+          "answer": 1,
+          "why": "La section « Combiner les deux » précise : Les exemples few-shot peuvent eux-mêmes contenir un bloc &lt;thinking&gt;."
+        }
+      ],
+      "commands": [],
+      "resources": [
+        {
+          "title": "Chain of Thought",
+          "href": "/wiki/prompt-engineering/chain-of-thought"
+        },
+        {
+          "title": "Few-shot prompting",
+          "href": "/wiki/prompt-engineering/few-shot"
+        },
+        {
+          "title": "Documentation officielle de Claude Code",
+          "href": "https://code.claude.com/docs/en/overview"
+        }
+      ],
+      "practice": {
+        "title": "Préparer un prompt avec des exemples",
+        "description": "Reprenez les exemples de la leçon « Few-shot et Chain of Thought » sur un petit projet ou dans un dossier de test. Conservez le résultat et les vérifications effectuées.",
+        "success": "Les exemples montrent le format attendu et vous avez testé la demande sur un cas supplémentaire."
+      },
+      "minutes": 11
+    },
+    "output-format": {
+      "level": "intermédiaire",
+      "objectives": [
+        "Décrire le format de sortie attendu",
+        "Vérifier une réponse structurée"
+      ],
+      "prerequisites": [
+        "few-shot-cot"
+      ],
+      "takeaways": [
+        "Décrire le format en texte ne suffit pas.",
+        "Dans l'API Messages, vous pouvez fournir le début de la réponse de l'assistant.",
+        "Pour une structure garantie, définissez un tool avec un JSON Schema."
+      ],
+      "quiz": [
+        {
+          "q": "Quelle explication correspond à « 1 : Spécifier ET montrer le format » dans cette leçon ?",
+          "options": [
+            "Décrire le format en texte ne suffit pas.",
+            "Claude Code est excellent pour moderniser et améliorer du code existant.",
+            "Claude Code est un partenaire de debugging redoutable."
+          ],
+          "answer": 0,
+          "why": "La section « 1 : Spécifier ET montrer le format » précise : Décrire le format en texte ne suffit pas."
+        },
+        {
+          "q": "Quelle explication correspond à « 2 : Prefilling : forcer le premier token » dans cette leçon ?",
+          "options": [
+            "Claude Code est un partenaire de debugging redoutable.",
+            "Dans l'API Messages, vous pouvez fournir le début de la réponse de l'assistant.",
+            "Claude Code a un accès complet à Git via la commande bash."
+          ],
+          "answer": 1,
+          "why": "La section « 2 : Prefilling : forcer le premier token » précise : Dans l'API Messages, vous pouvez fournir le début de la réponse de l'assistant."
+        },
+        {
+          "q": "Quelle explication correspond à « 3 : Tool use : la voie royale » dans cette leçon ?",
+          "options": [
+            "Claude Code a un accès complet à Git via la commande bash.",
+            "Via le CLI gh de GitHub, Claude Code peut créer des PR, commenter des issues, déclencher des workflows CI/CD et interagir avec l'écosystème GitHub.",
+            "Pour une structure garantie, définissez un tool avec un JSON Schema."
+          ],
+          "answer": 2,
+          "why": "La section « 3 : Tool use : la voie royale » précise : Pour une structure garantie, définissez un tool avec un JSON Schema."
+        }
+      ],
+      "commands": [],
+      "resources": [
+        {
+          "title": "Output formatting (JSON, Markdown)",
+          "href": "/wiki/prompt-engineering/output-format"
+        },
+        {
+          "title": "Prefilling (pré-remplissage de la réponse)",
+          "href": "/wiki/prompt-engineering/prefilling"
+        },
+        {
+          "title": "Documentation officielle de Claude Code",
+          "href": "https://code.claude.com/docs/en/overview"
+        }
+      ],
+      "practice": {
+        "title": "Préparer une demande de sortie JSON",
+        "description": "Reprenez les exemples de la leçon « Forcer un format de sortie strict » sur un petit projet ou dans un dossier de test. Conservez le résultat et les vérifications effectuées.",
+        "success": "La réponse est analysable en JSON et contient les champs demandés."
+      },
+      "minutes": 9
+    },
+    "iterate-debug-prompts": {
+      "level": "intermédiaire",
+      "objectives": [
+        "Comparer les résultats d’un prompt",
+        "Isoler une cause d’échec avant de réviser"
+      ],
+      "prerequisites": [
+        "output-format"
+      ],
+      "takeaways": [
+        "Sans eval set, vous ne faites pas du prompt engineering : vous faites de la divination. 20 cas bien choisis valent mieux que 200 cas aléatoires.",
+        "Consignes vagues : « Sois concis » est subjectif : « Maximum 3 phrases de 20 mots »",
+        "Quand un input précis donne une mauvaise réponse, ajoutez temporairement un bloc &lt;thinking&gt; pour voir le raisonnement du modèle."
+      ],
+      "quiz": [
+        {
+          "q": "Quelle explication correspond à « La boucle d'amélioration en 4 étapes » dans cette leçon ?",
+          "options": [
+            "Claude Code peut exécuter n'importe quelle commande bash, lancer des processus en background, et interagir avec votre environnement système.",
+            "Sans eval set, vous ne faites pas du prompt engineering : vous faites de la divination. 20 cas bien choisis valent mieux que 200 cas aléatoires.",
+            "Le fichier settings.json contrôle le comportement de Claude Code : permissions, outils autorisés, variables d'environnement, et plus encore."
+          ],
+          "answer": 1,
+          "why": "La section « La boucle d'amélioration en 4 étapes » précise : Sans eval set, vous ne faites pas du prompt engineering : vous faites de la divination. 20 cas bien choisis valent mieux que 200 cas aléatoires."
+        },
+        {
+          "q": "Quelle explication correspond à « Les anti-patterns qui tuent la qualité » dans cette leçon ?",
+          "options": [
+            "Le fichier settings.json contrôle le comportement de Claude Code : permissions, outils autorisés, variables d'environnement, et plus encore.",
+            "Le Model Context Protocol (MCP) est un standard ouvert qui permet à Claude Code de se connecter à des services externes : bases de données, APIs, outils DevOps, et plus.",
+            "Consignes vagues : « Sois concis » est subjectif : « Maximum 3 phrases de 20 mots »"
+          ],
+          "answer": 2,
+          "why": "La section « Les anti-patterns qui tuent la qualité » précise : Consignes vagues : « Sois concis » est subjectif : « Maximum 3 phrases de 20 mots »"
+        },
+        {
+          "q": "Quelle explication correspond à « Debugger un cas qui échoue » dans cette leçon ?",
+          "options": [
+            "Quand un input précis donne une mauvaise réponse, ajoutez temporairement un bloc &lt;thinking&gt; pour voir le raisonnement du modèle.",
+            "Le Model Context Protocol (MCP) est un standard ouvert qui permet à Claude Code de se connecter à des services externes : bases de données, APIs, outils DevOps, et plus.",
+            "Les hooks permettent d'exécuter des commandes shell automatiquement avant ou après les actions de Claude Code."
+          ],
+          "answer": 0,
+          "why": "La section « Debugger un cas qui échoue » précise : Quand un input précis donne une mauvaise réponse, ajoutez temporairement un bloc &lt;thinking&gt; pour voir le raisonnement du modèle."
+        }
+      ],
+      "commands": [],
+      "resources": [
+        {
+          "title": "Itérer sur un prompt",
+          "href": "/wiki/prompt-engineering/iterer-prompt"
+        },
+        {
+          "title": "Anti-patterns prompt engineering",
+          "href": "/wiki/prompt-engineering/anti-patterns"
+        },
+        {
+          "title": "Documentation officielle de Claude Code",
+          "href": "https://code.claude.com/docs/en/overview"
+        }
+      ],
+      "practice": {
+        "title": "Améliorer un prompt à partir d’un cas d’échec",
+        "description": "Reprenez les exemples de la leçon « Itérer et debugger un prompt » sur un petit projet ou dans un dossier de test. Conservez le résultat et les vérifications effectuées.",
+        "success": "Vous conservez le cas d’échec et montrez le résultat avant et après une modification ciblée."
+      },
+      "minutes": 10
+    },
+    "what-are-skills": {
+      "level": "avancé",
+      "objectives": [
+        "Distinguer skills, agents et MCP",
+        "Choisir une solution adaptée à une tâche"
+      ],
+      "prerequisites": [
+        "claude-md"
+      ],
+      "takeaways": [
+        "Skill : une capability réutilisable packagée dans un dossier (un SKILL.md + des fichiers).",
+        "Forme : Dossier + markdown : Prompt + tools : Serveur (stdio/http)",
+        "Un skill est le bon choix dès que vous vous retrouvez à répéter les mêmes instructions à Claude (\"d'abord lis le fichier X, puis applique le format Y, puis génère Z\")."
+      ],
+      "quiz": [
+        {
+          "q": "Quelle explication correspond à « Le trio Skills / Agents / MCP » dans cette leçon ?",
+          "options": [
+            "Skill : une capability réutilisable packagée dans un dossier (un SKILL.md + des fichiers).",
+            "La majorité des gens utilisent Claude pour chatter : poser des questions, obtenir des réponses, comme un moteur de recherche amélioré.",
+            "Claude Code est le CLI officiel d'Anthropic qui amène Claude directement dans votre terminal."
+          ],
+          "answer": 0,
+          "why": "La section « Le trio Skills / Agents / MCP » précise : Skill : une capability réutilisable packagée dans un dossier (un SKILL.md + des fichiers)."
+        },
+        {
+          "q": "Quelle explication correspond à « Comparaison rapide » dans cette leçon ?",
+          "options": [
+            "Claude Code est le CLI officiel d'Anthropic qui amène Claude directement dans votre terminal.",
+            "Forme : Dossier + markdown : Prompt + tools : Serveur (stdio/http)",
+            "L'installation de Claude Code se fait en une commande npm."
+          ],
+          "answer": 1,
+          "why": "La section « Comparaison rapide » précise : Forme : Dossier + markdown : Prompt + tools : Serveur (stdio/http)"
+        },
+        {
+          "q": "Quelle explication correspond à « Quand choisir un skill ? » dans cette leçon ?",
+          "options": [
+            "L'installation de Claude Code se fait en une commande npm.",
+            "Une fois Claude Code installé, découvrons comment naviguer dans l'interface, envoyer des messages et comprendre les réponses.",
+            "Un skill est le bon choix dès que vous vous retrouvez à répéter les mêmes instructions à Claude (\"d'abord lis le fichier X, puis applique le format Y, puis génère Z\")."
+          ],
+          "answer": 2,
+          "why": "La section « Quand choisir un skill ? » précise : Un skill est le bon choix dès que vous vous retrouvez à répéter les mêmes instructions à Claude (\"d'abord lis le fichier X, puis applique le format Y, puis génère Z\")."
+        }
+      ],
+      "commands": [],
+      "resources": [
+        {
+          "title": "Structure d'un skill",
+          "href": "/wiki/skills/structure-skill"
+        },
+        {
+          "title": "Skills officiels Anthropic",
+          "href": "/wiki/skills/skills-officiels"
+        },
+        {
+          "title": "Documentation officielle de Claude Code",
+          "href": "https://code.claude.com/docs/en/overview"
+        }
+      ],
+      "practice": {
+        "title": "Comparer trois besoins de votre projet",
+        "description": "Reprenez les exemples de la leçon « Skills, agents et MCP : quelle différence ? » sur un petit projet ou dans un dossier de test. Conservez le résultat et les vérifications effectuées.",
+        "success": "Vous justifiez le choix entre instructions réutilisables, délégation et connexion à des outils."
+      },
+      "minutes": 8
+    },
+    "anatomy-skill": {
+      "level": "avancé",
+      "objectives": [
+        "Repérer les parties d’un dossier de skill",
+        "Écrire une description précise dans SKILL.md"
+      ],
+      "prerequisites": [
+        "what-are-skills"
+      ],
+      "takeaways": [
+        "Un skill vit dans .claude/skills/&lt;nom&gt;/ (local au projet) ou dans ~/.claude/skills/ (global).",
+        "name : slug unique (kebab-case), sert d'identifiant",
+        "L’exemple « SKILL.md complet » utilise : --- name: pdf-fill"
+      ],
+      "quiz": [
+        {
+          "q": "Quelle explication correspond à « Structure d'un dossier skill » dans cette leçon ?",
+          "options": [
+            "Une fois Claude Code installé, découvrons comment naviguer dans l'interface, envoyer des messages et comprendre les réponses.",
+            "Un skill vit dans .claude/skills/&lt;nom&gt;/ (local au projet) ou dans ~/.claude/skills/ (global).",
+            "L'outil Read est le point d'entrée de Claude Code pour explorer votre codebase."
+          ],
+          "answer": 1,
+          "why": "La section « Structure d'un dossier skill » précise : Un skill vit dans .claude/skills/&lt;nom&gt;/ (local au projet) ou dans ~/.claude/skills/ (global)."
+        },
+        {
+          "q": "Quelle explication correspond à « Le frontmatter YAML » dans cette leçon ?",
+          "options": [
+            "L'outil Read est le point d'entrée de Claude Code pour explorer votre codebase.",
+            "L'outil Write permet à Claude de créer de nouveaux fichiers ou de réécrire entièrement des fichiers existants.",
+            "name : slug unique (kebab-case), sert d'identifiant"
+          ],
+          "answer": 2,
+          "why": "La section « Le frontmatter YAML » précise : name : slug unique (kebab-case), sert d'identifiant"
+        },
+        {
+          "q": "Quelle explication correspond à « Exemple complet » dans cette leçon ?",
+          "options": [
+            "L’exemple « SKILL.md complet » utilise : --- name: pdf-fill",
+            "L'outil Write permet à Claude de créer de nouveaux fichiers ou de réécrire entièrement des fichiers existants.",
+            "L'outil Edit est le plus utilisé de Claude Code."
+          ],
+          "answer": 0,
+          "why": "La section « Exemple complet » précise : L’exemple « SKILL.md complet » utilise : --- name: pdf-fill"
+        }
+      ],
+      "commands": [],
+      "resources": [
+        {
+          "title": "Structure d'un skill",
+          "href": "/wiki/skills/structure-skill"
+        },
+        {
+          "title": "SKILL.md frontmatter",
+          "href": "/wiki/skills/skill-md-frontmatter"
+        },
+        {
+          "title": "Documentation officielle de Claude Code",
+          "href": "https://code.claude.com/docs/en/overview"
+        }
+      ],
+      "practice": {
+        "title": "Préparer le dossier d’un skill",
+        "description": "Reprenez les exemples de la leçon « Anatomie d'un SKILL.md » sur un petit projet ou dans un dossier de test. Conservez le résultat et les vérifications effectuées.",
+        "success": "Le dossier contient un SKILL.md cohérent avec la structure et le frontmatter étudiés."
+      },
+      "minutes": 10
+    },
+    "install-and-use-skills": {
+      "level": "avancé",
+      "objectives": [
+        "Choisir une méthode d’installation présentée",
+        "Vérifier l’activation d’un skill"
+      ],
+      "prerequisites": [
+        "anatomy-skill"
+      ],
+      "takeaways": [
+        "Le plus simple : utiliser claude-mem (le gestionnaire de skills communautaires) pour installer un skill publié.",
+        ".claude/skills/&lt;nom&gt;/ → skill spécifique au projet (commit dans Git)",
+        "L’exemple « Clone direct » utilise : cd ~/.claude/skills git clone https://github.com/acme/awesome-skill.git"
+      ],
+      "quiz": [
+        {
+          "q": "Quelle explication correspond à « Méthode 1 : Le registry officiel » dans cette leçon ?",
+          "options": [
+            "Glob et Grep permettent à Claude de naviguer efficacement dans de larges codebases : Glob pour trouver des fichiers par pattern, Grep pour chercher du texte dans les fichiers.",
+            "Claude Code excelle dans la génération de code de haute qualité.",
+            "Le plus simple : utiliser claude-mem (le gestionnaire de skills communautaires) pour installer un skill publié."
+          ],
+          "answer": 2,
+          "why": "La section « Méthode 1 : Le registry officiel » précise : Le plus simple : utiliser claude-mem (le gestionnaire de skills communautaires) pour installer un skill publié."
+        },
+        {
+          "q": "Quelle explication correspond à « Méthode 2 : Installation manuelle » dans cette leçon ?",
+          "options": [
+            ".claude/skills/&lt;nom&gt;/ → skill spécifique au projet (commit dans Git)",
+            "Claude Code excelle dans la génération de code de haute qualité.",
+            "Claude Code est excellent pour moderniser et améliorer du code existant."
+          ],
+          "answer": 0,
+          "why": "La section « Méthode 2 : Installation manuelle » précise : .claude/skills/&lt;nom&gt;/ → skill spécifique au projet (commit dans Git)"
+        },
+        {
+          "q": "Quelle explication correspond à « Méthode 3 : Depuis un repo Git » dans cette leçon ?",
+          "options": [
+            "Claude Code est excellent pour moderniser et améliorer du code existant.",
+            "L’exemple « Clone direct » utilise : cd ~/.claude/skills git clone https://github.com/acme/awesome-skill.git",
+            "Claude Code est un partenaire de debugging redoutable."
+          ],
+          "answer": 1,
+          "why": "La section « Méthode 3 : Depuis un repo Git » précise : L’exemple « Clone direct » utilise : cd ~/.claude/skills git clone https://github.com/acme/awesome-skill.git"
+        }
+      ],
+      "commands": [],
+      "resources": [
+        {
+          "title": "Installer un skill",
+          "href": "/wiki/skills/installer-skill"
+        },
+        {
+          "title": "Skills officiels Anthropic",
+          "href": "/wiki/skills/skills-officiels"
+        },
+        {
+          "title": "Documentation officielle de Claude Code",
+          "href": "https://code.claude.com/docs/en/overview"
+        }
+      ],
+      "practice": {
+        "title": "Préparer et vérifier un skill local",
+        "description": "Reprenez les exemples de la leçon « Installer et utiliser des skills » sur un petit projet ou dans un dossier de test. Conservez le résultat et les vérifications effectuées.",
+        "success": "Le fichier est au bon emplacement et vous pouvez vérifier que le skill répond à sa tâche."
+      },
+      "minutes": 9
+    },
+    "create-custom-skill": {
+      "level": "avancé",
+      "objectives": [
+        "Définir une tâche réutilisable",
+        "Tester un skill sur un cas concret"
+      ],
+      "prerequisites": [
+        "install-and-use-skills"
+      ],
+      "takeaways": [
+        "L’exemple « Création du dossier » utilise : mkdir -p .claude/skills/release-notes/{scripts,examples} cd .claude/skills/release-notes",
+        "L’exemple « .claude/skills/release-notes/SKILL.md » utilise : --- name: release-notes",
+        "L’exemple « scripts/extract-commits.sh » utilise : set -euo pipefail LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo \"\")"
+      ],
+      "quiz": [
+        {
+          "q": "Quelle explication correspond à « Étape 1 : Scaffolding » dans cette leçon ?",
+          "options": [
+            "L’exemple « Création du dossier » utilise : mkdir -p .claude/skills/release-notes/{scripts,examples} cd .claude/skills/release-notes",
+            "Claude Code est un partenaire de debugging redoutable.",
+            "Claude Code a un accès complet à Git via la commande bash."
+          ],
+          "answer": 0,
+          "why": "La section « Étape 1 : Scaffolding » précise : L’exemple « Création du dossier » utilise : mkdir -p .claude/skills/release-notes/{scripts,examples} cd .claude/skills/release-notes"
+        },
+        {
+          "q": "Quelle explication correspond à « Étape 2 : Écrire le SKILL.md » dans cette leçon ?",
+          "options": [
+            "Claude Code a un accès complet à Git via la commande bash.",
+            "L’exemple « .claude/skills/release-notes/SKILL.md » utilise : --- name: release-notes",
+            "Via le CLI gh de GitHub, Claude Code peut créer des PR, commenter des issues, déclencher des workflows CI/CD et interagir avec l'écosystème GitHub."
+          ],
+          "answer": 1,
+          "why": "La section « Étape 2 : Écrire le SKILL.md » précise : L’exemple « .claude/skills/release-notes/SKILL.md » utilise : --- name: release-notes"
+        },
+        {
+          "q": "Quelle explication correspond à « Étape 3 : Le script helper » dans cette leçon ?",
+          "options": [
+            "Via le CLI gh de GitHub, Claude Code peut créer des PR, commenter des issues, déclencher des workflows CI/CD et interagir avec l'écosystème GitHub.",
+            "Claude Code peut exécuter n'importe quelle commande bash, lancer des processus en background, et interagir avec votre environnement système.",
+            "L’exemple « scripts/extract-commits.sh » utilise : set -euo pipefail LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo \"\")"
+          ],
+          "answer": 2,
+          "why": "La section « Étape 3 : Le script helper » précise : L’exemple « scripts/extract-commits.sh » utilise : set -euo pipefail LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo \"\")"
+        }
+      ],
+      "commands": [],
+      "resources": [
+        {
+          "title": "Publier un skill",
+          "href": "/wiki/skills/publier-skill"
+        },
+        {
+          "title": "Tester un skill localement",
+          "href": "/wiki/skills/tester-skill"
+        },
+        {
+          "title": "Documentation officielle de Claude Code",
+          "href": "https://code.claude.com/docs/en/overview"
+        }
+      ],
+      "practice": {
+        "title": "Créer un skill de votre projet",
+        "description": "Reprenez les exemples de la leçon « Créer son premier skill custom » sur un petit projet ou dans un dossier de test. Conservez le résultat et les vérifications effectuées.",
+        "success": "Le skill contient ses instructions et réussit un exemple représentatif de la tâche prévue."
+      },
+      "minutes": 15
+    },
+    "first-api-call": {
+      "level": "avancé",
+      "objectives": [
+        "Préparer un appel à l’API",
+        "Examiner la structure de la réponse"
+      ],
+      "prerequisites": [
+        "anatomie-prompt"
+      ],
+      "takeaways": [
+        "Rendez-vous sur console.anthropic.com, créez un compte (ou connectez-vous), puis allez dans Settings → API Keys.",
+        "Pour valider que tout fonctionne sans installer de SDK, lancez un appel curl direct sur l'endpoint /v1/messages.",
+        "Le SDK officiel gère l'authentification, les retries et le typage."
+      ],
+      "quiz": [
+        {
+          "q": "Quelle explication correspond à « 1. Récupérer une clé API » dans cette leçon ?",
+          "options": [
+            "Rendez-vous sur console.anthropic.com, créez un compte (ou connectez-vous), puis allez dans Settings → API Keys.",
+            "La majorité des gens utilisent Claude pour chatter : poser des questions, obtenir des réponses, comme un moteur de recherche amélioré.",
+            "Claude Code est le CLI officiel d'Anthropic qui amène Claude directement dans votre terminal."
+          ],
+          "answer": 0,
+          "why": "La section « 1. Récupérer une clé API » précise : Rendez-vous sur console.anthropic.com, créez un compte (ou connectez-vous), puis allez dans Settings → API Keys."
+        },
+        {
+          "q": "Quelle explication correspond à « 2. Premier appel en curl » dans cette leçon ?",
+          "options": [
+            "Claude Code est le CLI officiel d'Anthropic qui amène Claude directement dans votre terminal.",
+            "Pour valider que tout fonctionne sans installer de SDK, lancez un appel curl direct sur l'endpoint /v1/messages.",
+            "L'installation de Claude Code se fait en une commande npm."
+          ],
+          "answer": 1,
+          "why": "La section « 2. Premier appel en curl » précise : Pour valider que tout fonctionne sans installer de SDK, lancez un appel curl direct sur l'endpoint /v1/messages."
+        },
+        {
+          "q": "Quelle explication correspond à « 3. SDK Python » dans cette leçon ?",
+          "options": [
+            "L'installation de Claude Code se fait en une commande npm.",
+            "Une fois Claude Code installé, découvrons comment naviguer dans l'interface, envoyer des messages et comprendre les réponses.",
+            "Le SDK officiel gère l'authentification, les retries et le typage."
+          ],
+          "answer": 2,
+          "why": "La section « 3. SDK Python » précise : Le SDK officiel gère l'authentification, les retries et le typage."
+        }
+      ],
+      "commands": [],
+      "resources": [
+        {
+          "title": "Premier appel API",
+          "href": "/wiki/api/premier-appel-api"
+        },
+        {
+          "title": "SDK Python",
+          "href": "/wiki/api/sdk-python"
+        },
+        {
+          "title": "Documentation officielle de l’API Claude",
+          "href": "https://platform.claude.com/docs/en/intro"
+        }
+      ],
+      "practice": {
+        "title": "Réaliser un premier appel dans un projet de test",
+        "description": "Reprenez les exemples de la leçon « Votre premier appel à l'API Anthropic » sur un petit projet ou dans un dossier de test. Conservez le résultat et les vérifications effectuées.",
+        "success": "Vous obtenez une réponse et la clé reste dans la configuration locale, hors du code partagé."
+      },
+      "minutes": 12
+    },
+    "streaming-and-tools": {
+      "level": "avancé",
+      "objectives": [
+        "Identifier les événements d’une réponse en streaming",
+        "Décrire le cycle d’utilisation d’un outil"
+      ],
+      "prerequisites": [
+        "first-api-call"
+      ],
+      "takeaways": [
+        "Avec stream: true, le SDK renvoie un itérable d'événements (message_start, content_block_delta, message_stop).",
+        "Un outil = un nom, une description et un input_schema JSON Schema.",
+        "Tour 1 : user → Claude répond avec stop_reason = tool_use"
+      ],
+      "quiz": [
+        {
+          "q": "Quelle explication correspond à « 1. Activer le streaming » dans cette leçon ?",
+          "options": [
+            "Une fois Claude Code installé, découvrons comment naviguer dans l'interface, envoyer des messages et comprendre les réponses.",
+            "Avec stream: true, le SDK renvoie un itérable d'événements (message_start, content_block_delta, message_stop).",
+            "L'outil Read est le point d'entrée de Claude Code pour explorer votre codebase."
+          ],
+          "answer": 1,
+          "why": "La section « 1. Activer le streaming » précise : Avec stream: true, le SDK renvoie un itérable d'événements (message_start, content_block_delta, message_stop)."
+        },
+        {
+          "q": "Quelle explication correspond à « 2. Déclarer des outils (JSON Schema) » dans cette leçon ?",
+          "options": [
+            "L'outil Read est le point d'entrée de Claude Code pour explorer votre codebase.",
+            "L'outil Write permet à Claude de créer de nouveaux fichiers ou de réécrire entièrement des fichiers existants.",
+            "Un outil = un nom, une description et un input_schema JSON Schema."
+          ],
+          "answer": 2,
+          "why": "La section « 2. Déclarer des outils (JSON Schema) » précise : Un outil = un nom, une description et un input_schema JSON Schema."
+        },
+        {
+          "q": "Quelle explication correspond à « 3. Le cycle tool_use → tool_result » dans cette leçon ?",
+          "options": [
+            "Tour 1 : user → Claude répond avec stop_reason = tool_use",
+            "L'outil Write permet à Claude de créer de nouveaux fichiers ou de réécrire entièrement des fichiers existants.",
+            "L'outil Edit est le plus utilisé de Claude Code."
+          ],
+          "answer": 0,
+          "why": "La section « 3. Le cycle tool_use → tool_result » précise : Tour 1 : user → Claude répond avec stop_reason = tool_use"
+        }
+      ],
+      "commands": [],
+      "resources": [
+        {
+          "title": "Tool use (function calling)",
+          "href": "/wiki/api/tool-use"
+        },
+        {
+          "title": "Streaming",
+          "href": "/wiki/api/streaming"
+        },
+        {
+          "title": "Documentation officielle de l’API Claude",
+          "href": "https://platform.claude.com/docs/en/intro"
+        }
+      ],
+      "practice": {
+        "title": "Préparer un exemple de boucle d’outil",
+        "description": "Reprenez les exemples de la leçon « Streaming et tool use » sur un petit projet ou dans un dossier de test. Conservez le résultat et les vérifications effectuées.",
+        "success": "Le schéma de l’outil, l’appel et le résultat retourné correspondent au cycle présenté."
+      },
+      "minutes": 18
+    },
+    "prompt-caching": {
+      "level": "avancé",
+      "objectives": [
+        "Séparer le contexte statique des données variables",
+        "Lire les indicateurs de cache présentés"
+      ],
+      "prerequisites": [
+        "streaming-and-tools"
+      ],
+      "takeaways": [
+        "Vous marquez la fin d'un bloc stable de votre prompt avec cache_control: { type: 'ephemeral' }.",
+        "Le cache fonctionne par préfixe.",
+        "L’exemple « prompt-cache.ts » utilise : const response = await client.messages.create({ model: \"claude-sonnet-5-5\","
+      ],
+      "quiz": [
+        {
+          "q": "Quelle explication correspond à « 1. Le principe » dans cette leçon ?",
+          "options": [
+            "L'outil Edit est le plus utilisé de Claude Code.",
+            "Glob et Grep permettent à Claude de naviguer efficacement dans de larges codebases : Glob pour trouver des fichiers par pattern, Grep pour chercher du texte dans les fichiers.",
+            "Vous marquez la fin d'un bloc stable de votre prompt avec cache_control: { type: 'ephemeral' }."
+          ],
+          "answer": 2,
+          "why": "La section « 1. Le principe » précise : Vous marquez la fin d'un bloc stable de votre prompt avec cache_control: { type: 'ephemeral' }."
+        },
+        {
+          "q": "Quelle explication correspond à « 2. Ordre obligatoire : statique → dynamique » dans cette leçon ?",
+          "options": [
+            "Le cache fonctionne par préfixe.",
+            "Glob et Grep permettent à Claude de naviguer efficacement dans de larges codebases : Glob pour trouver des fichiers par pattern, Grep pour chercher du texte dans les fichiers.",
+            "Claude Code excelle dans la génération de code de haute qualité."
+          ],
+          "answer": 0,
+          "why": "La section « 2. Ordre obligatoire : statique → dynamique » précise : Le cache fonctionne par préfixe."
+        },
+        {
+          "q": "Quelle explication correspond à « 3. Exemple : cacher un gros system prompt » dans cette leçon ?",
+          "options": [
+            "Claude Code excelle dans la génération de code de haute qualité.",
+            "L’exemple « prompt-cache.ts » utilise : const response = await client.messages.create({ model: \"claude-sonnet-5-5\",",
+            "Claude Code est excellent pour moderniser et améliorer du code existant."
+          ],
+          "answer": 1,
+          "why": "La section « 3. Exemple : cacher un gros system prompt » précise : L’exemple « prompt-cache.ts » utilise : const response = await client.messages.create({ model: \"claude-sonnet-5-5\","
+        }
+      ],
+      "commands": [],
+      "resources": [
+        {
+          "title": "Prompt Caching : concepts et stratégies",
+          "href": "/wiki/prompt-engineering/prompt-caching-concepts"
+        },
+        {
+          "title": "Le prompt caching (API)",
+          "href": "/wiki/api/prompt-caching-implementation"
+        },
+        {
+          "title": "Documentation officielle de l’API Claude",
+          "href": "https://platform.claude.com/docs/en/intro"
+        }
+      ],
+      "practice": {
+        "title": "Préparer deux appels avec un contexte réutilisable",
+        "description": "Reprenez les exemples de la leçon « Prompt caching pour économiser » sur un petit projet ou dans un dossier de test. Conservez le résultat et les vérifications effectuées.",
+        "success": "Le contexte statique reste identique et vous savez où lire les indicateurs de cache de la réponse."
+      },
+      "minutes": 14
+    },
+    "production-best-practices": {
+      "level": "avancé",
+      "objectives": [
+        "Prévoir le traitement des erreurs d’API",
+        "Définir les informations utiles au suivi"
+      ],
+      "prerequisites": [
+        "prompt-caching"
+      ],
+      "takeaways": [
+        "Les SDK officiels font déjà 2 retries par défaut sur les erreurs 408/409/429/5xx.",
+        "Chaque réponse expose vos quotas restants.",
+        "Quand l'API renvoie 529 Overloaded ou que la latence explose, basculez automatiquement vers claude-haiku-4-5-20251001."
+      ],
+      "quiz": [
+        {
+          "q": "Quelle explication correspond à « 1. Retries avec exponential backoff » dans cette leçon ?",
+          "options": [
+            "Les SDK officiels font déjà 2 retries par défaut sur les erreurs 408/409/429/5xx.",
+            "Claude Code est un partenaire de debugging redoutable.",
+            "Claude Code a un accès complet à Git via la commande bash."
+          ],
+          "answer": 0,
+          "why": "La section « 1. Retries avec exponential backoff » précise : Les SDK officiels font déjà 2 retries par défaut sur les erreurs 408/409/429/5xx."
+        },
+        {
+          "q": "Quelle explication correspond à « 2. Lire les headers de rate limit » dans cette leçon ?",
+          "options": [
+            "Claude Code a un accès complet à Git via la commande bash.",
+            "Chaque réponse expose vos quotas restants.",
+            "Via le CLI gh de GitHub, Claude Code peut créer des PR, commenter des issues, déclencher des workflows CI/CD et interagir avec l'écosystème GitHub."
+          ],
+          "answer": 1,
+          "why": "La section « 2. Lire les headers de rate limit » précise : Chaque réponse expose vos quotas restants."
+        },
+        {
+          "q": "Quelle explication correspond à « 3. Fallback Sonnet → Haiku » dans cette leçon ?",
+          "options": [
+            "Via le CLI gh de GitHub, Claude Code peut créer des PR, commenter des issues, déclencher des workflows CI/CD et interagir avec l'écosystème GitHub.",
+            "Claude Code peut exécuter n'importe quelle commande bash, lancer des processus en background, et interagir avec votre environnement système.",
+            "Quand l'API renvoie 529 Overloaded ou que la latence explose, basculez automatiquement vers claude-haiku-4-5-20251001."
+          ],
+          "answer": 2,
+          "why": "La section « 3. Fallback Sonnet → Haiku » précise : Quand l'API renvoie 529 Overloaded ou que la latence explose, basculez automatiquement vers claude-haiku-4-5-20251001."
+        }
+      ],
+      "commands": [],
+      "resources": [
+        {
+          "title": "Best practices production",
+          "href": "/wiki/api/best-practices-production"
+        },
+        {
+          "title": "Gestion fine du Rate Limiting",
+          "href": "/wiki/api/rate-limit-headers"
+        },
+        {
+          "title": "Documentation officielle de l’API Claude",
+          "href": "https://platform.claude.com/docs/en/intro"
+        }
+      ],
+      "practice": {
+        "title": "Préparer une fiche de gestion des erreurs",
+        "description": "Reprenez les exemples de la leçon « Best practices production » sur un petit projet ou dans un dossier de test. Conservez le résultat et les vérifications effectuées.",
+        "success": "La fiche prévoit les reprises, les limites et les éléments à journaliser sans exposer de clé."
+      },
+      "minutes": 16
+    },
+    "supabase-setup": {
+      "level": "avancé",
+      "objectives": [
+        "Préparer les variables d’un projet Supabase",
+        "Distinguer le client serveur du client navigateur"
+      ],
+      "prerequisites": [
+        "project-setup"
+      ],
+      "takeaways": [
+        "Va sur supabase.com → New project → choisis une région proche de tes utilisateurs (eu-west-3 pour la France).",
+        "Plutôt que de cliquer dans Table Editor, demande à Claude Code de générer le SQL complet (tables + index + RLS) et colle-le dans SQL Editor → New query.",
+        "Deux clients distincts selon le contexte : @supabase/ssr pour les Route Handlers / Server Components (lit les cookies), et un client lazy pour le browser."
+      ],
+      "quiz": [
+        {
+          "q": "Quelle explication correspond à « 1. Créer le projet et récupérer les clés » dans cette leçon ?",
+          "options": [
+            "Va sur supabase.com → New project → choisis une région proche de tes utilisateurs (eu-west-3 pour la France).",
+            "La majorité des gens utilisent Claude pour chatter : poser des questions, obtenir des réponses, comme un moteur de recherche amélioré.",
+            "L'installation de Claude Code se fait en une commande npm."
+          ],
+          "answer": 0,
+          "why": "La section « 1. Créer le projet et récupérer les clés » précise : Va sur supabase.com → New project → choisis une région proche de tes utilisateurs (eu-west-3 pour la France)."
+        },
+        {
+          "q": "Quelle explication correspond à « 2. Schéma SQL via le SQL Editor » dans cette leçon ?",
+          "options": [
+            "L'installation de Claude Code se fait en une commande npm.",
+            "Plutôt que de cliquer dans Table Editor, demande à Claude Code de générer le SQL complet (tables + index + RLS) et colle-le dans SQL Editor → New query.",
+            "Une fois Claude Code installé, découvrons comment naviguer dans l'interface, envoyer des messages et comprendre les réponses."
+          ],
+          "answer": 1,
+          "why": "La section « 2. Schéma SQL via le SQL Editor » précise : Plutôt que de cliquer dans Table Editor, demande à Claude Code de générer le SQL complet (tables + index + RLS) et colle-le dans SQL Editor → New query."
+        },
+        {
+          "q": "Quelle explication correspond à « 3. Client SSR vs client browser » dans cette leçon ?",
+          "options": [
+            "Une fois Claude Code installé, découvrons comment naviguer dans l'interface, envoyer des messages et comprendre les réponses.",
+            "L'outil Read est le point d'entrée de Claude Code pour explorer votre codebase.",
+            "Deux clients distincts selon le contexte : @supabase/ssr pour les Route Handlers / Server Components (lit les cookies), et un client lazy pour le browser."
+          ],
+          "answer": 2,
+          "why": "La section « 3. Client SSR vs client browser » précise : Deux clients distincts selon le contexte : @supabase/ssr pour les Route Handlers / Server Components (lit les cookies), et un client lazy pour le browser."
+        }
+      ],
+      "commands": [],
+      "resources": [
+        {
+          "title": "Configurer un projet pour Claude Code",
+          "href": "/wiki/demarrer/configurer-projet"
+        },
+        {
+          "title": "Code review automatisé",
+          "href": "/wiki/workflows/code-review-auto"
+        },
+        {
+          "title": "Documentation officielle de Claude Code",
+          "href": "https://code.claude.com/docs/en/overview"
+        }
+      ],
+      "practice": {
+        "title": "Préparer la configuration d’un projet de test",
+        "description": "Reprenez les exemples de la leçon « Setup Supabase avec Claude Code » sur un petit projet ou dans un dossier de test. Conservez le résultat et les vérifications effectuées.",
+        "success": "Le schéma et les deux clients suivent les exemples, et les clés privées restent hors du navigateur."
+      },
+      "minutes": 18
+    },
+    "auth-oauth-github": {
+      "level": "avancé",
+      "objectives": [
+        "Identifier les étapes du parcours OAuth",
+        "Décrire le retour de connexion et la session"
+      ],
+      "prerequisites": [
+        "supabase-setup"
+      ],
+      "takeaways": [
+        "Dans Supabase : Authentication → Providers → GitHub → Enable.",
+        "L’exemple « Côté client » utilise : async function signInWithGitHub() { const { error } = await supabase.auth.signInWithOAuth({",
+        "Supabase redirige vers /auth/callback?code=xxx."
+      ],
+      "quiz": [
+        {
+          "q": "Quelle explication correspond à « 1. Activer le provider GitHub » dans cette leçon ?",
+          "options": [
+            "Une fois Claude Code installé, découvrons comment naviguer dans l'interface, envoyer des messages et comprendre les réponses.",
+            "Dans Supabase : Authentication → Providers → GitHub → Enable.",
+            "L'outil Read est le point d'entrée de Claude Code pour explorer votre codebase."
+          ],
+          "answer": 1,
+          "why": "La section « 1. Activer le provider GitHub » précise : Dans Supabase : Authentication → Providers → GitHub → Enable."
+        },
+        {
+          "q": "Quelle explication correspond à « 2. Le bouton de connexion » dans cette leçon ?",
+          "options": [
+            "L'outil Read est le point d'entrée de Claude Code pour explorer votre codebase.",
+            "L'outil Write permet à Claude de créer de nouveaux fichiers ou de réécrire entièrement des fichiers existants.",
+            "L’exemple « Côté client » utilise : async function signInWithGitHub() { const { error } = await supabase.auth.signInWithOAuth({"
+          ],
+          "answer": 2,
+          "why": "La section « 2. Le bouton de connexion » précise : L’exemple « Côté client » utilise : async function signInWithGitHub() { const { error } = await supabase.auth.signInWithOAuth({"
+        },
+        {
+          "q": "Quelle explication correspond à « 3. Callback route (PKCE flow) » dans cette leçon ?",
+          "options": [
+            "Supabase redirige vers /auth/callback?code=xxx.",
+            "L'outil Write permet à Claude de créer de nouveaux fichiers ou de réécrire entièrement des fichiers existants.",
+            "L'outil Edit est le plus utilisé de Claude Code."
+          ],
+          "answer": 0,
+          "why": "La section « 3. Callback route (PKCE flow) » précise : Supabase redirige vers /auth/callback?code=xxx."
+        }
+      ],
+      "commands": [],
+      "resources": [
+        {
+          "title": "Code review automatisé",
+          "href": "/wiki/workflows/code-review-auto"
+        },
+        {
+          "title": "Debug avec Claude",
+          "href": "/wiki/workflows/debug-avec-claude"
+        },
+        {
+          "title": "Documentation officielle de Claude Code",
+          "href": "https://code.claude.com/docs/en/overview"
+        }
+      ],
+      "practice": {
+        "title": "Tracer le parcours de connexion GitHub",
+        "description": "Reprenez les exemples de la leçon « Auth OAuth GitHub + middleware Next.js » sur un petit projet ou dans un dossier de test. Conservez le résultat et les vérifications effectuées.",
+        "success": "Le schéma relie le bouton, le fournisseur, le callback et le rafraîchissement de session."
+      },
+      "minutes": 22
+    },
+    "vercel-deploy": {
+      "level": "avancé",
+      "objectives": [
+        "Préparer les variables de déploiement",
+        "Distinguer un aperçu de la production"
+      ],
+      "prerequisites": [
+        "auth-oauth-github"
+      ],
+      "takeaways": [
+        "L’exemple « Setup one-time » utilise : npm i -g vercel vercel link",
+        "Ne JAMAIS copier-coller tes secrets dans le dashboard Vercel.",
+        "Chaque git push sur une branche crée une URL de preview unique (mon-saas-git-feat-x.vercel.app)."
+      ],
+      "quiz": [
+        {
+          "q": "Quelle explication correspond à « 1. Installation et link initial » dans cette leçon ?",
+          "options": [
+            "Glob et Grep permettent à Claude de naviguer efficacement dans de larges codebases : Glob pour trouver des fichiers par pattern, Grep pour chercher du texte dans les fichiers.",
+            "Claude Code excelle dans la génération de code de haute qualité.",
+            "L’exemple « Setup one-time » utilise : npm i -g vercel vercel link"
+          ],
+          "answer": 2,
+          "why": "La section « 1. Installation et link initial » précise : L’exemple « Setup one-time » utilise : npm i -g vercel vercel link"
+        },
+        {
+          "q": "Quelle explication correspond à « 2. Variables d'environnement » dans cette leçon ?",
+          "options": [
+            "Ne JAMAIS copier-coller tes secrets dans le dashboard Vercel.",
+            "Claude Code excelle dans la génération de code de haute qualité.",
+            "Claude Code est excellent pour moderniser et améliorer du code existant."
+          ],
+          "answer": 0,
+          "why": "La section « 2. Variables d'environnement » précise : Ne JAMAIS copier-coller tes secrets dans le dashboard Vercel."
+        },
+        {
+          "q": "Quelle explication correspond à « 3. Preview vs Production » dans cette leçon ?",
+          "options": [
+            "Claude Code est excellent pour moderniser et améliorer du code existant.",
+            "Chaque git push sur une branche crée une URL de preview unique (mon-saas-git-feat-x.vercel.app).",
+            "Claude Code est un partenaire de debugging redoutable."
+          ],
+          "answer": 1,
+          "why": "La section « 3. Preview vs Production » précise : Chaque git push sur une branche crée une URL de preview unique (mon-saas-git-feat-x.vercel.app)."
+        }
+      ],
+      "commands": [],
+      "resources": [
+        {
+          "title": "Les variables d'environnement",
+          "href": "/wiki/cli/variables-env"
+        },
+        {
+          "title": "Hooks et environnement",
+          "href": "/wiki/hooks/environnement"
+        },
+        {
+          "title": "Documentation officielle de Claude Code",
+          "href": "https://code.claude.com/docs/en/overview"
+        }
+      ],
+      "practice": {
+        "title": "Préparer une checklist de déploiement",
+        "description": "Reprenez les exemples de la leçon « Déployer un projet Next.js sur Vercel » sur un petit projet ou dans un dossier de test. Conservez le résultat et les vérifications effectuées.",
+        "success": "La checklist couvre les variables, le build et la vérification de l’environnement cible."
+      },
+      "minutes": 15
+    },
+    "subagents-parallel-content": {
+      "level": "avancé",
+      "objectives": [
+        "Découper une production de contenu en lots",
+        "Prévoir la reprise et la déduplication"
+      ],
+      "prerequisites": [
+        "vercel-deploy"
+      ],
+      "takeaways": [
+        "Orchestrateur = découpe le plan, distribue, agrège",
+        "Avant de lancer 200 subagents, génère d'abord un fichier de plan (CSV ou JSON) avec toutes les tâches.",
+        "Le prompt doit être auto-suffisant : un subagent ne voit pas l'historique du chat principal."
+      ],
+      "quiz": [
+        {
+          "q": "Quelle explication correspond à « 1. Le pattern orchestrateur → workers » dans cette leçon ?",
+          "options": [
+            "Orchestrateur = découpe le plan, distribue, agrège",
+            "Claude Code est excellent pour moderniser et améliorer du code existant.",
+            "Claude Code est un partenaire de debugging redoutable."
+          ],
+          "answer": 0,
+          "why": "La section « 1. Le pattern orchestrateur → workers » précise : Orchestrateur = découpe le plan, distribue, agrège"
+        },
+        {
+          "q": "Quelle explication correspond à « 2. Préparer le plan en amont » dans cette leçon ?",
+          "options": [
+            "Claude Code est un partenaire de debugging redoutable.",
+            "Avant de lancer 200 subagents, génère d'abord un fichier de plan (CSV ou JSON) avec toutes les tâches.",
+            "Claude Code a un accès complet à Git via la commande bash."
+          ],
+          "answer": 1,
+          "why": "La section « 2. Préparer le plan en amont » précise : Avant de lancer 200 subagents, génère d'abord un fichier de plan (CSV ou JSON) avec toutes les tâches."
+        },
+        {
+          "q": "Quelle explication correspond à « 3. Le prompt subagent type » dans cette leçon ?",
+          "options": [
+            "Claude Code a un accès complet à Git via la commande bash.",
+            "Via le CLI gh de GitHub, Claude Code peut créer des PR, commenter des issues, déclencher des workflows CI/CD et interagir avec l'écosystème GitHub.",
+            "Le prompt doit être auto-suffisant : un subagent ne voit pas l'historique du chat principal."
+          ],
+          "answer": 2,
+          "why": "La section « 3. Le prompt subagent type » précise : Le prompt doit être auto-suffisant : un subagent ne voit pas l'historique du chat principal."
+        }
+      ],
+      "commands": [],
+      "resources": [
+        {
+          "title": "Générer un prompt avec Claude (meta-prompt)",
+          "href": "/wiki/demarrer/meta-prompt-tool"
+        },
+        {
+          "title": "Prompt Caching : concepts et stratégies",
+          "href": "/wiki/prompt-engineering/prompt-caching-concepts"
+        },
+        {
+          "title": "Documentation officielle de Claude Code",
+          "href": "https://code.claude.com/docs/en/overview"
+        }
+      ],
+      "practice": {
+        "title": "Préparer un lot de contenus à déléguer",
+        "description": "Reprenez les exemples de la leçon « Subagents en parallèle pour générer du contenu en masse » sur un petit projet ou dans un dossier de test. Conservez le résultat et les vérifications effectuées.",
+        "success": "Chaque lot a un périmètre et un livrable, avec une vérification des doublons avant intégration."
+      },
+      "minutes": 25
+    },
+    "debug-ssr-vs-client": {
+      "level": "avancé",
+      "objectives": [
+        "Distinguer une erreur serveur d’une erreur navigateur",
+        "Organiser un diagnostic de déploiement"
+      ],
+      "prerequisites": [
+        "subagents-parallel-content"
+      ],
+      "takeaways": [
+        "L'erreur N°1 : tu as ajouté une nouvelle variable dans .env.local mais oublié de la pousser sur Vercel.",
+        "Si tu as activé Vercel Authentication sur ton projet, TOUTES les requêtes (y compris depuis ton frontend) reçoivent une page de login Vercel à la place de ta réponse JSON.",
+        "Tu utilises supabase.auth.getSession() côté serveur dans un Route Handler ?"
+      ],
+      "quiz": [
+        {
+          "q": "Quelle explication correspond à « 1. Vérifier les env vars Vercel (90% des cas) » dans cette leçon ?",
+          "options": [
+            "Claude Code peut exécuter n'importe quelle commande bash, lancer des processus en background, et interagir avec votre environnement système.",
+            "L'erreur N°1 : tu as ajouté une nouvelle variable dans .env.local mais oublié de la pousser sur Vercel.",
+            "Le fichier settings.json contrôle le comportement de Claude Code : permissions, outils autorisés, variables d'environnement, et plus encore."
+          ],
+          "answer": 1,
+          "why": "La section « 1. Vérifier les env vars Vercel (90% des cas) » précise : L'erreur N°1 : tu as ajouté une nouvelle variable dans .env.local mais oublié de la pousser sur Vercel."
+        },
+        {
+          "q": "Quelle explication correspond à « 2. Deployment Protection activée par erreur » dans cette leçon ?",
+          "options": [
+            "Le fichier settings.json contrôle le comportement de Claude Code : permissions, outils autorisés, variables d'environnement, et plus encore.",
+            "Le Model Context Protocol (MCP) est un standard ouvert qui permet à Claude Code de se connecter à des services externes : bases de données, APIs, outils DevOps, et plus.",
+            "Si tu as activé Vercel Authentication sur ton projet, TOUTES les requêtes (y compris depuis ton frontend) reçoivent une page de login Vercel à la place de ta réponse JSON."
+          ],
+          "answer": 2,
+          "why": "La section « 2. Deployment Protection activée par erreur » précise : Si tu as activé Vercel Authentication sur ton projet, TOUTES les requêtes (y compris depuis ton frontend) reçoivent une page de login Vercel à la place de ta réponse JSON."
+        },
+        {
+          "q": "Quelle explication correspond à « 3. Session client-only qui ne suit pas en SSR » dans cette leçon ?",
+          "options": [
+            "Tu utilises supabase.auth.getSession() côté serveur dans un Route Handler ?",
+            "Le Model Context Protocol (MCP) est un standard ouvert qui permet à Claude Code de se connecter à des services externes : bases de données, APIs, outils DevOps, et plus.",
+            "Les hooks permettent d'exécuter des commandes shell automatiquement avant ou après les actions de Claude Code."
+          ],
+          "answer": 0,
+          "why": "La section « 3. Session client-only qui ne suit pas en SSR » précise : Tu utilises supabase.auth.getSession() côté serveur dans un Route Handler ?"
+        }
+      ],
+      "commands": [],
+      "resources": [
+        {
+          "title": "Debug avec Claude",
+          "href": "/wiki/workflows/debug-avec-claude"
+        },
+        {
+          "title": "Artifacts : publier une page",
+          "href": "/wiki/cli/artifacts"
+        },
+        {
+          "title": "Documentation officielle de Claude Code",
+          "href": "https://code.claude.com/docs/en/overview"
+        }
+      ],
+      "practice": {
+        "title": "Construire une fiche de diagnostic reproductible",
+        "description": "Reprenez les exemples de la leçon « Debug : pourquoi 'This page couldn't load' ? » sur un petit projet ou dans un dossier de test. Conservez le résultat et les vérifications effectuées.",
+        "success": "La fiche relie chaque symptôme à un contrôle des variables, de l’accès ou de la session avant correction."
+      },
+      "minutes": 20
+    }
+  }
+}

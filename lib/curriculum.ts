@@ -1,3 +1,5 @@
+import type { MiniQuestion } from "./article-quizzes";
+import { applyCurriculumDetails } from "./curriculum-details";
 import { extraModules } from "./modules/_index";
 
 export interface CodeExample {
@@ -20,7 +22,22 @@ export interface Exercise {
   hint: string;
 }
 
+export type LearningLevel = "débutant" | "intermédiaire" | "avancé";
+export interface LearningResource { title: string; href: string }
+export interface LessonCommand { command: string; description: string }
+export interface Practice { title: string; description: string; success: string }
+export interface ModuleProject extends Practice { steps: string[] }
+
 export interface Lesson {
+  level?: LearningLevel;
+  objectives?: string[];
+  prerequisites?: string[];
+  takeaways?: string[];
+  quiz?: MiniQuestion[];
+  commands?: LessonCommand[];
+  resources?: LearningResource[];
+  practice?: Practice;
+  minutes?: number;
   id: string;
   title: string;
   duration: string;
@@ -41,6 +58,10 @@ export interface LessonSection {
 }
 
 export interface Module {
+  level?: LearningLevel;
+  outcome?: string;
+  minutes?: number;
+  project?: ModuleProject;
   id: string;
   title: string;
   emoji: string;
@@ -2356,6 +2377,7 @@ cd projet && git checkout fix/bugs && claude
 
 // Merge in extra modules from lib/modules/
 curriculum.push(...extraModules);
+applyCurriculumDetails(curriculum);
 
 export const totalLessons = curriculum.reduce(
   (acc, mod) => acc + mod.lessons.length,
