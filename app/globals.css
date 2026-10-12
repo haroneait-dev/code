@@ -1,4 +1,3 @@
-@import "highlight.js/styles/github.css";
 
 @tailwind base;
 @tailwind components;
@@ -23,6 +22,17 @@
 
   /* Couleurs du thème (canaux RGB), redéfinies en mode sombre */
   :root {
+    /* Six tailles : display 38/64, h1 32/48, h2 26/34,
+       h3 21/24, corps 17/17, petit 14/14 (mobile/desktop).
+       Deux rythmes de section : normal 48/64, compact 24/32. */
+    --type-display: 2.375rem;
+    --type-h1: 2rem;
+    --type-h2: 1.625rem;
+    --type-h3: 1.3125rem;
+    --type-body: 1.0625rem;
+    --type-small: 0.875rem;
+    --space-section: 3rem;
+    --space-compact: 1.5rem;
     --c-surface: 251 246 238;
     --c-surface-dim: 230 220 205;
     --c-surface-bright: 255 252 247;
@@ -198,30 +208,25 @@
     background-color: rgb(var(--c-surface-container-lowest));
   }
 
-  .btn-primary {
-    background-color: #2f5d46;
-    color: #fffcf7;
-    box-shadow: 0 2px 0 rgb(var(--c-green-deep));
-    transition: background-color 0.15s ease, transform 0.15s ease,
-      box-shadow 0.15s ease;
+  /* Boutons : géométrie commune, 48 px de hauteur minimum. */
+  .btn-primary, .btn-secondary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    min-height: 48px;
+    padding: 0.625rem 1.25rem;
+    border-radius: 0.375rem;
+    border: 1px solid transparent;
+    font-size: var(--type-small);
+    font-weight: 600;
+    line-height: 1.6;
+    transition: background-color 0.15s ease, border-color 0.15s ease;
   }
-  .btn-primary:hover {
-    background-color: #284f3c;
-  }
-  .btn-primary:active {
-    transform: translateY(2px);
-    box-shadow: 0 0 0 rgb(var(--c-green-deep));
-  }
-
-  .btn-secondary {
-    background-color: rgb(var(--c-surface-container-lowest));
-    border: 1.5px solid rgb(var(--c-on-surface));
-    color: rgb(var(--c-on-surface));
-    transition: background-color 0.15s ease;
-  }
-  .btn-secondary:hover {
-    background-color: rgb(var(--c-mark));
-  }
+  .btn-primary { background: rgb(var(--c-primary)); color: rgb(var(--c-on-primary)); }
+  .btn-primary:hover { background: rgb(var(--c-primary-container)); color: rgb(var(--c-on-primary-container)); }
+  .btn-secondary { background: rgb(var(--c-surface-container-lowest)); border-color: rgb(var(--c-outline)); color: rgb(var(--c-on-surface)); }
+  .btn-secondary:hover { background: rgb(var(--c-surface-container)); }
 
   /* Étiquette façon post-it, légèrement de travers */
   .tag-note {
@@ -229,11 +234,11 @@
     background: rgb(var(--c-mark));
     color: rgb(var(--c-on-primary-fixed));
     font-family: var(--font-jbm), ui-monospace, monospace;
-    font-size: 12px;
+    font-size: var(--type-small);
     letter-spacing: 0.02em;
     padding: 4px 10px;
-    border-radius: 3px;
-    transform: rotate(-1.5deg);
+    border-radius: 0.375rem;
+
   }
 }
 
@@ -257,7 +262,7 @@
     50%, 100% { opacity: 0; }
   }
   .animate-caret {
-    animation: caret 1s steps(1) infinite;
+    animation: none;
   }
 
   .paper-grid {
@@ -299,7 +304,10 @@
 }
 
 /* Mode sombre : coloration du code */
-.dark .hljs { background: #241d18; color: #f2e9dc; }
+.hljs { background: rgb(var(--c-surface-container-low)); color: rgb(var(--c-on-surface)); }
+.hljs-comment, .hljs-quote { color: rgb(var(--c-on-surface-variant)); }
+.hljs-keyword, .hljs-selector-tag, .hljs-title { color: rgb(var(--c-primary)); font-weight: 600; }
+.hljs-string, .hljs-number, .hljs-literal { color: rgb(var(--c-secondary)); }
 
 /* Schémas dans les articles */
 .prose-claude img {
@@ -351,7 +359,7 @@
   to { transform: none; }
 }
 .cm-page-enter {
-  animation: cm-page-enter 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+  animation: fade-in 0.18s ease;
 }
 @media (prefers-reduced-motion: reduce) {
   .cm-page-enter { animation: none; }
@@ -361,43 +369,40 @@
 @keyframes cm-line-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
 .cm-line-in { animation: cm-line-in 0.25s ease-out; }
 @keyframes cm-float { 0%, 100% { transform: translateY(0) rotate(0deg); } 50% { transform: translateY(-8px) rotate(-1.5deg); } }
-.cm-float { animation: cm-float 5s ease-in-out infinite; }
+.cm-float { animation: none; }
 @media (prefers-reduced-motion: reduce) { .cm-line-in, .cm-float { animation: none; } }
 
-/* Rideau de transition entre les pages (PageCurtain) */
-.cm-curtain { position: fixed; inset: 0; z-index: 200; pointer-events: none; }
-.cm-curtain-a, .cm-curtain-b { position: absolute; inset: 0; transform: translateY(100%); }
-.cm-curtain-a { background: #f2b23e; }
-.cm-curtain-b { background: #2f5d46; display: flex; align-items: center; justify-content: center; }
-.cm-curtain-logo {
-  width: 84px; height: 84px; border-radius: 18px; background: #fbf6ee; color: #2f5d46;
-  display: flex; align-items: center; justify-content: center;
-  font: 800 34px/1 ui-monospace, "JetBrains Mono", monospace; transform: rotate(-6deg) scale(0.6); opacity: 0;
-}
-.cm-curtain-cover .cm-curtain-a { animation: cm-cur-in 0.42s cubic-bezier(0.7, 0, 0.2, 1) forwards; }
-.cm-curtain-cover .cm-curtain-b { animation: cm-cur-in 0.42s cubic-bezier(0.7, 0, 0.2, 1) 0.07s forwards; }
-.cm-curtain-cover .cm-curtain-logo, .cm-curtain-hold .cm-curtain-logo { animation: cm-logo-pop 0.4s cubic-bezier(0.3, 1.6, 0.5, 1) 0.3s forwards; }
-.cm-curtain-hold .cm-curtain-a, .cm-curtain-hold .cm-curtain-b { transform: none; }
-.cm-curtain-hold .cm-curtain-logo { animation: cm-logo-pop 0.3s forwards, cm-logo-wait 0.9s ease-in-out 0.3s infinite; }
-.cm-curtain-reveal .cm-curtain-b { transform: none; animation: cm-cur-out 0.55s cubic-bezier(0.7, 0, 0.2, 1) forwards; }
-.cm-curtain-reveal .cm-curtain-a { transform: none; animation: cm-cur-out 0.55s cubic-bezier(0.7, 0, 0.2, 1) 0.08s forwards; }
-.cm-curtain-reveal .cm-curtain-logo { opacity: 1; transform: rotate(-6deg); }
-@keyframes cm-cur-in { from { transform: translateY(100%); } to { transform: none; } }
-@keyframes cm-cur-out { from { transform: none; } to { transform: translateY(-100%); } }
-@keyframes cm-logo-pop { to { opacity: 1; transform: rotate(-6deg) scale(1); } }
-@keyframes cm-logo-wait { 50% { transform: rotate(6deg) scale(1.06); } }
+/* PageCurtain est une fine barre, jamais un obstacle à la navigation. */
+.cm-route-progress { position: fixed; inset: 0 0 auto; height: 2px; background: rgb(var(--c-primary)); z-index: 100; pointer-events: none; animation: fade-in 0.15s ease; }
 
 /* Motion design au défilement (ScrollFX) */
 .cm-mark { background-size: 0% 100%; background-repeat: no-repeat; transition: background-size 0.75s cubic-bezier(0.65, 0, 0.25, 1); }
 .cm-mark.cm-in { background-size: 100% 100%; }
-.cm-reveal { opacity: 0; transform: translateY(28px) rotate(-0.6deg); }
+.cm-reveal { opacity: 0; transform: translateY(12px); }
 .cm-reveal.cm-in {
   opacity: 1; transform: none;
-  transition: opacity 0.6s ease, transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
-  transition-delay: calc(var(--cm-i, 0) * 70ms);
+  transition: opacity 0.4s ease, transform 0.4s ease;
+  transition-delay: 0ms;
 }
 @media (prefers-reduced-motion: reduce) {
   .cm-curtain { display: none; }
   .cm-mark { background-size: 100% 100%; }
   .cm-reveal { opacity: 1; transform: none; }
+}
+
+@media (min-width: 768px) {
+  :root { --type-display: 4rem; --type-h1: 3rem; --type-h2: 2.125rem; --type-h3: 1.5rem; --space-section: 4rem; --space-compact: 2rem; }
+}
+/* Articles et leçons : 70 caractères, interligne 1,7 et code défilable. */
+.prose-claude, .lesson-content { max-width: 70ch; line-height: 1.7; overflow-wrap: anywhere; }
+.prose-claude h2, .lesson-content h2 { margin-top: 3rem; }
+.prose-claude pre, .lesson-content pre { max-width: 100%; overflow-x: auto; overflow-wrap: normal; }
+.prose-claude table, .lesson-content table { min-width: 32rem; }
+main { min-width: 0; }
+button, input:not([type="checkbox"]), select, summary { min-height: 44px; }
+button { touch-action: manipulation; }
+header a, footer a { min-height: 44px; display: inline-flex; align-items: center; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+  .cm-route-progress { display: none; }
 }
