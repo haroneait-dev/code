@@ -1,0 +1,908 @@
+[
+  {
+    "route": "/",
+    "width": 390,
+    "theme": "light",
+    "status": 200,
+    "overflow": false,
+    "h1": [
+      {
+        "text": "Apprendre Claude et Claude Code, en français.",
+        "size": "42px"
+      }
+    ],
+    "offenders": [],
+    "errors": [],
+    "file": "accueil-390-light.jpg"
+  },
+  {
+    "route": "/claude",
+    "width": 390,
+    "theme": "light",
+    "status": 200,
+    "overflow": false,
+    "h1": [
+      {
+        "text": "Claude, l'assistant, expliqué de A à Z.",
+        "size": "40px"
+      }
+    ],
+    "offenders": [],
+    "errors": [],
+    "file": "claude-390-light.jpg"
+  },
+  {
+    "route": "/claude-code",
+    "width": 390,
+    "theme": "light",
+    "status": 200,
+    "overflow": false,
+    "h1": [
+      {
+        "text": "Claude Code, l'agent qui code avec vous.",
+        "size": "40px"
+      }
+    ],
+    "offenders": [],
+    "errors": [],
+    "file": "claude-code-390-light.jpg"
+  },
+  {
+    "route": "/learn",
+    "width": 390,
+    "theme": "light",
+    "status": 200,
+    "overflow": false,
+    "h1": [
+      {
+        "text": "De zéro à expert Claude Code.",
+        "size": "48px"
+      }
+    ],
+    "offenders": [],
+    "errors": [],
+    "file": "learn-390-light.jpg"
+  },
+  {
+    "route": "/learn/intro/chatting-vs-delegating",
+    "width": 390,
+    "theme": "light",
+    "status": 200,
+    "overflow": false,
+    "h1": [
+      {
+        "text": "Chatter vs Déléguer — le mindset qui change tout",
+        "size": "40px"
+      }
+    ],
+    "offenders": [
+      {
+        "tag": "CODE",
+        "class": ""
+      }
+    ],
+    "errors": [],
+    "file": "learn-intro-chatting-vs-delegating-390-light.jpg"
+  },
+  {
+    "route": "/wiki",
+    "width": 390,
+    "theme": "light",
+    "status": 200,
+    "overflow": false,
+    "h1": [
+      {
+        "text": "Tout le savoir, rangé.",
+        "size": "40px"
+      }
+    ],
+    "offenders": [],
+    "errors": [],
+    "file": "wiki-390-light.jpg"
+  },
+  {
+    "route": "/wiki/claude-bases/bien-demander",
+    "width": 390,
+    "theme": "light",
+    "status": 200,
+    "overflow": false,
+    "h1": [
+      {
+        "text": "Bien formuler ses demandes à Claude",
+        "size": "34px"
+      }
+    ],
+    "offenders": [],
+    "errors": [],
+    "file": "wiki-claude-bases-bien-demander-390-light.jpg"
+  },
+  {
+    "route": "/fiches",
+    "width": 390,
+    "theme": "light",
+    "status": 200,
+    "overflow": false,
+    "h1": [
+      {
+        "text": "Les fiches essentielles.",
+        "size": "48px"
+      }
+    ],
+    "offenders": [],
+    "errors": [],
+    "file": "fiches-390-light.jpg"
+  },
+  {
+    "route": "/applications",
+    "width": 390,
+    "theme": "light",
+    "status": 200,
+    "overflow": false,
+    "h1": [
+      {
+        "text": "Les applications à brancher sur Claude.",
+        "size": "40px"
+      }
+    ],
+    "offenders": [],
+    "errors": [],
+    "file": "applications-390-light.jpg"
+  },
+  {
+    "route": "/prompts",
+    "width": 390,
+    "theme": "light",
+    "status": 200,
+    "overflow": false,
+    "h1": [
+      {
+        "text": "Des prompts prêts à copier.",
+        "size": "40px"
+      }
+    ],
+    "offenders": [],
+    "errors": [],
+    "file": "prompts-390-light.jpg"
+  },
+  {
+    "route": "/test",
+    "width": 390,
+    "theme": "light",
+    "status": 200,
+    "overflow": false,
+    "h1": [
+      {
+        "text": "Par où commencer ?",
+        "size": "40px"
+      }
+    ],
+    "offenders": [],
+    "errors": [],
+    "file": "test-390-light.jpg"
+  },
+  {
+    "route": "/evolution",
+    "width": 390,
+    "theme": "light",
+    "status": 200,
+    "overflow": false,
+    "h1": [
+      {
+        "text": "L'évolution de Claude, en chiffres.",
+        "size": "40px"
+      }
+    ],
+    "offenders": [],
+    "errors": [],
+    "file": "evolution-390-light.jpg"
+  },
+  {
+    "route": "/choisir-modele",
+    "width": 390,
+    "theme": "light",
+    "status": 200,
+    "overflow": false,
+    "h1": [
+      {
+        "text": "Quel modèle Claude choisir ?",
+        "size": "40px"
+      }
+    ],
+    "offenders": [],
+    "errors": [],
+    "file": "choisir-modele-390-light.jpg"
+  },
+  {
+    "route": "/patch-notes",
+    "width": 390,
+    "theme": "light",
+    "status": 200,
+    "overflow": false,
+    "h1": [
+      {
+        "text": "Patch notes.",
+        "size": "40px"
+      }
+    ],
+    "offenders": [],
+    "errors": [],
+    "file": "patch-notes-390-light.jpg"
+  },
+  {
+    "route": "/",
+    "width": 390,
+    "theme": "dark",
+    "status": 200,
+    "overflow": false,
+    "h1": [
+      {
+        "text": "Apprendre Claude et Claude Code, en français.",
+        "size": "42px"
+      }
+    ],
+    "offenders": [],
+    "errors": [],
+    "file": "accueil-390-dark.jpg"
+  },
+  {
+    "route": "/claude",
+    "width": 390,
+    "theme": "dark",
+    "status": 200,
+    "overflow": false,
+    "h1": [
+      {
+        "text": "Claude, l'assistant, expliqué de A à Z.",
+        "size": "40px"
+      }
+    ],
+    "offenders": [],
+    "errors": [],
+    "file": "claude-390-dark.jpg"
+  },
+  {
+    "route": "/claude-code",
+    "width": 390,
+    "theme": "dark",
+    "status": 200,
+    "overflow": false,
+    "h1": [
+      {
+        "text": "Claude Code, l'agent qui code avec vous.",
+        "size": "40px"
+      }
+    ],
+    "offenders": [],
+    "errors": [],
+    "file": "claude-code-390-dark.jpg"
+  },
+  {
+    "route": "/learn",
+    "width": 390,
+    "theme": "dark",
+    "status": 200,
+    "overflow": false,
+    "h1": [
+      {
+        "text": "De zéro à expert Claude Code.",
+        "size": "48px"
+      }
+    ],
+    "offenders": [],
+    "errors": [],
+    "file": "learn-390-dark.jpg"
+  },
+  {
+    "route": "/learn/intro/chatting-vs-delegating",
+    "width": 390,
+    "theme": "dark",
+    "status": 200,
+    "overflow": false,
+    "h1": [
+      {
+        "text": "Chatter vs Déléguer — le mindset qui change tout",
+        "size": "40px"
+      }
+    ],
+    "offenders": [
+      {
+        "tag": "CODE",
+        "class": ""
+      }
+    ],
+    "errors": [],
+    "file": "learn-intro-chatting-vs-delegating-390-dark.jpg"
+  },
+  {
+    "route": "/wiki",
+    "width": 390,
+    "theme": "dark",
+    "status": 200,
+    "overflow": false,
+    "h1": [
+      {
+        "text": "Tout le savoir, rangé.",
+        "size": "40px"
+      }
+    ],
+    "offenders": [],
+    "errors": [],
+    "file": "wiki-390-dark.jpg"
+  },
+  {
+    "route": "/wiki/claude-bases/bien-demander",
+    "width": 390,
+    "theme": "dark",
+    "status": 200,
+    "overflow": false,
+    "h1": [
+      {
+        "text": "Bien formuler ses demandes à Claude",
+        "size": "34px"
+      }
+    ],
+    "offenders": [],
+    "errors": [],
+    "file": "wiki-claude-bases-bien-demander-390-dark.jpg"
+  },
+  {
+    "route": "/fiches",
+    "width": 390,
+    "theme": "dark",
+    "status": 200,
+    "overflow": false,
+    "h1": [
+      {
+        "text": "Les fiches essentielles.",
+        "size": "48px"
+      }
+    ],
+    "offenders": [],
+    "errors": [],
+    "file": "fiches-390-dark.jpg"
+  },
+  {
+    "route": "/applications",
+    "width": 390,
+    "theme": "dark",
+    "status": 200,
+    "overflow": false,
+    "h1": [
+      {
+        "text": "Les applications à brancher sur Claude.",
+        "size": "40px"
+      }
+    ],
+    "offenders": [],
+    "errors": [],
+    "file": "applications-390-dark.jpg"
+  },
+  {
+    "route": "/prompts",
+    "width": 390,
+    "theme": "dark",
+    "status": 200,
+    "overflow": false,
+    "h1": [
+      {
+        "text": "Des prompts prêts à copier.",
+        "size": "40px"
+      }
+    ],
+    "offenders": [],
+    "errors": [],
+    "file": "prompts-390-dark.jpg"
+  },
+  {
+    "route": "/test",
+    "width": 390,
+    "theme": "dark",
+    "status": 200,
+    "overflow": false,
+    "h1": [
+      {
+        "text": "Par où commencer ?",
+        "size": "40px"
+      }
+    ],
+    "offenders": [],
+    "errors": [],
+    "file": "test-390-dark.jpg"
+  },
+  {
+    "route": "/evolution",
+    "width": 390,
+    "theme": "dark",
+    "status": 200,
+    "overflow": false,
+    "h1": [
+      {
+        "text": "L'évolution de Claude, en chiffres.",
+        "size": "40px"
+      }
+    ],
+    "offenders": [],
+    "errors": [],
+    "file": "evolution-390-dark.jpg"
+  },
+  {
+    "route": "/choisir-modele",
+    "width": 390,
+    "theme": "dark",
+    "status": 200,
+    "overflow": false,
+    "h1": [
+      {
+        "text": "Quel modèle Claude choisir ?",
+        "size": "40px"
+      }
+    ],
+    "offenders": [],
+    "errors": [],
+    "file": "choisir-modele-390-dark.jpg"
+  },
+  {
+    "route": "/patch-notes",
+    "width": 390,
+    "theme": "dark",
+    "status": 200,
+    "overflow": false,
+    "h1": [
+      {
+        "text": "Patch notes.",
+        "size": "40px"
+      }
+    ],
+    "offenders": [],
+    "errors": [],
+    "file": "patch-notes-390-dark.jpg"
+  },
+  {
+    "route": "/",
+    "width": 1440,
+    "theme": "light",
+    "status": 200,
+    "overflow": false,
+    "h1": [
+      {
+        "text": "Apprendre Claude et Claude Code, en français.",
+        "size": "72px"
+      }
+    ],
+    "offenders": [],
+    "errors": [],
+    "file": "accueil-1440-light.jpg"
+  },
+  {
+    "route": "/claude",
+    "width": 1440,
+    "theme": "light",
+    "status": 200,
+    "overflow": false,
+    "h1": [
+      {
+        "text": "Claude, l'assistant, expliqué de A à Z.",
+        "size": "64px"
+      }
+    ],
+    "offenders": [],
+    "errors": [],
+    "file": "claude-1440-light.jpg"
+  },
+  {
+    "route": "/claude-code",
+    "width": 1440,
+    "theme": "light",
+    "status": 200,
+    "overflow": false,
+    "h1": [
+      {
+        "text": "Claude Code, l'agent qui code avec vous.",
+        "size": "64px"
+      }
+    ],
+    "offenders": [],
+    "errors": [],
+    "file": "claude-code-1440-light.jpg"
+  },
+  {
+    "route": "/learn",
+    "width": 1440,
+    "theme": "light",
+    "status": 200,
+    "overflow": false,
+    "h1": [
+      {
+        "text": "De zéro à expert Claude Code.",
+        "size": "64px"
+      }
+    ],
+    "offenders": [],
+    "errors": [],
+    "file": "learn-1440-light.jpg"
+  },
+  {
+    "route": "/learn/intro/chatting-vs-delegating",
+    "width": 1440,
+    "theme": "light",
+    "status": 200,
+    "overflow": false,
+    "h1": [
+      {
+        "text": "Chatter vs Déléguer — le mindset qui change tout",
+        "size": "48px"
+      }
+    ],
+    "offenders": [],
+    "errors": [],
+    "file": "learn-intro-chatting-vs-delegating-1440-light.jpg"
+  },
+  {
+    "route": "/wiki",
+    "width": 1440,
+    "theme": "light",
+    "status": 200,
+    "overflow": false,
+    "h1": [
+      {
+        "text": "Tout le savoir, rangé.",
+        "size": "64px"
+      }
+    ],
+    "offenders": [],
+    "errors": [],
+    "file": "wiki-1440-light.jpg"
+  },
+  {
+    "route": "/wiki/claude-bases/bien-demander",
+    "width": 1440,
+    "theme": "light",
+    "status": 200,
+    "overflow": false,
+    "h1": [
+      {
+        "text": "Bien formuler ses demandes à Claude",
+        "size": "48px"
+      }
+    ],
+    "offenders": [],
+    "errors": [],
+    "file": "wiki-claude-bases-bien-demander-1440-light.jpg"
+  },
+  {
+    "route": "/fiches",
+    "width": 1440,
+    "theme": "light",
+    "status": 200,
+    "overflow": false,
+    "h1": [
+      {
+        "text": "Les fiches essentielles.",
+        "size": "64px"
+      }
+    ],
+    "offenders": [],
+    "errors": [],
+    "file": "fiches-1440-light.jpg"
+  },
+  {
+    "route": "/applications",
+    "width": 1440,
+    "theme": "light",
+    "status": 200,
+    "overflow": false,
+    "h1": [
+      {
+        "text": "Les applications à brancher sur Claude.",
+        "size": "64px"
+      }
+    ],
+    "offenders": [],
+    "errors": [],
+    "file": "applications-1440-light.jpg"
+  },
+  {
+    "route": "/prompts",
+    "width": 1440,
+    "theme": "light",
+    "status": 200,
+    "overflow": false,
+    "h1": [
+      {
+        "text": "Des prompts prêts à copier.",
+        "size": "64px"
+      }
+    ],
+    "offenders": [],
+    "errors": [],
+    "file": "prompts-1440-light.jpg"
+  },
+  {
+    "route": "/test",
+    "width": 1440,
+    "theme": "light",
+    "status": 200,
+    "overflow": false,
+    "h1": [
+      {
+        "text": "Par où commencer ?",
+        "size": "60px"
+      }
+    ],
+    "offenders": [],
+    "errors": [],
+    "file": "test-1440-light.jpg"
+  },
+  {
+    "route": "/evolution",
+    "width": 1440,
+    "theme": "light",
+    "status": 200,
+    "overflow": false,
+    "h1": [
+      {
+        "text": "L'évolution de Claude, en chiffres.",
+        "size": "64px"
+      }
+    ],
+    "offenders": [],
+    "errors": [],
+    "file": "evolution-1440-light.jpg"
+  },
+  {
+    "route": "/choisir-modele",
+    "width": 1440,
+    "theme": "light",
+    "status": 200,
+    "overflow": false,
+    "h1": [
+      {
+        "text": "Quel modèle Claude choisir ?",
+        "size": "60px"
+      }
+    ],
+    "offenders": [],
+    "errors": [],
+    "file": "choisir-modele-1440-light.jpg"
+  },
+  {
+    "route": "/patch-notes",
+    "width": 1440,
+    "theme": "light",
+    "status": 200,
+    "overflow": false,
+    "h1": [
+      {
+        "text": "Patch notes.",
+        "size": "64px"
+      }
+    ],
+    "offenders": [],
+    "errors": [],
+    "file": "patch-notes-1440-light.jpg"
+  },
+  {
+    "route": "/",
+    "width": 1440,
+    "theme": "dark",
+    "status": 200,
+    "overflow": false,
+    "h1": [
+      {
+        "text": "Apprendre Claude et Claude Code, en français.",
+        "size": "72px"
+      }
+    ],
+    "offenders": [],
+    "errors": [],
+    "file": "accueil-1440-dark.jpg"
+  },
+  {
+    "route": "/claude",
+    "width": 1440,
+    "theme": "dark",
+    "status": 200,
+    "overflow": false,
+    "h1": [
+      {
+        "text": "Claude, l'assistant, expliqué de A à Z.",
+        "size": "64px"
+      }
+    ],
+    "offenders": [],
+    "errors": [],
+    "file": "claude-1440-dark.jpg"
+  },
+  {
+    "route": "/claude-code",
+    "width": 1440,
+    "theme": "dark",
+    "status": 200,
+    "overflow": false,
+    "h1": [
+      {
+        "text": "Claude Code, l'agent qui code avec vous.",
+        "size": "64px"
+      }
+    ],
+    "offenders": [],
+    "errors": [],
+    "file": "claude-code-1440-dark.jpg"
+  },
+  {
+    "route": "/learn",
+    "width": 1440,
+    "theme": "dark",
+    "status": 200,
+    "overflow": false,
+    "h1": [
+      {
+        "text": "De zéro à expert Claude Code.",
+        "size": "64px"
+      }
+    ],
+    "offenders": [],
+    "errors": [],
+    "file": "learn-1440-dark.jpg"
+  },
+  {
+    "route": "/learn/intro/chatting-vs-delegating",
+    "width": 1440,
+    "theme": "dark",
+    "status": 200,
+    "overflow": false,
+    "h1": [
+      {
+        "text": "Chatter vs Déléguer — le mindset qui change tout",
+        "size": "48px"
+      }
+    ],
+    "offenders": [],
+    "errors": [],
+    "file": "learn-intro-chatting-vs-delegating-1440-dark.jpg"
+  },
+  {
+    "route": "/wiki",
+    "width": 1440,
+    "theme": "dark",
+    "status": 200,
+    "overflow": false,
+    "h1": [
+      {
+        "text": "Tout le savoir, rangé.",
+        "size": "64px"
+      }
+    ],
+    "offenders": [],
+    "errors": [],
+    "file": "wiki-1440-dark.jpg"
+  },
+  {
+    "route": "/wiki/claude-bases/bien-demander",
+    "width": 1440,
+    "theme": "dark",
+    "status": 200,
+    "overflow": false,
+    "h1": [
+      {
+        "text": "Bien formuler ses demandes à Claude",
+        "size": "48px"
+      }
+    ],
+    "offenders": [],
+    "errors": [],
+    "file": "wiki-claude-bases-bien-demander-1440-dark.jpg"
+  },
+  {
+    "route": "/fiches",
+    "width": 1440,
+    "theme": "dark",
+    "status": 200,
+    "overflow": false,
+    "h1": [
+      {
+        "text": "Les fiches essentielles.",
+        "size": "64px"
+      }
+    ],
+    "offenders": [],
+    "errors": [],
+    "file": "fiches-1440-dark.jpg"
+  },
+  {
+    "route": "/applications",
+    "width": 1440,
+    "theme": "dark",
+    "status": 200,
+    "overflow": false,
+    "h1": [
+      {
+        "text": "Les applications à brancher sur Claude.",
+        "size": "64px"
+      }
+    ],
+    "offenders": [],
+    "errors": [],
+    "file": "applications-1440-dark.jpg"
+  },
+  {
+    "route": "/prompts",
+    "width": 1440,
+    "theme": "dark",
+    "status": 200,
+    "overflow": false,
+    "h1": [
+      {
+        "text": "Des prompts prêts à copier.",
+        "size": "64px"
+      }
+    ],
+    "offenders": [],
+    "errors": [],
+    "file": "prompts-1440-dark.jpg"
+  },
+  {
+    "route": "/test",
+    "width": 1440,
+    "theme": "dark",
+    "status": 200,
+    "overflow": false,
+    "h1": [
+      {
+        "text": "Par où commencer ?",
+        "size": "60px"
+      }
+    ],
+    "offenders": [],
+    "errors": [],
+    "file": "test-1440-dark.jpg"
+  },
+  {
+    "route": "/evolution",
+    "width": 1440,
+    "theme": "dark",
+    "status": 200,
+    "overflow": false,
+    "h1": [
+      {
+        "text": "L'évolution de Claude, en chiffres.",
+        "size": "64px"
+      }
+    ],
+    "offenders": [],
+    "errors": [],
+    "file": "evolution-1440-dark.jpg"
+  },
+  {
+    "route": "/choisir-modele",
+    "width": 1440,
+    "theme": "dark",
+    "status": 200,
+    "overflow": false,
+    "h1": [
+      {
+        "text": "Quel modèle Claude choisir ?",
+        "size": "60px"
+      }
+    ],
+    "offenders": [],
+    "errors": [],
+    "file": "choisir-modele-1440-dark.jpg"
+  },
+  {
+    "route": "/patch-notes",
+    "width": 1440,
+    "theme": "dark",
+    "status": 200,
+    "overflow": false,
+    "h1": [
+      {
+        "text": "Patch notes.",
+        "size": "64px"
+      }
+    ],
+    "offenders": [],
+    "errors": [],
+    "file": "patch-notes-1440-dark.jpg"
+  }
+]
